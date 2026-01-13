@@ -28,7 +28,7 @@ program
   .option("--no-tanstack-start", "Exclude TanStack Start app (default)")
   .option(
     "--integrations <list>",
-    "Comma-separated list of integrations (sentry,posthog,stripe,email,realtime,storage)",
+    "Comma-separated list of integrations (sentry,posthog,stripe,revenuecat,notifications,email,realtime,storage)",
   )
   .option("--email-provider <provider>", "Email provider (resend, sendgrid)")
   .option("--realtime-provider <provider>", "Realtime provider (pusher, ably)")
@@ -93,6 +93,8 @@ function parseIntegrations(
     sentry: set.has("sentry"),
     posthog: set.has("posthog"),
     stripe: set.has("stripe"),
+    revenuecat: set.has("revenuecat"),
+    notifications: set.has("notifications"),
     email: {
       enabled: set.has("email"),
       provider: set.has("email")

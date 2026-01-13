@@ -191,7 +191,9 @@ async function promptCustomIntegrations(): Promise<IntegrationConfig> {
     options: [
       { value: "sentry", label: "Sentry (monitoring)", hint: "recommended" },
       { value: "posthog", label: "PostHog (analytics)", hint: "recommended" },
-      { value: "stripe", label: "Stripe (payments)" },
+      { value: "stripe", label: "Stripe (payments)", hint: "web" },
+      { value: "revenuecat", label: "RevenueCat (mobile IAP)", hint: "mobile" },
+      { value: "notifications", label: "Push Notifications", hint: "mobile" },
       { value: "email", label: "Email" },
       { value: "realtime", label: "Realtime" },
       { value: "storage", label: "Storage" },
@@ -250,6 +252,8 @@ async function promptCustomIntegrations(): Promise<IntegrationConfig> {
     sentry: selectedSet.has("sentry"),
     posthog: selectedSet.has("posthog"),
     stripe: selectedSet.has("stripe"),
+    revenuecat: selectedSet.has("revenuecat"),
+    notifications: selectedSet.has("notifications"),
     email: { enabled: selectedSet.has("email"), provider: emailProvider },
     realtime: {
       enabled: selectedSet.has("realtime"),
