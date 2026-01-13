@@ -1,0 +1,366 @@
+name: CLI E2E Tests
+
+on:
+  # Run on release branches
+  push:
+    branches:
+      - main
+      - release/*
+    paths:
+      - "packages/create-gmacko-app/**"
+      - ".github/workflows/cli-e2e.yml"
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      keep_test_apps:
+        description: "Keep test apps for debugging"
+        type: boolean
+        default: false
+  # Run nightly
+  schedule:
+    - cron: "0 2 * * *" # 2 AM UTC daily
+
+concurrency:
+  group: cli-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-cli:
+    name: Build CLI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build CLI
+        run: pnpm --filter create-gmacko-app build
+
+      - name: Upload CLI dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-dist
+          path: packages/create-gmacko-app/dist
+          retention-days: 1
+
+  e2e-default:
+    name: E2E - Default Config
+    needs: build-cli
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download CLI dist
+        uses: actions/download-artifact@v4
+        with:
+          name: cli-dist
+          path: packages/create-gmacko-app/dist
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install CLI dependencies
+        run: pnpm --filter create-gmacko-app install
+
+      - name: Scaffold app
+        run: |
+          mkdir -p /tmp/e2e-test
+          node packages/create-gmacko-app/dist/index.js test-app-default \
+            --yes --no-git \
+            2>&1 || true
+        working-directory: /tmp/e2e-test
+        env:
+          CI: "true"
+
+      - name: Create mock .env
+        run: |
+          cat > .env << 'EOF'
+          DATABASE_URL="postgresql://test:test@localhost:5432/test"
+          AUTH_SECRET="test-secret-key-for-testing-only"
+          AUTH_URL="http://localhost:3000"
+          NEXT_PUBLIC_APP_URL="http://localhost:3000"
+          EOF
+        working-directory: /tmp/e2e-test/test-app-default
+
+      - name: Run typecheck
+        run: pnpm typecheck
+        working-directory: /tmp/e2e-test/test-app-default
+
+      - name: Run lint
+        run: pnpm lint
+        working-directory: /tmp/e2e-test/test-app-default
+
+      - name: Run build
+        run: pnpm build
+        working-directory: /tmp/e2e-test/test-app-default
+
+  e2e-minimal:
+    name: E2E - Minimal (Web Only)
+    needs: build-cli
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download CLI dist
+        uses: actions/download-artifact@v4
+        with:
+          name: cli-dist
+          path: packages/create-gmacko-app/dist
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install CLI dependencies
+        run: pnpm --filter create-gmacko-app install
+
+      - name: Scaffold minimal app
+        run: |
+          mkdir -p /tmp/e2e-test
+          cd /tmp/e2e-test
+          node ${{ github.workspace }}/packages/create-gmacko-app/dist/index.js test-app-minimal \
+            --yes --no-git \
+            --no-mobile --no-ai --prune \
+            --integrations "" \
+            2>&1 || true
+        env:
+          CI: "true"
+
+      - name: Create mock .env
+        run: |
+          cat > .env << 'EOF'
+          DATABASE_URL="postgresql://test:test@localhost:5432/test"
+          AUTH_SECRET="test-secret-key-for-testing-only"
+          AUTH_URL="http://localhost:3000"
+          NEXT_PUBLIC_APP_URL="http://localhost:3000"
+          EOF
+        working-directory: /tmp/e2e-test/test-app-minimal
+
+      - name: Verify structure
+        run: |
+          test -d apps/nextjs || (echo "Missing apps/nextjs" && exit 1)
+          test ! -d apps/expo || (echo "apps/expo should not exist" && exit 1)
+          test ! -d packages/analytics || (echo "packages/analytics should not exist" && exit 1)
+          echo "Structure verified!"
+        working-directory: /tmp/e2e-test/test-app-minimal
+
+      - name: Run typecheck
+        run: pnpm typecheck
+        working-directory: /tmp/e2e-test/test-app-minimal
+
+      - name: Run build
+        run: pnpm build
+        working-directory: /tmp/e2e-test/test-app-minimal
+
+  e2e-custom-scope:
+    name: E2E - Custom Package Scope
+    needs: build-cli
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download CLI dist
+        uses: actions/download-artifact@v4
+        with:
+          name: cli-dist
+          path: packages/create-gmacko-app/dist
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install CLI dependencies
+        run: pnpm --filter create-gmacko-app install
+
+      - name: Scaffold with custom scope
+        run: |
+          mkdir -p /tmp/e2e-test
+          cd /tmp/e2e-test
+          node ${{ github.workspace }}/packages/create-gmacko-app/dist/index.js test-app-scope \
+            --yes --no-git \
+            --no-mobile --no-ai --prune \
+            --package-scope "@mycompany" \
+            --integrations "" \
+            2>&1 || true
+        env:
+          CI: "true"
+
+      - name: Create mock .env
+        run: |
+          cat > .env << 'EOF'
+          DATABASE_URL="postgresql://test:test@localhost:5432/test"
+          AUTH_SECRET="test-secret-key-for-testing-only"
+          AUTH_URL="http://localhost:3000"
+          NEXT_PUBLIC_APP_URL="http://localhost:3000"
+          EOF
+        working-directory: /tmp/e2e-test/test-app-scope
+
+      - name: Verify package scope
+        run: |
+          grep '"name": "@mycompany/api"' packages/api/package.json || (echo "Wrong scope in api" && exit 1)
+          grep '"name": "@mycompany/db"' packages/db/package.json || (echo "Wrong scope in db" && exit 1)
+          echo "Package scope verified!"
+        working-directory: /tmp/e2e-test/test-app-scope
+
+      - name: Run typecheck
+        run: pnpm typecheck
+        working-directory: /tmp/e2e-test/test-app-scope
+
+      - name: Run build
+        run: pnpm build
+        working-directory: /tmp/e2e-test/test-app-scope
+
+  e2e-full:
+    name: E2E - Full Config
+    needs: build-cli
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download CLI dist
+        uses: actions/download-artifact@v4
+        with:
+          name: cli-dist
+          path: packages/create-gmacko-app/dist
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install CLI dependencies
+        run: pnpm --filter create-gmacko-app install
+
+      - name: Scaffold full app
+        run: |
+          mkdir -p /tmp/e2e-test
+          cd /tmp/e2e-test
+          node ${{ github.workspace }}/packages/create-gmacko-app/dist/index.js test-app-full \
+            --yes --no-git \
+            --tanstack-start \
+            --integrations "sentry,posthog,stripe,email" \
+            --email-provider resend \
+            2>&1 || true
+        env:
+          CI: "true"
+
+      - name: Create mock .env
+        run: |
+          cat > .env << 'EOF'
+          DATABASE_URL="postgresql://test:test@localhost:5432/test"
+          AUTH_SECRET="test-secret-key-for-testing-only"
+          AUTH_URL="http://localhost:3000"
+          NEXT_PUBLIC_APP_URL="http://localhost:3000"
+          SENTRY_DSN="https://test@test.ingest.sentry.io/test"
+          NEXT_PUBLIC_POSTHOG_KEY="phc_test"
+          STRIPE_SECRET_KEY="sk_test_123"
+          RESEND_API_KEY="re_test_123"
+          EOF
+        working-directory: /tmp/e2e-test/test-app-full
+
+      - name: Verify structure
+        run: |
+          test -d apps/nextjs || (echo "Missing apps/nextjs" && exit 1)
+          test -d apps/expo || (echo "Missing apps/expo" && exit 1)
+          test -d apps/tanstack-start || (echo "Missing apps/tanstack-start" && exit 1)
+          test -d packages/monitoring || (echo "Missing packages/monitoring" && exit 1)
+          test -d packages/analytics || (echo "Missing packages/analytics" && exit 1)
+          test -d packages/payments || (echo "Missing packages/payments" && exit 1)
+          test -d packages/email || (echo "Missing packages/email" && exit 1)
+          echo "Structure verified!"
+        working-directory: /tmp/e2e-test/test-app-full
+
+      - name: Run typecheck
+        run: pnpm typecheck
+        working-directory: /tmp/e2e-test/test-app-full
+
+      - name: Run build
+        run: pnpm build
+        working-directory: /tmp/e2e-test/test-app-full
+
+  report:
+    name: Report Results
+    needs: [e2e-default, e2e-minimal, e2e-custom-scope, e2e-full]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          echo "## CLI E2E Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.e2e-default.result }}" == "success" ]; then
+            echo "- :white_check_mark: Default configuration" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- :x: Default configuration" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.e2e-minimal.result }}" == "success" ]; then
+            echo "- :white_check_mark: Minimal (web only)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- :x: Minimal (web only)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.e2e-custom-scope.result }}" == "success" ]; then
+            echo "- :white_check_mark: Custom package scope" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- :x: Custom package scope" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.e2e-full.result }}" == "success" ]; then
+            echo "- :white_check_mark: Full configuration" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- :x: Full configuration" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Fail if any test failed
+          if [ "${{ needs.e2e-default.result }}" != "success" ] || \
+             [ "${{ needs.e2e-minimal.result }}" != "success" ] || \
+             [ "${{ needs.e2e-custom-scope.result }}" != "success" ] || \
+             [ "${{ needs.e2e-full.result }}" != "success" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Some E2E tests failed!**" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**All E2E tests passed!** :tada:" >> $GITHUB_STEP_SUMMARY

@@ -14,7 +14,11 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:e2e:update": "vitest run --config vitest.e2e.config.ts --update"
   },
   "dependencies": {
     "@clack/prompts": "^0.9.1",
@@ -27,8 +31,10 @@
     "@types/fs-extra": "^11.0.4",
     "@types/node": "catalog:",
     "@types/validate-npm-package-name": "^4.0.2",
+    "execa": "^9.5.2",
     "tsup": "^8.5.0",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^3.2.3"
   },
   "publishConfig": {
     "access": "public"
