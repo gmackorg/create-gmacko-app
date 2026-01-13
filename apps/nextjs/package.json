@@ -4,12 +4,15 @@
   "type": "module",
   "scripts": {
     "build": "pnpm with-env next build",
-    "clean": "git clean -xdf .cache .next .turbo node_modules",
+    "clean": "git clean -xdf .cache .next .turbo node_modules playwright-report test-results",
     "dev": "pnpm with-env next dev",
     "format": "prettier --check . --ignore-path ../../.gitignore",
     "lint": "eslint --flag unstable_native_nodejs_ts_config",
     "start": "pnpm with-env next start",
     "typecheck": "tsc --noEmit",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:headed": "playwright test --headed",
     "with-env": "dotenv -e ../../.env --"
   },
   "dependencies": {
@@ -40,6 +43,7 @@
     "@gmacko/prettier-config": "workspace:*",
     "@gmacko/tailwind-config": "workspace:*",
     "@gmacko/tsconfig": "workspace:*",
+    "@playwright/test": "^1.52.0",
     "@types/node": "catalog:",
     "@types/react": "catalog:react19",
     "@types/react-dom": "catalog:react19",

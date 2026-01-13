@@ -9,9 +9,11 @@
   },
   "license": "MIT",
   "scripts": {
-    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "clean": "git clean -xdf .cache .turbo dist node_modules coverage",
     "format": "prettier --check . --ignore-path ../../.gitignore",
     "lint": "eslint --flag unstable_native_nodejs_ts_config",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -21,9 +23,11 @@
     "@gmacko/eslint-config": "workspace:*",
     "@gmacko/prettier-config": "workspace:*",
     "@gmacko/tsconfig": "workspace:*",
+    "@gmacko/vitest-config": "workspace:*",
     "eslint": "catalog:",
     "prettier": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^3.2.3"
   },
   "prettier": "@gmacko/prettier-config"
 }
