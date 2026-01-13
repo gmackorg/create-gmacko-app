@@ -1,0 +1,85 @@
+# Posts CRUD Flow
+# Tests creating, reading, and deleting posts
+
+appId: ${APP_ID}
+
+---
+# Launch app (assumes signed in)
+- launchApp
+
+# Navigate to posts section
+- tapOn:
+    text: "Posts|Feed|Home"
+    regex: true
+    optional: true
+
+# Wait for posts to load
+- assertVisible:
+    text: "Posts|No posts|Loading"
+    regex: true
+    timeout: 10000
+
+# Take initial screenshot
+- takeScreenshot: posts-initial
+
+# Create a new post
+- tapOn:
+    text: "Create|New|Add|\\+"
+    regex: true
+    optional: true
+
+- tapOn:
+    id: "create-post-button"
+    optional: true
+
+# Fill in post form (if create screen appeared)
+- runFlow:
+    when:
+      visible:
+        text: "Title|Create Post|New Post"
+        regex: true
+    commands:
+      # Enter title
+      - tapOn:
+          text: "Title"
+          optional: true
+      - inputText: "Test Post from Maestro"
+
+      # Enter content
+      - tapOn:
+          text: "Content|Description|Body"
+          regex: true
+          optional: true
+      - inputText: "This is a test post created by Maestro E2E tests"
+
+      # Submit
+      - tapOn:
+          text: "Create|Submit|Save|Post"
+          regex: true
+
+      # Wait for success
+      - assertVisible:
+          text: "Test Post from Maestro|Success|Created"
+          regex: true
+          timeout: 10000
+
+# Take screenshot of result
+- takeScreenshot: posts-after-create
+
+# Delete the test post (cleanup)
+- tapOn:
+    text: "Test Post from Maestro"
+    optional: true
+
+- tapOn:
+    text: "Delete|Remove|Trash"
+    regex: true
+    optional: true
+
+- tapOn:
+    text: "Confirm|Yes|Delete"
+    regex: true
+    optional: true
+
+# Final screenshot
+- takeScreenshot: posts-after-delete

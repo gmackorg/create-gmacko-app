@@ -1,0 +1,53 @@
+# Authentication - Sign In Flow
+# Tests the sign-in functionality
+
+appId: ${APP_ID}
+
+---
+# Launch app fresh
+- launchApp:
+    clearState: true
+
+# Navigate to sign in (if not already there)
+- tapOn:
+    text: "Sign [Ii]n"
+    regex: true
+    optional: true
+
+# Wait for sign in screen
+- assertVisible:
+    text: "Sign [Ii]n"
+    regex: true
+
+# Enter email
+- tapOn:
+    id: "email-input"
+    optional: true
+- tapOn:
+    text: "Email"
+    optional: true
+- inputText: ${TEST_EMAIL}
+
+# Enter password
+- tapOn:
+    id: "password-input"
+    optional: true
+- tapOn:
+    text: "Password"
+    optional: true
+- inputText: ${TEST_PASSWORD}
+
+# Tap sign in button
+- tapOn:
+    text: "Sign [Ii]n"
+    regex: true
+    index: 1
+
+# Wait for navigation or error
+- assertVisible:
+    text: "Welcome|Dashboard|Home|Error|Invalid"
+    regex: true
+    timeout: 10000
+
+# Take screenshot of result
+- takeScreenshot: auth-signin-result

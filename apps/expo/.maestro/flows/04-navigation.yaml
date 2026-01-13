@@ -1,0 +1,44 @@
+# Navigation Flow
+# Tests basic navigation between screens
+
+appId: ${APP_ID}
+
+---
+# Launch app
+- launchApp
+
+# Test tab navigation (if using tab bar)
+- runFlow:
+    when:
+      visible:
+        id: "tab-bar"
+    commands:
+      # Tap Home tab
+      - tapOn:
+          id: "tab-home"
+          optional: true
+      - tapOn:
+          text: "Home"
+          optional: true
+
+      # Take screenshot
+      - takeScreenshot: nav-home
+
+      # Tap another tab (e.g., Profile)
+      - tapOn:
+          id: "tab-profile"
+          optional: true
+      - tapOn:
+          text: "Profile"
+          optional: true
+
+      # Take screenshot
+      - takeScreenshot: nav-profile
+
+# Test back navigation
+- back
+- takeScreenshot: nav-back
+
+# Test deep link navigation (if supported)
+- openLink: ${APP_SCHEME:-gmacko}://home
+- takeScreenshot: nav-deeplink

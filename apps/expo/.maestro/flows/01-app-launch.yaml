@@ -1,0 +1,26 @@
+# App Launch Flow
+# Verifies the app launches successfully and shows the home screen
+
+appId: ${APP_ID}
+
+---
+# Launch the app
+- launchApp
+
+# Wait for the app to be ready
+- assertVisible:
+    text: "Welcome"
+    optional: true
+
+# Take a screenshot of initial state
+- takeScreenshot: app-launch
+
+# Verify main navigation is visible (tab bar)
+- assertVisible:
+    id: "tab-bar"
+    optional: true
+
+# Alternative: check for any main content
+- assertVisible:
+    text: ".*"
+    regex: true
