@@ -29,6 +29,12 @@ export const integrations = {
     enabled: false,
     provider: "none" as "uploadthing" | "none",
   },
+
+  // Internationalization (default OFF)
+  i18n: false,
+
+  // OpenAPI documentation (default OFF)
+  openapi: false,
 } as const;
 
 export type Integrations = typeof integrations;
@@ -41,3 +47,5 @@ export const isNotificationsEnabled = () => integrations.notifications;
 export const isEmailEnabled = () => integrations.email.enabled;
 export const isRealtimeEnabled = () => integrations.realtime.enabled;
 export const isStorageEnabled = () => integrations.storage.enabled;
+export const isI18nEnabled = () => integrations.i18n;
+export const isOpenApiEnabled = () => integrations.openapi;

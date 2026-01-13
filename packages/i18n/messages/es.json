@@ -1,0 +1,28 @@
+{
+  "common": {
+    "loading": "Cargando...",
+    "error": "Ocurrio un error",
+    "retry": "Reintentar",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "back": "Atras",
+    "next": "Siguiente",
+    "submit": "Enviar",
+    "welcome": "Bienvenido"
+  },
+  "auth": {
+    "signIn": "Iniciar Sesion",
+    "signOut": "Cerrar Sesion",
+    "signUp": "Registrarse",
+    "email": "Correo electronico",
+    "password": "Contrasena",
+    "forgotPassword": "Olvidaste tu contrasena?"
+  },
+  "errors": {
+    "required": "Este campo es obligatorio",
+    "invalidEmail": "Correo electronico invalido",
+    "networkError": "Error de red. Por favor, intenta de nuevo."
+  }
+}

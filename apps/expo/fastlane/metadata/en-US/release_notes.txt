@@ -1,0 +1,3 @@
+What's New:
+- Bug fixes and performance improvements
+- New features coming soon!

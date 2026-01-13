@@ -96,4 +96,74 @@ export function resetUserNative(): void {
   posthogClient.reset();
 }
 
+export async function isFeatureEnabledNative(
+  flagKey: string,
+  defaultValue = false,
+): Promise<boolean> {
+  if (!integrations.posthog || !posthogClient) {
+    return defaultValue;
+  }
+  const value = await posthogClient.getFeatureFlag(flagKey);
+  return value === true || value === "true" || defaultValue;
+}
+
+export async function getFeatureFlagNative<T = string | boolean>(
+  flagKey: string,
+  defaultValue?: T,
+): Promise<T | undefined> {
+  if (!integrations.posthog || !posthogClient) {
+    return defaultValue;
+  }
+  const value = await posthogClient.getFeatureFlag(flagKey);
+  return (value as T) ?? defaultValue;
+}
+
+export async function getFeatureFlagPayloadNative<T = Record<string, unknown>>(
+  flagKey: string,
+): Promise<T | undefined> {
+  if (!integrations.posthog || !posthogClient) {
+    return undefined;
+  }
+  return (await posthogClient.getFeatureFlagPayload(flagKey)) as T | undefined;
+}
+
+export async function reloadFeatureFlagsNative(): Promise<void> {
+  if (!integrations.posthog || !posthogClient) {
+    return;
+  }
+  await posthogClient.reloadFeatureFlagsAsync();
+}
+
+export interface ExperimentNative {
+  key: string;
+  variant: string | boolean | undefined;
+  payload?: Record<string, unknown>;
+}
+
+export async function getExperimentNative(
+  experimentKey: string,
+): Promise<ExperimentNative> {
+  if (!integrations.posthog || !posthogClient) {
+    return { key: experimentKey, variant: undefined };
+  }
+  const [variant, payload] = await Promise.all([
+    posthogClient.getFeatureFlag(experimentKey),
+    posthogClient.getFeatureFlagPayload(experimentKey),
+  ]);
+  return {
+    key: experimentKey,
+    variant: variant as string | boolean | undefined,
+    payload: payload as Record<string, unknown> | undefined,
+  };
+}
+
+export function trackExperimentExposureNative(experimentKey: string): void {
+  if (!integrations.posthog || !posthogClient) {
+    return;
+  }
+  posthogClient.capture("$feature_flag_called", {
+    $feature_flag: experimentKey,
+  });
+}
+
 export { posthogClient };

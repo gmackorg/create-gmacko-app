@@ -96,4 +96,81 @@ export function resetUser(): void {
   posthog.reset();
 }
 
+// Feature Flags
+
+export function isFeatureEnabled(
+  flagKey: string,
+  defaultValue = false,
+): boolean {
+  if (!integrations.posthog) {
+    return defaultValue;
+  }
+  return posthog.isFeatureEnabled(flagKey) ?? defaultValue;
+}
+
+export function getFeatureFlag<T = string | boolean>(
+  flagKey: string,
+  defaultValue?: T,
+): T | undefined {
+  if (!integrations.posthog) {
+    return defaultValue;
+  }
+  return posthog.getFeatureFlag(flagKey) as T | undefined;
+}
+
+export function getFeatureFlagPayload<T = Record<string, unknown>>(
+  flagKey: string,
+): T | undefined {
+  if (!integrations.posthog) {
+    return undefined;
+  }
+  return posthog.getFeatureFlagPayload(flagKey) as T | undefined;
+}
+
+export function onFeatureFlags(callback: () => void): void {
+  if (!integrations.posthog) {
+    callback();
+    return;
+  }
+  posthog.onFeatureFlags(callback);
+}
+
+export function reloadFeatureFlags(): void {
+  if (!integrations.posthog) {
+    return;
+  }
+  posthog.reloadFeatureFlags();
+}
+
+// A/B Testing / Experiments
+
+export interface Experiment {
+  key: string;
+  variant: string | boolean | undefined;
+  payload?: Record<string, unknown>;
+}
+
+export function getExperiment(experimentKey: string): Experiment {
+  if (!integrations.posthog) {
+    return { key: experimentKey, variant: undefined };
+  }
+  return {
+    key: experimentKey,
+    variant: posthog.getFeatureFlag(experimentKey),
+    payload: posthog.getFeatureFlagPayload(experimentKey) as
+      | Record<string, unknown>
+      | undefined,
+  };
+}
+
+export function trackExperimentExposure(experimentKey: string): void {
+  if (!integrations.posthog) {
+    return;
+  }
+  posthog.capture("$feature_flag_called", {
+    $feature_flag: experimentKey,
+    $feature_flag_response: posthog.getFeatureFlag(experimentKey),
+  });
+}
+
 export { posthog };
