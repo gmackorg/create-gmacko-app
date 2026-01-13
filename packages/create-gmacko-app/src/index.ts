@@ -12,7 +12,7 @@ const program = new Command();
 program
   .name("create-gmacko-app")
   .description("Create a new Gmacko app with Next.js, Expo, tRPC, and more")
-  .version("0.1.0")
+  .version("0.1.1")
   .argument("<app-name>", "Name of the app to create")
   .option("--yes, -y", "Accept all defaults without prompting")
   .option("--prune", "Remove unused integration packages")
