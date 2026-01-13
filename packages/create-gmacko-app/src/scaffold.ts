@@ -93,20 +93,25 @@ export async function scaffold(options: CliOptions): Promise<void> {
 
   p.outro(pc.green("Scaffolding complete!"));
 
-  const shouldProvision = await p.confirm({
-    message: "Would you like to set up cloud services now?",
-    initialValue: true,
-  });
+  // Skip provisioning prompt in CI or non-interactive environments
+  const isInteractive = process.stdout.isTTY && !process.env.CI;
 
-  if (!p.isCancel(shouldProvision) && shouldProvision) {
-    await runProvisioning({
-      projectPath: targetDir,
-      appName: options.appName,
-      platforms: {
-        web: options.platforms.web,
-        mobile: options.platforms.mobile,
-      },
+  if (isInteractive) {
+    const shouldProvision = await p.confirm({
+      message: "Would you like to set up cloud services now?",
+      initialValue: true,
     });
+
+    if (!p.isCancel(shouldProvision) && shouldProvision) {
+      await runProvisioning({
+        projectPath: targetDir,
+        appName: options.appName,
+        platforms: {
+          web: options.platforms.web,
+          mobile: options.platforms.mobile,
+        },
+      });
+    }
   }
 
   console.log(`

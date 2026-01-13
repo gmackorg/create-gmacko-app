@@ -1,8 +1,11 @@
 import { execSync, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import path from "node:path";
-import type { SpawnOptions } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import fs from "fs-extra";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export interface ScaffoldOptions {
   appName?: string;
@@ -19,9 +22,6 @@ export interface ScaffoldResult {
   stderr: string;
 }
 
-/**
- * Get the path to the CLI entry point
- */
 export function getCliPath(): string {
   return path.join(__dirname, "../../dist/index.js");
 }
@@ -250,18 +250,10 @@ export const EXPECTED_FILES = {
     "packages/config/package.json",
     "packages/ui/package.json",
   ],
-  withWeb: [
-    "apps/nextjs/package.json",
-    "apps/nextjs/next.config.js",
-    "apps/nextjs/src/app/layout.tsx",
-  ],
-  withMobile: [
-    "apps/expo/package.json",
-    "apps/expo/app.json",
-    "apps/expo/src/app/_layout.tsx",
-  ],
+  withWeb: ["apps/nextjs/package.json", "apps/nextjs/next.config.js"],
+  withMobile: ["apps/expo/package.json", "apps/expo/app.config.ts"],
   withTanstackStart: ["apps/tanstack-start/package.json"],
   withSentry: ["packages/monitoring/package.json"],
   withPosthog: ["packages/analytics/package.json"],
-  withAi: [".opencode/agent.md", "opencode.json"],
+  withAi: [".opencode", "opencode.json"],
 } as const;

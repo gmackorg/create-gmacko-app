@@ -60,7 +60,7 @@ program
       if (opts.tanstackStart !== undefined)
         options.platforms.tanstackStart = opts.tanstackStart === true;
       if (opts.packageScope) options.packageScope = opts.packageScope as string;
-      if (opts.integrations) {
+      if (opts.integrations !== undefined) {
         options.integrations = parseIntegrations(
           opts.integrations as string,
           opts.emailProvider as string | undefined,
