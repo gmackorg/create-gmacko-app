@@ -5,6 +5,7 @@ import fs from "fs-extra";
 import pc from "picocolors";
 
 import type { CliOptions, IntegrationConfig } from "./types.js";
+import { runProvisioning } from "./provision.js";
 
 const TEMPLATE_REPO = "https://github.com/gmackorg/create-gmacko-app.git";
 
@@ -90,7 +91,23 @@ export async function scaffold(options: CliOptions): Promise<void> {
     }
   }
 
-  p.outro(pc.green("Done! Your project is ready."));
+  p.outro(pc.green("Scaffolding complete!"));
+
+  const shouldProvision = await p.confirm({
+    message: "Would you like to set up cloud services now?",
+    initialValue: true,
+  });
+
+  if (!p.isCancel(shouldProvision) && shouldProvision) {
+    await runProvisioning({
+      projectPath: targetDir,
+      appName: options.appName,
+      platforms: {
+        web: options.platforms.web,
+        mobile: options.platforms.mobile,
+      },
+    });
+  }
 
   console.log(`
 ${pc.bold("Next steps:")}
@@ -119,19 +136,12 @@ function updateIntegrationsConfig(
     "packages/config/src/integrations.ts",
   );
 
-  const content = `/**
- * Integration configuration - single source of truth
- *
- * This file defines which integrations are enabled in this instance.
- * Disabled integrations:
- * - Have no provider initialization
- * - Require no env vars
- * - Execute no runtime code paths
- */
-export const integrations = {
+  const content = `export const integrations = {
   sentry: ${integrations.sentry},
   posthog: ${integrations.posthog},
   stripe: ${integrations.stripe},
+  revenuecat: ${integrations.revenuecat},
+  notifications: ${integrations.notifications},
   email: {
     enabled: ${integrations.email.enabled},
     provider: "${integrations.email.provider}" as "resend" | "sendgrid" | "none",
@@ -144,6 +154,8 @@ export const integrations = {
     enabled: ${integrations.storage.enabled},
     provider: "${integrations.storage.provider}" as "uploadthing" | "none",
   },
+  i18n: false,
+  openapi: false,
 } as const;
 
 export type Integrations = typeof integrations;
@@ -151,9 +163,13 @@ export type Integrations = typeof integrations;
 export const isSentryEnabled = () => integrations.sentry;
 export const isPostHogEnabled = () => integrations.posthog;
 export const isStripeEnabled = () => integrations.stripe;
+export const isRevenueCatEnabled = () => integrations.revenuecat;
+export const isNotificationsEnabled = () => integrations.notifications;
 export const isEmailEnabled = () => integrations.email.enabled;
 export const isRealtimeEnabled = () => integrations.realtime.enabled;
 export const isStorageEnabled = () => integrations.storage.enabled;
+export const isI18nEnabled = () => integrations.i18n;
+export const isOpenApiEnabled = () => integrations.openapi;
 `;
 
   fs.writeFileSync(configPath, content);
@@ -216,6 +232,12 @@ function pruneIntegrations(
   }
   if (!integrations.stripe) {
     packagesToPrune.push("payments");
+  }
+  if (!integrations.revenuecat) {
+    packagesToPrune.push("purchases");
+  }
+  if (!integrations.notifications) {
+    packagesToPrune.push("notifications");
   }
   if (!integrations.email.enabled) {
     packagesToPrune.push("email");
