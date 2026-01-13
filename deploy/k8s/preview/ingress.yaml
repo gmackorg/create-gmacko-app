@@ -1,0 +1,38 @@
+# Preview ingress template
+# Variables: ${PR_NUMBER}, ${PREVIEW_DOMAIN}, ${PREVIEW_BASE_DOMAIN}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gmacko-preview
+  namespace: preview-pr-${PR_NUMBER}
+  labels:
+    app: gmacko-preview
+    app.kubernetes.io/name: gmacko-web
+    app.kubernetes.io/component: preview
+    preview.gmacko.io/pr: "${PR_NUMBER}"
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    # Use wildcard cert for preview subdomain
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # Rate limiting for preview environments
+    nginx.ingress.kubernetes.io/limit-rps: "50"
+    nginx.ingress.kubernetes.io/limit-connections: "20"
+spec:
+  tls:
+    - hosts:
+        - ${PREVIEW_DOMAIN}
+      secretName: preview-tls-pr-${PR_NUMBER}
+  rules:
+    - host: ${PREVIEW_DOMAIN}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: gmacko-preview
+                port:
+                  number: 80

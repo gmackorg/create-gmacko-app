@@ -12,12 +12,21 @@ import * as Clipboard from "expo-clipboard";
 import { Stack } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import {
+  supportedLocales,
+  useLocaleNative,
+  useTranslationsNative,
+} from "@gmacko/i18n/native";
+
 import { trpc } from "~/utils/api";
+import { setLocale } from "~/utils/i18n";
 
 const PERMISSIONS = ["read", "write", "delete", "admin"] as const;
 
 function PreferencesSection() {
   const queryClient = useQueryClient();
+  const t = useTranslationsNative();
+  const currentLocale = useLocaleNative();
 
   const { data: preferences, isLoading } = useQuery(
     trpc.settings.getPreferences.queryOptions(),
@@ -35,6 +44,11 @@ function PreferencesSection() {
 
   const handleThemeChange = (theme: "light" | "dark" | "system") => {
     updatePreferences({ theme });
+  };
+
+  const handleLanguageChange = (lang: string) => {
+    void setLocale(lang);
+    updatePreferences({ language: lang });
   };
 
   const toggleNotification = (type: "email" | "push") => {
@@ -86,6 +100,31 @@ function PreferencesSection() {
               }
             >
               {theme.charAt(0).toUpperCase() + theme.slice(1)}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <Text className="text-foreground mb-2 text-sm font-medium">Language</Text>
+      <View className="mb-4 flex-row flex-wrap gap-2">
+        {supportedLocales.map((lang) => (
+          <Pressable
+            key={lang}
+            onPress={() => handleLanguageChange(lang)}
+            className={`rounded-md px-4 py-2 ${
+              currentLocale === lang
+                ? "bg-primary"
+                : "border-border bg-background border"
+            }`}
+          >
+            <Text
+              className={
+                currentLocale === lang
+                  ? "text-primary-foreground"
+                  : "text-foreground"
+              }
+            >
+              {lang.toUpperCase()}
             </Text>
           </Pressable>
         ))}

@@ -1,0 +1,21 @@
+# Preview service template
+# Variables: ${PR_NUMBER}
+apiVersion: v1
+kind: Service
+metadata:
+  name: gmacko-preview
+  namespace: preview-pr-${PR_NUMBER}
+  labels:
+    app: gmacko-preview
+    app.kubernetes.io/name: gmacko-web
+    app.kubernetes.io/component: preview
+    preview.gmacko.io/pr: "${PR_NUMBER}"
+spec:
+  type: ClusterIP
+  selector:
+    app: gmacko-preview
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+      protocol: TCP

@@ -5,6 +5,8 @@ import { Link, Stack } from "expo-router";
 import { LegendList } from "@legendapp/list";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { useTranslationsNative } from "@gmacko/i18n/native";
+
 import type { RouterOutputs } from "~/utils/api";
 import { trpc } from "~/utils/api";
 import { authClient } from "~/utils/auth";
@@ -13,6 +15,8 @@ function PostCard(props: {
   post: RouterOutputs["post"]["all"][number];
   onDelete: () => void;
 }) {
+  const t = useTranslationsNative();
+
   return (
     <View className="bg-muted flex flex-row rounded-lg p-4">
       <View className="grow">
@@ -32,7 +36,7 @@ function PostCard(props: {
         </Link>
       </View>
       <Pressable onPress={props.onDelete}>
-        <Text className="text-primary font-bold uppercase">Delete</Text>
+        <Text className="text-primary font-bold uppercase">{t("common.delete")}</Text>
       </Pressable>
     </View>
   );
@@ -40,6 +44,7 @@ function PostCard(props: {
 
 function CreatePost() {
   const queryClient = useQueryClient();
+  const t = useTranslationsNative();
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -60,7 +65,7 @@ function CreatePost() {
         className="border-input bg-background text-foreground items-center rounded-md border px-3 text-lg leading-tight"
         value={title}
         onChangeText={setTitle}
-        placeholder="Title"
+        placeholder={t("common.create") + " " + t("common.title")}
       />
       {error?.data?.zodError?.fieldErrors.title && (
         <Text className="text-destructive mb-2">
@@ -71,7 +76,7 @@ function CreatePost() {
         className="border-input bg-background text-foreground items-center rounded-md border px-3 text-lg leading-tight"
         value={content}
         onChangeText={setContent}
-        placeholder="Content"
+        placeholder={t("common.content")}
       />
       {error?.data?.zodError?.fieldErrors.content && (
         <Text className="text-destructive mb-2">
@@ -87,11 +92,11 @@ function CreatePost() {
           });
         }}
       >
-        <Text className="text-foreground">Create</Text>
+        <Text className="text-foreground">{t("common.create")}</Text>
       </Pressable>
       {error?.data?.code === "UNAUTHORIZED" && (
         <Text className="text-destructive mt-2">
-          You need to be logged in to create a post
+          {t("errors.unauthorized")}
         </Text>
       )}
     </View>
@@ -100,11 +105,14 @@ function CreatePost() {
 
 function MobileAuth() {
   const { data: session } = authClient.useSession();
+  const t = useTranslationsNative();
 
   return (
     <>
       <Text className="text-foreground pb-2 text-center text-xl font-semibold">
-        {session?.user.name ? `Hello, ${session.user.name}` : "Not logged in"}
+        {session?.user.name
+          ? `${t("common.welcome")}, ${session.user.name}`
+          : t("auth.dontHaveAccount")}
       </Text>
       <Pressable
         onPress={() =>
@@ -117,7 +125,9 @@ function MobileAuth() {
         }
         className="bg-primary flex items-center rounded-sm p-2"
       >
-        <Text>{session ? "Sign Out" : "Sign In With Discord"}</Text>
+        <Text>
+          {session ? t("auth.signOut") : t("auth.signIn") + " With Discord"}
+        </Text>
       </Pressable>
     </>
   );
@@ -125,6 +135,7 @@ function MobileAuth() {
 
 export default function Index() {
   const queryClient = useQueryClient();
+  const t = useTranslationsNative();
 
   const postQuery = useQuery(trpc.post.all.queryOptions());
 
@@ -138,7 +149,7 @@ export default function Index() {
   return (
     <SafeAreaView className="bg-background">
       {/* Changes page title visible on the header */}
-      <Stack.Screen options={{ title: "Home Page" }} />
+      <Stack.Screen options={{ title: t("nav.home") }} />
       <View className="bg-background h-full w-full p-4">
         <Text className="text-foreground pb-2 text-center text-5xl font-bold">
           Create <Text className="text-primary">T3</Text> Turbo

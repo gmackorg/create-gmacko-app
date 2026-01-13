@@ -1,0 +1,44 @@
+# Preview namespace template
+# Variables: ${PR_NUMBER}, ${PR_AUTHOR}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: preview-pr-${PR_NUMBER}
+  labels:
+    app.kubernetes.io/part-of: gmacko
+    app.kubernetes.io/component: preview
+    preview.gmacko.io/pr: "${PR_NUMBER}"
+    preview.gmacko.io/author: "${PR_AUTHOR}"
+  annotations:
+    preview.gmacko.io/created-at: "${CREATED_AT}"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: preview-quota
+  namespace: preview-pr-${PR_NUMBER}
+spec:
+  hard:
+    requests.cpu: "500m"
+    requests.memory: "512Mi"
+    limits.cpu: "1"
+    limits.memory: "1Gi"
+    pods: "5"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: preview-network-policy
+  namespace: preview-pr-${PR_NUMBER}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+  egress:
+    - {} # Allow all egress for preview environments

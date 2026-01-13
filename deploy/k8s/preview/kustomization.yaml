@@ -1,0 +1,18 @@
+# Kustomization for preview deployments
+# Use: kubectl apply -k deploy/k8s/preview/ (after envsubst)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: preview-pr-${PR_NUMBER}
+
+resources:
+  - namespace.yaml
+  - secret.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: gmacko
+  app.kubernetes.io/managed-by: github-actions
+  environment: preview

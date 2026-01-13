@@ -31,7 +31,7 @@ export const integrations = {
   },
 
   // Internationalization (default OFF)
-  i18n: false,
+  i18n: true,
 
   // OpenAPI documentation (default OFF)
   openapi: false,

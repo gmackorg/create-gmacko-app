@@ -10,6 +10,10 @@
     "./integrations": {
       "types": "./dist/integrations.d.ts",
       "default": "./src/integrations.ts"
+    },
+    "./preview": {
+      "types": "./dist/preview.d.ts",
+      "default": "./src/preview.ts"
     }
   },
   "license": "MIT",

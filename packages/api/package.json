@@ -10,6 +10,14 @@
     "./openapi": {
       "types": "./dist/openapi.d.ts",
       "default": "./src/openapi.ts"
+    },
+    "./versioning": {
+      "types": "./dist/versioning.d.ts",
+      "default": "./src/versioning.ts"
+    },
+    "./deprecation": {
+      "types": "./dist/middleware/deprecation.d.ts",
+      "default": "./src/middleware/deprecation.ts"
     }
   },
   "license": "MIT",

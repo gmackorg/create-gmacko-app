@@ -84,6 +84,94 @@ sst dev
 sst deploy --stage production
 ```
 
+## Preview Deployments
+
+Preview deployments create isolated environments for each pull request, enabling reviewers to test changes before merging.
+
+### How It Works
+
+1. **On PR Open/Update**: The workflow builds a Docker image tagged with the PR number and deploys to a unique URL
+2. **PR Comment**: A bot comment is posted/updated with the preview URL
+3. **On PR Close**: All preview resources are automatically cleaned up
+
+### Configuration
+
+Set the `DEPLOY_TARGET` repository variable to choose the deployment platform:
+
+- `vercel` (default): Deploy to Vercel preview environments
+- `kubernetes`: Deploy to self-hosted Kubernetes cluster
+
+### Required Secrets
+
+**For Kubernetes:**
+
+```
+KUBE_CONFIG          - Base64-encoded kubeconfig
+PREVIEW_DATABASE_URL - Database URL for preview environments
+PREVIEW_AUTH_SECRET  - Auth secret for preview environments
+```
+
+**For Vercel:**
+
+```
+VERCEL_TOKEN      - Vercel authentication token
+VERCEL_ORG_ID     - Vercel organization ID
+VERCEL_PROJECT_ID - Vercel project ID
+```
+
+### Preview URLs
+
+Previews are accessible at: `https://pr-{number}.preview.gmacko.io`
+
+### Database Isolation
+
+Two strategies are supported for preview database isolation:
+
+1. **Neon Branch Database** (recommended): Set `PREVIEW_DATABASE_URL` to a Neon branch connection string
+2. **Schema Isolation**: Set `PREVIEW_USE_SCHEMA_ISOLATION=true` to use PR-specific schemas in the same database
+
+### Kubernetes Manifests
+
+Preview K8s manifests are in `deploy/k8s/preview/`:
+
+```
+deploy/k8s/preview/
+├── namespace.yaml   # PR-specific namespace with resource quotas
+├── deployment.yaml  # App deployment with security context
+├── service.yaml     # ClusterIP service
+├── ingress.yaml     # Ingress with TLS and rate limiting
+├── secret.yaml      # Environment secrets
+└── kustomization.yaml
+```
+
+All manifests support `envsubst` templating with these variables:
+
+- `${PR_NUMBER}` - Pull request number
+- `${IMAGE_TAG}` - Docker image tag
+- `${PREVIEW_DOMAIN}` - Full preview domain
+- `${DATABASE_URL}` - Database connection string
+
+### Preview Configuration API
+
+Use `@gmacko/config/preview` in your application:
+
+```typescript
+import {
+  getPreviewConfig,
+  getPreviewFeatureFlags,
+  isPreviewEnvironment,
+} from "@gmacko/config/preview";
+
+// Check if in preview
+if (isPreviewEnvironment()) {
+  const { prNumber, domain } = getPreviewConfig();
+  const flags = getPreviewFeatureFlags();
+
+  // flags.disablePayments - true in preview
+  // flags.showPreviewBanner - true in preview
+}
+```
+
 ## Health Check
 
 All deployments have a health check endpoint at `/api/health` that returns:
