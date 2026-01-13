@@ -78,7 +78,25 @@
     "AUTH_DISCORD_SECRET",
     "AUTH_REDIRECT_PROXY_URL",
     "AUTH_SECRET",
-    "PORT"
+    "PORT",
+    "NEXT_PUBLIC_PREVIEW",
+    "PREVIEW_PR_NUMBER",
+    "PREVIEW_DOMAIN",
+    "PREVIEW_BASE_DOMAIN",
+    "PREVIEW_DATABASE_URL",
+    "PREVIEW_USE_SCHEMA_ISOLATION",
+    "PREVIEW_SEND_EMAILS",
+    "PREVIEW_ENABLE_ANALYTICS",
+    "PREVIEW_BRANCH",
+    "PREVIEW_COMMIT",
+    "PREVIEW_DEPLOYED_AT",
+    "GMACKO_API_URL",
+    "GMACKO_API_KEY",
+    "LOG_LEVEL",
+    "SERVICE_NAME",
+    "npm_package_version",
+    "APP_ENV",
+    "API_URL"
   ],
   "globalPassThroughEnv": [
     "NODE_ENV",
@@ -86,6 +104,9 @@
     "VERCEL",
     "VERCEL_ENV",
     "VERCEL_URL",
+    "VERCEL_GIT_COMMIT_REF",
+    "VERCEL_GIT_COMMIT_SHA",
+    "NEXT_RUNTIME",
     "npm_lifecycle_event"
   ]
 }

@@ -11,7 +11,7 @@
   "scripts": {
     "clean": "git clean -xdf .cache .turbo dist node_modules coverage",
     "format": "prettier --check . --ignore-path ../../.gitignore",
-    "lint": "eslint --flag unstable_native_nodejs_ts_config",
+    "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"

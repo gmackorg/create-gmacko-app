@@ -56,11 +56,6 @@ export function initSentryWeb(config: SentryWebConfig): void {
 }
 
 /**
- * Sentry error boundary wrapper for React components
- */
-export const SentryErrorBoundary = Sentry.ErrorBoundary;
-
-/**
  * Capture exception manually
  */
 export function captureException(error: unknown): void {

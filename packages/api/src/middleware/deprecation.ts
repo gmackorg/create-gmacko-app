@@ -88,7 +88,7 @@ export function getDeprecationHeaders(
   }
 
   if (meta.sunsetDate) {
-    headers["Sunset"] = meta.sunsetDate;
+    headers.Sunset = meta.sunsetDate;
   }
 
   if (meta.message) {
@@ -122,7 +122,7 @@ export function isEndpointAvailableInVersion(
 
   // Check available versions list
   if (requirement.availableIn) {
-    return requirement.availableIn.indexOf(version) !== -1;
+    return requirement.availableIn.includes(version);
   }
 
   // Check min version
@@ -180,8 +180,8 @@ export class DeprecationRegistry {
     return meta?.deprecated ?? false;
   }
 
-  getAllDeprecated(): Array<{ path: string; meta: DeprecationMeta }> {
-    const result: Array<{ path: string; meta: DeprecationMeta }> = [];
+  getAllDeprecated(): { path: string; meta: DeprecationMeta }[] {
+    const result: { path: string; meta: DeprecationMeta }[] = [];
     for (const path of Object.keys(this.deprecations)) {
       const meta = this.deprecations[path];
       if (meta?.deprecated) {

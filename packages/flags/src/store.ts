@@ -192,7 +192,7 @@ export function createFlagStore<T extends FlagDefinitions>(definitions: T) {
     // 4. Evaluate rollout rules
     const rolloutResult = evaluateRollout(flagDef, flagName, context);
     if (rolloutResult) {
-      return rolloutResult as FlagEvaluationResult<FlagValue<T[K]>>;
+      return rolloutResult;
     }
 
     // 5. Return default value

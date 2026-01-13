@@ -25,7 +25,7 @@ const PERMISSIONS = ["read", "write", "delete", "admin"] as const;
 
 function PreferencesSection() {
   const queryClient = useQueryClient();
-  const t = useTranslationsNative();
+  const _t = useTranslationsNative();
   const currentLocale = useLocaleNative();
 
   const { data: preferences, isLoading } = useQuery(
@@ -353,8 +353,7 @@ function ApiKeysSection() {
               <View className="flex-1">
                 <Text className="text-foreground font-medium">{key.name}</Text>
                 <Text className="text-muted-foreground text-xs">
-                  {key.keyPrefix}... |{" "}
-                  {(key.permissions as string[]).join(", ")}
+                  {key.keyPrefix}... | {key.permissions.join(", ")}
                 </Text>
                 {key.lastUsedAt && (
                   <Text className="text-muted-foreground text-xs">

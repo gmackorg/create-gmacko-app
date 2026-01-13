@@ -88,7 +88,7 @@ export function createClient(options: CreateClientOptions): TRPCClient {
     };
 
     if (apiKey) {
-      headers["Authorization"] = `Bearer ${apiKey}`;
+      headers.Authorization = `Bearer ${apiKey}`;
     }
 
     return headers;
@@ -116,7 +116,7 @@ export function createClient(options: CreateClientOptions): TRPCClient {
     linkOptions.fetch = customFetch;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const link: TRPCLink<AppRouter> = batch
     ? httpBatchLink(linkOptions)
     : httpLink(linkOptions);

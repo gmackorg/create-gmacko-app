@@ -42,17 +42,21 @@ export function I18nProvider({
 }
 
 export function useTranslations(namespace?: string) {
+  // Always call hooks unconditionally to satisfy React's rules of hooks
+  const translations = useNextIntlTranslations(namespace);
   if (!integrations.i18n) {
     return (key: string) => key;
   }
-  return useNextIntlTranslations(namespace);
+  return translations;
 }
 
 export function useLocale(): Locale {
+  // Always call hooks unconditionally to satisfy React's rules of hooks
+  const locale = useNextIntlLocale();
   if (!integrations.i18n) {
     return defaultLocale;
   }
-  return useNextIntlLocale();
+  return locale;
 }
 
 export function getLocaleFromPath(pathname: string): Locale {

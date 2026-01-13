@@ -20,7 +20,7 @@ const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
     .where(eq(user.id, ctx.session.user.id))
     .limit(1);
 
-  if (!dbUser || dbUser.role !== "admin") {
+  if (dbUser?.role !== "admin") {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "Admin access required",

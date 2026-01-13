@@ -21,19 +21,21 @@ import {
   useCallback,
   useContext,
   useMemo,
-  useState,
-  type ReactNode,
+  useState
+  
 } from "react";
+import type {ReactNode} from "react";
 
 import type { FlagContext, FlagEvaluationResult } from "./types";
 import {
   flags,
-  type RuntimeFlagName,
+  
   getFlag as getFlagFromStore,
   getFlagValue as getFlagValueFromStore,
   isEnabled as isEnabledFromStore,
-  getAllFlags as getAllFlagsFromStore,
+  getAllFlags as getAllFlagsFromStore
 } from "./flags";
+import type {RuntimeFlagName} from "./flags";
 
 /**
  * Context value for the flags provider

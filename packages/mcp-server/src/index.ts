@@ -63,7 +63,7 @@ async function callTrpc<T>(path: string, input?: unknown): Promise<T> {
 
   return superjson.deserialize(
     data.result.data as Parameters<typeof superjson.deserialize>[0],
-  ) as T;
+  );
 }
 
 const server = new Server(
@@ -78,7 +78,7 @@ const server = new Server(
   },
 );
 
-server.setRequestHandler(ListToolsRequestSchema, async () => {
+server.setRequestHandler(ListToolsRequestSchema, () => {
   return {
     tools: [
       {
@@ -253,7 +253,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "update_preferences": {
-        const updates = args as Record<string, unknown>;
+        const updates = args!;
         const result = await callTrpc<unknown>(
           "settings.updatePreferences",
           updates,

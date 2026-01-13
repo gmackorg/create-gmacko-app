@@ -558,7 +558,7 @@ export function createRequestLoggingHandler(
     ) => {
       // Skip ignored paths
       const shouldIgnore = ignorePaths.some(
-        (p) => request.path.indexOf(p) === 0,
+        (p) => request.path.startsWith(p),
       );
       if (shouldIgnore) {
         return null;
@@ -607,7 +607,7 @@ export function createRequestLoggingHandler(
     ) => {
       // Skip ignored paths
       const shouldIgnore = ignorePaths.some(
-        (p) => request.path.indexOf(p) === 0,
+        (p) => request.path.startsWith(p),
       );
       if (shouldIgnore) {
         return;

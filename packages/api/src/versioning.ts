@@ -60,7 +60,7 @@ export function extractVersionFromHeaders(headers: Headers): ApiVersion | null {
  * Matches patterns like /api/v1/..., /v1/..., /api/v2/...
  */
 export function extractVersionFromUrl(url: string): ApiVersion | null {
-  const versionMatch = url.match(/\/(?:api\/)?v(\d+)(?:\/|$)/i);
+  const versionMatch = /\/(?:api\/)?v(\d+)(?:\/|$)/i.exec(url);
   if (versionMatch) {
     const version = `v${versionMatch[1]}` as ApiVersion;
     if (isValidVersion(version)) {
@@ -75,7 +75,7 @@ export function extractVersionFromUrl(url: string): ApiVersion | null {
  */
 export function isValidVersion(version: string): boolean {
   const normalized = normalizeVersion(version);
-  return API_VERSIONS.indexOf(normalized as ApiVersion) !== -1;
+  return API_VERSIONS.includes(normalized);
 }
 
 /**
@@ -222,7 +222,7 @@ export function getVersionResponseHeaders(
   };
 
   if (context.isDeprecated) {
-    headers["Deprecation"] = "true";
+    headers.Deprecation = "true";
     if (context.deprecationMessage) {
       headers["X-Deprecation-Notice"] = context.deprecationMessage;
     }
@@ -262,7 +262,7 @@ export function stripVersionFromPath(path: string): string {
  */
 export function addVersionToPath(path: string, version: ApiVersion): string {
   // Insert version after /api/ or at the beginning
-  if (path.indexOf("/api/") === 0) {
+  if (path.startsWith("/api/")) {
     return path.replace("/api/", `/api/${version}/`);
   }
   return `/${version}${path}`;

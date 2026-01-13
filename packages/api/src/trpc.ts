@@ -4,7 +4,7 @@ import superjson from "superjson";
 import { z, ZodError } from "zod/v4";
 
 import type { Auth } from "@gmacko/auth";
-import { and, eq, gt, isNull } from "@gmacko/db";
+import { and, eq, isNull } from "@gmacko/db";
 import { db } from "@gmacko/db/client";
 import { apiKeys, user } from "@gmacko/db/schema";
 

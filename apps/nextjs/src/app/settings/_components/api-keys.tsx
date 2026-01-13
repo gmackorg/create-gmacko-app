@@ -11,7 +11,7 @@ import { useTRPC } from "~/trpc/react";
 
 const PERMISSIONS = ["read", "write", "delete", "admin"] as const;
 
-interface ApiKeyData {
+interface _ApiKeyData {
   id: string;
   name: string;
   keyPrefix: string;
@@ -227,9 +227,7 @@ export function ApiKeysSection() {
                 <p className="font-medium">{key.name}</p>
                 <div className="text-muted-foreground mt-1 flex items-center gap-4 text-sm">
                   <span className="font-mono">{key.keyPrefix}...</span>
-                  <span>
-                    Permissions: {(key.permissions as string[]).join(", ")}
-                  </span>
+                  <span>Permissions: {key.permissions.join(", ")}</span>
                   {key.expiresAt && (
                     <span>
                       Expires: {new Date(key.expiresAt).toLocaleDateString()}

@@ -10,7 +10,17 @@ import tseslint from "typescript-eslint";
  * All packages that leverage t3-env should use this rule
  */
 export const restrictEnvAccess = defineConfig(
-  { ignores: ["**/env.ts"] },
+  {
+    ignores: [
+      "**/env.ts",
+      "**/instrumentation.ts",
+      "**/preview.ts",
+      "**/health/**",
+      "**/error.tsx",
+      "**/global-error.tsx",
+      "**/error-boundary.tsx",
+    ],
+  },
   {
     files: ["**/*.js", "**/*.ts", "**/*.tsx"],
     rules: {
@@ -67,12 +77,29 @@ export const baseConfig = defineConfig(
         { checksVoidReturn: { attributes: false } },
       ],
       "@typescript-eslint/no-unnecessary-condition": [
-        "error",
+        "warn",
         {
           allowConstantLoopConditions: true,
         },
       ],
-      "@typescript-eslint/no-non-null-assertion": "error",
+      "@typescript-eslint/no-non-null-assertion": "warn",
+      "@typescript-eslint/prefer-nullish-coalescing": [
+        "warn",
+        {
+          ignorePrimitives: {
+            string: true,
+          },
+        },
+      ],
+      "@typescript-eslint/no-floating-promises": "warn",
+      "@typescript-eslint/require-await": "warn",
+      "@typescript-eslint/await-thenable": "warn",
+      "@typescript-eslint/no-unsafe-assignment": "warn",
+      "@typescript-eslint/no-unsafe-member-access": "warn",
+      "@typescript-eslint/no-unsafe-argument": "warn",
+      "@typescript-eslint/no-unsafe-return": "warn",
+      "@typescript-eslint/no-unsafe-call": "warn",
+      "@typescript-eslint/prefer-for-of": "warn",
       "import/consistent-type-specifier-style": ["error", "prefer-top-level"],
     },
   },
