@@ -9,6 +9,8 @@ await jiti.import("./src/env");
 
 /** @type {import("next").NextConfig} */
 const config = {
+  output: process.env.DOCKER_BUILD ? "standalone" : undefined,
+
   transpilePackages: [
     "@gmacko/api",
     "@gmacko/auth",

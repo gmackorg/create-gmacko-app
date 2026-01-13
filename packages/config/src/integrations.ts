@@ -1,19 +1,16 @@
-/**
- * Integration configuration - single source of truth
- *
- * This file defines which integrations are enabled in this instance.
- * Disabled integrations:
- * - Have no provider initialization
- * - Require no env vars
- * - Execute no runtime code paths
- */
 export const integrations = {
   // Monitoring & Analytics (default ON)
   sentry: true,
   posthog: true,
 
-  // Payments (default OFF)
+  // Payments - Web (default OFF)
   stripe: false,
+
+  // Payments - Mobile (default OFF)
+  revenuecat: false,
+
+  // Push Notifications (default OFF)
+  notifications: false,
 
   // Communication (default OFF)
   email: {
@@ -36,10 +33,11 @@ export const integrations = {
 
 export type Integrations = typeof integrations;
 
-// Helper type guards
 export const isSentryEnabled = () => integrations.sentry;
 export const isPostHogEnabled = () => integrations.posthog;
 export const isStripeEnabled = () => integrations.stripe;
+export const isRevenueCatEnabled = () => integrations.revenuecat;
+export const isNotificationsEnabled = () => integrations.notifications;
 export const isEmailEnabled = () => integrations.email.enabled;
 export const isRealtimeEnabled = () => integrations.realtime.enabled;
 export const isStorageEnabled = () => integrations.storage.enabled;
