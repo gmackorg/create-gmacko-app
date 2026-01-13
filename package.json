@@ -14,6 +14,7 @@
     "provision": "./scripts/provision.sh",
     "auth:generate": "pnpm -F @gmacko/auth generate",
     "db:push": "turbo -F @gmacko/db push",
+    "db:seed": "pnpm -F @gmacko/db seed",
     "db:studio": "turbo -F @gmacko/db studio",
     "dev": "turbo watch dev --continue",
     "dev:next": "turbo watch dev -F @gmacko/nextjs...",
