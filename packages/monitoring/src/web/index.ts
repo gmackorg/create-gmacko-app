@@ -6,6 +6,22 @@ export interface SentryWebConfig {
   dsn: string;
   environment?: string;
   debug?: boolean;
+  tracesSampleRate?: number;
+  replaysOnErrorSampleRate?: number;
+  replaysSessionSampleRate?: number;
+}
+
+/**
+ * Detect environment from Vercel or fallback to NODE_ENV
+ */
+function detectEnvironment(): string {
+  // Vercel provides VERCEL_ENV: 'production' | 'preview' | 'development'
+  if (process.env.VERCEL_ENV) {
+    return process.env.VERCEL_ENV === "preview"
+      ? "staging"
+      : process.env.VERCEL_ENV;
+  }
+  return process.env.NODE_ENV ?? "development";
 }
 
 /**
@@ -17,15 +33,25 @@ export function initSentryWeb(config: SentryWebConfig): void {
     return;
   }
 
+  const environment = config.environment ?? detectEnvironment();
+  const isProduction = environment === "production";
+
   Sentry.init({
     dsn: config.dsn,
-    environment: config.environment ?? process.env.NODE_ENV,
-    debug: config.debug ?? false,
+    environment,
+    debug: config.debug ?? !isProduction,
 
-    // Recommended settings for Next.js
-    tracesSampleRate: 1.0,
-    replaysOnErrorSampleRate: 1.0,
-    replaysSessionSampleRate: 0.1,
+    // Sample rates - lower in production for cost
+    tracesSampleRate: config.tracesSampleRate ?? (isProduction ? 0.1 : 1.0),
+    replaysOnErrorSampleRate: config.replaysOnErrorSampleRate ?? 1.0,
+    replaysSessionSampleRate:
+      config.replaysSessionSampleRate ?? (isProduction ? 0.1 : 1.0),
+
+    // Filter out noisy errors
+    ignoreErrors: [
+      "ResizeObserver loop limit exceeded",
+      "ResizeObserver loop completed with undelivered notifications",
+    ],
   });
 }
 

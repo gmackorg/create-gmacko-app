@@ -6,24 +6,22 @@ export interface SentryNativeConfig {
   dsn: string;
   environment?: string;
   debug?: boolean;
+  tracesSampleRate?: number;
 }
 
-/**
- * Initialize Sentry for React Native / Expo
- * Only initializes if sentry integration is enabled
- */
 export function initSentryNative(config: SentryNativeConfig): void {
   if (!integrations.sentry) {
     return;
   }
 
+  const environment = config.environment ?? "development";
+  const isProduction = environment === "production";
+
   Sentry.init({
     dsn: config.dsn,
-    environment: config.environment,
-    debug: config.debug ?? false,
-
-    // Recommended settings
-    tracesSampleRate: 1.0,
+    environment,
+    debug: config.debug ?? !isProduction,
+    tracesSampleRate: config.tracesSampleRate ?? (isProduction ? 0.1 : 1.0),
   });
 }
 

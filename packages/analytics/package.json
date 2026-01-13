@@ -34,13 +34,21 @@
     "@gmacko/eslint-config": "workspace:*",
     "@gmacko/prettier-config": "workspace:*",
     "@gmacko/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
     "@types/react": "catalog:react19",
     "eslint": "catalog:",
+    "expo-constants": "~18.0.10",
     "prettier": "catalog:",
     "typescript": "catalog:"
   },
   "peerDependencies": {
+    "expo-constants": ">=17.0.0",
     "react": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "expo-constants": {
+      "optional": true
+    }
   },
   "prettier": "@gmacko/prettier-config"
 }

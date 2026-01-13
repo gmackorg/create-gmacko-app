@@ -1,6 +1,9 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useEffect } from "react";
+import posthog from "posthog-js";
+import { PostHogProvider as PHProvider } from "posthog-js/react";
 
 import { integrations } from "@gmacko/config";
 
@@ -9,42 +12,63 @@ export interface PostHogWebConfig {
   apiHost?: string;
 }
 
-/**
- * Check if PostHog analytics is enabled
- */
+function detectEnvironment(): string {
+  if (typeof window === "undefined") return "server";
+  if (process.env.VERCEL_ENV) {
+    return process.env.VERCEL_ENV === "preview"
+      ? "staging"
+      : process.env.VERCEL_ENV;
+  }
+  return process.env.NODE_ENV ?? "development";
+}
+
 export function isPostHogEnabled(): boolean {
   return integrations.posthog;
 }
 
-/**
- * Initialize PostHog for web
- * Stub implementation - extend when PostHog is configured
- */
-export function initPostHogWeb(_config: PostHogWebConfig): void {
-  if (!integrations.posthog) {
+export function initPostHogWeb(config: PostHogWebConfig): void {
+  if (!integrations.posthog || typeof window === "undefined") {
     return;
   }
-  // TODO: Implement with posthog.init when enabled
+
+  if (!posthog.__loaded) {
+    posthog.init(config.apiKey, {
+      api_host: config.apiHost ?? "https://us.i.posthog.com",
+      person_profiles: "identified_only",
+      capture_pageview: false,
+      capture_pageleave: true,
+    });
+
+    posthog.register({
+      environment: detectEnvironment(),
+    });
+  }
 }
 
-/**
- * PostHog React Provider wrapper
- * Returns children directly - extend when PostHog is configured
- */
+interface PostHogProviderProps {
+  children: ReactNode;
+  apiKey: string;
+  apiHost?: string;
+}
+
 export function PostHogProvider({
   children,
-}: {
-  children: ReactNode;
-  apiKey?: string;
-  apiHost?: string;
-}): ReactNode {
-  // When PostHog is configured, wrap with PostHogProvider from posthog-js/react
-  return children;
+  apiKey,
+  apiHost,
+}: PostHogProviderProps): ReactNode {
+  useEffect(() => {
+    if (integrations.posthog && apiKey) {
+      initPostHogWeb({ apiKey, apiHost });
+    }
+  }, [apiKey, apiHost]);
+
+  if (!integrations.posthog) {
+    return children;
+  }
+
+  return <PHProvider client={posthog}>{children}</PHProvider>;
 }
 
-/**
- * Track an event
- */
 export function trackEvent(
   eventName: string,
   properties?: Record<string, unknown>,
@@ -52,14 +76,9 @@ export function trackEvent(
   if (!integrations.posthog) {
     return;
   }
-  // TODO: Implement with posthog.capture(eventName, properties)
-  void eventName;
-  void properties;
+  posthog.capture(eventName, properties);
 }
 
-/**
- * Identify a user
- */
 export function identifyUser(
   userId: string,
   properties?: Record<string, unknown>,
@@ -67,17 +86,14 @@ export function identifyUser(
   if (!integrations.posthog) {
     return;
   }
-  // TODO: Implement with posthog.identify(userId, properties)
-  void userId;
-  void properties;
+  posthog.identify(userId, properties);
 }
 
-/**
- * Reset user identity (on logout)
- */
 export function resetUser(): void {
   if (!integrations.posthog) {
     return;
   }
-  // TODO: Implement with posthog.reset()
+  posthog.reset();
 }
+
+export { posthog };

@@ -1,4 +1,7 @@
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
+import Constants from "expo-constants";
+import { PostHogProvider as PHProvider, PostHog } from "posthog-react-native";
 
 import { integrations } from "@gmacko/config";
 
@@ -7,76 +10,90 @@ export interface PostHogNativeConfig {
   apiHost?: string;
 }
 
-/**
- * Check if PostHog analytics is enabled
- */
+let posthogClient: PostHog | null = null;
+
+function getEnvironment(): string {
+  const releaseChannel = Constants.expoConfig?.extra?.releaseChannel;
+  if (releaseChannel === "production") return "production";
+  if (releaseChannel === "staging") return "staging";
+  return "development";
+}
+
 export function isPostHogNativeEnabled(): boolean {
   return integrations.posthog;
 }
 
-/**
- * Initialize PostHog for React Native / Expo
- * Stub implementation - extend when PostHog is configured
- */
 export async function initPostHogNative(
-  _config: PostHogNativeConfig,
-): Promise<null> {
+  config: PostHogNativeConfig,
+): Promise<PostHog | null> {
   if (!integrations.posthog) {
     return null;
   }
-  // TODO: Implement with PostHog.initAsync when enabled
-  return null;
+
+  if (!posthogClient) {
+    posthogClient = new PostHog(config.apiKey, {
+      host: config.apiHost ?? "https://us.i.posthog.com",
+    });
+
+    posthogClient.register({
+      environment: getEnvironment(),
+    });
+  }
+
+  return posthogClient;
 }
 
-/**
- * PostHog React Native Provider wrapper
- * Stub implementation - extend when PostHog is configured
- */
+interface PostHogNativeProviderProps {
+  children: ReactNode;
+  apiKey?: string;
+  apiHost?: string;
+}
+
 export function PostHogNativeProvider({
   children,
-}: {
-  children: ReactNode;
-}): ReactNode {
-  // When PostHog is configured, wrap with PostHogProvider from posthog-react-native
-  return children;
+  apiKey,
+  apiHost,
+}: PostHogNativeProviderProps): ReactNode {
+  const [client, setClient] = useState<PostHog | null>(null);
+
+  useEffect(() => {
+    if (integrations.posthog && apiKey) {
+      initPostHogNative({ apiKey, apiHost }).then(setClient);
+    }
+  }, [apiKey, apiHost]);
+
+  if (!integrations.posthog || !client) {
+    return children;
+  }
+
+  return <PHProvider client={client}>{children}</PHProvider>;
 }
 
-/**
- * Track an event (native)
- */
 export function trackEventNative(
   eventName: string,
-  properties?: Record<string, unknown>,
+  properties?: Record<string, string | number | boolean | null>,
 ): void {
-  if (!integrations.posthog) {
+  if (!integrations.posthog || !posthogClient) {
     return;
   }
-  // TODO: Implement with client.capture when enabled
-  void eventName;
-  void properties;
+  posthogClient.capture(eventName, properties);
 }
 
-/**
- * Identify a user (native)
- */
 export function identifyUserNative(
   userId: string,
-  properties?: Record<string, unknown>,
+  properties?: Record<string, string | number | boolean | null>,
 ): void {
-  if (!integrations.posthog) {
+  if (!integrations.posthog || !posthogClient) {
     return;
   }
-  // TODO: Implement with client.identify when enabled
-  void userId;
-  void properties;
+  posthogClient.identify(userId, properties);
 }
 
-/**
- * Reset user identity (native)
- */
 export function resetUserNative(): void {
-  if (!integrations.posthog) {
+  if (!integrations.posthog || !posthogClient) {
     return;
   }
-  // TODO: Implement with client.reset when enabled
+  posthogClient.reset();
 }
+
+export { posthogClient };

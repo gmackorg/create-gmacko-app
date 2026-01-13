@@ -1,23 +1,36 @@
+import { withSentryConfig } from "@sentry/nextjs";
 import { createJiti } from "jiti";
+
+import { integrations } from "@gmacko/config";
 
 const jiti = createJiti(import.meta.url);
 
-// Import env files to validate at build time. Use jiti so we can load .ts files in here.
 await jiti.import("./src/env");
 
 /** @type {import("next").NextConfig} */
 const config = {
-  /** Enables hot reloading for local packages without a build step */
   transpilePackages: [
     "@gmacko/api",
     "@gmacko/auth",
+    "@gmacko/config",
     "@gmacko/db",
+    "@gmacko/monitoring",
     "@gmacko/ui",
     "@gmacko/validators",
   ],
 
-  /** We already do linting and typechecking as separate tasks in CI */
   typescript: { ignoreBuildErrors: true },
 };
 
-export default config;
+const sentryConfig = {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+  disableLogger: true,
+  automaticVercelMonitors: true,
+};
+
+export default integrations.sentry
+  ? withSentryConfig(config, sentryConfig)
+  : config;
