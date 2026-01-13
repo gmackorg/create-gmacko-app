@@ -1,42 +1,97 @@
-/**
- * YOU PROBABLY DON'T NEED TO EDIT THIS FILE, UNLESS:
- * 1. You want to modify request context (see Part 1)
- * 2. You want to create a new middleware or type of procedure (see Part 3)
- *
- * tl;dr - this is where all the tRPC server stuff is created and plugged in.
- * The pieces you will need to use are documented accordingly near the end
- */
+import { createHash } from "crypto";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { z, ZodError } from "zod/v4";
 
 import type { Auth } from "@gmacko/auth";
+import { and, eq, gt, isNull } from "@gmacko/db";
 import { db } from "@gmacko/db/client";
+import { apiKeys, user } from "@gmacko/db/schema";
 
-/**
- * 1. CONTEXT
- *
- * This section defines the "contexts" that are available in the backend API.
- *
- * These allow you to access things when processing a request, like the database, the session, etc.
- *
- * This helper generates the "internals" for a tRPC context. The API handler and RSC clients each
- * wrap this and provides the required context.
- *
- * @see https://trpc.io/docs/server/context
- */
+type ApiKeyPermission = "read" | "write" | "delete" | "admin";
+
+interface ApiKeyAuth {
+  userId: string;
+  permissions: ApiKeyPermission[];
+  keyId: string;
+}
+
+function hashApiKey(key: string): string {
+  return createHash("sha256").update(key).digest("hex");
+}
+
+async function validateApiKey(key: string): Promise<ApiKeyAuth | null> {
+  const keyHash = hashApiKey(key);
+
+  const [keyRecord] = await db
+    .select({
+      id: apiKeys.id,
+      userId: apiKeys.userId,
+      permissions: apiKeys.permissions,
+      expiresAt: apiKeys.expiresAt,
+    })
+    .from(apiKeys)
+    .where(and(eq(apiKeys.keyHash, keyHash), isNull(apiKeys.revokedAt)))
+    .limit(1);
+
+  if (!keyRecord) return null;
+
+  if (keyRecord.expiresAt && keyRecord.expiresAt < new Date()) {
+    return null;
+  }
+
+  await db
+    .update(apiKeys)
+    .set({ lastUsedAt: new Date() })
+    .where(eq(apiKeys.id, keyRecord.id));
+
+  return {
+    userId: keyRecord.userId,
+    permissions: keyRecord.permissions as ApiKeyPermission[],
+    keyId: keyRecord.id,
+  };
+}
 
 export const createTRPCContext = async (opts: {
   headers: Headers;
   auth: Auth;
 }) => {
   const authApi = opts.auth.api;
+
+  const authHeader = opts.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer gmk_")) {
+    const apiKey = authHeader.slice(7);
+    const apiKeyAuth = await validateApiKey(apiKey);
+
+    if (apiKeyAuth) {
+      const [userRecord] = await db
+        .select()
+        .from(user)
+        .where(eq(user.id, apiKeyAuth.userId))
+        .limit(1);
+
+      if (userRecord) {
+        return {
+          authApi,
+          session: {
+            user: userRecord,
+            session: null,
+          },
+          apiKeyAuth,
+          db,
+        };
+      }
+    }
+  }
+
   const session = await authApi.getSession({
     headers: opts.headers,
   });
+
   return {
     authApi,
     session,
+    apiKeyAuth: null as ApiKeyAuth | null,
     db,
   };
 };
@@ -121,8 +176,44 @@ export const protectedProcedure = t.procedure
     }
     return next({
       ctx: {
-        // infers the `session` as non-nullable
         session: { ...ctx.session, user: ctx.session.user },
       },
     });
   });
+
+const createApiKeyProcedure = (requiredPermission: ApiKeyPermission) =>
+  t.procedure.use(timingMiddleware).use(({ ctx, next }) => {
+    if (!ctx.apiKeyAuth) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "API key required",
+      });
+    }
+
+    const hasPermission =
+      ctx.apiKeyAuth.permissions.includes("admin") ||
+      ctx.apiKeyAuth.permissions.includes(requiredPermission);
+
+    if (!hasPermission) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: `API key lacks '${requiredPermission}' permission`,
+      });
+    }
+
+    if (!ctx.session?.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+
+    return next({
+      ctx: {
+        session: { ...ctx.session, user: ctx.session.user },
+        apiKeyAuth: ctx.apiKeyAuth,
+      },
+    });
+  });
+
+export const apiKeyReadProcedure = createApiKeyProcedure("read");
+export const apiKeyWriteProcedure = createApiKeyProcedure("write");
+export const apiKeyDeleteProcedure = createApiKeyProcedure("delete");
+export const apiKeyAdminProcedure = createApiKeyProcedure("admin");

@@ -1,37 +1,37 @@
 import type { ReactNode } from "react";
 import { useEffect } from "react";
-import Constants from "expo-constants";
 
 import { PostHogNativeProvider } from "@gmacko/analytics/native";
 import { integrations } from "@gmacko/config";
 import { initSentryNative } from "@gmacko/monitoring/native";
 
+import { env } from "./config/env";
+
 interface ProvidersProps {
   children: ReactNode;
 }
 
-function getEnvironment(): string {
-  const releaseChannel = Constants.expoConfig?.extra?.releaseChannel;
-  if (releaseChannel === "production") return "production";
-  if (releaseChannel === "staging") return "staging";
-  return "development";
-}
-
 export function Providers({ children }: ProvidersProps) {
   useEffect(() => {
-    if (integrations.sentry) {
-      const dsn = Constants.expoConfig?.extra?.sentryDsn;
-      if (dsn) {
-        initSentryNative({
-          dsn,
-          environment: getEnvironment(),
-        });
-      }
+    if (integrations.sentry && env.observability.sentryDsn) {
+      initSentryNative({
+        dsn: env.observability.sentryDsn,
+        environment: env.environment,
+        debug: env.enableDebugMode,
+        tracesSampleRate: env.isProduction ? 0.1 : 1.0,
+      });
     }
   }, []);
 
-  if (integrations.posthog) {
-    return <PostHogNativeProvider>{children}</PostHogNativeProvider>;
+  if (integrations.posthog && env.observability.posthogKey) {
+    return (
+      <PostHogNativeProvider
+        apiKey={env.observability.posthogKey}
+        apiHost={env.observability.posthogHost}
+      >
+        {children}
+      </PostHogNativeProvider>
+    );
   }
 
   return <>{children}</>;

@@ -1,6 +1,6 @@
 {
   "cli": {
-    "version": ">= 4.1.2",
+    "version": ">= 13.0.0",
     "appVersionSource": "remote"
   },
   "build": {
@@ -9,25 +9,109 @@
       "pnpm": "9.15.4",
       "ios": {
         "resourceClass": "m-medium"
+      },
+      "env": {
+        "SENTRY_ORG": "${SENTRY_ORG}",
+        "SENTRY_PROJECT": "${SENTRY_PROJECT_MOBILE}",
+        "SENTRY_AUTH_TOKEN": "${SENTRY_AUTH_TOKEN}"
       }
     },
     "development": {
       "extends": "base",
       "developmentClient": true,
-      "distribution": "internal"
-    },
-    "preview": {
-      "extends": "base",
       "distribution": "internal",
+      "env": {
+        "APP_ENV": "development",
+        "API_URL": "http://localhost:3000",
+        "SENTRY_DSN": "${EXPO_PUBLIC_SENTRY_DSN_DEV}",
+        "POSTHOG_KEY": "${EXPO_PUBLIC_POSTHOG_KEY_DEV}",
+        "POSTHOG_HOST": "${EXPO_PUBLIC_POSTHOG_HOST}"
+      },
+      "ios": {
+        "simulator": false
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug"
+      },
+      "channel": "development"
+    },
+    "development:simulator": {
+      "extends": "development",
       "ios": {
         "simulator": true
       }
     },
+    "beta": {
+      "extends": "base",
+      "distribution": "internal",
+      "env": {
+        "APP_ENV": "staging",
+        "API_URL": "${STAGING_API_URL}",
+        "SENTRY_DSN": "${EXPO_PUBLIC_SENTRY_DSN_STAGING}",
+        "POSTHOG_KEY": "${EXPO_PUBLIC_POSTHOG_KEY_STAGING}",
+        "POSTHOG_HOST": "${EXPO_PUBLIC_POSTHOG_HOST}"
+      },
+      "ios": {
+        "enterpriseProvisioning": "adhoc"
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "channel": "beta"
+    },
+    "beta:production-api": {
+      "extends": "beta",
+      "env": {
+        "APP_ENV": "staging",
+        "API_URL": "${PRODUCTION_API_URL}",
+        "SENTRY_DSN": "${EXPO_PUBLIC_SENTRY_DSN_STAGING}",
+        "POSTHOG_KEY": "${EXPO_PUBLIC_POSTHOG_KEY_STAGING}",
+        "POSTHOG_HOST": "${EXPO_PUBLIC_POSTHOG_HOST}"
+      },
+      "channel": "beta-production"
+    },
     "production": {
-      "extends": "base"
+      "extends": "base",
+      "autoIncrement": true,
+      "env": {
+        "APP_ENV": "production",
+        "API_URL": "${PRODUCTION_API_URL}",
+        "SENTRY_DSN": "${EXPO_PUBLIC_SENTRY_DSN_PROD}",
+        "POSTHOG_KEY": "${EXPO_PUBLIC_POSTHOG_KEY_PROD}",
+        "POSTHOG_HOST": "${EXPO_PUBLIC_POSTHOG_HOST}"
+      },
+      "ios": {
+        "enterpriseProvisioning": "universal"
+      },
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "channel": "production"
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "${APPLE_ID}",
+        "ascAppId": "${ASC_APP_ID}",
+        "appleTeamId": "${APPLE_TEAM_ID}"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-services.json",
+        "track": "internal"
+      }
+    },
+    "beta": {
+      "ios": {
+        "appleId": "${APPLE_ID}",
+        "ascAppId": "${ASC_APP_ID}",
+        "appleTeamId": "${APPLE_TEAM_ID}"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-services.json",
+        "track": "internal"
+      }
+    }
   }
 }
