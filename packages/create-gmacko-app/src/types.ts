@@ -1,0 +1,60 @@
+export interface IntegrationConfig {
+  sentry: boolean;
+  posthog: boolean;
+  stripe: boolean;
+  email: { enabled: boolean; provider: "resend" | "sendgrid" | "none" };
+  realtime: { enabled: boolean; provider: "pusher" | "ably" | "none" };
+  storage: { enabled: boolean; provider: "uploadthing" | "none" };
+}
+
+export interface PlatformConfig {
+  web: boolean;
+  mobile: boolean;
+  tanstackStart: boolean;
+}
+
+export interface CliOptions {
+  appName: string;
+  displayName: string;
+  packageScope: string;
+  platforms: PlatformConfig;
+  integrations: IntegrationConfig;
+  includeAi: boolean;
+  includeProvision: boolean;
+  prune: boolean;
+  install: boolean;
+  git: boolean;
+}
+
+export type IntegrationPreset =
+  | "core"
+  | "recommended"
+  | "everything"
+  | "custom";
+
+export const DEFAULT_INTEGRATIONS: IntegrationConfig = {
+  sentry: true,
+  posthog: true,
+  stripe: false,
+  email: { enabled: false, provider: "none" },
+  realtime: { enabled: false, provider: "none" },
+  storage: { enabled: false, provider: "none" },
+};
+
+export const CORE_INTEGRATIONS: IntegrationConfig = {
+  sentry: false,
+  posthog: false,
+  stripe: false,
+  email: { enabled: false, provider: "none" },
+  realtime: { enabled: false, provider: "none" },
+  storage: { enabled: false, provider: "none" },
+};
+
+export const EVERYTHING_INTEGRATIONS: IntegrationConfig = {
+  sentry: true,
+  posthog: true,
+  stripe: true,
+  email: { enabled: true, provider: "resend" },
+  realtime: { enabled: true, provider: "pusher" },
+  storage: { enabled: true, provider: "uploadthing" },
+};

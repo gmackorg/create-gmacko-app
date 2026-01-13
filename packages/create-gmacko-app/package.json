@@ -1,0 +1,36 @@
+{
+  "name": "create-gmacko-app",
+  "version": "0.1.0",
+  "description": "Create a new Gmacko app with Next.js, Expo, tRPC, and more",
+  "type": "module",
+  "bin": {
+    "create-gmacko-app": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "template"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.9.1",
+    "commander": "^13.1.0",
+    "fs-extra": "^11.3.0",
+    "picocolors": "^1.1.1",
+    "validate-npm-package-name": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "catalog:",
+    "@types/validate-npm-package-name": "^4.0.2",
+    "tsup": "^8.5.0",
+    "typescript": "catalog:"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
