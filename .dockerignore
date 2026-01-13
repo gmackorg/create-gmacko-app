@@ -1,0 +1,61 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Build outputs
+.next
+**/dist
+**/.turbo
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Testing
+coverage
+**/coverage
+playwright-report
+test-results
+.maestro
+
+# Environment files (we pass these as build args)
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Development files
+*.md
+!README.md
+LICENSE
+.changeset
+.github
+
+# Mobile apps (not needed for web docker build)
+apps/expo
+apps/tanstack-start
+
+# Generated SDKs
+sdks/generated
+
+# Tooling configs
+tooling/vitest
+tooling/openapi-generator
+
+# Cache
+.cache
+.pnpm-store
