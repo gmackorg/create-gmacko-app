@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@trpc/client": "catalog:",
+    "@trpc/server": "catalog:",
     "superjson": "2.2.3"
   },
   "devDependencies": {
@@ -34,7 +35,7 @@
     "@types/node": "catalog:",
     "eslint": "catalog:",
     "prettier": "catalog:",
-    "tsup": "^8.3.5",
+    "tsup": "^8.5.0",
     "typescript": "catalog:"
   },
   "peerDependencies": {

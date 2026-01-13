@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 
 import { Button } from "@gmacko/ui/button";
 
@@ -8,9 +9,12 @@ import { useTRPC } from "~/trpc/react";
 
 export function AdminDashboard() {
   const trpc = useTRPC();
-  const { data: stats, isLoading: statsLoading } = trpc.admin.stats.useQuery();
-  const { data: recentUsers, isLoading: usersLoading } =
-    trpc.admin.listUsers.useQuery({ limit: 5 });
+  const { data: stats, isLoading: statsLoading } = useQuery(
+    trpc.admin.stats.queryOptions(),
+  );
+  const { data: recentUsers, isLoading: usersLoading } = useQuery(
+    trpc.admin.listUsers.queryOptions({ limit: 5 }),
+  );
 
   return (
     <div className="space-y-6">

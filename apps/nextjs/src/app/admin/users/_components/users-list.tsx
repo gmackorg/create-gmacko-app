@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@gmacko/ui/button";
 
@@ -23,18 +23,22 @@ export function UsersList() {
   const [isPending, startTransition] = useTransition();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const { data, isLoading } = trpc.admin.listUsers.useQuery({ limit: 20 });
+  const { data, isLoading } = useQuery(
+    trpc.admin.listUsers.queryOptions({ limit: 20 }),
+  );
 
-  const updateRole = trpc.admin.updateUserRole.useMutation({
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: trpc.admin.listUsers.queryKey(),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: trpc.admin.stats.queryKey(),
-      });
-    },
-  });
+  const updateRole = useMutation(
+    trpc.admin.updateUserRole.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.listUsers.queryKey(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.stats.queryKey(),
+        });
+      },
+    }),
+  );
 
   const handleRoleChange = (userId: string, newRole: UserRole) => {
     startTransition(() => {

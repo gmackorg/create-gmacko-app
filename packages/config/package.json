@@ -29,6 +29,7 @@
     "@gmacko/eslint-config": "workspace:*",
     "@gmacko/prettier-config": "workspace:*",
     "@gmacko/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
     "eslint": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:"

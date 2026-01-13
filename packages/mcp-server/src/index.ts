@@ -15,9 +15,17 @@ if (!API_KEY) {
   process.exit(1);
 }
 
-interface TrpcResponse<T> {
+interface SuperJSONValue {
+  json: unknown;
+  meta?: {
+    values?: Record<string, string[]>;
+    referentialEqualities?: Record<string, string[]>;
+  };
+}
+
+interface TrpcResponse {
   result?: {
-    data: T;
+    data: SuperJSONValue;
   };
   error?: {
     message: string;
@@ -43,7 +51,7 @@ async function callTrpc<T>(path: string, input?: unknown): Promise<T> {
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
 
-  const data = (await response.json()) as TrpcResponse<T>;
+  const data = (await response.json()) as TrpcResponse;
 
   if (data.error) {
     throw new Error(`tRPC Error (${data.error.code}): ${data.error.message}`);
@@ -54,7 +62,7 @@ async function callTrpc<T>(path: string, input?: unknown): Promise<T> {
   }
 
   return superjson.deserialize(
-    data.result as Parameters<typeof superjson.deserialize>[0],
+    data.result.data as Parameters<typeof superjson.deserialize>[0],
   ) as T;
 }
 

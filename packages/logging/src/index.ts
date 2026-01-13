@@ -222,11 +222,12 @@ export async function setUserContext(user: {
   const sentry = await getSentry();
   if (!sentry) return;
 
+  const { id, email, username, ...rest } = user;
   sentry.setUser({
-    id: user.id,
-    email: user.email,
-    username: user.username,
-    ...user,
+    id,
+    email,
+    username,
+    ...rest,
   });
 }
 
