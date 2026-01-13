@@ -1,0 +1,17 @@
+{
+  "$schema": "https://opencode.ai/schemas/opencode.json",
+  "name": "create-gmacko-app",
+  "skills": {
+    "project-context": {
+      "description": "Understand the create-gmacko-app template structure and patterns",
+      "file": ".opencode/skill/project-context.md"
+    }
+  },
+  "context": {
+    "include": [
+      "packages/config/src/integrations.ts",
+      "gmacko.integrations.json",
+      "docs/ai/IMPLEMENTATION_PLAN.md"
+    ]
+  }
+}

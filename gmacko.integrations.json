@@ -1,0 +1,18 @@
+{
+  "preset": "recommended",
+  "integrations": {
+    "sentry": true,
+    "posthog": true,
+    "stripe": false,
+    "email": { "enabled": false, "provider": "none" },
+    "realtime": { "enabled": false, "provider": "none" },
+    "storage": { "enabled": false, "provider": "none" }
+  },
+  "platforms": {
+    "web": true,
+    "mobile": true,
+    "tanstackStart": true
+  },
+  "scaffoldedAt": "2026-01-12T00:00:00.000Z",
+  "packageScope": "@gmacko"
+}

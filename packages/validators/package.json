@@ -1,5 +1,5 @@
 {
-  "name": "@acme/validators",
+  "name": "@gmacko/validators",
   "private": true,
   "type": "module",
   "exports": {
@@ -21,12 +21,12 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@acme/eslint-config": "workspace:*",
-    "@acme/prettier-config": "workspace:*",
-    "@acme/tsconfig": "workspace:*",
+    "@gmacko/eslint-config": "workspace:*",
+    "@gmacko/prettier-config": "workspace:*",
+    "@gmacko/tsconfig": "workspace:*",
     "eslint": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:"
   },
-  "prettier": "@acme/prettier-config"
+  "prettier": "@gmacko/prettier-config"
 }

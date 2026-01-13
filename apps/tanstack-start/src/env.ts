@@ -2,7 +2,7 @@ import { createEnv } from "@t3-oss/env-core";
 import { vercel } from "@t3-oss/env-core/presets-zod";
 import { z } from "zod/v4";
 
-import { authEnv } from "@acme/auth/env";
+import { authEnv } from "@gmacko/auth/env";
 
 export const env = createEnv({
   clientPrefix: "VITE_",
@@ -17,7 +17,7 @@ export const env = createEnv({
    * This way you can ensure the app isn't built with invalid env vars.
    */
   server: {
-    POSTGRES_URL: z.url(),
+    DATABASE_URL: z.url(),
   },
 
   /**

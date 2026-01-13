@@ -1,5 +1,5 @@
 {
-  "name": "create-t3-turbo",
+  "name": "create-gmacko-app",
   "private": true,
   "engines": {
     "node": "^22.21.0",
@@ -10,11 +10,13 @@
     "build": "turbo run build",
     "clean": "git clean -xdf node_modules",
     "clean:workspaces": "turbo run clean",
-    "auth:generate": "pnpm -F @acme/auth generate",
-    "db:push": "turbo -F @acme/db push",
-    "db:studio": "turbo -F @acme/db studio",
+    "setup": "./scripts/setup.sh",
+    "provision": "./scripts/provision.sh",
+    "auth:generate": "pnpm -F @gmacko/auth generate",
+    "db:push": "turbo -F @gmacko/db push",
+    "db:studio": "turbo -F @gmacko/db studio",
     "dev": "turbo watch dev --continue",
-    "dev:next": "turbo watch dev -F @acme/nextjs...",
+    "dev:next": "turbo watch dev -F @gmacko/nextjs...",
     "format": "turbo run format --continue -- --cache --cache-location .cache/.prettiercache",
     "format:fix": "turbo run format --continue -- --write --cache --cache-location .cache/.prettiercache",
     "lint": "turbo run lint --continue -- --cache --cache-location .cache/.eslintcache",
@@ -27,12 +29,12 @@
     "ios": "expo run:ios"
   },
   "devDependencies": {
-    "@acme/prettier-config": "workspace:*",
+    "@gmacko/prettier-config": "workspace:*",
     "@turbo/gen": "^2.5.8",
     "dotenv-cli": "^10.0.0",
     "prettier": "catalog:",
     "turbo": "^2.5.8",
     "typescript": "catalog:"
   },
-  "prettier": "@acme/prettier-config"
+  "prettier": "@gmacko/prettier-config"
 }

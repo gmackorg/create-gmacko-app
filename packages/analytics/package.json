@@ -1,0 +1,46 @@
+{
+  "name": "@gmacko/analytics",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./web": {
+      "types": "./dist/web/index.d.ts",
+      "default": "./src/web/index.tsx"
+    },
+    "./native": {
+      "types": "./dist/native/index.d.ts",
+      "default": "./src/native/index.tsx"
+    }
+  },
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc",
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "dev": "tsc",
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "lint": "eslint --flag unstable_native_nodejs_ts_config",
+    "typecheck": "tsc --noEmit --emitDeclarationOnly false"
+  },
+  "dependencies": {
+    "@gmacko/config": "workspace:*",
+    "posthog-js": "^1.224.0",
+    "posthog-react-native": "^3.5.2"
+  },
+  "devDependencies": {
+    "@gmacko/eslint-config": "workspace:*",
+    "@gmacko/prettier-config": "workspace:*",
+    "@gmacko/tsconfig": "workspace:*",
+    "@types/react": "catalog:react19",
+    "eslint": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  },
+  "prettier": "@gmacko/prettier-config"
+}

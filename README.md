@@ -1,8 +1,10 @@
-# create-t3-turbo
+# create-gmacko-app
 
-> [!NOTE]
->
-> create-t3-turbo now includes the option to use Tanstack Start for the web app!
+A fork of [create-t3-turbo](https://github.com/t3-oss/create-t3-turbo) with:
+
+- Neon Postgres (instead of Vercel Postgres)
+- Conditional integration system (Sentry, PostHog, Stripe, Email, Realtime, Storage)
+- AI workflow support via OpenCode skills
 
 ## Installation
 
@@ -10,14 +12,12 @@
 >
 > Make sure to follow the system requirements specified in [`package.json#engines`](./package.json#L4) before proceeding.
 
-There are two ways of initializing an app using the `create-t3-turbo` starter. You can either use this repository as a template:
-
-![use-as-template](https://github.com/t3-oss/create-t3-turbo/assets/51714798/bb6c2e5d-d8b6-416e-aeb3-b3e50e2ca994)
-
-or use Turbo's CLI to init your project (use PNPM as package manager):
+Clone this repository or use it as a template:
 
 ```bash
-npx create-turbo@latest -e https://github.com/t3-oss/create-t3-turbo
+git clone https://github.com/gmackorg/create-gmacko-app.git my-app
+cd my-app
+pnpm setup
 ```
 
 ## About
@@ -53,11 +53,25 @@ packages
   ├─ api
   │   └─ tRPC v11 router definition
   ├─ auth
-  │   └─ Authentication using better-auth.
+  │   └─ Authentication using better-auth
+  ├─ config
+  │   └─ Integration flags (single source of truth)
   ├─ db
-  │   └─ Typesafe db calls using Drizzle & Supabase
-  └─ ui
-      └─ Start of a UI package for the webapp using shadcn-ui
+  │   └─ Typesafe db calls using Drizzle & Neon
+  ├─ ui
+  │   └─ UI components using shadcn-ui
+  ├─ analytics
+  │   └─ PostHog analytics wrapper (optional)
+  ├─ monitoring
+  │   └─ Sentry monitoring wrapper (optional)
+  ├─ payments
+  │   └─ Stripe payments wrapper (optional)
+  ├─ email
+  │   └─ Email service wrapper (optional)
+  ├─ realtime
+  │   └─ Realtime service wrapper (optional)
+  └─ storage
+      └─ File storage wrapper (optional)
 tooling
   ├─ eslint
   │   └─ shared, fine-grained, eslint presets
@@ -69,12 +83,29 @@ tooling
       └─ shared tsconfig you can extend from
 ```
 
-> In this template, we use `@acme` as a placeholder for package names. As a user, you might want to replace it with your own organization or project name. You can use find-and-replace to change all the instances of `@acme` to something like `@my-company` or `@project-name`.
+> In this template, we use `@gmacko` as a placeholder for package names. You can replace it with your own organization or project name using find-and-replace.
+
+## Integrations
+
+This template uses a conditional integration system. Edit `packages/config/src/integrations.ts` to enable/disable integrations:
+
+```typescript
+export const integrations = {
+  sentry: true, // Monitoring (default ON)
+  posthog: true, // Analytics (default ON)
+  stripe: false, // Payments (default OFF)
+  email: { enabled: false, provider: "none" },
+  realtime: { enabled: false, provider: "none" },
+  storage: { enabled: false, provider: "none" },
+} as const;
+```
+
+Disabled integrations require no env vars and have no runtime code paths.
 
 ## Quick Start
 
 > **Note**
-> The [db](./packages/db) package is preconfigured to use Supabase and is **edge-bound** with the [Vercel Postgres](https://github.com/vercel/storage/tree/main/packages/postgres) driver. If you're using something else, make the necessary modifications to the [schema](./packages/db/src/schema.ts) as well as the [client](./packages/db/src/index.ts) and the [drizzle config](./packages/db/drizzle.config.ts). If you want to switch to non-edge database driver, remove `export const runtime = "edge";` [from all pages and api routes](https://github.com/t3-oss/create-t3-turbo/issues/634#issuecomment-1730240214).
+> The database is configured for [Neon Postgres](https://neon.tech) using the `@neondatabase/serverless` driver with Drizzle ORM.
 
 To get it running, follow the steps below:
 
@@ -102,7 +133,7 @@ This project uses [Better Auth](https://www.better-auth.com) for authentication.
 
 ```bash
 # Generate the Better Auth schema
-pnpm --filter @acme/auth generate
+pnpm --filter @gmacko/auth generate
 ```
 
 This command runs the Better Auth CLI with the following configuration:
@@ -114,7 +145,7 @@ The generation process:
 
 1. Reads the Better Auth configuration from `packages/auth/script/auth-cli.ts`
 2. Generates the appropriate database schema based on your auth setup
-3. Outputs a Drizzle-compatible schema file to the `@acme/db` package
+3. Outputs a Drizzle-compatible schema file to the `@gmacko/db` package
 
 > **Note**: The `auth-cli.ts` file is placed in the `script/` directory (instead of `src/`) to prevent accidental imports from other parts of the codebase. This file is exclusively for CLI schema generation and should **not** be used directly in your application. For runtime authentication, use the configuration from `packages/auth/src/index.ts`.
 
