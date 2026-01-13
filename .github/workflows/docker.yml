@@ -1,0 +1,119 @@
+name: Docker Build & Push
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - "v*"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/nextjs/**"
+      - "packages/**"
+      - "Dockerfile"
+      - ".github/workflows/docker.yml"
+  workflow_dispatch:
+    inputs:
+      registry:
+        description: "Container registry"
+        required: true
+        default: "ghcr"
+        type: choice
+        options:
+          - ghcr
+          - dockerhub
+          - harbor
+      harbor_url:
+        description: "Harbor registry URL (if using Harbor)"
+        required: false
+        type: string
+
+env:
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    name: Build & Push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Determine registry
+        id: registry
+        run: |
+          REGISTRY="${{ inputs.registry || vars.DOCKER_REGISTRY || 'ghcr' }}"
+
+          case "$REGISTRY" in
+            ghcr)
+              echo "url=ghcr.io" >> $GITHUB_OUTPUT
+              echo "image=ghcr.io/${{ github.repository }}" >> $GITHUB_OUTPUT
+              ;;
+            dockerhub)
+              echo "url=docker.io" >> $GITHUB_OUTPUT
+              echo "image=${{ vars.DOCKERHUB_USERNAME || github.repository_owner }}/${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
+              ;;
+            harbor)
+              HARBOR_URL="${{ inputs.harbor_url || vars.HARBOR_REGISTRY_URL }}"
+              echo "url=$HARBOR_URL" >> $GITHUB_OUTPUT
+              echo "image=$HARBOR_URL/${{ vars.HARBOR_PROJECT || 'library' }}/${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+          echo "registry=$REGISTRY" >> $GITHUB_OUTPUT
+
+      - name: Log in to GitHub Container Registry
+        if: steps.registry.outputs.registry == 'ghcr'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        if: steps.registry.outputs.registry == 'dockerhub'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Log in to Harbor
+        if: steps.registry.outputs.registry == 'harbor'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ steps.registry.outputs.url }}
+          username: ${{ vars.HARBOR_USERNAME || secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.registry.outputs.image }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            SKIP_ENV_VALIDATION=true
+
+      - name: Image digest
+        run: echo "Image pushed with digest ${{ steps.build-push.outputs.digest }}"

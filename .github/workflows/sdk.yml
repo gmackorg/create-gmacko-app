@@ -1,0 +1,170 @@
+name: SDK Generation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/api/**"
+      - "sdks/openapi/**"
+      - "tooling/openapi-generator/**"
+      - ".github/workflows/sdk.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "packages/api/**"
+      - "sdks/openapi/**"
+      - "tooling/openapi-generator/**"
+      - ".github/workflows/sdk.yml"
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      languages:
+        description: "Languages to generate (comma-separated, or 'all')"
+        required: false
+        default: "typescript,python"
+
+env:
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
+jobs:
+  generate-spec:
+    name: Generate OpenAPI Spec
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate OpenAPI spec
+        run: pnpm -F @gmacko/openapi-spec generate
+        env:
+          API_TITLE: "Gmacko API"
+          API_VERSION: ${{ github.event.release.tag_name || '1.0.0' }}
+
+      - name: Upload spec artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-spec
+          path: sdks/openapi/openapi.json
+
+      - name: Check for spec drift (PR only)
+        if: github.event_name == 'pull_request'
+        run: |
+          git diff --exit-code sdks/openapi/openapi.json || {
+            echo "::warning::OpenAPI spec has changed. Commit the updated spec."
+            exit 1
+          }
+
+  generate-sdks:
+    name: Generate SDKs
+    needs: generate-spec
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        language: [typescript, python, go, java, kotlin, swift, rust, ruby]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Setup Java (for openapi-generator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Download OpenAPI spec
+        uses: actions/download-artifact@v4
+        with:
+          name: openapi-spec
+          path: sdks/openapi
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: tooling/openapi-generator
+
+      - name: Generate SDK
+        run: pnpm generate --language ${{ matrix.language }}
+        working-directory: tooling/openapi-generator
+
+      - name: Upload SDK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-${{ matrix.language }}
+          path: sdks/generated/${{ matrix.language }}
+
+  publish-sdks:
+    name: Publish SDKs
+    needs: generate-sdks
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all SDK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: sdks/generated
+          pattern: sdk-*
+          merge-multiple: true
+
+      - name: Setup Python (for PyPI publish)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Publish Python SDK to PyPI
+        if: vars.PUBLISH_PYPI == 'true'
+        run: |
+          cd sdks/generated/python
+          pip install build twine
+          python -m build
+          twine upload dist/*
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+
+      - name: Setup Go (for Go module)
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Tag Go SDK
+        if: vars.PUBLISH_GO == 'true'
+        run: |
+          cd sdks/generated/go
+          git tag go/v${{ github.event.release.tag_name }}
+          git push origin go/v${{ github.event.release.tag_name }}
+
+      - name: Create GitHub Release assets
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            sdks/generated/*/README.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

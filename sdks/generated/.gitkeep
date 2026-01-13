@@ -1,0 +1,3 @@
+# Generated SDKs directory
+# SDKs are generated from the OpenAPI spec at build time
+# Do not commit generated files - they are built in CI

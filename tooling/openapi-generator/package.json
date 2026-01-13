@@ -1,0 +1,21 @@
+{
+  "name": "@gmacko/openapi-generator",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "tsx generate.ts",
+    "generate:python": "tsx generate.ts --language python",
+    "generate:go": "tsx generate.ts --language go",
+    "generate:ruby": "tsx generate.ts --language ruby",
+    "generate:java": "tsx generate.ts --language java",
+    "generate:kotlin": "tsx generate.ts --language kotlin",
+    "generate:swift": "tsx generate.ts --language swift",
+    "generate:rust": "tsx generate.ts --language rust",
+    "generate:all": "tsx generate.ts --all",
+    "clean": "rm -rf ../../sdks/generated"
+  },
+  "devDependencies": {
+    "@openapitools/openapi-generator-cli": "^2.19.0",
+    "tsx": "^4.19.0"
+  }
+}
