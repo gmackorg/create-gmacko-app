@@ -1,3 +1,8 @@
+---
+name: frontend-development
+description: Build UI components for web (shadcn/ui) and mobile (NativeWind)
+---
+
 # Frontend Development Skill
 
 Use this skill when building UI components for web (shadcn/ui) and mobile (NativeWind).
@@ -297,40 +302,6 @@ export function ItemList() {
 }
 ```
 
-### Bottom Sheet Pattern
-
-```typescript
-import { useRef } from "react";
-import { View, Text, Pressable } from "react-native";
-import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
-
-export function MyBottomSheet() {
-  const bottomSheetRef = useRef<BottomSheet>(null);
-
-  return (
-    <>
-      <Pressable onPress={() => bottomSheetRef.current?.expand()}>
-        <Text>Open Sheet</Text>
-      </Pressable>
-
-      <BottomSheet
-        ref={bottomSheetRef}
-        index={-1}
-        snapPoints={["25%", "50%"]}
-        enablePanDownToClose
-      >
-        <BottomSheetView className="p-4">
-          <Text className="text-foreground text-xl font-bold mb-4">
-            Sheet Content
-          </Text>
-          {/* Content */}
-        </BottomSheetView>
-      </BottomSheet>
-    </>
-  );
-}
-```
-
 ## Shared Tailwind Classes Reference
 
 ### Colors (both platforms)
@@ -364,36 +335,7 @@ Flex: flex-1, flex-row, items-center, justify-center, justify-between
 Rounded: rounded-sm, rounded-md, rounded-lg, rounded-full
 ```
 
-## Responsive Design
-
-### Web (Tailwind breakpoints)
-
-```typescript
-<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-  {items.map((item) => (
-    <Card key={item.id}>{item.title}</Card>
-  ))}
-</div>
-```
-
-### Mobile (use Dimensions or hooks)
-
-```typescript
-import { useWindowDimensions } from "react-native";
-
-function ResponsiveLayout({ children }) {
-  const { width } = useWindowDimensions();
-  const isTablet = width >= 768;
-
-  return (
-    <View className={isTablet ? "flex-row" : "flex-col"}>
-      {children}
-    </View>
-  );
-}
-```
-
-## Loading & Error States
+## Loading and Error States
 
 Always handle these states:
 

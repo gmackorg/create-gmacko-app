@@ -1,3 +1,8 @@
+---
+name: project-context
+description: Understand the create-gmacko-app template structure and patterns
+---
+
 # Project Context Skill
 
 Use this skill to understand the create-gmacko-app template structure.

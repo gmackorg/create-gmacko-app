@@ -1,3 +1,8 @@
+---
+name: feature-development
+description: Implement full-stack features with database, API, web UI, and mobile UI
+---
+
 # Feature Development Skill
 
 Use this skill when implementing full-stack features in the create-gmacko-app template.
@@ -253,43 +258,6 @@ if (integrations.yourFeature) {
 1. Create wrapper package in `packages/your-service/`
 2. Follow existing packages for pattern (analytics, monitoring, etc.)
 3. Export unified interface that handles disabled state
-
-## Common Patterns
-
-### Optimistic updates
-
-```typescript
-const utils = api.useUtils();
-const mutation = api.yourFeature.create.useMutation({
-  onMutate: async (newItem) => {
-    await utils.yourFeature.all.cancel();
-    const previous = utils.yourFeature.all.getData();
-    utils.yourFeature.all.setData(undefined, (old) => [
-      ...(old ?? []),
-      newItem,
-    ]);
-    return { previous };
-  },
-  onError: (err, newItem, context) => {
-    utils.yourFeature.all.setData(undefined, context?.previous);
-  },
-  onSettled: () => {
-    utils.yourFeature.all.invalidate();
-  },
-});
-```
-
-### Real-time subscriptions (if realtime enabled)
-
-```typescript
-import { useRealtimeSubscription } from "@gmacko/realtime";
-
-const { data } = useRealtimeSubscription("your-channel", {
-  onMessage: (msg) => {
-    utils.yourFeature.all.invalidate();
-  },
-});
-```
 
 ## Verification Steps
 
