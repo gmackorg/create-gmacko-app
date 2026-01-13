@@ -8,9 +8,9 @@ import { and, eq, gt, isNull } from "@gmacko/db";
 import { db } from "@gmacko/db/client";
 import { apiKeys, user } from "@gmacko/db/schema";
 
-type ApiKeyPermission = "read" | "write" | "delete" | "admin";
+export type ApiKeyPermission = "read" | "write" | "delete" | "admin";
 
-interface ApiKeyAuth {
+export interface ApiKeyAuth {
   userId: string;
   permissions: ApiKeyPermission[];
   keyId: string;

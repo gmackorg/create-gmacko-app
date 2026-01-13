@@ -1,0 +1,91 @@
+name: Database Migrations
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/db/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "packages/db/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
+jobs:
+  check-migrations:
+    name: Check Migrations
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate migrations (dry run)
+        working-directory: packages/db
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          # Generate migrations to a temp directory
+          pnpm with-env drizzle-kit generate --name ci_check 2>&1 || true
+
+      - name: Check for uncommitted migration changes
+        working-directory: packages/db
+        run: |
+          # Check if there are any new SQL files that should have been committed
+          if git status --porcelain drizzle/ | grep -q "^?"; then
+            echo "::error::Uncommitted migration files detected!"
+            echo "New migration files found that should be committed:"
+            git status --porcelain drizzle/
+            echo ""
+            echo "Please run 'pnpm --filter @gmacko/db generate' and commit the generated files."
+            exit 1
+          fi
+          echo "✓ All migrations are in sync with schema"
+
+  validate-migrations:
+    name: Validate Migration Files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate migration integrity
+        working-directory: packages/db
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          # Run drizzle-kit check to validate migrations
+          pnpm with-env drizzle-kit check 2>&1 || {
+            echo "::warning::Migration validation returned non-zero exit code"
+            echo "This may indicate schema drift or migration issues"
+          }

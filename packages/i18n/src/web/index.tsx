@@ -91,3 +91,5 @@ export async function loadMessages(locale: Locale): Promise<Messages> {
     return fallback.default;
   }
 }
+
+export { LocaleSwitcher } from "./locale-switcher";

@@ -9,6 +9,7 @@ export {
   getLocaleFromPath,
   getPathWithLocale,
   loadMessages,
+  LocaleSwitcher,
 } from "./web";
 
 export {

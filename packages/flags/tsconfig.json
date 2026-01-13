@@ -1,0 +1,8 @@
+{
+  "extends": "@gmacko/tsconfig/compiled-package.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "jsx": "react-jsx"
+  },
+  "include": ["src"]
+}

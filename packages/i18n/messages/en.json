@@ -10,7 +10,41 @@
     "back": "Back",
     "next": "Next",
     "submit": "Submit",
-    "welcome": "Welcome"
+    "welcome": "Welcome",
+    "search": "Search",
+    "close": "Close",
+    "open": "Open",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No",
+    "ok": "OK",
+    "done": "Done",
+    "create": "Create",
+    "update": "Update",
+    "view": "View",
+    "download": "Download",
+    "upload": "Upload",
+    "refresh": "Refresh",
+    "settings": "Settings",
+    "help": "Help",
+    "more": "More",
+    "less": "Less",
+    "showMore": "Show more",
+    "showLess": "Show less",
+    "selectLanguage": "Select language"
+  },
+  "nav": {
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "profile": "Profile",
+    "settings": "Settings",
+    "notifications": "Notifications",
+    "messages": "Messages",
+    "account": "Account",
+    "billing": "Billing",
+    "support": "Support",
+    "documentation": "Documentation",
+    "api": "API"
   },
   "auth": {
     "signIn": "Sign In",
@@ -18,11 +52,60 @@
     "signUp": "Sign Up",
     "email": "Email",
     "password": "Password",
-    "forgotPassword": "Forgot Password?"
+    "confirmPassword": "Confirm Password",
+    "forgotPassword": "Forgot Password?",
+    "resetPassword": "Reset Password",
+    "createAccount": "Create Account",
+    "alreadyHaveAccount": "Already have an account?",
+    "dontHaveAccount": "Don't have an account?",
+    "rememberMe": "Remember me",
+    "orContinueWith": "Or continue with",
+    "verifyEmail": "Verify your email",
+    "checkEmail": "Check your email for a verification link",
+    "sessionExpired": "Your session has expired. Please sign in again."
   },
   "errors": {
     "required": "This field is required",
     "invalidEmail": "Invalid email address",
-    "networkError": "Network error. Please try again."
+    "invalidPassword": "Password must be at least 8 characters",
+    "passwordMismatch": "Passwords do not match",
+    "networkError": "Network error. Please try again.",
+    "serverError": "Server error. Please try again later.",
+    "unauthorized": "You are not authorized to perform this action",
+    "notFound": "The requested resource was not found",
+    "rateLimited": "Too many requests. Please try again later.",
+    "validationFailed": "Validation failed. Please check your input.",
+    "somethingWentWrong": "Something went wrong. Please try again.",
+    "sessionExpired": "Your session has expired",
+    "forbidden": "Access denied"
+  },
+  "success": {
+    "saved": "Successfully saved",
+    "updated": "Successfully updated",
+    "deleted": "Successfully deleted",
+    "created": "Successfully created",
+    "sent": "Successfully sent",
+    "copied": "Copied to clipboard"
+  },
+  "time": {
+    "justNow": "Just now",
+    "minutesAgo": "{count, plural, =1 {1 minute ago} other {# minutes ago}}",
+    "hoursAgo": "{count, plural, =1 {1 hour ago} other {# hours ago}}",
+    "daysAgo": "{count, plural, =1 {1 day ago} other {# days ago}}",
+    "weeksAgo": "{count, plural, =1 {1 week ago} other {# weeks ago}}",
+    "monthsAgo": "{count, plural, =1 {1 month ago} other {# months ago}}"
+  },
+  "pagination": {
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page {current} of {total}",
+    "showing": "Showing {from} to {to} of {total} results"
+  },
+  "table": {
+    "noData": "No data available",
+    "loading": "Loading data...",
+    "actions": "Actions",
+    "sortAscending": "Sort ascending",
+    "sortDescending": "Sort descending"
   }
 }

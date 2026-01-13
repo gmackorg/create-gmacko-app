@@ -10,7 +10,41 @@
     "back": "Atras",
     "next": "Siguiente",
     "submit": "Enviar",
-    "welcome": "Bienvenido"
+    "welcome": "Bienvenido",
+    "search": "Buscar",
+    "close": "Cerrar",
+    "open": "Abrir",
+    "confirm": "Confirmar",
+    "yes": "Si",
+    "no": "No",
+    "ok": "OK",
+    "done": "Listo",
+    "create": "Crear",
+    "update": "Actualizar",
+    "view": "Ver",
+    "download": "Descargar",
+    "upload": "Subir",
+    "refresh": "Actualizar",
+    "settings": "Configuracion",
+    "help": "Ayuda",
+    "more": "Mas",
+    "less": "Menos",
+    "showMore": "Mostrar mas",
+    "showLess": "Mostrar menos",
+    "selectLanguage": "Seleccionar idioma"
+  },
+  "nav": {
+    "home": "Inicio",
+    "dashboard": "Panel",
+    "profile": "Perfil",
+    "settings": "Configuracion",
+    "notifications": "Notificaciones",
+    "messages": "Mensajes",
+    "account": "Cuenta",
+    "billing": "Facturacion",
+    "support": "Soporte",
+    "documentation": "Documentacion",
+    "api": "API"
   },
   "auth": {
     "signIn": "Iniciar Sesion",
@@ -18,11 +52,60 @@
     "signUp": "Registrarse",
     "email": "Correo electronico",
     "password": "Contrasena",
-    "forgotPassword": "Olvidaste tu contrasena?"
+    "confirmPassword": "Confirmar contrasena",
+    "forgotPassword": "Olvidaste tu contrasena?",
+    "resetPassword": "Restablecer contrasena",
+    "createAccount": "Crear cuenta",
+    "alreadyHaveAccount": "Ya tienes una cuenta?",
+    "dontHaveAccount": "No tienes una cuenta?",
+    "rememberMe": "Recuerdame",
+    "orContinueWith": "O continua con",
+    "verifyEmail": "Verifica tu correo",
+    "checkEmail": "Revisa tu correo para el enlace de verificacion",
+    "sessionExpired": "Tu sesion ha expirado. Por favor, inicia sesion de nuevo."
   },
   "errors": {
     "required": "Este campo es obligatorio",
     "invalidEmail": "Correo electronico invalido",
-    "networkError": "Error de red. Por favor, intenta de nuevo."
+    "invalidPassword": "La contrasena debe tener al menos 8 caracteres",
+    "passwordMismatch": "Las contrasenas no coinciden",
+    "networkError": "Error de red. Por favor, intenta de nuevo.",
+    "serverError": "Error del servidor. Por favor, intenta mas tarde.",
+    "unauthorized": "No estas autorizado para realizar esta accion",
+    "notFound": "El recurso solicitado no fue encontrado",
+    "rateLimited": "Demasiadas solicitudes. Por favor, intenta mas tarde.",
+    "validationFailed": "Validacion fallida. Por favor, revisa tu entrada.",
+    "somethingWentWrong": "Algo salio mal. Por favor, intenta de nuevo.",
+    "sessionExpired": "Tu sesion ha expirado",
+    "forbidden": "Acceso denegado"
+  },
+  "success": {
+    "saved": "Guardado exitosamente",
+    "updated": "Actualizado exitosamente",
+    "deleted": "Eliminado exitosamente",
+    "created": "Creado exitosamente",
+    "sent": "Enviado exitosamente",
+    "copied": "Copiado al portapapeles"
+  },
+  "time": {
+    "justNow": "Ahora mismo",
+    "minutesAgo": "{count, plural, =1 {hace 1 minuto} other {hace # minutos}}",
+    "hoursAgo": "{count, plural, =1 {hace 1 hora} other {hace # horas}}",
+    "daysAgo": "{count, plural, =1 {hace 1 dia} other {hace # dias}}",
+    "weeksAgo": "{count, plural, =1 {hace 1 semana} other {hace # semanas}}",
+    "monthsAgo": "{count, plural, =1 {hace 1 mes} other {hace # meses}}"
+  },
+  "pagination": {
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "page": "Pagina {current} de {total}",
+    "showing": "Mostrando {from} a {to} de {total} resultados"
+  },
+  "table": {
+    "noData": "No hay datos disponibles",
+    "loading": "Cargando datos...",
+    "actions": "Acciones",
+    "sortAscending": "Ordenar ascendente",
+    "sortDescending": "Ordenar descendente"
   }
 }

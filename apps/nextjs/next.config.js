@@ -1,7 +1,10 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import { createJiti } from "jiti";
+import createNextIntlPlugin from "next-intl/plugin";
 
 import { integrations } from "@gmacko/config";
+
+const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const jiti = createJiti(import.meta.url);
 
@@ -16,6 +19,7 @@ const config = {
     "@gmacko/auth",
     "@gmacko/config",
     "@gmacko/db",
+    "@gmacko/i18n",
     "@gmacko/logging",
     "@gmacko/monitoring",
     "@gmacko/ui",
@@ -91,6 +95,9 @@ const sentryConfig = {
   automaticVercelMonitors: true,
 };
 
+// Apply i18n plugin conditionally, then Sentry if enabled
+const configWithI18n = integrations.i18n ? withNextIntl(config) : config;
+
 export default integrations.sentry
-  ? withSentryConfig(config, sentryConfig)
-  : config;
+  ? withSentryConfig(configWithI18n, sentryConfig)
+  : configWithI18n;

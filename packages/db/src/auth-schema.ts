@@ -1,11 +1,15 @@
 import { pgTable } from "drizzle-orm/pg-core";
 
+export const userRoleEnum = ["user", "admin"] as const;
+export type UserRole = (typeof userRoleEnum)[number];
+
 export const user = pgTable("user", (t) => ({
   id: t.text().primaryKey(),
   name: t.text().notNull(),
   email: t.text().notNull().unique(),
   emailVerified: t.boolean().notNull(),
   image: t.text(),
+  role: t.text().$type<UserRole>().notNull().default("user"),
   createdAt: t.timestamp().notNull(),
   updatedAt: t.timestamp().notNull(),
 }));

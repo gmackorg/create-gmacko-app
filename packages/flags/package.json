@@ -1,5 +1,5 @@
 {
-  "name": "@gmacko/i18n",
+  "name": "@gmacko/flags",
   "private": true,
   "type": "module",
   "exports": {
@@ -7,19 +7,14 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
-    "./web": {
-      "types": "./dist/web/index.d.ts",
-      "default": "./src/web/index.tsx"
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "default": "./src/react.tsx"
     },
-    "./web/locale-switcher": {
-      "types": "./dist/web/locale-switcher.d.ts",
-      "default": "./src/web/locale-switcher.tsx"
-    },
-    "./native": {
-      "types": "./dist/native/index.d.ts",
-      "default": "./src/native/index.tsx"
-    },
-    "./messages/*": "./messages/*"
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "default": "./src/server.ts"
+    }
   },
   "license": "MIT",
   "scripts": {
@@ -31,10 +26,7 @@
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
-    "@gmacko/config": "workspace:*",
-    "i18next": "^24.2.3",
-    "next-intl": "^4.1.0",
-    "react-i18next": "^15.5.1"
+    "react": "catalog:react19"
   },
   "devDependencies": {
     "@gmacko/eslint-config": "workspace:*",
@@ -43,20 +35,14 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:react19",
     "eslint": "catalog:",
-    "expo-localization": "~17.0.8",
     "prettier": "catalog:",
     "typescript": "catalog:"
   },
   "peerDependencies": {
-    "expo-localization": ">=17.0.0",
-    "next": ">=15.0.0",
-    "react": ">=18.0.0"
+    "react": ">=18"
   },
   "peerDependenciesMeta": {
-    "expo-localization": {
-      "optional": true
-    },
-    "next": {
+    "react": {
       "optional": true
     }
   },
