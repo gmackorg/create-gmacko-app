@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@gmacko/config": "workspace:*",
-    "resend": "^4.5.1"
+    "resend": "^6.9.4"
   },
   "devDependencies": {
     "@gmacko/eslint-config": "workspace:*",

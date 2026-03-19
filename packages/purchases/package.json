@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@gmacko/config": "workspace:*",
-    "react-native-purchases": "^8.10.6"
+    "react-native-purchases": "^9.14.0"
   },
   "devDependencies": {
     "@gmacko/eslint-config": "workspace:*",

@@ -32,9 +32,9 @@
   },
   "dependencies": {
     "@gmacko/config": "workspace:*",
-    "i18next": "^24.2.3",
-    "next-intl": "^4.1.0",
-    "react-i18next": "^15.5.1"
+    "i18next": "^25.8.18",
+    "next-intl": "^4.8.3",
+    "react-i18next": "^16.5.8"
   },
   "devDependencies": {
     "@gmacko/eslint-config": "workspace:*",
@@ -43,7 +43,7 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:react19",
     "eslint": "catalog:",
-    "expo-localization": "~17.0.8",
+    "expo-localization": "~55.0.9",
     "prettier": "catalog:",
     "typescript": "catalog:"
   },

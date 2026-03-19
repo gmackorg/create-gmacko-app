@@ -12,6 +12,7 @@ coverage
 .next/
 out/
 next-env.d.ts
+storybook-static/
 
 # nitro
 .nitro/

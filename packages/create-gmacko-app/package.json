@@ -21,20 +21,20 @@
     "test:e2e:update": "vitest run --config vitest.e2e.config.ts --update"
   },
   "dependencies": {
-    "@clack/prompts": "^0.9.1",
-    "commander": "^13.1.0",
-    "fs-extra": "^11.3.0",
+    "@clack/prompts": "^1.1.0",
+    "commander": "^14.0.3",
+    "fs-extra": "^11.3.4",
     "picocolors": "^1.1.1",
-    "validate-npm-package-name": "^6.0.0"
+    "validate-npm-package-name": "^7.0.2"
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
     "@types/node": "catalog:",
     "@types/validate-npm-package-name": "^4.0.2",
-    "execa": "^9.5.2",
-    "tsup": "^8.5.0",
+    "execa": "^9.6.1",
+    "tsup": "^8.5.1",
     "typescript": "catalog:",
-    "vitest": "^3.2.3"
+    "vitest": "^4.1.0"
   },
   "publishConfig": {
     "access": "public"

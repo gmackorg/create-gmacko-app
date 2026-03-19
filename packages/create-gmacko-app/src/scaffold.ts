@@ -7,7 +7,9 @@ import pc from "picocolors";
 import type { CliOptions, IntegrationConfig } from "./types.js";
 import { runProvisioning } from "./provision.js";
 
-const TEMPLATE_REPO = "https://github.com/gmackorg/create-gmacko-app.git";
+const TEMPLATE_REPO =
+  process.env.CREATE_GMACKO_APP_TEMPLATE_REPO ??
+  "https://github.com/gmackorg/create-gmacko-app.git";
 
 export async function scaffold(options: CliOptions): Promise<void> {
   const targetDir = path.resolve(process.cwd(), options.appName);
@@ -26,10 +28,17 @@ export async function scaffold(options: CliOptions): Promise<void> {
 
   spinner.start("Cloning template...");
   try {
-    execSync(`git clone --depth 1 ${TEMPLATE_REPO} "${targetDir}"`, {
-      stdio: "pipe",
-    });
-    fs.removeSync(path.join(targetDir, ".git"));
+    if (isLocalTemplatePath(TEMPLATE_REPO)) {
+      fs.copySync(TEMPLATE_REPO, targetDir, {
+        filter: (src) => shouldCopyTemplatePath(src, TEMPLATE_REPO),
+      });
+    } else {
+      execSync(`git clone --depth 1 ${TEMPLATE_REPO} "${targetDir}"`, {
+        stdio: "pipe",
+      });
+      fs.removeSync(path.join(targetDir, ".git"));
+    }
+
     spinner.stop("Template cloned");
   } catch {
     spinner.stop("Failed to clone template");
@@ -55,7 +64,10 @@ export async function scaffold(options: CliOptions): Promise<void> {
   }
 
   if (!options.includeAi) {
+    fs.removeSync(path.join(targetDir, ".claude"));
     fs.removeSync(path.join(targetDir, ".opencode"));
+    fs.removeSync(path.join(targetDir, "CLAUDE.md"));
+    fs.removeSync(path.join(targetDir, "DESIGN.md"));
     fs.removeSync(path.join(targetDir, "docs/ai"));
     fs.removeSync(path.join(targetDir, "opencode.json"));
   }
@@ -297,4 +309,28 @@ function getAllFiles(dir: string): string[] {
 
   walk(dir);
   return files;
+}
+
+function isLocalTemplatePath(templateRepo: string): boolean {
+  return fs.existsSync(templateRepo) && fs.statSync(templateRepo).isDirectory();
+}
+
+function shouldCopyTemplatePath(src: string, templateRoot: string): boolean {
+  const basename = path.basename(src);
+
+  if (
+    basename === ".git" ||
+    basename === "node_modules" ||
+    basename === ".turbo" ||
+    basename === ".cache" ||
+    basename === "dist"
+  ) {
+    return false;
+  }
+
+  if (src === templateRoot) {
+    return true;
+  }
+
+  return true;
 }

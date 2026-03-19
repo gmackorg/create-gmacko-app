@@ -152,7 +152,7 @@ export async function getExperimentNative(
   ]);
   return {
     key: experimentKey,
-    variant: variant as string | boolean | undefined,
+    variant,
     payload: payload as Record<string, unknown> | undefined,
   };
 }

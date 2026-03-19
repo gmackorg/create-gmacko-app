@@ -25,7 +25,7 @@
   "dependencies": {
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",
-    "superjson": "2.2.3"
+    "superjson": "catalog:"
   },
   "devDependencies": {
     "@gmacko/api": "workspace:*",
@@ -35,7 +35,7 @@
     "@types/node": "catalog:",
     "eslint": "catalog:",
     "prettier": "catalog:",
-    "tsup": "^8.5.0",
+    "tsup": "^8.5.1",
     "typescript": "catalog:"
   },
   "peerDependencies": {

@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/create-gmacko-app.svg)](https://www.npmjs.com/package/create-gmacko-app)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-Create a new Gmacko app with Next.js, Expo, tRPC, and more.
+Create a new Gmacko app with Next.js, Expo, Storybook, tRPC, and AI planning workflows.
 
 ## Quick Start
 
@@ -76,12 +76,31 @@ npx create-gmacko-app my-app --no-mobile --no-ai
 
 - **Monorepo Management**: Turborepo + pnpm workspaces
 - **Web Framework**: Next.js 15
+- **Component Development**: Storybook 10
 - **Mobile Framework**: Expo SDK 54 / React Native 0.81
 - **Optional Framework**: TanStack Start
 - **Type-safe API**: tRPC v11 with OpenAPI support
 - **Database Layer**: Drizzle ORM + Neon Postgres
 - **Authentication**: Better-auth
 - **Design System**: Tailwind CSS v4 + shadcn/ui components
+- **AI Workflow**: OpenCode docs plus vendored Claude Code gstack skills
+
+## AI Planning Workflow
+
+Generated apps include a `CLAUDE.md`, `docs/ai/INITIAL_PROPOSAL.md`, and a vendored `.claude/skills/gstack` install.
+
+1. Use `superpowers:brainstorming` to write the initial proposal to `docs/ai/INITIAL_PROPOSAL.md`.
+2. Run `/plan-ceo-review` and `/plan-eng-review` to refine the proposal and implementation plan.
+3. Run `/design-consultation` to define the design philosophy and write `DESIGN.md`.
+4. If the gstack commands are unavailable, run `cd .claude/skills/gstack && ./setup`.
+
+## Storybook
+
+The generated Next.js app includes Storybook for isolated UI work.
+
+```bash
+pnpm --filter @gmacko/nextjs storybook
+```
 
 ## Optional Integrations
 

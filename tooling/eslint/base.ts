@@ -1,10 +1,20 @@
 import * as path from "node:path";
 import { includeIgnoreFile } from "@eslint/compat";
+import type { Linter } from "eslint";
 import eslint from "@eslint/js";
 import importPlugin from "eslint-plugin-import";
 import turboPlugin from "eslint-plugin-turbo";
 import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
+
+const turboRecommendedRules =
+  (
+    (Array.isArray(turboPlugin.configs?.recommended)
+      ? turboPlugin.configs?.recommended[0]
+      : turboPlugin.configs?.recommended) as
+      | { rules?: Linter.RulesRecord }
+      | undefined
+  )?.rules ?? {};
 
 /**
  * All packages that leverage t3-env should use this rule
@@ -63,7 +73,7 @@ export const baseConfig = defineConfig(
       ...tseslint.configs.stylisticTypeChecked,
     ],
     rules: {
-      ...turboPlugin.configs.recommended.rules,
+      ...turboRecommendedRules,
       "@typescript-eslint/no-unused-vars": [
         "error",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },

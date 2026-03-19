@@ -27,8 +27,8 @@
   },
   "dependencies": {
     "@gmacko/config": "workspace:*",
-    "posthog-js": "^1.224.0",
-    "posthog-react-native": "^3.5.2"
+    "posthog-js": "^1.362.0",
+    "posthog-react-native": "^4.37.4"
   },
   "devDependencies": {
     "@gmacko/eslint-config": "workspace:*",
@@ -37,7 +37,7 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:react19",
     "eslint": "catalog:",
-    "expo-constants": "~18.0.10",
+    "expo-constants": "~55.0.8",
     "prettier": "catalog:",
     "typescript": "catalog:"
   },

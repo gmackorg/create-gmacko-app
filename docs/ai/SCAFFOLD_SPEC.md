@@ -191,12 +191,15 @@ export type Integrations = typeof integrations;
 #### Web selected (Next.js)
 - Modify: `apps/nextjs/package.json`
   - Ensure deps for enabled integrations are present (or always present if not pruning)
+- Create: `apps/nextjs/.storybook/main.ts`
+- Create: `apps/nextjs/.storybook/preview.ts`
 - Modify: `apps/nextjs/src/env.ts`
   - Zod validation must only require env vars for enabled integrations
 - Modify: `apps/nextjs/src/app/layout.tsx` (or the upstream equivalent)
   - Add conditional provider wiring based on `integrations`
 - Modify: `apps/nextjs/src/instrumentation.ts` / `sentry.*` (only if Sentry enabled)
 - Modify: `apps/nextjs/next.config.*` (only if Sentry enabled and you use Sentry plugin)
+- Create: `packages/ui/src/**/*.stories.tsx` for shared component documentation
 
 #### Mobile selected (Expo)
 - Modify: `apps/expo/package.json`
@@ -217,14 +220,22 @@ export type Integrations = typeof integrations;
 
 ### 2.3 AI system outputs (only if AI enabled)
 - Copy/Create: `docs/ai/**`
+- Create: `docs/ai/INITIAL_PROPOSAL.md`
+- Create: `CLAUDE.md`
+- Copy/Create: `.claude/skills/gstack/**`
 - Copy/Create: `.opencode/skill/**`
 - Copy/Create: `.opencode/agent/**` (if used)
 - Copy/Create: `opencode.json`
+- Create: `DESIGN.md` as the target file for `/design-consultation`
 - Create (optional): `PROJECT_MANIFEST.json` **only if you want it generated immediately**
   - If you don't want to generate it at scaffold time, you still include examples in `docs/ai/examples/`.
 
 **Recommended behavior**
 - If AI system enabled: generate a minimal `PROJECT_MANIFEST.json` that matches scaffold answers (platforms + integrations), so the AI workflow is "ready to run".
+- The default planning path is:
+  1. `superpowers:brainstorming` writes the initial proposal to `docs/ai/INITIAL_PROPOSAL.md`
+  2. `/plan-ceo-review` and `/plan-eng-review` refine the proposal and implementation plan
+  3. `/design-consultation` writes `DESIGN.md`
 
 ---
 

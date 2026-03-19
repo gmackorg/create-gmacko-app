@@ -31,6 +31,7 @@ export async function runPrompts(
     placeholder: toTitleCase(appName),
     defaultValue: toTitleCase(appName),
     validate: (value) => {
+      if (value === undefined) return "Display name is required";
       if (value.length === 0) return "Display name is required";
       if (value.length > 50)
         return "Display name must be 50 characters or less";
@@ -63,6 +64,7 @@ export async function runPrompts(
     placeholder: "@gmacko",
     defaultValue: defaults.packageScope ?? "@gmacko",
     validate: (value) => {
+      if (value === undefined) return "Scope must start with @";
       if (!value.startsWith("@")) return "Scope must start with @";
       if (value.includes(" ")) return "Scope cannot contain spaces";
     },

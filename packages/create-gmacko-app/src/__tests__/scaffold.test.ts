@@ -8,6 +8,7 @@ import {
   EXPECTED_FILES,
   fileExists,
   generateAppName,
+  readFile,
   readJson,
   runCli,
 } from "./helpers.js";
@@ -68,6 +69,23 @@ describe("create-gmacko-app scaffold", () => {
       }
     }, 120000);
 
+    it("should include Storybook for the web app by default", async () => {
+      const appName = generateAppName("with-storybook");
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-install", "--no-git"],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+
+      for (const file of EXPECTED_FILES.withStorybook) {
+        expect(fileExists(result.appPath, file)).toBe(true);
+      }
+    }, 120000);
+
     it("should include mobile app by default", async () => {
       const appName = generateAppName("with-mobile");
       const result = await runCli({
@@ -100,6 +118,61 @@ describe("create-gmacko-app scaffold", () => {
       for (const file of EXPECTED_FILES.withAi) {
         expect(fileExists(result.appPath, file)).toBe(true);
       }
+    }, 120000);
+
+    it("should include Claude planning and design workflow guidance", async () => {
+      const appName = generateAppName("with-claude-guidance");
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-install", "--no-git"],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+
+      const claudeInstructions = readFile(result.appPath, "CLAUDE.md");
+      const initialProposal = readFile(
+        result.appPath,
+        "docs/ai/INITIAL_PROPOSAL.md",
+      );
+
+      expect(claudeInstructions).toContain("superpowers:brainstorming");
+      expect(claudeInstructions).toContain("/plan-ceo-review");
+      expect(claudeInstructions).toContain("/plan-eng-review");
+      expect(claudeInstructions).toContain("/design-consultation");
+      expect(claudeInstructions).toContain("DESIGN.md");
+
+      expect(initialProposal).toContain("superpowers:brainstorming");
+      expect(initialProposal).toContain("/plan-ceo-review");
+      expect(initialProposal).toContain("/plan-eng-review");
+      expect(initialProposal).toContain("/design-consultation");
+    }, 120000);
+
+    it("should include create-gmacko-app repo skill guidance for Claude", async () => {
+      const appName = generateAppName("with-gmacko-skill");
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-install", "--no-git"],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+
+      const claudeInstructions = readFile(result.appPath, "CLAUDE.md");
+      const repoSkill = readFile(
+        result.appPath,
+        ".claude/skills/create-gmacko-app-workflow/SKILL.md",
+      );
+
+      expect(claudeInstructions).toContain("create-gmacko-app-workflow");
+      expect(repoSkill).toContain("apps/nextjs");
+      expect(repoSkill).toContain("packages/ui");
+      expect(repoSkill).toContain("docs/ai");
+      expect(repoSkill).toContain("Storybook");
     }, 120000);
   });
 
@@ -162,6 +235,9 @@ describe("create-gmacko-app scaffold", () => {
       expect(result.exitCode).toBe(0);
       expect(fileExists(result.appPath, ".opencode")).toBe(false);
       expect(fileExists(result.appPath, "opencode.json")).toBe(false);
+      expect(fileExists(result.appPath, ".claude")).toBe(false);
+      expect(fileExists(result.appPath, "CLAUDE.md")).toBe(false);
+      expect(fileExists(result.appPath, "docs/ai")).toBe(false);
     }, 120000);
   });
 

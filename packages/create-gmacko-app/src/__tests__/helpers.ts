@@ -6,6 +6,7 @@ import fs from "fs-extra";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const TEMPLATE_REPO = path.resolve(__dirname, "../../../../");
 
 export interface ScaffoldOptions {
   appName?: string;
@@ -80,7 +81,11 @@ export async function runCli(
 
     const child = spawn("node", args, {
       cwd,
-      env: { ...process.env, CI: "true" },
+      env: {
+        ...process.env,
+        CI: "true",
+        CREATE_GMACKO_APP_TEMPLATE_REPO: TEMPLATE_REPO,
+      },
       stdio: ["pipe", "pipe", "pipe"],
     });
 
@@ -251,9 +256,21 @@ export const EXPECTED_FILES = {
     "packages/ui/package.json",
   ],
   withWeb: ["apps/nextjs/package.json", "apps/nextjs/next.config.js"],
+  withStorybook: [
+    "apps/nextjs/.storybook/main.ts",
+    "apps/nextjs/.storybook/preview.tsx",
+    "packages/ui/src/button.stories.tsx",
+  ],
   withMobile: ["apps/expo/package.json", "apps/expo/app.config.ts"],
   withTanstackStart: ["apps/tanstack-start/package.json"],
   withSentry: ["packages/monitoring/package.json"],
   withPosthog: ["packages/analytics/package.json"],
-  withAi: [".opencode", "opencode.json"],
+  withAi: [
+    ".opencode",
+    "opencode.json",
+    "CLAUDE.md",
+    ".claude/skills/gstack/setup",
+    ".claude/skills/create-gmacko-app-workflow/SKILL.md",
+    "docs/ai/INITIAL_PROPOSAL.md",
+  ],
 } as const;

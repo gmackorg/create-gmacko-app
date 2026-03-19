@@ -27,8 +27,8 @@
   },
   "dependencies": {
     "@gmacko/config": "workspace:*",
-    "@sentry/nextjs": "^9.27.0",
-    "@sentry/react-native": "^6.14.0"
+    "@sentry/nextjs": "^10.44.0",
+    "@sentry/react-native": "^8.4.0"
   },
   "devDependencies": {
     "@gmacko/eslint-config": "workspace:*",

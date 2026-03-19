@@ -19,8 +19,8 @@
   },
   "dependencies": {
     "@gmacko/config": "workspace:*",
-    "pusher": "^5.2.0",
-    "pusher-js": "^8.4.0"
+    "pusher": "^5.3.3",
+    "pusher-js": "^8.4.2"
   },
   "devDependencies": {
     "@gmacko/eslint-config": "workspace:*",

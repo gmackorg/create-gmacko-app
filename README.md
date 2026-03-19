@@ -4,7 +4,8 @@ A fork of [create-t3-turbo](https://github.com/t3-oss/create-t3-turbo) with:
 
 - Neon Postgres (instead of Vercel Postgres)
 - Conditional integration system (Sentry, PostHog, Stripe, Email, Realtime, Storage)
-- AI workflow support via OpenCode skills
+- AI workflow support via OpenCode skills and Claude Code gstack workflows
+- Storybook wired into the Next.js app for isolated UI development
 
 ## Installation
 
@@ -42,6 +43,7 @@ apps
   ├─ nextjs
   │   ├─ Next.js 15
   │   ├─ React 19
+  │   ├─ Storybook 10
   │   ├─ Tailwind CSS v4
   │   └─ E2E Typesafe API Server & Client
   └─ tanstack-start
@@ -206,6 +208,26 @@ When the component(s) has been installed, you should be good to go and start usi
 To add a new package, simply run `pnpm turbo gen init` in the monorepo root. This will prompt you for a package name as well as if you want to install any dependencies to the new package (of course you can also do this yourself later).
 
 The generator sets up the `package.json`, `tsconfig.json` and a `index.ts`, as well as configures all the necessary configurations for tooling around your package such as formatting, linting and typechecking. When the package is created, you're ready to go build out the package.
+
+### 5c. Work on shared UI in Storybook
+
+Run Storybook from the web app workspace:
+
+```bash
+pnpm --filter @gmacko/nextjs storybook
+```
+
+Shared component stories live in `packages/ui/src/**/*.stories.tsx`.
+
+## AI Planning Workflow
+
+This template vendors [gstack](https://github.com/garrytan/gstack) in `.claude/skills/gstack` for Claude Code and keeps the existing `docs/ai` workflow for proposal and planning artifacts.
+
+1. Use `superpowers:brainstorming` to turn the app idea into `docs/ai/INITIAL_PROPOSAL.md`.
+2. Run `/plan-ceo-review` to refine the problem framing and scope.
+3. Run `/plan-eng-review` to turn the approved proposal into `docs/ai/IMPLEMENTATION_PLAN.md`.
+4. Run `/design-consultation` to define the design philosophy and generate `DESIGN.md`.
+5. If gstack commands are unavailable, run `cd .claude/skills/gstack && ./setup`.
 
 ## FAQ
 

@@ -6,7 +6,7 @@
 FROM node:22-alpine AS base
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@10.19.0 --activate
+RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
 # Install dependencies for native modules
 RUN apk add --no-cache libc6-compat

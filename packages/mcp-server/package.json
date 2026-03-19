@@ -19,7 +19,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "superjson": "catalog:",
     "zod": "catalog:"
   },
@@ -30,7 +30,7 @@
     "@types/node": "catalog:",
     "eslint": "catalog:",
     "prettier": "catalog:",
-    "tsup": "^8.5.0",
+    "tsup": "^8.5.1",
     "typescript": "catalog:"
   },
   "prettier": "@gmacko/prettier-config"

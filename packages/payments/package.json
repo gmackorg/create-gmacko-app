@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@gmacko/config": "workspace:*",
-    "stripe": "^18.1.0"
+    "stripe": "^20.4.1"
   },
   "devDependencies": {
     "@gmacko/eslint-config": "workspace:*",

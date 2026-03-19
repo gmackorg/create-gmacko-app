@@ -19,9 +19,9 @@
   },
   "dependencies": {
     "@gmacko/config": "workspace:*",
-    "expo-constants": "~18.0.10",
-    "expo-device": "~8.0.10",
-    "expo-notifications": "~0.32.5"
+    "expo-constants": "~55.0.8",
+    "expo-device": "~55.0.10",
+    "expo-notifications": "~55.0.13"
   },
   "devDependencies": {
     "@gmacko/eslint-config": "workspace:*",

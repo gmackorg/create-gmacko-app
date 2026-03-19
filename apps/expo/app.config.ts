@@ -81,7 +81,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     runtimeVersion: {
       policy: "appVersion",
     },
-    newArchEnabled: true,
     assetBundlePatterns: ["**/*"],
     ios: {
       bundleIdentifier: getBundleId(),
@@ -100,7 +99,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         foregroundImage: "./assets/icon-light.png",
         backgroundColor: "#1F104A",
       },
-      edgeToEdgeEnabled: true,
     },
     extra: {
       APP_ENV,

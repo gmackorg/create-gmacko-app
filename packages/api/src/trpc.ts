@@ -3,7 +3,6 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { z, ZodError } from "zod/v4";
 
-import type { Auth } from "@gmacko/auth";
 import { and, eq, isNull } from "@gmacko/db";
 import { db } from "@gmacko/db/client";
 import { apiKeys, user } from "@gmacko/db/schema";
@@ -14,6 +13,38 @@ export interface ApiKeyAuth {
   userId: string;
   permissions: ApiKeyPermission[];
   keyId: string;
+}
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  emailVerified: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  image?: string | null;
+}
+
+export interface SessionRecord {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  userId: string;
+  expiresAt: Date;
+  token: string;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+}
+
+export type AuthSession =
+  | {
+      user: AuthUser;
+      session: SessionRecord | null;
+    }
+  | null;
+
+export interface AuthApi {
+  getSession(input: { headers: Headers }): Promise<AuthSession>;
 }
 
 function hashApiKey(key: string): string {
@@ -54,10 +85,8 @@ async function validateApiKey(key: string): Promise<ApiKeyAuth | null> {
 
 export const createTRPCContext = async (opts: {
   headers: Headers;
-  auth: Auth;
+  authApi: AuthApi;
 }) => {
-  const authApi = opts.auth.api;
-
   const authHeader = opts.headers.get("authorization");
   if (authHeader?.startsWith("Bearer gmk_")) {
     const apiKey = authHeader.slice(7);
@@ -72,7 +101,7 @@ export const createTRPCContext = async (opts: {
 
       if (userRecord) {
         return {
-          authApi,
+          authApi: opts.authApi,
           session: {
             user: userRecord,
             session: null,
@@ -84,12 +113,12 @@ export const createTRPCContext = async (opts: {
     }
   }
 
-  const session = await authApi.getSession({
+  const session = await opts.authApi.getSession({
     headers: opts.headers,
   });
 
   return {
-    authApi,
+    authApi: opts.authApi,
     session,
     apiKeyAuth: null as ApiKeyAuth | null,
     db,

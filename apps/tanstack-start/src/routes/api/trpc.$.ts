@@ -12,7 +12,7 @@ const handler = (req: Request) =>
     req,
     createContext: () =>
       createTRPCContext({
-        auth: auth,
+        authApi: auth.api,
         headers: req.headers,
       }),
     onError({ error, path }) {
