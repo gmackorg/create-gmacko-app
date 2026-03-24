@@ -68,6 +68,10 @@ export async function scaffold(options: CliOptions): Promise<void> {
     configureVinext(targetDir);
   }
 
+  if (options.platforms.mobile) {
+    configureExpoApp(targetDir, options.appName);
+  }
+
   if (!options.includeAi) {
     fs.removeSync(path.join(targetDir, ".claude"));
     fs.removeSync(path.join(targetDir, ".opencode"));
@@ -265,6 +269,11 @@ function createForgeGraphConfig(targetDir: string, appName: string): void {
     path.join(targetDir, ".forgegraph.yaml"),
     `app: ${appName}
 server: https://forge.example.com
+stages:
+  - name: staging
+    sortOrder: 10
+  - name: production
+    sortOrder: 20
 `,
   );
 }
@@ -301,6 +310,32 @@ export default defineConfig({
 });
 `,
   );
+
+  fs.writeFileSync(
+    path.join(targetDir, "apps/nextjs/wrangler.jsonc"),
+    `{
+  "name": "${path.basename(targetDir)}",
+  "compatibility_date": "2026-03-23",
+  "main": ".open-next/worker.js"
+}
+`,
+  );
+}
+
+function configureExpoApp(targetDir: string, appName: string): void {
+  const expoConfigPath = path.join(targetDir, "apps/expo/app.config.ts");
+  const sanitizedId = appName.replace(/[^a-z0-9-]/gi, "").toLowerCase();
+  const bundleSegment = sanitizedId.replace(/-/g, "");
+
+  let content = fs.readFileSync(expoConfigPath, "utf-8");
+  content = content.replace(
+    'const base = "com.gmacko.app";',
+    `const base = "com.gmacko.${bundleSegment}";`,
+  );
+  content = content.replace('slug: "gmacko",', `slug: "${sanitizedId}",`);
+  content = content.replace('scheme: "gmacko",', `scheme: "${sanitizedId}",`);
+
+  fs.writeFileSync(expoConfigPath, content);
 }
 
 function pruneIntegrations(

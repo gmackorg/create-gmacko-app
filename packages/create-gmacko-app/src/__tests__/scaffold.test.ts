@@ -221,6 +221,9 @@ describe("create-gmacko-app scaffold", () => {
 
       expect(forgeGraphConfig).toContain(`app: ${appName}`);
       expect(forgeGraphConfig).toContain("server: https://forge.example.com");
+      expect(forgeGraphConfig).toContain("stages:");
+      expect(forgeGraphConfig).toContain("- name: staging");
+      expect(forgeGraphConfig).toContain("- name: production");
     }, 120000);
 
     it("should scaffold vinext support when requested", async () => {
@@ -235,11 +238,16 @@ describe("create-gmacko-app scaffold", () => {
 
       expect(result.exitCode).toBe(0);
       expect(fileExists(result.appPath, "apps/nextjs/vite.config.ts")).toBe(true);
+      expect(fileExists(result.appPath, "apps/nextjs/wrangler.jsonc")).toBe(true);
 
       const nextPkg = readJson<{
         scripts?: Record<string, string>;
         devDependencies?: Record<string, string>;
       }>(result.appPath, "apps/nextjs/package.json");
+      const wranglerConfig = readFile(
+        result.appPath,
+        "apps/nextjs/wrangler.jsonc",
+      );
 
       expect(nextPkg.scripts?.["dev:vinext"]).toBeDefined();
       expect(nextPkg.scripts?.["build:vinext"]).toBeDefined();
@@ -247,6 +255,8 @@ describe("create-gmacko-app scaffold", () => {
       expect(nextPkg.devDependencies?.vinext).toBeDefined();
       expect(nextPkg.devDependencies?.vite).toBeDefined();
       expect(nextPkg.devDependencies?.wrangler).toBeDefined();
+      expect(wranglerConfig).toContain(`"name": "${appName}"`);
+      expect(wranglerConfig).toContain('"compatibility_date"');
     }, 120000);
 
     it("should scaffold stronger Expo development-build defaults", async () => {
@@ -266,12 +276,18 @@ describe("create-gmacko-app scaffold", () => {
         scripts?: Record<string, string>;
       }>(result.appPath, "apps/expo/package.json");
       const expoReadme = readFile(result.appPath, "apps/expo/README.md");
+      const expoConfig = readFile(result.appPath, "apps/expo/app.config.ts");
 
       expect(expoPkg.scripts?.["dev:client"]).toBeDefined();
       expect(expoPkg.scripts?.["build:device:ios"]).toBeDefined();
       expect(expoPkg.scripts?.["build:device:android"]).toBeDefined();
       expect(expoReadme).toContain("Expo Orbit");
       expect(expoReadme).toContain("development build");
+      expect(expoConfig).toContain(`slug: "${appName}"`);
+      expect(expoConfig).toContain(`scheme: "${appName}"`);
+      expect(expoConfig).toContain(
+        `const base = "com.gmacko.${appName.replace(/-/g, "")}"`,
+      );
     }, 120000);
 
     it("should scaffold web env files without vercel presets", async () => {
