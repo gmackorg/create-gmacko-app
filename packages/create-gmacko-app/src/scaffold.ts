@@ -52,6 +52,7 @@ export async function scaffold(options: CliOptions): Promise<void> {
   updateIntegrationsConfig(targetDir, options.integrations);
   updatePackageScope(targetDir, options.packageScope);
   createManifest(targetDir, options);
+  createForgeGraphConfig(targetDir, options.appName);
 
   if (!options.platforms.web) {
     fs.removeSync(path.join(targetDir, "apps/nextjs"));
@@ -61,6 +62,10 @@ export async function scaffold(options: CliOptions): Promise<void> {
   }
   if (!options.platforms.tanstackStart) {
     fs.removeSync(path.join(targetDir, "apps/tanstack-start"));
+  }
+
+  if (options.platforms.web && options.vinext) {
+    configureVinext(targetDir);
   }
 
   if (!options.includeAi) {
@@ -127,10 +132,10 @@ ${pc.bold("Next steps:")}
   ${pc.cyan("cd")} ${options.appName}
   ${pc.cyan("cp")} .env.example .env
   ${pc.dim("# Update .env with your credentials")}
+  ${pc.dim("# Update .forgegraph.yaml with your real ForgeGraph server")}
   ${pc.cyan("docker compose")} up -d postgres
   ${pc.cyan("pnpm")} db:push
-  ${pc.cyan("fg")} config set server https://forge.example.com
-  ${pc.cyan("pnpm")} fg:init
+  ${pc.cyan("pnpm")} fg:doctor
   ${pc.cyan("pnpm")} format:check
   ${pc.cyan("pnpm")} lint:ox
   ${pc.cyan("pnpm")} dev
@@ -253,6 +258,49 @@ function createManifest(targetDir: string, options: CliOptions): void {
   fs.writeJsonSync(path.join(targetDir, "gmacko.integrations.json"), manifest, {
     spaces: 2,
   });
+}
+
+function createForgeGraphConfig(targetDir: string, appName: string): void {
+  fs.writeFileSync(
+    path.join(targetDir, ".forgegraph.yaml"),
+    `app: ${appName}
+server: https://forge.example.com
+`,
+  );
+}
+
+function configureVinext(targetDir: string): void {
+  const nextPkgPath = path.join(targetDir, "apps/nextjs/package.json");
+  const nextPkg = fs.readJsonSync(nextPkgPath) as {
+    scripts?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
+
+  nextPkg.scripts ??= {};
+  nextPkg.devDependencies ??= {};
+
+  nextPkg.scripts["dev:vinext"] = "vinext dev";
+  nextPkg.scripts["build:vinext"] = "vinext build";
+  nextPkg.scripts["start:vinext"] = "vinext start";
+  nextPkg.scripts["deploy:cloudflare"] = "vinext deploy";
+
+  nextPkg.devDependencies.vinext = "^0.7.4";
+  nextPkg.devDependencies.vite = "^7.1.7";
+  nextPkg.devDependencies.wrangler = "^4.43.0";
+  nextPkg.devDependencies["@cloudflare/vite-plugin"] = "^1.13.6";
+
+  fs.writeJsonSync(nextPkgPath, nextPkg, { spaces: 2 });
+
+  fs.writeFileSync(
+    path.join(targetDir, "apps/nextjs/vite.config.ts"),
+    `import vinext from "vinext";
+import { defineConfig } from "vite";
+
+export default defineConfig({
+  plugins: [vinext()],
+});
+`,
+  );
 }
 
 function pruneIntegrations(

@@ -127,15 +127,17 @@ pnpm i
 # There is an `.env.example` in the root directory you can use for reference
 cp .env.example .env
 
+# Update the generated ForgeGraph repo metadata with your real server
+$EDITOR .forgegraph.yaml
+
 # Start the local Postgres service if you are using the included compose setup
 docker compose up -d postgres
 
 # Push the Drizzle schema to the database
 pnpm db:push
 
-# Point fg at your ForgeGraph server and initialize repo metadata
-fg config set server https://forge.example.com
-pnpm fg:init
+# Verify the repo is ready for ForgeGraph workflows
+pnpm fg:doctor
 ```
 
 ### 2. Generate Better Auth Schema
@@ -242,6 +244,7 @@ Generated apps are set up for current agent-native and platform-native workflows
   - `vinext` is the experimental Next.js-on-Workers path.
   - TanStack Start is the cleaner Workers-native path today.
   - ForgeGraph + Nix remains the stable owned-infrastructure path.
+- Generated repos now also include `.forgegraph.yaml` and stronger Expo development-build defaults out of the box.
 
 See [docs/ai/DEVELOPER_EXPERIENCE.md](./docs/ai/DEVELOPER_EXPERIENCE.md) for the current support matrix and recommendations.
 

@@ -26,6 +26,7 @@ program
   .option("--no-mobile", "Exclude Expo mobile app")
   .option("--tanstack-start", "Include TanStack Start app")
   .option("--no-tanstack-start", "Exclude TanStack Start app (default)")
+  .option("--vinext", "Add experimental vinext support to the Next.js app")
   .option(
     "--integrations <list>",
     "Comma-separated list of integrations (sentry,posthog,stripe,revenuecat,notifications,email,realtime,storage)",
@@ -59,6 +60,7 @@ program
         options.platforms.mobile = opts.mobile === true;
       if (opts.tanstackStart !== undefined)
         options.platforms.tanstackStart = opts.tanstackStart === true;
+      options.vinext = opts.vinext === true;
       if (opts.packageScope) options.packageScope = opts.packageScope as string;
       if (opts.integrations !== undefined) {
         options.integrations = parseIntegrations(
@@ -75,6 +77,7 @@ program
       if (opts.prune !== undefined) options.prune = opts.prune === true;
       if (opts.install !== undefined) options.install = opts.install !== false;
       if (opts.git !== undefined) options.git = opts.git !== false;
+      options.vinext = opts.vinext === true;
     }
 
     await scaffold(options);

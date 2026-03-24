@@ -5,8 +5,11 @@
   "scripts": {
     "clean": "git clean -xdf .cache .expo .turbo android ios node_modules",
     "dev": "expo start",
+    "dev:client": "expo start --dev-client",
     "dev:android": "expo start --android",
     "dev:ios": "expo start --ios",
+    "build:device:ios": "eas build --profile development --platform ios",
+    "build:device:android": "eas build --profile development --platform android",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "e2e": "maestro test .maestro/",

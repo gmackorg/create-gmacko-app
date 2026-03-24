@@ -205,6 +205,75 @@ describe("create-gmacko-app scaffold", () => {
       expect(dbClient).not.toContain("drizzle-orm/neon-http");
     }, 120000);
 
+    it("should scaffold ForgeGraph repo metadata by default", async () => {
+      const appName = generateAppName("forgegraph-bootstrap");
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-install", "--no-git"],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+
+      const forgeGraphConfig = readFile(result.appPath, ".forgegraph.yaml");
+
+      expect(forgeGraphConfig).toContain(`app: ${appName}`);
+      expect(forgeGraphConfig).toContain("server: https://forge.example.com");
+    }, 120000);
+
+    it("should scaffold vinext support when requested", async () => {
+      const appName = generateAppName("vinext");
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-install", "--no-git", "--vinext"],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+      expect(fileExists(result.appPath, "apps/nextjs/vite.config.ts")).toBe(true);
+
+      const nextPkg = readJson<{
+        scripts?: Record<string, string>;
+        devDependencies?: Record<string, string>;
+      }>(result.appPath, "apps/nextjs/package.json");
+
+      expect(nextPkg.scripts?.["dev:vinext"]).toBeDefined();
+      expect(nextPkg.scripts?.["build:vinext"]).toBeDefined();
+      expect(nextPkg.scripts?.["deploy:cloudflare"]).toBeDefined();
+      expect(nextPkg.devDependencies?.vinext).toBeDefined();
+      expect(nextPkg.devDependencies?.vite).toBeDefined();
+      expect(nextPkg.devDependencies?.wrangler).toBeDefined();
+    }, 120000);
+
+    it("should scaffold stronger Expo development-build defaults", async () => {
+      const appName = generateAppName("expo-dx");
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-install", "--no-git"],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+      expect(fileExists(result.appPath, "apps/expo/README.md")).toBe(true);
+
+      const expoPkg = readJson<{
+        scripts?: Record<string, string>;
+      }>(result.appPath, "apps/expo/package.json");
+      const expoReadme = readFile(result.appPath, "apps/expo/README.md");
+
+      expect(expoPkg.scripts?.["dev:client"]).toBeDefined();
+      expect(expoPkg.scripts?.["build:device:ios"]).toBeDefined();
+      expect(expoPkg.scripts?.["build:device:android"]).toBeDefined();
+      expect(expoReadme).toContain("Expo Orbit");
+      expect(expoReadme).toContain("development build");
+    }, 120000);
+
     it("should scaffold web env files without vercel presets", async () => {
       const appName = generateAppName("no-vercel-env");
       const result = await runCli({

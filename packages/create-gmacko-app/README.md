@@ -32,6 +32,7 @@ create-gmacko-app is a CLI tool designed to bootstrap production-ready, full-sta
 | `--no-mobile`                    | Exclude Expo mobile app                                                                                             |
 | `--tanstack-start`               | Include TanStack Start app                                                                                          |
 | `--no-tanstack-start`            | Exclude TanStack Start app (default)                                                                                |
+| `--vinext`                       | Add experimental `vinext` support to the Next.js app for a Cloudflare Workers lane                                 |
 | `--integrations <list>`          | Comma-separated list of integrations (sentry, posthog, stripe, revenuecat, notifications, email, realtime, storage) |
 | `--email-provider <provider>`    | Email provider (resend, sendgrid)                                                                                   |
 | `--realtime-provider <provider>` | Realtime provider (pusher, ably)                                                                                    |
@@ -79,6 +80,7 @@ npx create-gmacko-app my-app --no-mobile --no-ai
 - **Component Development**: Storybook 10
 - **Mobile Framework**: Expo SDK 55 / React Native 0.84
 - **Optional Framework**: TanStack Start
+- **Experimental Workers Lane**: `vinext` for Next-style apps on Cloudflare Workers
 - **Type-safe API**: tRPC v11 with OpenAPI support
 - **Database Layer**: Drizzle ORM + Postgres, with the recommended default being a colocated database before moving to hosted infrastructure
 - **Authentication**: Better-auth
@@ -126,7 +128,9 @@ Generated apps should be guided toward:
 - ForgeGraph-managed deployments as the default operating model
 - Hetzner VPS hosting with Postgres deployed alongside the app in the early stage
 - Nix-based build and runtime definitions as the repo evolves into a ForgeGraph-native deployment target
+- generated `.forgegraph.yaml` repo metadata with the app slug already scaffolded
 - `fg:init`, `fg:doctor`, and `fg:status` as the default repo-level ForgeGraph command surface
+- Expo development-build scripts and an app-local mobile README geared around Expo Orbit
 - hosted Postgres only after the product has enough customers to justify the added operational split
 - `jj` as the default repo shape, with colocated Git compatibility for GitHub and other tooling
 - a modern baseline of `oxlint`, `biome`, `lefthook`, `commitlint`, and `knip`

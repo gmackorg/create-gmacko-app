@@ -20,6 +20,7 @@ export interface CliOptions {
   displayName: string;
   packageScope: string;
   platforms: PlatformConfig;
+  vinext: boolean;
   integrations: IntegrationConfig;
   includeAi: boolean;
   includeProvision: boolean;

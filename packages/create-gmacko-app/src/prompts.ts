@@ -275,6 +275,7 @@ export function getDefaultOptions(appName: string): CliOptions {
       mobile: true,
       tanstackStart: false,
     },
+    vinext: false,
     integrations: DEFAULT_INTEGRATIONS,
     includeAi: true,
     includeProvision: true,

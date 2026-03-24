@@ -78,6 +78,7 @@ Current mobile DX recommendations:
 
 - Use `jj` locally and keep Git interop intact.
 - Use `fg` from `../ForgeGraph` for real deployment workflows.
+- Keep `.forgegraph.yaml` checked in as the per-repo ForgeGraph metadata surface.
 - Expose the common ForgeGraph workflow through repo scripts such as `pnpm fg:init`, `pnpm fg:doctor`, and `pnpm fg:status`.
 - Keep docs current when framework, deployment, or agent conventions change.
 - Favor shared standards over vendor-specific sprawl.
