@@ -132,6 +132,10 @@ docker compose up -d postgres
 
 # Push the Drizzle schema to the database
 pnpm db:push
+
+# Point fg at your ForgeGraph server and initialize repo metadata
+fg config set server https://forge.example.com
+pnpm fg:init
 ```
 
 ### 2. Generate Better Auth Schema
@@ -230,6 +234,7 @@ Generated apps are set up for current agent-native and platform-native workflows
 
 - `AGENTS.md` is the shared repo instruction file for Codex, Claude Code, and OpenCode.
 - `CLAUDE.md` is a thin Claude-specific shim that points back to `AGENTS.md` and the vendored gstack commands.
+- `.claude/settings.json` ships project-level Claude permissions, including `../ForgeGraph` as an additional working directory.
 - `opencode.json` loads the repo's shared instructions and planning docs into OpenCode.
 - `.mcp.json` configures the official Next.js MCP server for Next.js 16+ agent-assisted debugging.
 - Expo development should move toward development builds and Expo Orbit rather than long-term reliance on Expo Go.

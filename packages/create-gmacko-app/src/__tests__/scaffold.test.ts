@@ -322,6 +322,12 @@ describe("create-gmacko-app scaffold", () => {
         result.appPath,
         "docs/ai/DEVELOPER_EXPERIENCE.md",
       );
+      const claudeSettings = readJson<{
+        permissions?: {
+          additionalDirectories?: string[];
+          deny?: string[];
+        };
+      }>(result.appPath, ".claude/settings.json");
       const openCodeConfig = readJson<{
         instructions?: string[];
       }>(result.appPath, "opencode.json");
@@ -337,6 +343,9 @@ describe("create-gmacko-app scaffold", () => {
       expect(developerExperience).toContain("ForgeGraph");
       expect(developerExperience).toContain("vinext");
       expect(developerExperience).toContain("Expo Orbit");
+      expect(claudeSettings.permissions?.additionalDirectories).toContain(
+        "../ForgeGraph",
+      );
       expect(openCodeConfig.instructions).toContain("AGENTS.md");
       expect(openCodeConfig.instructions).toContain("docs/ai/DEVELOPER_EXPERIENCE.md");
       expect(mcpConfig.mcpServers?.["next-devtools"]?.command).toBe("npx");
@@ -453,6 +462,9 @@ describe("create-gmacko-app scaffold", () => {
       expect(pkg.scripts?.["lint:ox"]).toBeDefined();
       expect(pkg.scripts?.["format:check"]).toBeDefined();
       expect(pkg.scripts?.["format:fix"]).toBeDefined();
+      expect(pkg.scripts?.["fg:init"]).toBe("fg init --full");
+      expect(pkg.scripts?.["fg:doctor"]).toBe("fg doctor");
+      expect(pkg.scripts?.["fg:status"]).toBe("fg status");
       expect(pkg.scripts?.knip).toBeDefined();
       expect(pkg.scripts?.prepare).toBe("lefthook install");
     }, 120000);

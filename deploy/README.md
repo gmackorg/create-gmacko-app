@@ -46,6 +46,7 @@ ForgeGraph repo
 In this workspace, use [`../ForgeGraph`](../ForgeGraph) as the reference implementation for that deployment model.
 
 The generated repo also includes a small handoff directory at [`deploy/forgegraph/README.md`](./forgegraph/README.md) for the app-side deployment contract.
+If you intentionally want a Workers deployment lane, use [`deploy/cloudflare/README.md`](./cloudflare/README.md) as the current support note rather than mixing Cloudflare assumptions into the ForgeGraph path.
 
 ## Legacy Context
 

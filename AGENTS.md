@@ -32,6 +32,7 @@ This repository is set up to work well with `Codex`, `Claude Code`, and `OpenCod
 - Use the vendored `.claude/skills/gstack` commands when they match the task.
 - Project hooks belong in `.claude/settings.json`, not in this file.
 - Project subagents belong in `.claude/agents/` when they are narrow and reusable.
+- This repo ships `.claude/settings.json` with `../ForgeGraph` available as an additional working directory.
 
 ### OpenCode
 

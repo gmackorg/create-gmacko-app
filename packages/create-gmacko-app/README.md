@@ -84,11 +84,11 @@ npx create-gmacko-app my-app --no-mobile --no-ai
 - **Authentication**: Better-auth
 - **Design System**: Tailwind CSS v4 + shadcn/ui components
 - **DX Baseline**: `jj`, `oxlint`, `biome`, `lefthook`, `commitlint`, `knip`
-- **Agent Workflow**: `AGENTS.md`, `CLAUDE.md`, `opencode.json`, `.mcp.json`, and vendored Claude Code gstack skills
+- **Agent Workflow**: `AGENTS.md`, `CLAUDE.md`, `.claude/settings.json`, `opencode.json`, `.mcp.json`, and vendored Claude Code gstack skills
 
 ## AI Planning Workflow
 
-Generated apps include `AGENTS.md`, `CLAUDE.md`, `opencode.json`, `.mcp.json`, `docs/ai/INITIAL_PROPOSAL.md`, and a vendored `.claude/skills/gstack` install.
+Generated apps include `AGENTS.md`, `CLAUDE.md`, `.claude/settings.json`, `opencode.json`, `.mcp.json`, `docs/ai/INITIAL_PROPOSAL.md`, and a vendored `.claude/skills/gstack` install.
 
 1. Use `superpowers:brainstorming` to write the initial proposal to `docs/ai/INITIAL_PROPOSAL.md`.
 2. Run `/plan-ceo-review` and `/plan-eng-review` to refine the proposal and implementation plan.
@@ -126,6 +126,7 @@ Generated apps should be guided toward:
 - ForgeGraph-managed deployments as the default operating model
 - Hetzner VPS hosting with Postgres deployed alongside the app in the early stage
 - Nix-based build and runtime definitions as the repo evolves into a ForgeGraph-native deployment target
+- `fg:init`, `fg:doctor`, and `fg:status` as the default repo-level ForgeGraph command surface
 - hosted Postgres only after the product has enough customers to justify the added operational split
 - `jj` as the default repo shape, with colocated Git compatibility for GitHub and other tooling
 - a modern baseline of `oxlint`, `biome`, `lefthook`, `commitlint`, and `knip`

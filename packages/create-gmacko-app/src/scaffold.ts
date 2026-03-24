@@ -129,6 +129,8 @@ ${pc.bold("Next steps:")}
   ${pc.dim("# Update .env with your credentials")}
   ${pc.cyan("docker compose")} up -d postgres
   ${pc.cyan("pnpm")} db:push
+  ${pc.cyan("fg")} config set server https://forge.example.com
+  ${pc.cyan("pnpm")} fg:init
   ${pc.cyan("pnpm")} format:check
   ${pc.cyan("pnpm")} lint:ox
   ${pc.cyan("pnpm")} dev
