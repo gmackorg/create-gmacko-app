@@ -254,9 +254,33 @@ Generated apps are set up for current agent-native and platform-native workflows
   - TanStack Start is the cleaner Workers-native path today.
   - ForgeGraph + Nix remains the stable owned-infrastructure path.
 - Generated repos now also include `.forgegraph.yaml` and stronger Expo development-build defaults out of the box.
-- The scaffold can now override ForgeGraph server/node placeholders directly from the CLI and emits Cloudflare env stubs when `--vinext` is enabled.
+- The scaffold can now override ForgeGraph server/node placeholders directly from the CLI and emits a fuller Cloudflare lane when `--vinext` is enabled:
+  - `apps/nextjs/vite.config.ts` with the Cloudflare Vite plugin wired for the RSC runtime
+  - `apps/nextjs/wrangler.jsonc` with staging and production-ready Workers config
+  - `apps/nextjs/worker/index.ts` as the generated Worker entry
+  - `apps/nextjs/src/cloudflare-env.ts` plus Cloudflare env stubs in `.env.example`
+  - `prebuild:vinext`, `build:vinext`, `deploy:cloudflare:staging`, and `deploy:cloudflare:production`
 
 See [docs/ai/DEVELOPER_EXPERIENCE.md](./docs/ai/DEVELOPER_EXPERIENCE.md) for the current support matrix and recommendations.
+
+### Experimental Cloudflare Lane
+
+If you scaffold with `--vinext`, the generated Next app gets an explicit Workers path alongside the default ForgeGraph/Nix path.
+
+From the generated repo root:
+
+```bash
+pnpm --filter @gmacko/nextjs dev:vinext
+CI=1 pnpm --filter @gmacko/nextjs build:vinext
+pnpm --filter @gmacko/nextjs deploy:cloudflare:staging
+pnpm --filter @gmacko/nextjs deploy:cloudflare:production
+```
+
+Notes:
+
+- `build:vinext` prebuilds the Next app's workspace dependencies before invoking `vinext`.
+- the generated Workers config assumes the normal default integration set; aggressively pruned integration layouts are still a separate cleanup path
+- this is intentionally a separate deployment lane from ForgeGraph and should not be treated as the primary production path for the Hetzner VPS setup
 
 ## AI Planning Workflow
 

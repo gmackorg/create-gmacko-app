@@ -76,6 +76,14 @@ Skip the mobile app and AI features.
 npx create-gmacko-app my-app --no-mobile --no-ai
 ```
 
+### Experimental Cloudflare Setup
+
+Add the `vinext` Workers lane to the generated Next app.
+
+```bash
+npx create-gmacko-app my-app --no-mobile --no-ai --vinext
+```
+
 ## Tech Stack
 
 - **Monorepo Management**: Turborepo + pnpm workspaces
@@ -134,10 +142,18 @@ Generated apps should be guided toward:
 - generated `.forgegraph.yaml` repo metadata with the app slug already scaffolded
 - optional CLI overrides for ForgeGraph server and stage node placeholders
 - `fg:init`, `fg:doctor`, and `fg:status` as the default repo-level ForgeGraph command surface
+- `--vinext` scaffolding that now emits:
+  - `apps/nextjs/vite.config.ts`
+  - `apps/nextjs/wrangler.jsonc`
+  - `apps/nextjs/worker/index.ts`
+  - `apps/nextjs/src/cloudflare-env.ts`
+  - `prebuild:vinext`, `build:vinext`, `deploy:cloudflare:staging`, and `deploy:cloudflare:production`
 - Expo development-build scripts and an app-local mobile README geared around Expo Orbit
 - hosted Postgres only after the product has enough customers to justify the added operational split
 - `jj` as the default repo shape, with colocated Git compatibility for GitHub and other tooling
 - a modern baseline of `oxlint`, `biome`, `lefthook`, `commitlint`, and `knip`
+
+For Cloudflare-specific commands and operating notes after scaffolding, see [../../deploy/cloudflare/README.md](/Volumes/dev/create-gmacko-app/deploy/cloudflare/README.md).
 
 ## License
 
