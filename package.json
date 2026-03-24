@@ -36,7 +36,7 @@
     "knip": "knip",
     "commitlint": "commitlint --from HEAD~1 --to HEAD",
     "postinstall": "pnpm lint:ws",
-    "prepare": "lefthook install",
+    "prepare": "git rev-parse --git-dir >/dev/null 2>&1 && lefthook install || true",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "test:watch": "turbo run test:watch",
@@ -51,8 +51,8 @@
     "ios": "expo run:ios"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.30.0",
     "@biomejs/biome": "catalog:",
+    "@changesets/cli": "^2.30.0",
     "@commitlint/cli": "catalog:",
     "@commitlint/config-conventional": "catalog:",
     "@turbo/gen": "^2.8.18",

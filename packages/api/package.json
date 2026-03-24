@@ -41,13 +41,13 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@biomejs/biome": "catalog:",
     "@gmacko/tsconfig": "workspace:*",
     "@gmacko/vitest-config": "workspace:*",
     "@types/node": "catalog:",
     "openapi-types": "^12.1.3",
+    "oxlint": "catalog:",
     "typescript": "catalog:",
-    "vitest": "^4.1.0",
-    "@biomejs/biome": "catalog:",
-    "oxlint": "catalog:"
+    "vitest": "^4.1.0"
   }
 }

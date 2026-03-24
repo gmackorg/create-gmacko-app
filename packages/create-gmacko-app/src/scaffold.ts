@@ -290,25 +290,40 @@ function configureVinext(targetDir: string): void {
   nextPkg.scripts ??= {};
   nextPkg.devDependencies ??= {};
 
-  nextPkg.scripts["dev:vinext"] = "vinext dev";
-  nextPkg.scripts["build:vinext"] = "vinext build";
-  nextPkg.scripts["start:vinext"] = "vinext start";
-  nextPkg.scripts["deploy:cloudflare"] = "vinext deploy";
+  nextPkg.scripts["prebuild:vinext"] =
+    "pnpm --dir ../.. --filter @gmacko/nextjs^... build";
+  nextPkg.scripts["dev:vinext"] = "pnpm prebuild:vinext && pnpm with-env vinext dev";
+  nextPkg.scripts["build:vinext"] =
+    "pnpm prebuild:vinext && pnpm with-env vinext build";
+  nextPkg.scripts["start:vinext"] = "pnpm with-env vinext start";
+  nextPkg.scripts["deploy:cloudflare"] = "pnpm deploy:cloudflare:production";
+  nextPkg.scripts["deploy:cloudflare:staging"] =
+    "pnpm build:vinext && pnpm with-env wrangler deploy --env staging";
+  nextPkg.scripts["deploy:cloudflare:production"] =
+    "pnpm build:vinext && pnpm with-env wrangler deploy";
 
-  nextPkg.devDependencies.vinext = "^0.7.4";
-  nextPkg.devDependencies.vite = "^7.1.7";
-  nextPkg.devDependencies.wrangler = "^4.43.0";
-  nextPkg.devDependencies["@cloudflare/vite-plugin"] = "^1.13.6";
+  nextPkg.devDependencies.vinext = "^0.0.35";
+  nextPkg.devDependencies.vite = "^8.0.2";
+  nextPkg.devDependencies.wrangler = "^4.77.0";
+  nextPkg.devDependencies["@cloudflare/vite-plugin"] = "^1.30.1";
+  nextPkg.devDependencies["@vitejs/plugin-rsc"] = "^0.5.21";
+  nextPkg.devDependencies = sortObjectKeys(nextPkg.devDependencies);
 
   fs.writeJsonSync(nextPkgPath, nextPkg, { spaces: 2 });
 
   fs.writeFileSync(
     path.join(targetDir, "apps/nextjs/vite.config.ts"),
-    `import vinext from "vinext";
+    `import { cloudflare } from "@cloudflare/vite-plugin";
+import vinext from "vinext";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [vinext()],
+  plugins: [
+    vinext(),
+    cloudflare({
+      viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
+    }),
+  ],
 });
 `,
   );
@@ -316,10 +331,19 @@ export default defineConfig({
   fs.writeFileSync(
     path.join(targetDir, "apps/nextjs/wrangler.jsonc"),
     `{
+  "$schema": "node_modules/wrangler/config-schema.json",
   "name": "${path.basename(targetDir)}",
   "compatibility_date": "2026-03-23",
   "compatibility_flags": ["nodejs_compat"],
-  "main": ".open-next/worker.js",
+  "main": "./worker/index.ts",
+  "assets": {
+    "directory": "dist/client",
+    "not_found_handling": "none",
+    "binding": "ASSETS"
+  },
+  "images": {
+    "binding": "IMAGES"
+  },
   "vars": {
     "APP_ENV": "production"
   },
@@ -348,6 +372,70 @@ export type CloudflareEnv = z.infer<typeof cloudflareEnvSchema>;
 `,
   );
 
+  fs.ensureDirSync(path.join(targetDir, "apps/nextjs/worker"));
+  fs.writeFileSync(
+    path.join(targetDir, "apps/nextjs/worker/index.ts"),
+    `import {
+  DEFAULT_DEVICE_SIZES,
+  DEFAULT_IMAGE_SIZES,
+  handleImageOptimization,
+} from "vinext/server/image-optimization";
+import type { ImageConfig } from "vinext/server/image-optimization";
+import handler from "vinext/server/app-router-entry";
+
+interface Env {
+  APP_ENV?: "development" | "staging" | "production";
+  ASSETS: {
+    fetch(request: Request): Promise<Response>;
+  };
+  IMAGES: {
+    input(stream: ReadableStream): {
+      transform(options: Record<string, unknown>): {
+        output(options: {
+          format: string;
+          quality: number;
+        }): Promise<{ response(): Response }>;
+      };
+    };
+  };
+}
+
+interface ExecutionContext {
+  waitUntil(promise: Promise<unknown>): void;
+  passThroughOnException(): void;
+}
+
+const imageConfig: ImageConfig = {};
+
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+
+    if (url.pathname === "/_vinext/image") {
+      const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
+      return handleImageOptimization(
+        request,
+        {
+          fetchAsset: (assetPath) =>
+            env.ASSETS.fetch(new Request(new URL(assetPath, request.url))),
+          imageConfig,
+          transformImage: async (body, { width, format, quality }) => {
+            const result = await env.IMAGES.input(body)
+              .transform(width > 0 ? { width } : {})
+              .output({ format, quality });
+            return result.response();
+          },
+        },
+        allowedWidths,
+      );
+    }
+
+    return handler.fetch(request, env, ctx);
+  },
+};
+`,
+  );
+
   const envExamplePath = path.join(targetDir, ".env.example");
   const envExample = fs.readFileSync(envExamplePath, "utf-8");
   if (!envExample.includes("CLOUDFLARE_ACCOUNT_ID")) {
@@ -364,6 +452,16 @@ export type CloudflareEnv = z.infer<typeof cloudflareEnvSchema>;
 `,
     );
   }
+}
+
+function sortObjectKeys(
+  record: Record<string, string>,
+): Record<string, string> {
+  return Object.fromEntries(
+    [...Object.entries(record)].sort(([left], [right]) =>
+      left.localeCompare(right),
+    ),
+  );
 }
 
 function configureExpoApp(targetDir: string, appName: string): void {

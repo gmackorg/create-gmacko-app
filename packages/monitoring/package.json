@@ -31,10 +31,10 @@
     "@sentry/react-native": "^8.4.0"
   },
   "devDependencies": {
-    "@gmacko/tsconfig": "workspace:*",
-    "typescript": "catalog:",
     "@biomejs/biome": "catalog:",
-    "oxlint": "catalog:"
+    "@gmacko/tsconfig": "workspace:*",
+    "oxlint": "catalog:",
+    "typescript": "catalog:"
   },
   "peerDependencies": {
     "next": ">=15.0.0",

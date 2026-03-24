@@ -29,12 +29,12 @@
     "react": "catalog:react19"
   },
   "devDependencies": {
+    "@biomejs/biome": "catalog:",
     "@gmacko/tsconfig": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:react19",
-    "typescript": "catalog:",
-    "@biomejs/biome": "catalog:",
-    "oxlint": "catalog:"
+    "oxlint": "catalog:",
+    "typescript": "catalog:"
   },
   "peerDependencies": {
     "react": ">=18"

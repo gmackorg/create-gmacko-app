@@ -31,13 +31,13 @@
     "posthog-react-native": "^4.37.4"
   },
   "devDependencies": {
+    "@biomejs/biome": "catalog:",
     "@gmacko/tsconfig": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:react19",
     "expo-constants": "~55.0.8",
-    "typescript": "catalog:",
-    "@biomejs/biome": "catalog:",
-    "oxlint": "catalog:"
+    "oxlint": "catalog:",
+    "typescript": "catalog:"
   },
   "peerDependencies": {
     "expo-constants": ">=17.0.0",

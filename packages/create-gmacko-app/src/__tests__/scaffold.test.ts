@@ -270,11 +270,15 @@ describe("create-gmacko-app scaffold", () => {
       expect(result.exitCode).toBe(0);
       expect(fileExists(result.appPath, "apps/nextjs/vite.config.ts")).toBe(true);
       expect(fileExists(result.appPath, "apps/nextjs/wrangler.jsonc")).toBe(true);
+      expect(fileExists(result.appPath, "apps/nextjs/worker/index.ts")).toBe(
+        true,
+      );
 
       const nextPkg = readJson<{
         scripts?: Record<string, string>;
         devDependencies?: Record<string, string>;
       }>(result.appPath, "apps/nextjs/package.json");
+      const viteConfig = readFile(result.appPath, "apps/nextjs/vite.config.ts");
       const wranglerConfig = readFile(
         result.appPath,
         "apps/nextjs/wrangler.jsonc",
@@ -284,17 +288,48 @@ describe("create-gmacko-app scaffold", () => {
         "apps/nextjs/src/cloudflare-env.ts",
       );
       const envExample = readFile(result.appPath, ".env.example");
+      const cloudflareReadme = readFile(
+        result.appPath,
+        "deploy/cloudflare/README.md",
+      );
 
       expect(nextPkg.scripts?.["dev:vinext"]).toBeDefined();
       expect(nextPkg.scripts?.["build:vinext"]).toBeDefined();
       expect(nextPkg.scripts?.["deploy:cloudflare"]).toBeDefined();
+      expect(nextPkg.scripts?.["deploy:cloudflare:staging"]).toBeDefined();
+      expect(nextPkg.scripts?.["deploy:cloudflare:production"]).toBeDefined();
+      expect(nextPkg.scripts?.["prebuild:vinext"]).toBe(
+        "pnpm --dir ../.. --filter @gmacko/nextjs^... build",
+      );
+      expect(nextPkg.scripts?.["build:vinext"]).toContain("pnpm prebuild:vinext");
+      expect(nextPkg.scripts?.["build:vinext"]).toContain("pnpm with-env vinext build");
+      expect(nextPkg.scripts?.["deploy:cloudflare:staging"]).toContain(
+        "pnpm with-env wrangler deploy --env staging",
+      );
+      expect(nextPkg.scripts?.["deploy:cloudflare:production"]).toContain(
+        "pnpm with-env wrangler deploy",
+      );
+      const nextDevDependencyNames = Object.keys(nextPkg.devDependencies ?? {});
+      expect(nextDevDependencyNames).toEqual(
+        [...nextDevDependencyNames].sort((left, right) =>
+          left.localeCompare(right),
+        ),
+      );
       expect(nextPkg.devDependencies?.vinext).toBeDefined();
       expect(nextPkg.devDependencies?.vite).toBeDefined();
       expect(nextPkg.devDependencies?.wrangler).toBeDefined();
+      expect(nextPkg.devDependencies?.["@vitejs/plugin-rsc"]).toBeDefined();
+      expect(viteConfig).toContain('@cloudflare/vite-plugin');
+      expect(viteConfig).toContain("cloudflare({");
       expect(wranglerConfig).toContain(`"name": "${appName}"`);
       expect(wranglerConfig).toContain('"compatibility_date"');
       expect(wranglerConfig).toContain('"compatibility_flags"');
       expect(wranglerConfig).toContain('"nodejs_compat"');
+      expect(wranglerConfig).toContain('"main": "./worker/index.ts"');
+      expect(wranglerConfig).toContain('"assets"');
+      expect(wranglerConfig).toContain('"binding": "ASSETS"');
+      expect(wranglerConfig).toContain('"images"');
+      expect(wranglerConfig).toContain('"binding": "IMAGES"');
       expect(wranglerConfig).toContain('"vars"');
       expect(wranglerConfig).toContain('"APP_ENV": "production"');
       expect(wranglerConfig).toContain('"env"');
@@ -303,6 +338,13 @@ describe("create-gmacko-app scaffold", () => {
       expect(cloudflareEnv).toContain("CLOUDFLARE_API_TOKEN");
       expect(envExample).toContain("CLOUDFLARE_ACCOUNT_ID");
       expect(envExample).toContain("CLOUDFLARE_API_TOKEN");
+      expect(cloudflareReadme).toContain("pnpm --filter @gmacko/nextjs build:vinext");
+      expect(cloudflareReadme).toContain(
+        "pnpm --filter @gmacko/nextjs deploy:cloudflare:staging",
+      );
+      expect(cloudflareReadme).toContain(
+        "pnpm --filter @gmacko/nextjs deploy:cloudflare:production",
+      );
     }, 120000);
 
     it("should scaffold stronger Expo development-build defaults", async () => {
@@ -600,7 +642,9 @@ describe("create-gmacko-app scaffold", () => {
       expect(pkg.scripts?.["fg:doctor"]).toBe("fg doctor");
       expect(pkg.scripts?.["fg:status"]).toBe("fg status");
       expect(pkg.scripts?.knip).toBeDefined();
-      expect(pkg.scripts?.prepare).toBe("lefthook install");
+      expect(pkg.scripts?.prepare).toBe(
+        "git rev-parse --git-dir >/dev/null 2>&1 && lefthook install || true",
+      );
     }, 120000);
 
     it("should initialize a jj repo by default", async () => {

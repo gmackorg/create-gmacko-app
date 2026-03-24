@@ -29,6 +29,28 @@ Stay on ForgeGraph when:
 - you want Nix-controlled builds and owned deployment infrastructure
 - colocated Postgres is still the right operational tradeoff
 
+## Generated Next.js Commands
+
+When you scaffold with `--vinext`, the generated Next app includes a separate Workers lane.
+
+From the repo root:
+
+```sh
+pnpm --filter @gmacko/nextjs dev:vinext
+pnpm --filter @gmacko/nextjs build:vinext
+pnpm --filter @gmacko/nextjs deploy:cloudflare:staging
+pnpm --filter @gmacko/nextjs deploy:cloudflare:production
+```
+
+What gets generated:
+
+- `apps/nextjs/vite.config.ts` for `vinext`
+- `apps/nextjs/wrangler.jsonc` with `nodejs_compat` and a `staging` env block
+- `apps/nextjs/src/cloudflare-env.ts` for Workers-specific env validation
+- `.env.example` entries for `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`
+
+The generated `build:vinext` script first builds the Next app's workspace dependencies and then runs `vinext build` through the existing `.env` loader. The production deploy script reuses that build output and then runs `wrangler deploy`; the staging deploy script does the same with `wrangler deploy --env staging`.
+
 ## Important Constraint
 
 Do not try to make one runtime contract cover both ForgeGraph/Nix and Cloudflare Workers equally well. Treat them as separate deployment lanes with separate operational assumptions.

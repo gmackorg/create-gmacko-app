@@ -59,13 +59,13 @@
     "superjson": "catalog:"
   },
   "devDependencies": {
+    "@biomejs/biome": "catalog:",
     "@gmacko/api": "workspace:*",
     "@gmacko/tailwind-config": "workspace:*",
     "@gmacko/tsconfig": "workspace:*",
     "@types/react": "catalog:react19",
+    "oxlint": "catalog:",
     "tailwindcss": "catalog:",
-    "typescript": "catalog:",
-    "@biomejs/biome": "catalog:",
-    "oxlint": "catalog:"
+    "typescript": "catalog:"
   }
 }

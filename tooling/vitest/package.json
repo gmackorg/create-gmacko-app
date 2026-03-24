@@ -17,11 +17,11 @@
     "vitest": "^4.1.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "catalog:",
     "@gmacko/tsconfig": "workspace:*",
     "@types/node": "catalog:",
-    "typescript": "catalog:",
-    "@biomejs/biome": "catalog:",
-    "oxlint": "catalog:"
+    "oxlint": "catalog:",
+    "typescript": "catalog:"
   },
   "peerDependencies": {
     "@testing-library/react": ">=14.0.0",

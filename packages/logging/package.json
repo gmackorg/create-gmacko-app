@@ -31,10 +31,10 @@
     }
   },
   "devDependencies": {
+    "@biomejs/biome": "catalog:",
     "@gmacko/tsconfig": "workspace:*",
     "@types/node": "catalog:",
-    "typescript": "catalog:",
-    "@biomejs/biome": "catalog:",
-    "oxlint": "catalog:"
+    "oxlint": "catalog:",
+    "typescript": "catalog:"
   }
 }

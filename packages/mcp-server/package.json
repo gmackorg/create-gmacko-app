@@ -24,11 +24,11 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@biomejs/biome": "catalog:",
     "@gmacko/tsconfig": "workspace:*",
     "@types/node": "catalog:",
+    "oxlint": "catalog:",
     "tsup": "^8.5.1",
-    "typescript": "catalog:",
-    "@biomejs/biome": "catalog:",
-    "oxlint": "catalog:"
+    "typescript": "catalog:"
   }
 }

@@ -196,6 +196,53 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
     }, 900000);
   });
 
+  describe("vinext configuration", () => {
+    let appPath: string;
+    let appName: string;
+
+    beforeAll(async () => {
+      appName = generateAppName("e2e-vinext");
+      console.log(`\n[E2E] Scaffolding vinext ${appName}...`);
+
+      const result = await runCli({
+        appName,
+        flags: [
+          "--yes",
+          "--no-git",
+          "--no-mobile",
+          "--no-ai",
+          "--vinext",
+        ],
+        cwd: tempDir,
+        timeout: 600000,
+      });
+
+      appPath = result.appPath;
+      appsToClean.push(appPath);
+
+      expect(result.exitCode).toBe(0);
+      console.log(`[E2E] Scaffolded to ${appPath}`);
+    }, 900000);
+
+    it("should build the vinext lane", () => {
+      console.log("[E2E] Running vinext build...");
+
+      const result = runInApp(appPath, "pnpm --filter @gmacko/nextjs build:vinext", {
+        env: {
+          CI: "true",
+        },
+        timeout: 600000,
+      });
+
+      if (!result.success) {
+        console.error("[E2E] Vinext build failed:");
+        console.error(result.stderr || result.stdout);
+      }
+
+      expect(result.success).toBe(true);
+    }, 900000);
+  });
+
   describe("full configuration", () => {
     let appPath: string;
     let appName: string;

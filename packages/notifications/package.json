@@ -24,12 +24,12 @@
     "expo-notifications": "~55.0.13"
   },
   "devDependencies": {
+    "@biomejs/biome": "catalog:",
     "@gmacko/tsconfig": "workspace:*",
     "@types/react": "catalog:react19",
     "@types/react-native": "^0.73.0",
-    "typescript": "catalog:",
-    "@biomejs/biome": "catalog:",
-    "oxlint": "catalog:"
+    "oxlint": "catalog:",
+    "typescript": "catalog:"
   },
   "peerDependencies": {
     "expo": ">=52.0.0",

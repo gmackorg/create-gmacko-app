@@ -22,9 +22,6 @@
     "enabled": true,
     "indentStyle": "space"
   },
-  "organizeImports": {
-    "enabled": true
-  },
   "linter": {
     "enabled": false
   }

@@ -22,9 +22,9 @@
     "resend": "^6.9.4"
   },
   "devDependencies": {
-    "@gmacko/tsconfig": "workspace:*",
-    "typescript": "catalog:",
     "@biomejs/biome": "catalog:",
-    "oxlint": "catalog:"
+    "@gmacko/tsconfig": "workspace:*",
+    "oxlint": "catalog:",
+    "typescript": "catalog:"
   }
 }

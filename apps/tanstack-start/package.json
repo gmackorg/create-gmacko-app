@@ -37,6 +37,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@biomejs/biome": "catalog:",
     "@gmacko/tailwind-config": "workspace:*",
     "@gmacko/tsconfig": "workspace:*",
     "@tailwindcss/vite": "catalog:",
@@ -44,11 +45,10 @@
     "@types/react": "catalog:react19",
     "@types/react-dom": "catalog:react19",
     "@vitejs/plugin-react": "catalog:",
+    "oxlint": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vite-tsconfig-paths": "^6.1.1",
-    "@biomejs/biome": "catalog:",
-    "oxlint": "catalog:"
+    "vite-tsconfig-paths": "^6.1.1"
   }
 }
