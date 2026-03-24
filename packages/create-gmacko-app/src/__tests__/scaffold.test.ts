@@ -228,6 +228,35 @@ describe("create-gmacko-app scaffold", () => {
       expect(forgeGraphConfig).toContain("nodeId: change-me-production-node");
     }, 120000);
 
+    it("should allow ForgeGraph config to be customized from CLI flags", async () => {
+      const appName = generateAppName("forgegraph-custom");
+      const result = await runCli({
+        appName,
+        flags: [
+          "--yes",
+          "--no-install",
+          "--no-git",
+          "--forgegraph-server",
+          "https://forge.gmac.io",
+          "--forgegraph-staging-node",
+          "node-staging-1",
+          "--forgegraph-production-node",
+          "node-production-1",
+        ],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+
+      const forgeGraphConfig = readFile(result.appPath, ".forgegraph.yaml");
+
+      expect(forgeGraphConfig).toContain("server: https://forge.gmac.io");
+      expect(forgeGraphConfig).toContain("nodeId: node-staging-1");
+      expect(forgeGraphConfig).toContain("nodeId: node-production-1");
+    }, 120000);
+
     it("should scaffold vinext support when requested", async () => {
       const appName = generateAppName("vinext");
       const result = await runCli({
@@ -250,6 +279,11 @@ describe("create-gmacko-app scaffold", () => {
         result.appPath,
         "apps/nextjs/wrangler.jsonc",
       );
+      const cloudflareEnv = readFile(
+        result.appPath,
+        "apps/nextjs/src/cloudflare-env.ts",
+      );
+      const envExample = readFile(result.appPath, ".env.example");
 
       expect(nextPkg.scripts?.["dev:vinext"]).toBeDefined();
       expect(nextPkg.scripts?.["build:vinext"]).toBeDefined();
@@ -265,6 +299,10 @@ describe("create-gmacko-app scaffold", () => {
       expect(wranglerConfig).toContain('"APP_ENV": "production"');
       expect(wranglerConfig).toContain('"env"');
       expect(wranglerConfig).toContain('"staging"');
+      expect(cloudflareEnv).toContain("CLOUDFLARE_ACCOUNT_ID");
+      expect(cloudflareEnv).toContain("CLOUDFLARE_API_TOKEN");
+      expect(envExample).toContain("CLOUDFLARE_ACCOUNT_ID");
+      expect(envExample).toContain("CLOUDFLARE_API_TOKEN");
     }, 120000);
 
     it("should scaffold stronger Expo development-build defaults", async () => {

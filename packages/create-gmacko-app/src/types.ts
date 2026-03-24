@@ -21,6 +21,9 @@ export interface CliOptions {
   packageScope: string;
   platforms: PlatformConfig;
   vinext: boolean;
+  forgegraphServer: string;
+  forgegraphStagingNode: string;
+  forgegraphProductionNode: string;
   integrations: IntegrationConfig;
   includeAi: boolean;
   includeProvision: boolean;

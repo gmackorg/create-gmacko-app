@@ -349,4 +349,52 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
       expect(result.success).toBe(true);
     }, 900000);
   });
+
+  describe("vinext configuration", () => {
+    let appPath: string;
+    let appName: string;
+
+    beforeAll(async () => {
+      appName = generateAppName("e2e-vinext");
+      console.log(`\n[E2E] Scaffolding vinext ${appName}...`);
+
+      const result = await runCli({
+        appName,
+        flags: [
+          "--yes",
+          "--no-git",
+          "--no-mobile",
+          "--no-ai",
+          "--prune",
+          "--integrations",
+          "",
+          "--vinext",
+        ],
+        cwd: tempDir,
+        timeout: 600000,
+      });
+
+      appPath = result.appPath;
+      appsToClean.push(appPath);
+
+      expect(result.exitCode).toBe(0);
+      console.log(`[E2E] Scaffolded to ${appPath}`);
+    }, 900000);
+
+    it("should typecheck with vinext enabled", () => {
+      console.log("[E2E] Running typecheck (vinext)...");
+      createMockEnv(appPath);
+
+      const result = runInApp(appPath, "pnpm --filter @gmacko/nextjs typecheck", {
+        timeout: 300000,
+      });
+
+      if (!result.success) {
+        console.error("[E2E] Typecheck failed:");
+        console.error(result.stderr || result.stdout);
+      }
+
+      expect(result.success).toBe(true);
+    }, 600000);
+  });
 });

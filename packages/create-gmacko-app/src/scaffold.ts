@@ -52,7 +52,7 @@ export async function scaffold(options: CliOptions): Promise<void> {
   updateIntegrationsConfig(targetDir, options.integrations);
   updatePackageScope(targetDir, options.packageScope);
   createManifest(targetDir, options);
-  createForgeGraphConfig(targetDir, options.appName);
+  createForgeGraphConfig(targetDir, options);
 
   if (!options.platforms.web) {
     fs.removeSync(path.join(targetDir, "apps/nextjs"));
@@ -264,17 +264,17 @@ function createManifest(targetDir: string, options: CliOptions): void {
   });
 }
 
-function createForgeGraphConfig(targetDir: string, appName: string): void {
+function createForgeGraphConfig(targetDir: string, options: CliOptions): void {
   fs.writeFileSync(
     path.join(targetDir, ".forgegraph.yaml"),
-    `app: ${appName}
-server: https://forge.example.com
+    `app: ${options.appName}
+server: ${options.forgegraphServer}
 stages:
   - name: staging
-    nodeId: change-me-staging-node
+    nodeId: ${options.forgegraphStagingNode}
     sortOrder: 10
   - name: production
-    nodeId: change-me-production-node
+    nodeId: ${options.forgegraphProductionNode}
     sortOrder: 20
 `,
   );
@@ -333,6 +333,37 @@ export default defineConfig({
 }
 `,
   );
+
+  fs.writeFileSync(
+    path.join(targetDir, "apps/nextjs/src/cloudflare-env.ts"),
+    `import { z } from "zod/v4";
+
+export const cloudflareEnvSchema = z.object({
+  APP_ENV: z.enum(["development", "staging", "production"]).default("production"),
+  CLOUDFLARE_ACCOUNT_ID: z.string().min(1),
+  CLOUDFLARE_API_TOKEN: z.string().min(1),
+});
+
+export type CloudflareEnv = z.infer<typeof cloudflareEnvSchema>;
+`,
+  );
+
+  const envExamplePath = path.join(targetDir, ".env.example");
+  const envExample = fs.readFileSync(envExamplePath, "utf-8");
+  if (!envExample.includes("CLOUDFLARE_ACCOUNT_ID")) {
+    fs.writeFileSync(
+      envExamplePath,
+      `${envExample}
+
+# =====================================================
+# OPTIONAL: Cloudflare Workers (vinext)
+# Used for the experimental Next.js-on-Workers lane
+# =====================================================
+# CLOUDFLARE_ACCOUNT_ID='your-account-id'
+# CLOUDFLARE_API_TOKEN='your-api-token'
+`,
+    );
+  }
 }
 
 function configureExpoApp(targetDir: string, appName: string): void {

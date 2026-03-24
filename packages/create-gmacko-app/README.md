@@ -33,6 +33,9 @@ create-gmacko-app is a CLI tool designed to bootstrap production-ready, full-sta
 | `--tanstack-start`               | Include TanStack Start app                                                                                          |
 | `--no-tanstack-start`            | Exclude TanStack Start app (default)                                                                                |
 | `--vinext`                       | Add experimental `vinext` support to the Next.js app for a Cloudflare Workers lane                                 |
+| `--forgegraph-server <url>`      | Write a ForgeGraph server URL into `.forgegraph.yaml`                                                               |
+| `--forgegraph-staging-node <id>` | Write the staging node placeholder into `.forgegraph.yaml`                                                          |
+| `--forgegraph-production-node <id>` | Write the production node placeholder into `.forgegraph.yaml`                                                   |
 | `--integrations <list>`          | Comma-separated list of integrations (sentry, posthog, stripe, revenuecat, notifications, email, realtime, storage) |
 | `--email-provider <provider>`    | Email provider (resend, sendgrid)                                                                                   |
 | `--realtime-provider <provider>` | Realtime provider (pusher, ably)                                                                                    |
@@ -129,6 +132,7 @@ Generated apps should be guided toward:
 - Hetzner VPS hosting with Postgres deployed alongside the app in the early stage
 - Nix-based build and runtime definitions as the repo evolves into a ForgeGraph-native deployment target
 - generated `.forgegraph.yaml` repo metadata with the app slug already scaffolded
+- optional CLI overrides for ForgeGraph server and stage node placeholders
 - `fg:init`, `fg:doctor`, and `fg:status` as the default repo-level ForgeGraph command surface
 - Expo development-build scripts and an app-local mobile README geared around Expo Orbit
 - hosted Postgres only after the product has enough customers to justify the added operational split

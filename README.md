@@ -254,6 +254,7 @@ Generated apps are set up for current agent-native and platform-native workflows
   - TanStack Start is the cleaner Workers-native path today.
   - ForgeGraph + Nix remains the stable owned-infrastructure path.
 - Generated repos now also include `.forgegraph.yaml` and stronger Expo development-build defaults out of the box.
+- The scaffold can now override ForgeGraph server/node placeholders directly from the CLI and emits Cloudflare env stubs when `--vinext` is enabled.
 
 See [docs/ai/DEVELOPER_EXPERIENCE.md](./docs/ai/DEVELOPER_EXPERIENCE.md) for the current support matrix and recommendations.
 

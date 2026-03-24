@@ -35,6 +35,18 @@ program
   .option("--realtime-provider <provider>", "Realtime provider (pusher, ably)")
   .option("--storage-provider <provider>", "Storage provider (uploadthing)")
   .option("--package-scope <scope>", "Package scope (default: @gmacko)")
+  .option(
+    "--forgegraph-server <url>",
+    "ForgeGraph server URL to write into .forgegraph.yaml",
+  )
+  .option(
+    "--forgegraph-staging-node <id>",
+    "ForgeGraph staging node placeholder to write into .forgegraph.yaml",
+  )
+  .option(
+    "--forgegraph-production-node <id>",
+    "ForgeGraph production node placeholder to write into .forgegraph.yaml",
+  )
   .action(async (appName: string, opts: Record<string, unknown>) => {
     const validation = validateNpmPackageName(appName);
     if (!validation.validForNewPackages) {
@@ -61,6 +73,15 @@ program
       if (opts.tanstackStart !== undefined)
         options.platforms.tanstackStart = opts.tanstackStart === true;
       options.vinext = opts.vinext === true;
+      if (opts.forgegraphServer) {
+        options.forgegraphServer = opts.forgegraphServer as string;
+      }
+      if (opts.forgegraphStagingNode) {
+        options.forgegraphStagingNode = opts.forgegraphStagingNode as string;
+      }
+      if (opts.forgegraphProductionNode) {
+        options.forgegraphProductionNode = opts.forgegraphProductionNode as string;
+      }
       if (opts.packageScope) options.packageScope = opts.packageScope as string;
       if (opts.integrations !== undefined) {
         options.integrations = parseIntegrations(
@@ -78,6 +99,15 @@ program
       if (opts.install !== undefined) options.install = opts.install !== false;
       if (opts.git !== undefined) options.git = opts.git !== false;
       options.vinext = opts.vinext === true;
+      if (opts.forgegraphServer) {
+        options.forgegraphServer = opts.forgegraphServer as string;
+      }
+      if (opts.forgegraphStagingNode) {
+        options.forgegraphStagingNode = opts.forgegraphStagingNode as string;
+      }
+      if (opts.forgegraphProductionNode) {
+        options.forgegraphProductionNode = opts.forgegraphProductionNode as string;
+      }
     }
 
     await scaffold(options);
