@@ -1,0 +1,13 @@
+pre-commit:
+  commands:
+    format:
+      run: pnpm format:check
+    lint_ox:
+      run: pnpm lint:ox
+
+pre-push:
+  commands:
+    lint:
+      run: pnpm lint
+    typecheck:
+      run: pnpm typecheck

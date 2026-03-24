@@ -12,14 +12,11 @@ export interface SentryWebConfig {
 }
 
 /**
- * Detect environment from Vercel or fallback to NODE_ENV
+ * Detect environment from deployment metadata or fallback to NODE_ENV
  */
 function detectEnvironment(): string {
-  // Vercel provides VERCEL_ENV: 'production' | 'preview' | 'development'
-  if (process.env.VERCEL_ENV) {
-    return process.env.VERCEL_ENV === "preview"
-      ? "staging"
-      : process.env.VERCEL_ENV;
+  if (process.env.DEPLOY_ENV) {
+    return process.env.DEPLOY_ENV;
   }
   return process.env.NODE_ENV ?? "development";
 }

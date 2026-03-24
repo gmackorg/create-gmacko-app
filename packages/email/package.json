@@ -13,8 +13,8 @@
     "build": "tsc",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "dev": "tsc",
-    "format": "prettier --check . --ignore-path ../../.gitignore",
-    "lint": "eslint",
+    "format": "biome check .",
+    "lint": "oxlint .",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
@@ -22,12 +22,9 @@
     "resend": "^6.9.4"
   },
   "devDependencies": {
-    "@gmacko/eslint-config": "workspace:*",
-    "@gmacko/prettier-config": "workspace:*",
     "@gmacko/tsconfig": "workspace:*",
-    "eslint": "catalog:",
-    "prettier": "catalog:",
-    "typescript": "catalog:"
-  },
-  "prettier": "@gmacko/prettier-config"
+    "typescript": "catalog:",
+    "@biomejs/biome": "catalog:",
+    "oxlint": "catalog:"
+  }
 }

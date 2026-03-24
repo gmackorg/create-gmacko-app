@@ -1,88 +1,62 @@
-# Deployment Options
+# Deployment Guidance
 
-This template supports three deployment targets for the Next.js web app.
+The recommended deployment path for this template is:
 
-## Vercel (Recommended for simplicity)
+1. Keep the app in a ForgeGraph-managed repo.
+2. Deploy it to the Hetzner VPS using the ForgeGraph setup in [`../ForgeGraph`](../ForgeGraph).
+3. Run Postgres alongside the app first.
+4. Migrate to hosted Postgres later, once customer demand and operational pressure justify it.
 
-The app works with Vercel out of the box:
+This repository used to ship several different deployment paths. Those legacy assets have been removed from the template so new repos start from the ForgeGraph + Nix direction instead of inheriting dead deployment branches.
 
-```bash
-# Install Vercel CLI
-npm i -g vercel
+## Preferred Path: ForgeGraph on Hetzner
 
-# Deploy
-vercel
+Use ForgeGraph as the deployment control plane and keep the application repo aligned with that model.
+
+### Recommended Operating Model
+
+- App and Postgres live together on the same VPS in the early stage.
+- Secrets and runtime configuration are managed in ForgeGraph.
+- The app should move toward a Nix-based deployment setup so build and runtime behavior are reproducible.
+- Hosted Postgres is a later optimization, not the starting point.
+
+### Early-Stage Database Guidance
+
+Use a standard Postgres instance deployed beside the application. That keeps the initial system cheap, debuggable, and easy to operate. The included local `docker-compose.yml` is the same operating model you should prefer in the early production stage: one app deployment and one Postgres deployment, managed together.
+
+When it is time to migrate off the colocated database, do it for a concrete reason such as:
+
+- sustained customer traffic
+- backup or failover requirements
+- operational isolation requirements
+- team capacity to own another external dependency well
+
+## ForgeGraph Checklist
+
+For new deployments, the intended shape is:
+
+```text
+ForgeGraph repo
+├── app deployment
+├── postgres deployment
+├── env + secret management
+└── Nix-based build and runtime definitions
 ```
 
-Set environment variables in the Vercel dashboard.
+In this workspace, use [`../ForgeGraph`](../ForgeGraph) as the reference implementation for that deployment model.
 
-## Kubernetes
+The generated repo also includes a small handoff directory at [`deploy/forgegraph/README.md`](./forgegraph/README.md) for the app-side deployment contract.
 
-For self-hosted Kubernetes clusters:
+## Legacy Context
 
-### Build and Push Docker Image
+Older plans and notes in this repository may still mention:
 
-```bash
-# From repo root
-docker build -t your-registry/gmacko-web:latest -f apps/nextjs/Dockerfile .
-docker push your-registry/gmacko-web:latest
-```
+- older hosted-preview deployment flows
+- preview-specific infrastructure manifests
+- retired deployment experiments
+- provider-specific preview database automation
 
-### Create Secrets
-
-```bash
-kubectl create secret generic gmacko-env \
-  --from-literal=DATABASE_URL='...' \
-  --from-literal=AUTH_SECRET='...' \
-  --from-literal=AUTH_DISCORD_ID='...' \
-  --from-literal=AUTH_DISCORD_SECRET='...'
-```
-
-### Deploy
-
-```bash
-# Replace variables in manifest
-export IMAGE_TAG=your-registry/gmacko-web:latest
-export DOMAIN=app.yourdomain.com
-
-envsubst < deploy/k8s/deployment.yaml | kubectl apply -f -
-```
-
-## SST (AWS)
-
-For AWS deployment using SST v3:
-
-### Setup
-
-```bash
-# Install SST
-curl -fsSL https://sst.dev/install | bash
-
-# Copy SST config to root
-cp deploy/sst/sst.config.ts sst.config.ts
-
-# Initialize SST
-sst init
-```
-
-### Set Secrets
-
-```bash
-sst secret set DatabaseUrl "postgresql://..."
-sst secret set AuthSecret "your-auth-secret"
-sst secret set AuthDiscordId "your-discord-id"
-sst secret set AuthDiscordSecret "your-discord-secret"
-```
-
-### Deploy
-
-```bash
-# Development
-sst dev
-
-# Production
-sst deploy --stage production
-```
+Treat those references as historical context rather than current template guidance.
 
 ## Preview Deployments
 
@@ -96,27 +70,15 @@ Preview deployments create isolated environments for each pull request, enabling
 
 ### Configuration
 
-Set the `DEPLOY_TARGET` repository variable to choose the deployment platform:
-
-- `vercel` (default): Deploy to Vercel preview environments
-- `kubernetes`: Deploy to self-hosted Kubernetes cluster
+The template no longer ships platform-specific preview deployment manifests. If you want preview environments, model them in ForgeGraph directly and keep the database strategy simple unless stronger isolation is warranted.
 
 ### Required Secrets
 
-**For Kubernetes:**
+**For self-hosted previews:**
 
 ```
-KUBE_CONFIG          - Base64-encoded kubeconfig
 PREVIEW_DATABASE_URL - Database URL for preview environments
 PREVIEW_AUTH_SECRET  - Auth secret for preview environments
-```
-
-**For Vercel:**
-
-```
-VERCEL_TOKEN      - Vercel authentication token
-VERCEL_ORG_ID     - Vercel organization ID
-VERCEL_PROJECT_ID - Vercel project ID
 ```
 
 ### Preview URLs
@@ -125,31 +87,14 @@ Previews are accessible at: `https://pr-{number}.preview.gmacko.io`
 
 ### Database Isolation
 
-Two strategies are supported for preview database isolation:
+Two strategies are documented in the current codebase, but the preferred early-stage default is to keep previews simple and share infrastructure conservatively:
 
-1. **Neon Branch Database** (recommended): Set `PREVIEW_DATABASE_URL` to a Neon branch connection string
-2. **Schema Isolation**: Set `PREVIEW_USE_SCHEMA_ISOLATION=true` to use PR-specific schemas in the same database
+1. **Schema Isolation**: Set `PREVIEW_USE_SCHEMA_ISOLATION=true` to use PR-specific schemas in the same database
+2. **Dedicated Preview Database**: Set `PREVIEW_DATABASE_URL` to a dedicated Postgres instance when you truly need stronger isolation
 
-### Kubernetes Manifests
+### Preview Implementation
 
-Preview K8s manifests are in `deploy/k8s/preview/`:
-
-```
-deploy/k8s/preview/
-├── namespace.yaml   # PR-specific namespace with resource quotas
-├── deployment.yaml  # App deployment with security context
-├── service.yaml     # ClusterIP service
-├── ingress.yaml     # Ingress with TLS and rate limiting
-├── secret.yaml      # Environment secrets
-└── kustomization.yaml
-```
-
-All manifests support `envsubst` templating with these variables:
-
-- `${PR_NUMBER}` - Pull request number
-- `${IMAGE_TAG}` - Docker image tag
-- `${PREVIEW_DOMAIN}` - Full preview domain
-- `${DATABASE_URL}` - Database connection string
+This template now leaves preview infrastructure implementation to ForgeGraph instead of shipping stale Kubernetes manifests that are no longer part of the recommended path.
 
 ### Preview Configuration API
 

@@ -1,4 +1,6 @@
 import { exec, execSync } from "child_process";
+import { existsSync } from "fs";
+import path from "path";
 import { promisify } from "util";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
@@ -31,20 +33,15 @@ const CLI_TOOLS: Record<string, CliTool> = {
     command: "tea",
     installHint: "brew install tea",
   },
-  vercel: {
-    name: "Vercel CLI",
-    command: "vercel",
-    installHint: "npm i -g vercel",
-  },
   eas: {
     name: "EAS CLI",
     command: "eas",
     installHint: "npm i -g eas-cli",
   },
-  neonctl: {
-    name: "Neon CLI",
-    command: "neonctl",
-    installHint: "npm i -g neonctl",
+  docker: {
+    name: "Docker",
+    command: "docker",
+    installHint: "Install Docker Desktop or docker engine",
   },
 };
 
@@ -63,14 +60,8 @@ function isCliAuthenticated(command: string): boolean {
       case "gh":
         execSync("gh auth status", { stdio: "ignore" });
         return true;
-      case "vercel":
-        execSync("vercel whoami", { stdio: "ignore" });
-        return true;
       case "eas":
         execSync("eas whoami", { stdio: "ignore" });
-        return true;
-      case "neonctl":
-        execSync("neonctl me", { stdio: "ignore" });
         return true;
       default:
         return false;
@@ -165,27 +156,15 @@ export async function provisionGitRepo(
   }
 }
 
-export async function provisionVercel(
+export async function provisionForgeGraph(
   config: ProvisionConfig,
 ): Promise<boolean> {
   if (!config.platforms.web) {
     return false;
   }
 
-  if (!isCliInstalled("vercel")) {
-    p.log.warn(
-      `Vercel CLI not found. Install with: ${CLI_TOOLS.vercel.installHint}`,
-    );
-    return false;
-  }
-
-  if (!isCliAuthenticated("vercel")) {
-    p.log.warn("Please run `vercel login` first");
-    return false;
-  }
-
   const shouldSetup = await p.confirm({
-    message: "Set up Vercel deployment?",
+    message: "Show ForgeGraph deployment steps?",
     initialValue: true,
   });
 
@@ -193,37 +172,38 @@ export async function provisionVercel(
     return false;
   }
 
-  const spinner = p.spinner();
-  spinner.start("Linking to Vercel...");
+  const forgeGraphPath = path.resolve(config.projectPath, "../ForgeGraph");
+  const hasLocalReference = existsSync(forgeGraphPath);
 
-  const result = await runCommand(
-    "vercel link --yes",
-    `${config.projectPath}/apps/nextjs`,
+  p.log.info("ForgeGraph deployment guidance:");
+  p.log.message(
+    pc.cyan(
+      `1. Keep this repo flake-based and deploy it from ForgeGraph on your Hetzner VPS.`,
+    ),
   );
-
-  if (result.success) {
-    spinner.stop("Vercel project linked!");
-
-    const envSpinner = p.spinner();
-    envSpinner.start("Pulling environment variables...");
-
-    const envResult = await runCommand(
-      "vercel env pull .env.local",
-      `${config.projectPath}/apps/nextjs`,
+  p.log.message(
+    pc.cyan(
+      `2. Run Postgres alongside the app first and export DATABASE_URL in the deployment environment.`,
+    ),
+  );
+  p.log.message(
+    pc.cyan(
+      `3. Use flake.nix as the Nix entry point for build and runtime definitions.`,
+    ),
+  );
+  if (hasLocalReference) {
+    p.log.message(
+      pc.cyan(`4. Use the local ForgeGraph repo at ${forgeGraphPath} and deploy with fg.`),
     );
-
-    if (envResult.success) {
-      envSpinner.stop("Environment variables pulled!");
-    } else {
-      envSpinner.stop("Could not pull env vars (you can do this later)");
-    }
-
-    return true;
-  } else {
-    spinner.stop("Failed to link Vercel");
-    p.log.error(result.output);
-    return false;
+    p.log.message(
+      pc.cyan(`   Example flow: fg login --server <forgegraph-url> --token <token>`),
+    );
+    p.log.message(
+      pc.cyan(`   Then: fg deploy ${config.appName} --stage production`),
+    );
   }
+
+  return true;
 }
 
 export async function provisionEAS(config: ProvisionConfig): Promise<boolean> {
@@ -280,21 +260,28 @@ export async function provisionEAS(config: ProvisionConfig): Promise<boolean> {
   }
 }
 
-export async function provisionNeon(config: ProvisionConfig): Promise<boolean> {
-  if (!isCliInstalled("neonctl")) {
+export async function provisionPostgres(
+  config: ProvisionConfig,
+): Promise<boolean> {
+  if (!isCliInstalled("docker")) {
     p.log.warn(
-      `Neon CLI not found. Install with: ${CLI_TOOLS.neonctl.installHint}`,
+      `Docker not found. Install with: ${CLI_TOOLS.docker.installHint}`,
     );
     return false;
   }
 
-  if (!isCliAuthenticated("neonctl")) {
-    p.log.warn("Please run `neonctl auth` first");
+  try {
+    execSync("docker compose version", {
+      cwd: config.projectPath,
+      stdio: "ignore",
+    });
+  } catch {
+    p.log.warn("Docker Compose is required to start the local Postgres service");
     return false;
   }
 
   const shouldSetup = await p.confirm({
-    message: "Create a Neon database project?",
+    message: "Start the local Postgres service?",
     initialValue: true,
   });
 
@@ -303,35 +290,26 @@ export async function provisionNeon(config: ProvisionConfig): Promise<boolean> {
   }
 
   const spinner = p.spinner();
-  spinner.start("Creating Neon project...");
+  spinner.start("Starting Postgres...");
 
   const result = await runCommand(
-    `neonctl projects create --name ${config.appName} --set-context`,
+    "docker compose up -d postgres",
     config.projectPath,
   );
 
   if (!result.success) {
-    spinner.stop("Failed to create Neon project");
+    spinner.stop("Failed to start Postgres");
     p.log.error(result.output);
     return false;
   }
 
-  spinner.message("Getting connection string...");
-
-  const connResult = await runCommand(
-    "neonctl connection-string --pooled",
-    config.projectPath,
+  spinner.stop("Postgres started!");
+  p.log.info("Use this connection string in your .env file:");
+  p.log.message(
+    pc.cyan(`DATABASE_URL="postgresql://postgres:postgres@localhost:5432/gmacko_dev"`),
   );
 
-  if (connResult.success) {
-    spinner.stop("Neon project created!");
-    p.log.info("Add this to your .env file:");
-    p.log.message(pc.cyan(`POSTGRES_URL="${connResult.output.trim()}"`));
-    return true;
-  } else {
-    spinner.stop("Project created but could not get connection string");
-    return true;
-  }
+  return true;
 }
 
 export async function runProvisioning(config: ProvisionConfig): Promise<void> {
@@ -349,18 +327,14 @@ export async function runProvisioning(config: ProvisionConfig): Promise<void> {
             : "CLI not found",
       },
       {
-        value: "neon",
-        label: "Neon Database",
-        hint: isCliInstalled("neonctl") ? "available" : "CLI not found",
+        value: "postgres",
+        label: "Postgres Setup",
+        hint: isCliInstalled("docker") ? "available" : "Docker not found",
       },
       {
-        value: "vercel",
-        label: "Vercel Deployment",
-        hint: config.platforms.web
-          ? isCliInstalled("vercel")
-            ? "available"
-            : "CLI not found"
-          : "web not selected",
+        value: "forgegraph",
+        label: "ForgeGraph Deployment",
+        hint: config.platforms.web ? "recommended" : "web not selected",
       },
       {
         value: "eas",
@@ -387,12 +361,12 @@ export async function runProvisioning(config: ProvisionConfig): Promise<void> {
     results.git = await provisionGitRepo(config);
   }
 
-  if (selectedServices.includes("neon")) {
-    results.neon = await provisionNeon(config);
+  if (selectedServices.includes("postgres")) {
+    results.postgres = await provisionPostgres(config);
   }
 
-  if (selectedServices.includes("vercel")) {
-    results.vercel = await provisionVercel(config);
+  if (selectedServices.includes("forgegraph")) {
+    results.forgegraph = await provisionForgeGraph(config);
   }
 
   if (selectedServices.includes("eas")) {

@@ -83,13 +83,8 @@ export async function scaffold(options: CliOptions): Promise<void> {
   spinner.stop("Project configured");
 
   if (options.git) {
-    spinner.start("Initializing git repository...");
-    try {
-      execSync("git init", { cwd: targetDir, stdio: "pipe" });
-      spinner.stop("Git repository initialized");
-    } catch {
-      spinner.stop("Failed to initialize git");
-    }
+    spinner.start("Initializing repository...");
+    initializeRepository(targetDir, spinner);
   }
 
   if (options.install) {
@@ -132,9 +127,32 @@ ${pc.bold("Next steps:")}
   ${pc.cyan("cd")} ${options.appName}
   ${pc.cyan("cp")} .env.example .env
   ${pc.dim("# Update .env with your credentials")}
+  ${pc.cyan("docker compose")} up -d postgres
   ${pc.cyan("pnpm")} db:push
+  ${pc.cyan("pnpm")} format:check
+  ${pc.cyan("pnpm")} lint:ox
   ${pc.cyan("pnpm")} dev
 `);
+}
+
+function initializeRepository(
+  targetDir: string,
+  spinner: ReturnType<typeof p.spinner>,
+): void {
+  try {
+    execSync("jj git init .", { cwd: targetDir, stdio: "pipe" });
+    spinner.stop("Repository initialized with jj");
+    return;
+  } catch {
+    p.log.warn("jj was unavailable; falling back to a plain Git repo.");
+  }
+
+  try {
+    execSync("git init", { cwd: targetDir, stdio: "pipe" });
+    spinner.stop("Repository initialized with git");
+  } catch {
+    spinner.stop("Failed to initialize repository");
+  }
 }
 
 function updatePackageJson(targetDir: string, options: CliOptions): void {

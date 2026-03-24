@@ -10,9 +10,9 @@
  */
 export function isPreviewEnvironment(): boolean {
   return (
+    process.env.DEPLOY_ENV === "preview" ||
     process.env.NODE_ENV === "preview" ||
     process.env.NEXT_PUBLIC_PREVIEW === "true" ||
-    process.env.VERCEL_ENV === "preview" ||
     !!process.env.PREVIEW_PR_NUMBER
   );
 }
@@ -57,8 +57,8 @@ export interface PreviewDatabaseConfig {
   useSchema: boolean;
   /** Schema name pattern */
   schemaName: string | null;
-  /** Use branch database */
-  useBranchDatabase: boolean;
+  /** Use dedicated preview database */
+  useDedicatedDatabase: boolean;
 }
 
 /**
@@ -82,36 +82,34 @@ export function getPreviewConfig(): PreviewConfig {
  *
  * Supports two strategies:
  * 1. Schema-based isolation: Each PR gets its own schema in the same database
- * 2. Branch database: Each PR gets a dedicated Neon branch
+ * 2. Dedicated preview database: Each PR or preview lane gets its own database
  */
 function getPreviewDatabaseConfig(
   prNumber: number | null,
 ): PreviewDatabaseConfig {
-  // Check if using Neon branch databases
-  const useBranchDatabase = !!process.env.PREVIEW_DATABASE_URL;
+  const useDedicatedDatabase = !!process.env.PREVIEW_DATABASE_URL;
 
-  // Check if using schema-based isolation
   const useSchema =
-    !useBranchDatabase && !!process.env.PREVIEW_USE_SCHEMA_ISOLATION;
+    !useDedicatedDatabase && !!process.env.PREVIEW_USE_SCHEMA_ISOLATION;
 
   return {
     useSchema,
     schemaName: useSchema && prNumber ? `preview_pr_${prNumber}` : null,
-    useBranchDatabase,
+    useDedicatedDatabase,
   };
 }
 
 /**
  * Get the database URL for preview environments
  *
- * If PREVIEW_DATABASE_URL is set, uses that directly (Neon branch database).
+ * If PREVIEW_DATABASE_URL is set, uses that directly.
  * If PREVIEW_USE_SCHEMA_ISOLATION is set, appends schema to regular DATABASE_URL.
  * Otherwise, falls back to regular DATABASE_URL.
  */
 export function getPreviewDatabaseUrl(): string {
   const config = getPreviewConfig();
 
-  // Priority 1: Dedicated preview database URL (Neon branch)
+  // Priority 1: Dedicated preview database URL
   if (process.env.PREVIEW_DATABASE_URL) {
     return process.env.PREVIEW_DATABASE_URL;
   }
@@ -196,10 +194,8 @@ export function getPreviewMetadata(): PreviewMetadata | null {
 
   return {
     prNumber: getPreviewPRNumber(),
-    branch:
-      process.env.VERCEL_GIT_COMMIT_REF || process.env.PREVIEW_BRANCH || null,
-    commit:
-      process.env.VERCEL_GIT_COMMIT_SHA || process.env.PREVIEW_COMMIT || null,
+    branch: process.env.PREVIEW_BRANCH || null,
+    commit: process.env.PREVIEW_COMMIT || null,
     deployedAt: process.env.PREVIEW_DEPLOYED_AT || null,
   };
 }

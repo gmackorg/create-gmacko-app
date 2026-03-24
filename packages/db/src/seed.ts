@@ -57,7 +57,7 @@ const samplePosts = [
     id: randomUUID(),
     title: "Getting Started with Drizzle ORM",
     content:
-      "Drizzle ORM is a TypeScript-first ORM that provides type-safe database access. In this post, we explore the basics of setting up Drizzle with Neon Postgres and creating your first schema.",
+      "Drizzle ORM is a TypeScript-first ORM that provides type-safe database access. In this post, we explore the basics of setting up Drizzle with Postgres and creating your first schema.",
   },
   {
     id: randomUUID(),
@@ -79,9 +79,9 @@ const samplePosts = [
   },
   {
     id: randomUUID(),
-    title: "Deploying to Vercel and Neon",
+    title: "Deploying with ForgeGraph and Postgres",
     content:
-      "Learn the best practices for deploying your Next.js application to Vercel with a Neon Postgres database. We cover environment variables, connection pooling, and performance optimization.",
+      "Learn the best practices for deploying your Next.js application with ForgeGraph while keeping Postgres colocated early on. We cover environment variables, operational simplicity, and when to move to hosted infrastructure.",
   },
 ];
 

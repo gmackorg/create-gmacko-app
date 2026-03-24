@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/create-gmacko-app.svg)](https://www.npmjs.com/package/create-gmacko-app)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-Create a new Gmacko app with Next.js, Expo, Storybook, tRPC, and AI planning workflows.
+Create a new Gmacko app with Next.js, Expo, Storybook, tRPC, ForgeGraph-first deployment guidance, and shared agent-native workflows.
 
 ## Quick Start
 
@@ -13,7 +13,7 @@ npx create-gmacko-app my-app
 
 ## Description
 
-create-gmacko-app is a CLI tool designed to bootstrap production-ready, full-stack applications with a modern tech stack. It sets up a monorepo using Turborepo and pnpm workspaces, integrating web and mobile platforms with a shared backend and seamless AI workflows.
+create-gmacko-app is a CLI tool designed to bootstrap production-ready, full-stack applications with a modern tech stack. It sets up a monorepo using Turborepo and pnpm workspaces, integrating web and mobile platforms with a shared backend, colocated-Postgres-first deployment guidance, and shared agent workflows.
 
 ## CLI Options
 
@@ -23,7 +23,7 @@ create-gmacko-app is a CLI tool designed to bootstrap production-ready, full-sta
 | `--yes, -y`                      | Accept all defaults without prompting                                                                               |
 | `--prune`                        | Remove unused integration packages                                                                                  |
 | `--no-install`                   | Skip pnpm install                                                                                                   |
-| `--no-git`                       | Skip git init                                                                                                       |
+| `--no-git`                       | Skip repository init (`jj`/`git`)                                                                                   |
 | `--no-ai`                        | Exclude AI workflow system                                                                                          |
 | `--no-provision`                 | Exclude provisioning script                                                                                         |
 | `--web`                          | Include Next.js web app (default: true)                                                                             |
@@ -75,24 +75,27 @@ npx create-gmacko-app my-app --no-mobile --no-ai
 ## Tech Stack
 
 - **Monorepo Management**: Turborepo + pnpm workspaces
-- **Web Framework**: Next.js 15
+- **Web Framework**: Next.js 16
 - **Component Development**: Storybook 10
-- **Mobile Framework**: Expo SDK 54 / React Native 0.81
+- **Mobile Framework**: Expo SDK 55 / React Native 0.84
 - **Optional Framework**: TanStack Start
 - **Type-safe API**: tRPC v11 with OpenAPI support
-- **Database Layer**: Drizzle ORM + Neon Postgres
+- **Database Layer**: Drizzle ORM + Postgres, with the recommended default being a colocated database before moving to hosted infrastructure
 - **Authentication**: Better-auth
 - **Design System**: Tailwind CSS v4 + shadcn/ui components
-- **AI Workflow**: OpenCode docs plus vendored Claude Code gstack skills
+- **DX Baseline**: `jj`, `oxlint`, `biome`, `lefthook`, `commitlint`, `knip`
+- **Agent Workflow**: `AGENTS.md`, `CLAUDE.md`, `opencode.json`, `.mcp.json`, and vendored Claude Code gstack skills
 
 ## AI Planning Workflow
 
-Generated apps include a `CLAUDE.md`, `docs/ai/INITIAL_PROPOSAL.md`, and a vendored `.claude/skills/gstack` install.
+Generated apps include `AGENTS.md`, `CLAUDE.md`, `opencode.json`, `.mcp.json`, `docs/ai/INITIAL_PROPOSAL.md`, and a vendored `.claude/skills/gstack` install.
 
 1. Use `superpowers:brainstorming` to write the initial proposal to `docs/ai/INITIAL_PROPOSAL.md`.
 2. Run `/plan-ceo-review` and `/plan-eng-review` to refine the proposal and implementation plan.
 3. Run `/design-consultation` to define the design philosophy and write `DESIGN.md`.
 4. If the gstack commands are unavailable, run `cd .claude/skills/gstack && ./setup`.
+
+See [../../docs/ai/DEVELOPER_EXPERIENCE.md](/Volumes/dev/create-gmacko-app/docs/ai/DEVELOPER_EXPERIENCE.md) for the current recommendations around Codex, Claude Code, OpenCode, Expo Orbit, Cloudflare Workers, ForgeGraph, and Nix.
 
 ## Storybook
 
@@ -115,6 +118,17 @@ pnpm --filter @gmacko/nextjs storybook
 ## Repository
 
 The source code is available on GitHub: [https://github.com/gmackorg/create-gmacko-app](https://github.com/gmackorg/create-gmacko-app)
+
+## Deployment Guidance
+
+Generated apps should be guided toward:
+
+- ForgeGraph-managed deployments as the default operating model
+- Hetzner VPS hosting with Postgres deployed alongside the app in the early stage
+- Nix-based build and runtime definitions as the repo evolves into a ForgeGraph-native deployment target
+- hosted Postgres only after the product has enough customers to justify the added operational split
+- `jj` as the default repo shape, with colocated Git compatibility for GitHub and other tooling
+- a modern baseline of `oxlint`, `biome`, `lefthook`, `commitlint`, and `knip`
 
 ## License
 

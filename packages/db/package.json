@@ -21,8 +21,8 @@
     "build": "tsc",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "dev": "tsc",
-    "format": "prettier --check . --ignore-path ../../.gitignore",
-    "lint": "eslint",
+    "format": "biome check .",
+    "lint": "oxlint .",
     "generate": "pnpm with-env drizzle-kit generate",
     "migrate": "pnpm with-env drizzle-kit migrate",
     "push": "pnpm with-env drizzle-kit push",
@@ -33,20 +33,18 @@
     "with-env": "dotenv -e ../../.env --"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.0.2",
     "drizzle-orm": "^0.45.1",
     "drizzle-zod": "^0.8.3",
+    "postgres": "^3.4.7",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@gmacko/eslint-config": "workspace:*",
-    "@gmacko/prettier-config": "workspace:*",
     "@gmacko/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
     "drizzle-kit": "^0.31.10",
-    "eslint": "catalog:",
-    "prettier": "catalog:",
     "tsx": "^4.21.0",
-    "typescript": "catalog:"
-  },
-  "prettier": "@gmacko/prettier-config"
+    "typescript": "catalog:",
+    "@biomejs/biome": "catalog:",
+    "oxlint": "catalog:"
+  }
 }

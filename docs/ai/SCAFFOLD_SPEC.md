@@ -26,7 +26,7 @@
 - `--yes` (accept defaults, no prompts)
 - `--prune` (remove unused integration packages + references)
 - `--no-install` (skip `pnpm install`)
-- `--no-git` (skip `git init`)
+- `--no-git` (skip repository init)
 - `--no-ai` (do not include AI skill system + docs)
 - `--no-provision` (do not include `scripts/provision.sh`)
 - `--web / --no-web` (default: `--web`)
@@ -38,7 +38,7 @@
 - `--realtime-provider <pusher|ably|none>` (default: `none`)
 - `--storage-provider <uploadthing|none>` (default: `none`)
 - `--package-scope <@your-scope>` (default: `@gmacko` for upstream parity OR `@repo` if you standardize; choose one and keep stable)
-- `--db <neon>` (only `neon` supported; no prompt)
+- `--db <postgres>` (only `postgres` supported; no prompt)
 - `--auth <better-auth>` (only `better-auth` supported; no prompt)
 
 **Determinism rule:** if a flag explicitly sets a choice, it wins over prompt defaults.
@@ -103,7 +103,7 @@
 - **Default:** UploadThing
 
 #### Prompt 9 — Include AI workflow system?
-- **Question:** "Include Gmacko AI workflow system (docs/ai + .opencode skills)?"
+- **Question:** "Include Gmacko AI workflow system (shared AGENTS docs + agent configs + planning docs)?"
 - **Default:** Yes
 - **Validation:** boolean
 
@@ -221,7 +221,10 @@ export type Integrations = typeof integrations;
 ### 2.3 AI system outputs (only if AI enabled)
 - Copy/Create: `docs/ai/**`
 - Create: `docs/ai/INITIAL_PROPOSAL.md`
+- Create: `docs/ai/DEVELOPER_EXPERIENCE.md`
+- Create: `AGENTS.md`
 - Create: `CLAUDE.md`
+- Create: `.mcp.json`
 - Copy/Create: `.claude/skills/gstack/**`
 - Copy/Create: `.opencode/skill/**`
 - Copy/Create: `.opencode/agent/**` (if used)
@@ -232,6 +235,9 @@ export type Integrations = typeof integrations;
 
 **Recommended behavior**
 - If AI system enabled: generate a minimal `PROJECT_MANIFEST.json` that matches scaffold answers (platforms + integrations), so the AI workflow is "ready to run".
+- Keep `AGENTS.md` as the canonical repo instruction file and make `CLAUDE.md` a thin Claude-specific shim.
+- Ship `.mcp.json` with the official Next.js MCP server when the Next.js app is enabled.
+- Prefer `opencode.json` for loading supplemental instruction docs instead of duplicating them into `AGENTS.md`.
 - The default planning path is:
   1. `superpowers:brainstorming` writes the initial proposal to `docs/ai/INITIAL_PROPOSAL.md`
   2. `/plan-ceo-review` and `/plan-eng-review` refine the proposal and implementation plan
@@ -482,7 +488,7 @@ After scaffolding:
   - Without prune: present but not wired, no required env vars.
   - With prune: removed entirely, no references remain.
 - Defaults produce a working app with:
-  - better-auth + Neon + tRPC + shadcn UI
+  - better-auth + Postgres + tRPC + shadcn UI
   - Sentry + PostHog enabled but not blocking local dev if env vars missing (you choose whether "enabled requires env" vs "enabled but optional in dev"; pick one and enforce consistently).
 
 ---

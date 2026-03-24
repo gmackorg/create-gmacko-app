@@ -14,10 +14,8 @@ export interface PostHogWebConfig {
 
 function detectEnvironment(): string {
   if (typeof window === "undefined") return "server";
-  if (process.env.VERCEL_ENV) {
-    return process.env.VERCEL_ENV === "preview"
-      ? "staging"
-      : process.env.VERCEL_ENV;
+  if (process.env.DEPLOY_ENV) {
+    return process.env.DEPLOY_ENV;
   }
   return process.env.NODE_ENV ?? "development";
 }

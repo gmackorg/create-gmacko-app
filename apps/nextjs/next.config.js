@@ -92,7 +92,6 @@ const sentryConfig = {
   silent: !process.env.CI,
   widenClientFileUpload: true,
   disableLogger: true,
-  automaticVercelMonitors: true,
 };
 
 // Apply i18n plugin conditionally, then Sentry if enabled

@@ -15,12 +15,12 @@
       "persistent": false
     },
     "format": {
-      "outputs": [".cache/.prettiercache"],
+      "outputs": [],
       "outputLogs": "new-only"
     },
     "lint": {
       "dependsOn": ["^topo", "^build"],
-      "outputs": [".cache/.eslintcache"]
+      "outputs": []
     },
     "typecheck": {
       "dependsOn": ["^topo", "^build"],
@@ -101,11 +101,6 @@
   "globalPassThroughEnv": [
     "NODE_ENV",
     "CI",
-    "VERCEL",
-    "VERCEL_ENV",
-    "VERCEL_URL",
-    "VERCEL_GIT_COMMIT_REF",
-    "VERCEL_GIT_COMMIT_SHA",
     "NEXT_RUNTIME",
     "npm_lifecycle_event"
   ]

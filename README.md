@@ -2,9 +2,13 @@
 
 A fork of [create-t3-turbo](https://github.com/t3-oss/create-t3-turbo) with:
 
-- Neon Postgres (instead of Vercel Postgres)
+- Postgres deployed alongside the app first, with hosted Postgres as a later migration once the product has real customer demand
+- ForgeGraph as the preferred deployment path for app hosting, especially on the Hetzner VPS setup
+- Nix-oriented deployment guidance so generated apps can move toward living as ForgeGraph repos
+- `jj`-first repository setup with colocated Git compatibility
+- a baseline standards stack of `oxlint`, `biome`, `lefthook`, `commitlint`, and `knip`
 - Conditional integration system (Sentry, PostHog, Stripe, Email, Realtime, Storage)
-- AI workflow support via OpenCode skills and Claude Code gstack workflows
+- shared agent workflow support for Codex, Claude Code, and OpenCode via `AGENTS.md`, `CLAUDE.md`, `opencode.json`, and `.mcp.json`
 - Storybook wired into the Next.js app for isolated UI development
 
 ## Installation
@@ -35,13 +39,13 @@ It uses [Turborepo](https://turborepo.com) and contains:
   └─ Recommended extensions and settings for VSCode users
 apps
   ├─ expo
-  │   ├─ Expo SDK 54
-  │   ├─ React Native 0.81 using React 19
+  │   ├─ Expo SDK 55
+  │   ├─ React Native 0.84 using React 19
   │   ├─ Navigation using Expo Router
   │   ├─ Tailwind CSS v4 using NativeWind v5
   │   └─ Typesafe API calls using tRPC
   ├─ nextjs
-  │   ├─ Next.js 15
+  │   ├─ Next.js 16
   │   ├─ React 19
   │   ├─ Storybook 10
   │   ├─ Tailwind CSS v4
@@ -59,7 +63,7 @@ packages
   ├─ config
   │   └─ Integration flags (single source of truth)
   ├─ db
-  │   └─ Typesafe db calls using Drizzle & Neon
+  │   └─ Typesafe db calls using Drizzle & Postgres
   ├─ ui
   │   └─ UI components using shadcn-ui
   ├─ analytics
@@ -75,10 +79,6 @@ packages
   └─ storage
       └─ File storage wrapper (optional)
 tooling
-  ├─ eslint
-  │   └─ shared, fine-grained, eslint presets
-  ├─ prettier
-  │   └─ shared prettier configuration
   ├─ tailwind
   │   └─ shared tailwind theme and configuration
   └─ typescript
@@ -86,6 +86,8 @@ tooling
 ```
 
 > In this template, we use `@gmacko` as a placeholder for package names. You can replace it with your own organization or project name using find-and-replace.
+
+> Linting and formatting are standardized on `oxlint` and `biome` across the generated repo, with `lefthook`, `commitlint`, and `knip` wired in at the root.
 
 ## Integrations
 
@@ -107,7 +109,7 @@ Disabled integrations require no env vars and have no runtime code paths.
 ## Quick Start
 
 > **Note**
-> The database is configured for [Neon Postgres](https://neon.tech) using the `@neondatabase/serverless` driver with Drizzle ORM.
+> The recommended operating model is to run Postgres alongside the app during the early stages of the product. On the Hetzner VPS, use the sibling [`../ForgeGraph`](../ForgeGraph) deployment setup as the deployment reference, keep the database colocated with the app, and only move to a hosted Postgres provider once you have real customer and operational pressure to justify it.
 
 To get it running, follow the steps below:
 
@@ -124,6 +126,9 @@ pnpm i
 # Configure environment variables
 # There is an `.env.example` in the root directory you can use for reference
 cp .env.example .env
+
+# Start the local Postgres service if you are using the included compose setup
+docker compose up -d postgres
 
 # Push the Drizzle schema to the database
 pnpm db:push
@@ -219,15 +224,32 @@ pnpm --filter @gmacko/nextjs storybook
 
 Shared component stories live in `packages/ui/src/**/*.stories.tsx`.
 
+## Developer Experience
+
+Generated apps are set up for current agent-native and platform-native workflows:
+
+- `AGENTS.md` is the shared repo instruction file for Codex, Claude Code, and OpenCode.
+- `CLAUDE.md` is a thin Claude-specific shim that points back to `AGENTS.md` and the vendored gstack commands.
+- `opencode.json` loads the repo's shared instructions and planning docs into OpenCode.
+- `.mcp.json` configures the official Next.js MCP server for Next.js 16+ agent-assisted debugging.
+- Expo development should move toward development builds and Expo Orbit rather than long-term reliance on Expo Go.
+- Cloudflare support should be treated as a separate deployment lane:
+  - `vinext` is the experimental Next.js-on-Workers path.
+  - TanStack Start is the cleaner Workers-native path today.
+  - ForgeGraph + Nix remains the stable owned-infrastructure path.
+
+See [docs/ai/DEVELOPER_EXPERIENCE.md](./docs/ai/DEVELOPER_EXPERIENCE.md) for the current support matrix and recommendations.
+
 ## AI Planning Workflow
 
-This template vendors [gstack](https://github.com/garrytan/gstack) in `.claude/skills/gstack` for Claude Code and keeps the existing `docs/ai` workflow for proposal and planning artifacts.
+This template keeps a shared planning flow for Codex, Claude Code, and OpenCode, and vendors [gstack](https://github.com/garrytan/gstack) for Claude-specific slash command workflows.
 
 1. Use `superpowers:brainstorming` to turn the app idea into `docs/ai/INITIAL_PROPOSAL.md`.
 2. Run `/plan-ceo-review` to refine the problem framing and scope.
 3. Run `/plan-eng-review` to turn the approved proposal into `docs/ai/IMPLEMENTATION_PLAN.md`.
 4. Run `/design-consultation` to define the design philosophy and generate `DESIGN.md`.
 5. If gstack commands are unavailable, run `cd .claude/skills/gstack && ./setup`.
+6. Keep `AGENTS.md`, `docs/ai/IMPLEMENTATION_PLAN.md`, and `DESIGN.md` aligned as the project changes.
 
 ## FAQ
 
@@ -252,19 +274,20 @@ If you need to share runtime code between the client and server, such as input v
 > **Note**
 > Please note that the Next.js application with tRPC must be deployed in order for the Expo app to communicate with the server in a production environment.
 
-#### Deploy to Vercel
+#### Deploy with ForgeGraph
 
-Let's deploy the Next.js application to [Vercel](https://vercel.com). If you've never deployed a Turborepo app there, don't worry, the steps are quite straightforward. You can also read the [official Turborepo guide](https://vercel.com/docs/concepts/monorepos/turborepo) on deploying to Vercel.
+The recommended deployment path for this template is to keep the application inside a ForgeGraph-managed repo and deploy it to the Hetzner VPS from there. In this workspace, the reference deployment setup lives in [`../ForgeGraph`](../ForgeGraph).
 
-1. Create a new project on Vercel, select the `apps/nextjs` folder as the root directory. Vercel's zero-config system should handle all configurations for you.
-
-2. Add your `POSTGRES_URL` environment variable.
-
-3. Done! Your app should successfully deploy. Assign your domain and use that instead of `localhost` for the `url` in the Expo app so that your Expo app can communicate with your backend when you are not in development.
+1. Treat ForgeGraph as the deployment home for the app.
+2. Run Postgres alongside the app on the VPS first, keeping application and database operations simple while the product is still early.
+3. Configure `DATABASE_URL`, auth secrets, and any enabled integration env vars in the ForgeGraph deployment environment.
+4. Use `fg` from [`../ForgeGraph`](../ForgeGraph) to log in, manage secrets, and deploy the app.
+5. Point your production domain at the ForgeGraph-managed deployment so the Expo app can use a stable backend URL.
+6. When you have real customers and concrete operational needs, migrate Postgres to a hosted provider instead of paying that complexity cost upfront.
 
 ### Auth Proxy
 
-The auth proxy comes as a better-auth plugin. This is required for the Next.js app to be able to authenticate users in preview deployments. The auth proxy is not used for OAuth request in production deployments. The easiest way to get it running is to deploy the Next.js app to vercel.
+The auth proxy comes as a better-auth plugin. This is required for the Next.js app to be able to authenticate users in preview deployments. The auth proxy is not used for OAuth requests in production deployments. The recommended place to run it is alongside the web app in your ForgeGraph deployment.
 
 ### Expo
 

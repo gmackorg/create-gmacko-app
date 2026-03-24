@@ -1,5 +1,0 @@
-import { defineConfig } from "eslint/config";
-
-import { baseConfig } from "@gmacko/eslint-config/base";
-
-export default defineConfig(baseConfig);

@@ -17,7 +17,7 @@ program
   .option("--yes, -y", "Accept all defaults without prompting")
   .option("--prune", "Remove unused integration packages")
   .option("--no-install", "Skip pnpm install")
-  .option("--no-git", "Skip git init")
+  .option("--no-git", "Skip repository init (jj/git)")
   .option("--no-ai", "Exclude AI workflow system")
   .option("--no-provision", "Exclude provisioning script")
   .option("--web", "Include Next.js web app (default: true)")

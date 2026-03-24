@@ -14,8 +14,8 @@
     "build": "tsup src/index.ts --format esm --dts",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "dev": "tsup src/index.ts --format esm --watch",
-    "format": "prettier --check . --ignore-path ../../.gitignore",
-    "lint": "eslint",
+    "format": "biome check .",
+    "lint": "oxlint .",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -24,14 +24,11 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@gmacko/eslint-config": "workspace:*",
-    "@gmacko/prettier-config": "workspace:*",
     "@gmacko/tsconfig": "workspace:*",
     "@types/node": "catalog:",
-    "eslint": "catalog:",
-    "prettier": "catalog:",
     "tsup": "^8.5.1",
-    "typescript": "catalog:"
-  },
-  "prettier": "@gmacko/prettier-config"
+    "typescript": "catalog:",
+    "@biomejs/biome": "catalog:",
+    "oxlint": "catalog:"
+  }
 }

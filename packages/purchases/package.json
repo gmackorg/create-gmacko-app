@@ -13,8 +13,8 @@
     "build": "tsc",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "dev": "tsc",
-    "format": "prettier --check . --ignore-path ../../.gitignore",
-    "lint": "eslint",
+    "format": "biome check .",
+    "lint": "oxlint .",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
@@ -22,13 +22,11 @@
     "react-native-purchases": "^9.14.0"
   },
   "devDependencies": {
-    "@gmacko/eslint-config": "workspace:*",
-    "@gmacko/prettier-config": "workspace:*",
     "@gmacko/tsconfig": "workspace:*",
     "@types/react": "catalog:react19",
-    "eslint": "catalog:",
-    "prettier": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "@biomejs/biome": "catalog:",
+    "oxlint": "catalog:"
   },
   "peerDependencies": {
     "expo": ">=52.0.0",
@@ -42,6 +40,5 @@
     "react-native": {
       "optional": true
     }
-  },
-  "prettier": "@gmacko/prettier-config"
+  }
 }

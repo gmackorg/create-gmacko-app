@@ -12,8 +12,8 @@
     "e2e": "maestro test .maestro/",
     "e2e:record": "maestro record",
     "e2e:studio": "maestro studio",
-    "format": "prettier --check . --ignore-path ../../.gitignore --ignore-path .prettierignore",
-    "lint": "eslint",
+    "format": "biome check .",
+    "lint": "oxlint .",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -57,15 +57,12 @@
   },
   "devDependencies": {
     "@gmacko/api": "workspace:*",
-    "@gmacko/eslint-config": "workspace:*",
-    "@gmacko/prettier-config": "workspace:*",
     "@gmacko/tailwind-config": "workspace:*",
     "@gmacko/tsconfig": "workspace:*",
     "@types/react": "catalog:react19",
-    "eslint": "catalog:",
-    "prettier": "catalog:",
     "tailwindcss": "catalog:",
-    "typescript": "catalog:"
-  },
-  "prettier": "@gmacko/prettier-config"
+    "typescript": "catalog:",
+    "@biomejs/biome": "catalog:",
+    "oxlint": "catalog:"
+  }
 }

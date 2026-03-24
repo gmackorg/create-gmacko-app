@@ -7,8 +7,8 @@
     "dev": "pnpm with-env vite dev",
     "build": "vite build",
     "start": "vite start",
-    "format": "prettier --check . --ignore-path ../../.gitignore --ignore-path .prettierignore",
-    "lint": "eslint",
+    "format": "biome check .",
+    "lint": "oxlint .",
     "typecheck": "tsc --noEmit",
     "with-env": "dotenv -e ../../.env --"
   },
@@ -37,8 +37,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@gmacko/eslint-config": "workspace:*",
-    "@gmacko/prettier-config": "workspace:*",
     "@gmacko/tailwind-config": "workspace:*",
     "@gmacko/tsconfig": "workspace:*",
     "@tailwindcss/vite": "catalog:",
@@ -46,12 +44,11 @@
     "@types/react": "catalog:react19",
     "@types/react-dom": "catalog:react19",
     "@vitejs/plugin-react": "catalog:",
-    "eslint": "catalog:",
-    "prettier": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vite-tsconfig-paths": "^6.1.1"
-  },
-  "prettier": "@gmacko/prettier-config"
+    "vite-tsconfig-paths": "^6.1.1",
+    "@biomejs/biome": "catalog:",
+    "oxlint": "catalog:"
+  }
 }

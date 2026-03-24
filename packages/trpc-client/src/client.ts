@@ -94,7 +94,7 @@ export function createClient(options: CreateClientOptions): TRPCClient {
     return headers;
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line typescript/no-explicit-any
   const linkOptions: any = {
     url,
     transformer: superjson,

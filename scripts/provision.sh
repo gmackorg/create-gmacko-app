@@ -29,9 +29,10 @@ prompt_env() {
 
 # Always required: Database
 echo ""
-echo "=== Database (Neon) ==="
-echo "Create a Neon project at https://neon.tech"
-prompt_env "DATABASE_URL" "postgresql://...neon.tech/..."
+echo "=== Database (Postgres) ==="
+echo "Run Postgres alongside the app first."
+echo "For Hetzner deployments, use the ForgeGraph setup in ../ForgeGraph as the reference."
+prompt_env "DATABASE_URL" "postgresql://user:password@host:5432/database"
 
 # Always required: Auth
 echo ""
@@ -68,4 +69,5 @@ echo "==================================="
 echo ""
 echo "Your .env file has been updated."
 echo "Run 'pnpm db:push' to initialize the database schema."
+echo "Preferred deployment direction: ForgeGraph + Hetzner VPS + colocated Postgres, then hosted Postgres later if needed."
 echo ""

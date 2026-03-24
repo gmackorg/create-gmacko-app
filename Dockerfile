@@ -33,8 +33,6 @@ COPY packages/analytics/package.json ./packages/analytics/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/validators/package.json ./packages/validators/
 COPY packages/settings/package.json ./packages/settings/
-COPY tooling/eslint/package.json ./tooling/eslint/
-COPY tooling/prettier/package.json ./tooling/prettier/
 COPY tooling/tailwind/package.json ./tooling/tailwind/
 COPY tooling/typescript/package.json ./tooling/typescript/
 

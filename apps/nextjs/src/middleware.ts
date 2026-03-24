@@ -23,7 +23,7 @@ export const config = {
   // - Static files (images, fonts, etc.)
   // - Next.js internals
   matcher: [
-    "/((?!api|_next|_vercel|.*\\..*).*)",
+    "/((?!api|_next|.*\\..*).*)",
     // Also match the root
     "/",
   ],
