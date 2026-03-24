@@ -166,6 +166,15 @@ For more information about the Better Auth CLI, see the [official documentation]
 
 ### 3. Configure Expo `dev`-script
 
+Expo development should prefer development builds plus Expo Orbit over long-term Expo Go usage.
+
+```bash
+pnpm --filter @gmacko/expo build:device:ios
+pnpm --filter @gmacko/expo dev:client
+```
+
+Orbit gives you a cleaner device/simulator install loop once the development build exists.
+
 #### Use iOS Simulator
 
 1. Make sure you have XCode and XCommand Line Tools installed [as shown on expo docs](https://docs.expo.dev/workflow/ios-simulator).

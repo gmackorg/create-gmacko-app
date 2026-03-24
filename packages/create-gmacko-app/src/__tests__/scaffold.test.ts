@@ -224,6 +224,8 @@ describe("create-gmacko-app scaffold", () => {
       expect(forgeGraphConfig).toContain("stages:");
       expect(forgeGraphConfig).toContain("- name: staging");
       expect(forgeGraphConfig).toContain("- name: production");
+      expect(forgeGraphConfig).toContain("nodeId: change-me-staging-node");
+      expect(forgeGraphConfig).toContain("nodeId: change-me-production-node");
     }, 120000);
 
     it("should scaffold vinext support when requested", async () => {
@@ -257,6 +259,12 @@ describe("create-gmacko-app scaffold", () => {
       expect(nextPkg.devDependencies?.wrangler).toBeDefined();
       expect(wranglerConfig).toContain(`"name": "${appName}"`);
       expect(wranglerConfig).toContain('"compatibility_date"');
+      expect(wranglerConfig).toContain('"compatibility_flags"');
+      expect(wranglerConfig).toContain('"nodejs_compat"');
+      expect(wranglerConfig).toContain('"vars"');
+      expect(wranglerConfig).toContain('"APP_ENV": "production"');
+      expect(wranglerConfig).toContain('"env"');
+      expect(wranglerConfig).toContain('"staging"');
     }, 120000);
 
     it("should scaffold stronger Expo development-build defaults", async () => {
@@ -277,6 +285,7 @@ describe("create-gmacko-app scaffold", () => {
       }>(result.appPath, "apps/expo/package.json");
       const expoReadme = readFile(result.appPath, "apps/expo/README.md");
       const expoConfig = readFile(result.appPath, "apps/expo/app.config.ts");
+      const rootReadme = readFile(result.appPath, "README.md");
 
       expect(expoPkg.scripts?.["dev:client"]).toBeDefined();
       expect(expoPkg.scripts?.["build:device:ios"]).toBeDefined();
@@ -288,6 +297,8 @@ describe("create-gmacko-app scaffold", () => {
       expect(expoConfig).toContain(
         `const base = "com.gmacko.${appName.replace(/-/g, "")}"`,
       );
+      expect(rootReadme).toContain("Expo Orbit");
+      expect(rootReadme).toContain("dev:client");
     }, 120000);
 
     it("should scaffold web env files without vercel presets", async () => {

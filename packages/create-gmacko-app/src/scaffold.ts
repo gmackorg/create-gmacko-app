@@ -271,8 +271,10 @@ function createForgeGraphConfig(targetDir: string, appName: string): void {
 server: https://forge.example.com
 stages:
   - name: staging
+    nodeId: change-me-staging-node
     sortOrder: 10
   - name: production
+    nodeId: change-me-production-node
     sortOrder: 20
 `,
   );
@@ -316,7 +318,18 @@ export default defineConfig({
     `{
   "name": "${path.basename(targetDir)}",
   "compatibility_date": "2026-03-23",
-  "main": ".open-next/worker.js"
+  "compatibility_flags": ["nodejs_compat"],
+  "main": ".open-next/worker.js",
+  "vars": {
+    "APP_ENV": "production"
+  },
+  "env": {
+    "staging": {
+      "vars": {
+        "APP_ENV": "staging"
+      }
+    }
+  }
 }
 `,
   );
