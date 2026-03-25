@@ -823,12 +823,22 @@ describe("create-gmacko-app scaffold", () => {
     expect(e2eWorkflow).toContain("pnpm --filter @gmacko/tanstack-start build");
     expect(e2eWorkflow).toContain("pnpm --filter @gmacko/expo typecheck");
     expect(e2eWorkflow).toContain(
+      "pnpm --filter @gmacko/expo exec expo start --dev-client --help",
+    );
+    expect(e2eWorkflow).toContain(
+      "pnpm --filter @gmacko/expo exec expo config --json",
+    );
+    expect(e2eWorkflow).toContain(
       "pnpm --filter @gmacko/nextjs deploy:cloudflare:staging",
     );
     expect(e2eWorkflow).toContain("pnpm fg:stages");
     expect(e2eWorkflow).toContain("pnpm fg:deploy:staging");
     expect(e2eWorkflow).toContain("Cloudflare Workers credentials present");
     expect(e2eWorkflow).toContain("fake-wrangler deploy --env staging");
+    expect(e2eWorkflow).toContain('RUN_E2E: "true"');
+    expect(e2eWorkflow).toContain(
+      "pnpm --dir packages/create-gmacko-app vitest run src/__tests__/e2e.test.ts",
+    );
   });
 
   it("keeps repo formatting focused on first-party files", () => {

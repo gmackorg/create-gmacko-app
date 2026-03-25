@@ -374,6 +374,13 @@ jobs:
         run: pnpm --filter @gmacko/expo typecheck
         working-directory: /tmp/e2e-test/test-app-full
 
+      - name: Run Expo dev-client smoke checks
+        run: |
+          pnpm --filter @gmacko/expo exec expo start --dev-client --help
+          pnpm --filter @gmacko/expo exec expo config --json >/tmp/e2e-test/expo-config.json
+          grep '"name"' /tmp/e2e-test/expo-config.json || (echo "Expo config did not resolve" && exit 1)
+        working-directory: /tmp/e2e-test/test-app-full
+
   e2e-vinext:
     name: E2E - Vinext
     needs: build-cli
@@ -510,3 +517,31 @@ jobs:
 
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**All E2E tests passed!** :tada:" >> $GITHUB_STEP_SUMMARY
+
+  e2e-vitest-on-demand:
+    name: E2E - Full Vitest Suite
+    if: github.event_name == 'workflow_dispatch'
+    needs: build-cli
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run full CLI E2E vitest suite
+        run: pnpm --dir packages/create-gmacko-app vitest run src/__tests__/e2e.test.ts
+        env:
+          RUN_E2E: "true"
+          KEEP_TEST_APPS: ${{ inputs.keep_test_apps && 'true' || 'false' }}

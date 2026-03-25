@@ -181,7 +181,7 @@ When changing the scaffolder itself, use:
 pnpm check:release
 ```
 
-That keeps validation scoped to `packages/create-gmacko-app` and the publish tarball. Full generated-app smoke coverage is handled in [../../.github/workflows/cli-e2e.yml](/Volumes/dev/create-gmacko-app/.github/workflows/cli-e2e.yml), including ForgeGraph script smoke checks and the `vinext` lane's Cloudflare doctor assertions.
+That keeps validation scoped to `packages/create-gmacko-app` and the publish tarball. Full generated-app smoke coverage is handled in [../../.github/workflows/cli-e2e.yml](/Volumes/dev/create-gmacko-app/.github/workflows/cli-e2e.yml), including ForgeGraph script smoke checks, Expo dev-client/config smoke checks, and the `vinext` lane's Cloudflare doctor assertions. The workflow also exposes a manual `RUN_E2E=true` job for the full `src/__tests__/e2e.test.ts` suite.
 
 ## License
 

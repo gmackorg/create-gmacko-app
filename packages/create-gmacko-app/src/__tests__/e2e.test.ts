@@ -421,6 +421,42 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
 
       expect(result.success).toBe(true);
     }, 600000);
+
+    it("should resolve Expo dev-client commands without network work", () => {
+      console.log("[E2E] Running Expo dev-client smoke checks (full)...");
+      createMockEnv(appPath);
+
+      const helpResult = runInApp(
+        appPath,
+        "pnpm --filter @gmacko/expo exec expo start --dev-client --help",
+        {
+          timeout: 180000,
+        },
+      );
+
+      if (!helpResult.success) {
+        console.error("[E2E] Expo dev-client help failed:");
+        console.error(helpResult.stderr || helpResult.stdout);
+      }
+
+      expect(helpResult.success).toBe(true);
+
+      const configResult = runInApp(
+        appPath,
+        "pnpm --filter @gmacko/expo exec expo config --json",
+        {
+          timeout: 180000,
+        },
+      );
+
+      if (!configResult.success) {
+        console.error("[E2E] Expo config resolution failed:");
+        console.error(configResult.stderr || configResult.stdout);
+      }
+
+      expect(configResult.success).toBe(true);
+      expect(configResult.stdout).toContain('"name"');
+    }, 300000);
   });
 
   describe("custom package scope", () => {
