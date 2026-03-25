@@ -222,19 +222,27 @@ describe("create-gmacko-app scaffold", () => {
       expect(forgeGraphConfig).toContain(`app: ${appName}`);
       expect(forgeGraphConfig).toContain("server: https://forge.example.com");
       expect(forgeGraphConfig).toContain("stages:");
-      expect(forgeGraphConfig).toContain("metadata:");
-      expect(forgeGraphConfig).toContain("flakeRef: .");
-      expect(forgeGraphConfig).toContain("path: apps/nextjs");
-      expect(forgeGraphConfig).toContain("healthcheckPath: /api/health");
-      expect(forgeGraphConfig).toContain("strategy: colocated-postgres");
-      expect(forgeGraphConfig).toContain(
-        "preview: change-me.preview.example.com",
-      );
-      expect(forgeGraphConfig).toContain("production: change-me.example.com");
       expect(forgeGraphConfig).toContain("- name: staging");
       expect(forgeGraphConfig).toContain("- name: production");
       expect(forgeGraphConfig).toContain("nodeId: change-me-staging-node");
       expect(forgeGraphConfig).toContain("nodeId: change-me-production-node");
+      expect(forgeGraphConfig).toContain("sortOrder: 10");
+      expect(forgeGraphConfig).toContain("sortOrder: 20");
+      expect(forgeGraphConfig).toContain("# ForgeGraph operator notes:");
+      expect(forgeGraphConfig).toContain("# flakeRef: .");
+      expect(forgeGraphConfig).toContain(
+        "# primary web service path: apps/nextjs",
+      );
+      expect(forgeGraphConfig).toContain("# healthcheck path: /api/health");
+      expect(forgeGraphConfig).toContain(
+        "# database strategy: colocated-postgres",
+      );
+      expect(forgeGraphConfig).toContain(
+        "# preview domain: change-me.preview.example.com",
+      );
+      expect(forgeGraphConfig).toContain(
+        "# production domain: change-me.example.com",
+      );
     }, 120000);
 
     it("should allow ForgeGraph config to be customized from CLI flags", async () => {
@@ -268,8 +276,10 @@ describe("create-gmacko-app scaffold", () => {
       expect(forgeGraphConfig).toContain("server: https://forge.gmac.io");
       expect(forgeGraphConfig).toContain("nodeId: node-staging-1");
       expect(forgeGraphConfig).toContain("nodeId: node-production-1");
-      expect(forgeGraphConfig).toContain("preview: pr.preview.gmac.io");
-      expect(forgeGraphConfig).toContain("production: app.gmac.io");
+      expect(forgeGraphConfig).toContain(
+        "# preview domain: pr.preview.gmac.io",
+      );
+      expect(forgeGraphConfig).toContain("# production domain: app.gmac.io");
     }, 120000);
 
     it("should scaffold vinext support when requested", async () => {
@@ -674,6 +684,7 @@ describe("create-gmacko-app scaffold", () => {
         result.appPath,
         "scripts/bootstrap-local.sh",
       );
+      const envExample = readFile(result.appPath, ".env.example");
 
       expect(pkg.devDependencies?.["@biomejs/biome"]).toBeDefined();
       expect(pkg.devDependencies?.oxlint).toBeDefined();
@@ -704,6 +715,9 @@ describe("create-gmacko-app scaffold", () => {
       expect(pkg.scripts?.["fg:init"]).toBe("fg init --full");
       expect(pkg.scripts?.["fg:doctor"]).toBe("fg doctor");
       expect(pkg.scripts?.["fg:status"]).toBe("fg status");
+      expect(pkg.scripts?.["fg:diff"]).toBe("fg diff");
+      expect(pkg.scripts?.["fg:apply"]).toBe("fg apply");
+      expect(pkg.scripts?.["fg:pull"]).toBe("fg pull");
       expect(pkg.scripts?.["fg:deploy:staging"]).toBe(
         "fg deploy create staging --wait",
       );
@@ -722,16 +736,35 @@ describe("create-gmacko-app scaffold", () => {
       expect(bootstrapScript).toContain("pnpm db:generate");
       expect(bootstrapScript).toContain("pnpm db:push");
       expect(bootstrapScript).toContain("pnpm check:fast");
+      expect(bootstrapScript).toContain(
+        "Docker Compose was not found. Start Postgres another way",
+      );
+      expect(bootstrapScript).toContain(
+        "ForgeGraph placeholders are still present in .forgegraph.yaml",
+      );
+      expect(bootstrapScript).toContain("pnpm fg:apply");
       expect(doctorScript).toContain(
         "Checking local development prerequisites",
       );
       expect(doctorScript).toContain("ForgeGraph CLI");
+      expect(doctorScript).toContain("Core app env values");
+      expect(doctorScript).toContain("ForgeGraph deploy values");
+      expect(doctorScript).toContain("Cloudflare Workers env values");
       expect(doctorScript).toContain(
         ".forgegraph.yaml still has placeholder ForgeGraph values; update server, domains, and stage node IDs before deploying",
       );
       expect(doctorScript).toContain("Cloudflare Workers lane detected");
       expect(doctorScript).toContain("Wrangler CLI available");
-      expect(doctorScript).toContain("Cloudflare Workers credentials present");
+      expect(doctorScript).toContain("Cloudflare Workers env values");
+      expect(envExample).toContain("# CORE APP ENV");
+      expect(envExample).toContain("# WEB APP ENV");
+      expect(envExample).toContain("# MOBILE APP ENV");
+      expect(envExample).toContain("# FORGEGRAPH DEPLOYMENT ENV");
+      expect(envExample).toContain("# CLOUDFLARE WORKERS ENV");
+      expect(envExample).toContain(
+        'DATABASE_URL="postgresql://postgres:postgres@localhost:5432/gmacko_dev"',
+      );
+      expect(envExample).toContain('# AUTH_SECRET="replace-me-in-forgegraph"');
       expect(
         fs.statSync(path.join(result.appPath, "scripts/setup.sh")).mode & 0o111,
       ).toBeTruthy();

@@ -340,22 +340,28 @@ ${preferredDevCommands}
 <!-- SCAFFOLD_PROFILE_END -->`;
 }
 
+function getPrimaryServicePath(options: CliOptions): string {
+  if (options.platforms.web) return "apps/nextjs";
+  if (options.platforms.tanstackStart) return "apps/tanstack-start";
+  if (options.platforms.mobile) return "apps/expo";
+  return ".";
+}
+
+function getHealthcheckHint(options: CliOptions): string {
+  if (options.platforms.web) return "/api/health";
+  if (options.platforms.tanstackStart) return "/api/health";
+  if (options.platforms.mobile) return "n/a (mobile-only scaffold)";
+  return "n/a";
+}
+
 function createForgeGraphConfig(targetDir: string, options: CliOptions): void {
+  const primaryServicePath = getPrimaryServicePath(options);
+  const healthcheckHint = getHealthcheckHint(options);
+
   fs.writeFileSync(
     path.join(targetDir, ".forgegraph.yaml"),
     `app: ${options.appName}
 server: ${options.forgegraphServer}
-metadata:
-  flakeRef: .
-  primaryService:
-    name: web
-    path: apps/nextjs
-    healthcheckPath: /api/health
-  database:
-    strategy: colocated-postgres
-  routes:
-    preview: ${options.forgegraphPreviewDomain}
-    production: ${options.forgegraphProductionDomain}
 stages:
   - name: staging
     nodeId: ${options.forgegraphStagingNode}
@@ -363,6 +369,14 @@ stages:
   - name: production
     nodeId: ${options.forgegraphProductionNode}
     sortOrder: 20
+
+# ForgeGraph operator notes:
+# flakeRef: .
+# primary web service path: ${primaryServicePath}
+# healthcheck path: ${healthcheckHint}
+# database strategy: colocated-postgres
+# preview domain: ${options.forgegraphPreviewDomain}
+# production domain: ${options.forgegraphProductionDomain}
 `,
   );
 }
@@ -374,6 +388,9 @@ function addForgeGraphScripts(targetDir: string): void {
   };
 
   rootPackage.scripts ??= {};
+  rootPackage.scripts["fg:diff"] = "fg diff";
+  rootPackage.scripts["fg:apply"] = "fg apply";
+  rootPackage.scripts["fg:pull"] = "fg pull";
   rootPackage.scripts["fg:deploy:staging"] = "fg deploy create staging --wait";
   rootPackage.scripts["fg:deploy:production"] =
     "fg deploy create production --wait";

@@ -15,10 +15,10 @@ If you are working from the sibling [`../ForgeGraph`](../../ForgeGraph) repo, us
 
 ```bash
 fg login --server <forgegraph-url> --token <token>
-fg app create <app> --flake-ref .
-fg stage add staging --node <staging-node-id>
-fg stage add production --node <production-node-id>
-fg secrets set <app> production DATABASE_URL <value>
+fg diff
+fg apply
+fg stage list
+fg deploy create staging --wait
 fg deploy create production --wait
 ```
 
@@ -26,8 +26,9 @@ Use `fg logs <app> <stage> --follow` to follow a stage after it starts deploying
 
 The generated repo now also includes:
 
-- `.forgegraph.yaml` with app/server plus operator metadata for flake ref, primary web service, colocated Postgres, and preview/production route placeholders
-- `pnpm fg:deploy:staging` and `pnpm fg:deploy:production` wrappers around the current `fg deploy create <stage> --wait` workflow
+- `.forgegraph.yaml` aligned to the current live `fg` repo contract: `app`, `server`, and `stages`, plus operator notes as comments
+- `pnpm fg:diff`, `pnpm fg:apply`, and `pnpm fg:pull` wrappers for repo-local config sync
+- `pnpm fg:deploy:staging` and `pnpm fg:deploy:production` wrappers around `fg deploy create <stage> --wait`
 - `pnpm fg:stages` as a quick repo-local view of configured ForgeGraph stages
 
 ## Preview Environments

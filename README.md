@@ -260,14 +260,14 @@ Generated apps are set up for current agent-native and platform-native workflows
   - `vinext` is the experimental Next.js-on-Workers path.
   - TanStack Start is the cleaner Workers-native path today.
   - ForgeGraph + Nix remains the stable owned-infrastructure path.
-- Generated repos now also include `.forgegraph.yaml` and stronger Expo development-build defaults out of the box.
+- Generated repos now also include `.forgegraph.yaml` aligned to the live `fg` repo contract and stronger Expo development-build defaults out of the box.
 - The scaffold can now override ForgeGraph server/node placeholders directly from the CLI and emits a fuller Cloudflare lane when `--vinext` is enabled:
   - `apps/nextjs/vite.config.ts` with the Cloudflare Vite plugin wired for the RSC runtime
   - `apps/nextjs/wrangler.jsonc` with staging and production-ready Workers config
   - `apps/nextjs/worker/index.ts` as the generated Worker entry
   - `apps/nextjs/src/cloudflare-env.ts` plus Cloudflare env stubs in `.env.example`
   - `prebuild:vinext`, `build:vinext`, `deploy:cloudflare:staging`, and `deploy:cloudflare:production`
-- `pnpm doctor` now warns when `.forgegraph.yaml` still contains scaffold placeholders and, when the `vinext` lane exists, checks for Wrangler plus `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in `.env`
+- `pnpm doctor` now warns when `.forgegraph.yaml` still contains scaffold placeholders, checks grouped core and ForgeGraph env values, and, when the `vinext` lane exists, checks Wrangler plus grouped Cloudflare env values in `.env`
 
 See [docs/ai/DEVELOPER_EXPERIENCE.md](./docs/ai/DEVELOPER_EXPERIENCE.md) for the current support matrix and recommendations.
 
@@ -332,7 +332,7 @@ The recommended deployment path for this template is to keep the application ins
 2. Run Postgres alongside the app on the VPS first, keeping application and database operations simple while the product is still early.
 3. Configure `DATABASE_URL`, auth secrets, and any enabled integration env vars in the ForgeGraph deployment environment.
 4. Use `fg` from [`../ForgeGraph`](../ForgeGraph) to log in, create the app and stages if needed, manage secrets, and deploy the app.
-5. Prefer the repo-local wrappers once the app is configured: `pnpm fg:stages`, `pnpm fg:deploy:staging`, and `pnpm fg:deploy:production`.
+5. Prefer the repo-local wrappers once the app is configured: `pnpm fg:diff`, `pnpm fg:apply`, `pnpm fg:stages`, `pnpm fg:deploy:staging`, and `pnpm fg:deploy:production`.
 6. Point your production domain at the ForgeGraph-managed deployment so the Expo app can use a stable backend URL.
 7. When you have real customers and concrete operational needs, migrate Postgres to a hosted provider instead of paying that complexity cost upfront.
 

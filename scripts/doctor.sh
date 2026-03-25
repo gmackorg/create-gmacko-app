@@ -13,6 +13,7 @@ NVMRC_FILE="$ROOT_DIR/.nvmrc"
 
 FAILURES=0
 WARNINGS=0
+HAS_ENV=0
 
 ok() {
   echo "  [ok] $1"
@@ -61,6 +62,7 @@ fi
 
 if [ -f "$ROOT_DIR/.env" ]; then
   ok ".env present"
+  HAS_ENV=1
 else
   warn ".env is missing; copy .env.example to .env before starting app services"
 fi
@@ -92,6 +94,39 @@ else
   warn "ForgeGraph CLI (fg) not installed; install/use fg from ../ForgeGraph for deploy workflows"
 fi
 
+echo ""
+echo "Checking configured env groups..."
+
+check_env_group() {
+  local label="$1"
+  shift
+
+  if [ "$HAS_ENV" -eq 0 ]; then
+    warn "$label: .env is missing"
+    return
+  fi
+
+  local missing=()
+  local key
+  for key in "$@"; do
+    if ! grep -Eq "^${key}=" "$ROOT_DIR/.env"; then
+      missing+=("$key")
+    fi
+  done
+
+  if [ "${#missing[@]}" -eq 0 ]; then
+    ok "$label"
+  else
+    warn "$label missing: ${missing[*]}"
+  fi
+}
+
+check_env_group "Core app env values" "DATABASE_URL" "AUTH_SECRET"
+
+if [ -f "$ROOT_DIR/.forgegraph.yaml" ]; then
+  check_env_group "ForgeGraph deploy values" "DATABASE_URL" "AUTH_SECRET"
+fi
+
 if [ -f "$ROOT_DIR/apps/nextjs/wrangler.jsonc" ]; then
   ok "Cloudflare Workers lane detected"
 
@@ -101,15 +136,10 @@ if [ -f "$ROOT_DIR/apps/nextjs/wrangler.jsonc" ]; then
     warn "Wrangler CLI not installed; vinext deploy workflows will be unavailable"
   fi
 
-  if [ -f "$ROOT_DIR/.env" ]; then
-    if grep -q '^CLOUDFLARE_ACCOUNT_ID=' "$ROOT_DIR/.env" && grep -q '^CLOUDFLARE_API_TOKEN=' "$ROOT_DIR/.env"; then
-      ok "Cloudflare Workers credentials present"
-    else
-      warn "Cloudflare Workers lane detected but CLOUDFLARE_ACCOUNT_ID/CLOUDFLARE_API_TOKEN are missing from .env"
-    fi
-  else
-    warn "Cloudflare Workers lane detected but .env is missing; add CLOUDFLARE_ACCOUNT_ID/CLOUDFLARE_API_TOKEN before deploying"
-  fi
+  check_env_group \
+    "Cloudflare Workers env values" \
+    "CLOUDFLARE_ACCOUNT_ID" \
+    "CLOUDFLARE_API_TOKEN"
 fi
 
 echo ""
