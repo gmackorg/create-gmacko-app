@@ -38,7 +38,7 @@
     "check:fast": "pnpm lint && pnpm typecheck",
     "check": "pnpm check:fast && pnpm test && pnpm build",
     "release:cli:dry-run": "mkdir -p .artifacts && cd packages/create-gmacko-app && npm pack --pack-destination ../../.artifacts >/dev/null",
-    "check:release": "pnpm check && pnpm release:cli:dry-run",
+    "check:release": "pnpm --dir packages/create-gmacko-app test && pnpm --dir packages/create-gmacko-app build && pnpm release:cli:dry-run",
     "commitlint": "commitlint --from HEAD~1 --to HEAD",
     "postinstall": "pnpm lint:ws",
     "prepare": "git rev-parse --git-dir >/dev/null 2>&1 && lefthook install || true",

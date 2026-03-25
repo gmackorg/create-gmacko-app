@@ -171,6 +171,16 @@ pnpm check:fast
 
 `pnpm doctor` checks the local baseline for Node, pnpm, Docker Compose, `jj`, `fg`, `.env`, and `.forgegraph.yaml`.
 
+## Maintaining The CLI
+
+When changing the scaffolder itself, use:
+
+```bash
+pnpm check:release
+```
+
+That keeps validation scoped to `packages/create-gmacko-app` and the publish tarball. Full generated-app smoke coverage is handled in [../../.github/workflows/cli-e2e.yml](/Volumes/dev/create-gmacko-app/.github/workflows/cli-e2e.yml), including the `vinext` lane.
+
 ## License
 
 MIT

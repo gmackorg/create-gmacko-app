@@ -38,14 +38,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: ".nvmrc"
           cache: "pnpm"
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build CLI
-        run: pnpm --filter create-gmacko-app build
+        run: pnpm --dir packages/create-gmacko-app build
 
       - name: Upload CLI dist
         uses: actions/upload-artifact@v4
@@ -75,18 +75,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: ".nvmrc"
           cache: "pnpm"
 
       - name: Install CLI dependencies
-        run: pnpm --filter create-gmacko-app install
+        run: pnpm install --frozen-lockfile
 
       - name: Scaffold app
         run: |
           mkdir -p /tmp/e2e-test
-          node packages/create-gmacko-app/dist/index.js test-app-default \
-            --yes --no-git \
-            2>&1 || true
+          node ${{ github.workspace }}/packages/create-gmacko-app/dist/index.js test-app-default \
+            --yes --no-git
         working-directory: /tmp/e2e-test
         env:
           CI: "true"
@@ -102,11 +101,11 @@ jobs:
         working-directory: /tmp/e2e-test/test-app-default
 
       - name: Run typecheck
-        run: pnpm typecheck
+        run: pnpm doctor
         working-directory: /tmp/e2e-test/test-app-default
 
-      - name: Run lint
-        run: pnpm lint
+      - name: Run fast checks
+        run: pnpm check:fast
         working-directory: /tmp/e2e-test/test-app-default
 
       - name: Run build
@@ -134,11 +133,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: ".nvmrc"
           cache: "pnpm"
 
       - name: Install CLI dependencies
-        run: pnpm --filter create-gmacko-app install
+        run: pnpm install --frozen-lockfile
 
       - name: Scaffold minimal app
         run: |
@@ -147,8 +146,7 @@ jobs:
           node ${{ github.workspace }}/packages/create-gmacko-app/dist/index.js test-app-minimal \
             --yes --no-git \
             --no-mobile --no-ai --prune \
-            --integrations "" \
-            2>&1 || true
+            --integrations ""
         env:
           CI: "true"
 
@@ -170,8 +168,12 @@ jobs:
           echo "Structure verified!"
         working-directory: /tmp/e2e-test/test-app-minimal
 
-      - name: Run typecheck
-        run: pnpm typecheck
+      - name: Run doctor
+        run: pnpm doctor
+        working-directory: /tmp/e2e-test/test-app-minimal
+
+      - name: Run fast checks
+        run: pnpm check:fast
         working-directory: /tmp/e2e-test/test-app-minimal
 
       - name: Run build
@@ -199,11 +201,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: ".nvmrc"
           cache: "pnpm"
 
       - name: Install CLI dependencies
-        run: pnpm --filter create-gmacko-app install
+        run: pnpm install --frozen-lockfile
 
       - name: Scaffold with custom scope
         run: |
@@ -213,8 +215,7 @@ jobs:
             --yes --no-git \
             --no-mobile --no-ai --prune \
             --package-scope "@mycompany" \
-            --integrations "" \
-            2>&1 || true
+            --integrations ""
         env:
           CI: "true"
 
@@ -235,8 +236,12 @@ jobs:
           echo "Package scope verified!"
         working-directory: /tmp/e2e-test/test-app-scope
 
-      - name: Run typecheck
-        run: pnpm typecheck
+      - name: Run doctor
+        run: pnpm doctor
+        working-directory: /tmp/e2e-test/test-app-scope
+
+      - name: Run fast checks
+        run: pnpm check:fast
         working-directory: /tmp/e2e-test/test-app-scope
 
       - name: Run build
@@ -264,11 +269,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: ".nvmrc"
           cache: "pnpm"
 
       - name: Install CLI dependencies
-        run: pnpm --filter create-gmacko-app install
+        run: pnpm install --frozen-lockfile
 
       - name: Scaffold full app
         run: |
@@ -278,8 +283,7 @@ jobs:
             --yes --no-git \
             --tanstack-start \
             --integrations "sentry,posthog,stripe,email" \
-            --email-provider resend \
-            2>&1 || true
+            --email-provider resend
         env:
           CI: "true"
 
@@ -309,17 +313,82 @@ jobs:
           echo "Structure verified!"
         working-directory: /tmp/e2e-test/test-app-full
 
-      - name: Run typecheck
-        run: pnpm typecheck
+      - name: Run doctor
+        run: pnpm doctor
+        working-directory: /tmp/e2e-test/test-app-full
+
+      - name: Run fast checks
+        run: pnpm check:fast
         working-directory: /tmp/e2e-test/test-app-full
 
       - name: Run build
         run: pnpm build
         working-directory: /tmp/e2e-test/test-app-full
 
+  e2e-vinext:
+    name: E2E - Vinext
+    needs: build-cli
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download CLI dist
+        uses: actions/download-artifact@v4
+        with:
+          name: cli-dist
+          path: packages/create-gmacko-app/dist
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install CLI dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Scaffold vinext app
+        run: |
+          mkdir -p /tmp/e2e-test
+          cd /tmp/e2e-test
+          node ${{ github.workspace }}/packages/create-gmacko-app/dist/index.js test-app-vinext \
+            --yes --no-git \
+            --no-mobile --no-ai --vinext
+        env:
+          CI: "true"
+
+      - name: Create mock .env
+        run: |
+          cat > .env << 'EOF'
+          DATABASE_URL="postgresql://test:test@localhost:5432/test"
+          AUTH_SECRET="test-secret-key-for-testing-only"
+          AUTH_URL="http://localhost:3000"
+          NEXT_PUBLIC_APP_URL="http://localhost:3000"
+          EOF
+        working-directory: /tmp/e2e-test/test-app-vinext
+
+      - name: Run doctor
+        run: pnpm doctor
+        working-directory: /tmp/e2e-test/test-app-vinext
+
+      - name: Run fast checks
+        run: pnpm check:fast
+        working-directory: /tmp/e2e-test/test-app-vinext
+
+      - name: Run vinext build
+        run: pnpm --filter @gmacko/nextjs build:vinext
+        working-directory: /tmp/e2e-test/test-app-vinext
+        env:
+          CI: "true"
+
   report:
     name: Report Results
-    needs: [e2e-default, e2e-minimal, e2e-custom-scope, e2e-full]
+    needs: [e2e-default, e2e-minimal, e2e-custom-scope, e2e-full, e2e-vinext]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -352,11 +421,18 @@ jobs:
             echo "- :x: Full configuration" >> $GITHUB_STEP_SUMMARY
           fi
 
+          if [ "${{ needs.e2e-vinext.result }}" == "success" ]; then
+            echo "- :white_check_mark: Vinext" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- :x: Vinext" >> $GITHUB_STEP_SUMMARY
+          fi
+
           # Fail if any test failed
           if [ "${{ needs.e2e-default.result }}" != "success" ] || \
              [ "${{ needs.e2e-minimal.result }}" != "success" ] || \
              [ "${{ needs.e2e-custom-scope.result }}" != "success" ] || \
-             [ "${{ needs.e2e-full.result }}" != "success" ]; then
+             [ "${{ needs.e2e-full.result }}" != "success" ] || \
+             [ "${{ needs.e2e-vinext.result }}" != "success" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Some E2E tests failed!**" >> $GITHUB_STEP_SUMMARY
             exit 1

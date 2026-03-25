@@ -647,7 +647,9 @@ describe("create-gmacko-app scaffold", () => {
         "pnpm check:fast && pnpm test && pnpm build",
       );
       expect(pkg.scripts?.["release:cli:dry-run"]).toBeDefined();
-      expect(pkg.scripts?.["check:release"]).toBeDefined();
+      expect(pkg.scripts?.["check:release"]).toBe(
+        "pnpm --dir packages/create-gmacko-app test && pnpm --dir packages/create-gmacko-app build && pnpm release:cli:dry-run",
+      );
       expect(pkg.scripts?.["fg:init"]).toBe("fg init --full");
       expect(pkg.scripts?.["fg:doctor"]).toBe("fg doctor");
       expect(pkg.scripts?.["fg:status"]).toBe("fg status");
@@ -724,10 +726,25 @@ describe("create-gmacko-app scaffold", () => {
       "utf8",
     );
 
-    expect(releaseWorkflow).toContain("pnpm --filter create-gmacko-app test");
-    expect(releaseWorkflow).toContain("pnpm --filter create-gmacko-app build");
+    expect(releaseWorkflow).toContain("pnpm --dir packages/create-gmacko-app test");
+    expect(releaseWorkflow).toContain("pnpm --dir packages/create-gmacko-app build");
     expect(releaseWorkflow).toContain("pnpm release:cli:dry-run");
     expect(releaseWorkflow).not.toContain("pnpm check:release");
+    expect(releaseWorkflow).not.toContain("pnpm --filter create-gmacko-app test");
+  });
+
+  it("keeps the CLI E2E workflow aligned with the current template baseline", () => {
+    const e2eWorkflow = fs.readFileSync(
+      path.resolve(process.cwd(), "../../.github/workflows/cli-e2e.yml"),
+      "utf8",
+    );
+
+    expect(e2eWorkflow).toContain('node-version-file: ".nvmrc"');
+    expect(e2eWorkflow).not.toContain("node-version: 22");
+    expect(e2eWorkflow).not.toContain("2>&1 || true");
+    expect(e2eWorkflow).toContain("pnpm doctor");
+    expect(e2eWorkflow).toContain("pnpm check:fast");
+    expect(e2eWorkflow).toContain("pnpm --dir packages/create-gmacko-app build");
   });
 
   describe("platform options", () => {
