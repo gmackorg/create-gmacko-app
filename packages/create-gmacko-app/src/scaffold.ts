@@ -52,6 +52,7 @@ export async function scaffold(options: CliOptions): Promise<void> {
   updatePackageScope(targetDir, options.packageScope);
   createManifest(targetDir, options);
   createForgeGraphConfig(targetDir, options);
+  addForgeGraphScripts(targetDir);
 
   if (!options.platforms.web) {
     fs.removeSync(path.join(targetDir, "apps/nextjs"));
@@ -268,6 +269,17 @@ function createForgeGraphConfig(targetDir: string, options: CliOptions): void {
     path.join(targetDir, ".forgegraph.yaml"),
     `app: ${options.appName}
 server: ${options.forgegraphServer}
+metadata:
+  flakeRef: .
+  primaryService:
+    name: web
+    path: apps/nextjs
+    healthcheckPath: /api/health
+  database:
+    strategy: colocated-postgres
+  routes:
+    preview: ${options.forgegraphPreviewDomain}
+    production: ${options.forgegraphProductionDomain}
 stages:
   - name: staging
     nodeId: ${options.forgegraphStagingNode}
@@ -398,6 +410,21 @@ interface Env {
       };
     };
   };
+}
+
+function addForgeGraphScripts(targetDir: string): void {
+  const rootPackagePath = path.join(targetDir, "package.json");
+  const rootPackage = fs.readJsonSync(rootPackagePath) as {
+    scripts?: Record<string, string>;
+  };
+
+  rootPackage.scripts ??= {};
+  rootPackage.scripts["fg:deploy:staging"] = "fg deploy create staging --wait";
+  rootPackage.scripts["fg:deploy:production"] =
+    "fg deploy create production --wait";
+  rootPackage.scripts["fg:stages"] = "fg stage list";
+
+  fs.writeJsonSync(rootPackagePath, rootPackage, { spaces: 2 });
 }
 
 interface ExecutionContext {

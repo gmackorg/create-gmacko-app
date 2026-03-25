@@ -36,6 +36,8 @@ create-gmacko-app is a CLI tool designed to bootstrap production-ready, full-sta
 | `--forgegraph-server <url>`      | Write a ForgeGraph server URL into `.forgegraph.yaml`                                                               |
 | `--forgegraph-staging-node <id>` | Write the staging node placeholder into `.forgegraph.yaml`                                                          |
 | `--forgegraph-production-node <id>` | Write the production node placeholder into `.forgegraph.yaml`                                                   |
+| `--forgegraph-preview-domain <domain>` | Write the preview domain placeholder into `.forgegraph.yaml`                                               |
+| `--forgegraph-production-domain <domain>` | Write the production domain placeholder into `.forgegraph.yaml`                                         |
 | `--integrations <list>`          | Comma-separated list of integrations (sentry, posthog, stripe, revenuecat, notifications, email, realtime, storage) |
 | `--email-provider <provider>`    | Email provider (resend, sendgrid)                                                                                   |
 | `--realtime-provider <provider>` | Realtime provider (pusher, ably)                                                                                    |
@@ -139,9 +141,9 @@ Generated apps should be guided toward:
 - ForgeGraph-managed deployments as the default operating model
 - Hetzner VPS hosting with Postgres deployed alongside the app in the early stage
 - Nix-based build and runtime definitions as the repo evolves into a ForgeGraph-native deployment target
-- generated `.forgegraph.yaml` repo metadata with the app slug already scaffolded
-- optional CLI overrides for ForgeGraph server and stage node placeholders
-- `fg:init`, `fg:doctor`, and `fg:status` as the default repo-level ForgeGraph command surface
+- generated `.forgegraph.yaml` repo metadata with the app slug, flake ref, service hints, colocated Postgres note, and preview/production route placeholders already scaffolded
+- optional CLI overrides for ForgeGraph server, stage node, and route placeholders
+- `fg:init`, `fg:doctor`, `fg:status`, `fg:stages`, `fg:deploy:staging`, and `fg:deploy:production` as the default repo-level ForgeGraph command surface
 - `--vinext` scaffolding that now emits:
   - `apps/nextjs/vite.config.ts`
   - `apps/nextjs/wrangler.jsonc`

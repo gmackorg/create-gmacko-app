@@ -24,6 +24,8 @@ export interface CliOptions {
   forgegraphServer: string;
   forgegraphStagingNode: string;
   forgegraphProductionNode: string;
+  forgegraphPreviewDomain: string;
+  forgegraphProductionDomain: string;
   integrations: IntegrationConfig;
   includeAi: boolean;
   includeProvision: boolean;

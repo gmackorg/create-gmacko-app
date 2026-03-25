@@ -222,6 +222,15 @@ describe("create-gmacko-app scaffold", () => {
       expect(forgeGraphConfig).toContain(`app: ${appName}`);
       expect(forgeGraphConfig).toContain("server: https://forge.example.com");
       expect(forgeGraphConfig).toContain("stages:");
+      expect(forgeGraphConfig).toContain("metadata:");
+      expect(forgeGraphConfig).toContain("flakeRef: .");
+      expect(forgeGraphConfig).toContain("path: apps/nextjs");
+      expect(forgeGraphConfig).toContain("healthcheckPath: /api/health");
+      expect(forgeGraphConfig).toContain("strategy: colocated-postgres");
+      expect(forgeGraphConfig).toContain(
+        "preview: change-me.preview.example.com",
+      );
+      expect(forgeGraphConfig).toContain("production: change-me.example.com");
       expect(forgeGraphConfig).toContain("- name: staging");
       expect(forgeGraphConfig).toContain("- name: production");
       expect(forgeGraphConfig).toContain("nodeId: change-me-staging-node");
@@ -242,6 +251,10 @@ describe("create-gmacko-app scaffold", () => {
           "node-staging-1",
           "--forgegraph-production-node",
           "node-production-1",
+          "--forgegraph-preview-domain",
+          "pr.preview.gmac.io",
+          "--forgegraph-production-domain",
+          "app.gmac.io",
         ],
         cwd: tempDir,
       });
@@ -255,6 +268,8 @@ describe("create-gmacko-app scaffold", () => {
       expect(forgeGraphConfig).toContain("server: https://forge.gmac.io");
       expect(forgeGraphConfig).toContain("nodeId: node-staging-1");
       expect(forgeGraphConfig).toContain("nodeId: node-production-1");
+      expect(forgeGraphConfig).toContain("preview: pr.preview.gmac.io");
+      expect(forgeGraphConfig).toContain("production: app.gmac.io");
     }, 120000);
 
     it("should scaffold vinext support when requested", async () => {
@@ -667,6 +682,13 @@ describe("create-gmacko-app scaffold", () => {
       expect(pkg.scripts?.["fg:init"]).toBe("fg init --full");
       expect(pkg.scripts?.["fg:doctor"]).toBe("fg doctor");
       expect(pkg.scripts?.["fg:status"]).toBe("fg status");
+      expect(pkg.scripts?.["fg:deploy:staging"]).toBe(
+        "fg deploy create staging --wait",
+      );
+      expect(pkg.scripts?.["fg:deploy:production"]).toBe(
+        "fg deploy create production --wait",
+      );
+      expect(pkg.scripts?.["fg:stages"]).toBe("fg stage list");
       expect(pkg.scripts?.knip).toBeDefined();
       expect(pkg.scripts?.prepare).toBe(
         "git rev-parse --git-dir >/dev/null 2>&1 && lefthook install || true",
@@ -679,7 +701,7 @@ describe("create-gmacko-app scaffold", () => {
       );
       expect(doctorScript).toContain("ForgeGraph CLI");
       expect(doctorScript).toContain(
-        ".forgegraph.yaml still has placeholder ForgeGraph values",
+        ".forgegraph.yaml still has placeholder ForgeGraph values; update server, domains, and stage node IDs before deploying",
       );
       expect(doctorScript).toContain("Cloudflare Workers lane detected");
       expect(doctorScript).toContain("Wrangler CLI available");

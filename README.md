@@ -140,7 +140,7 @@ pnpm doctor
 # There is an `.env.example` in the root directory you can use for reference
 cp .env.example .env
 
-# Update the generated ForgeGraph repo metadata with your real server
+# Update the generated ForgeGraph repo metadata with your real server, domains, and node IDs
 $EDITOR .forgegraph.yaml
 
 # Start the local Postgres service if you are using the included compose setup
@@ -151,6 +151,9 @@ pnpm db:push
 
 # Verify the repo is ready for ForgeGraph workflows
 pnpm fg:doctor
+
+# Trigger a stage deployment through the repo-local ForgeGraph scripts
+pnpm fg:deploy:staging
 
 # Verify linting and types before you start iterating
 pnpm check:fast
@@ -340,9 +343,10 @@ The recommended deployment path for this template is to keep the application ins
 1. Treat ForgeGraph as the deployment home for the app.
 2. Run Postgres alongside the app on the VPS first, keeping application and database operations simple while the product is still early.
 3. Configure `DATABASE_URL`, auth secrets, and any enabled integration env vars in the ForgeGraph deployment environment.
-4. Use `fg` from [`../ForgeGraph`](../ForgeGraph) to log in, manage secrets, and deploy the app.
-5. Point your production domain at the ForgeGraph-managed deployment so the Expo app can use a stable backend URL.
-6. When you have real customers and concrete operational needs, migrate Postgres to a hosted provider instead of paying that complexity cost upfront.
+4. Use `fg` from [`../ForgeGraph`](../ForgeGraph) to log in, create the app and stages if needed, manage secrets, and deploy the app.
+5. Prefer the repo-local wrappers once the app is configured: `pnpm fg:stages`, `pnpm fg:deploy:staging`, and `pnpm fg:deploy:production`.
+6. Point your production domain at the ForgeGraph-managed deployment so the Expo app can use a stable backend URL.
+7. When you have real customers and concrete operational needs, migrate Postgres to a hosted provider instead of paying that complexity cost upfront.
 
 ### Auth Proxy
 

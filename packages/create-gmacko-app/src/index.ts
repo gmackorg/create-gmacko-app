@@ -45,6 +45,14 @@ program
     "--forgegraph-production-node <id>",
     "ForgeGraph production node placeholder to write into .forgegraph.yaml",
   )
+  .option(
+    "--forgegraph-preview-domain <domain>",
+    "ForgeGraph preview domain placeholder to write into .forgegraph.yaml",
+  )
+  .option(
+    "--forgegraph-production-domain <domain>",
+    "ForgeGraph production domain placeholder to write into .forgegraph.yaml",
+  )
   .action(async (appName: string, opts: Record<string, unknown>) => {
     const validation = validateNpmPackageName(appName);
     if (!validation.validForNewPackages) {
@@ -81,6 +89,14 @@ program
         options.forgegraphProductionNode =
           opts.forgegraphProductionNode as string;
       }
+      if (opts.forgegraphPreviewDomain) {
+        options.forgegraphPreviewDomain =
+          opts.forgegraphPreviewDomain as string;
+      }
+      if (opts.forgegraphProductionDomain) {
+        options.forgegraphProductionDomain =
+          opts.forgegraphProductionDomain as string;
+      }
       if (opts.packageScope) options.packageScope = opts.packageScope as string;
       if (opts.integrations !== undefined) {
         options.integrations = parseIntegrations(
@@ -106,6 +122,14 @@ program
       if (opts.forgegraphProductionNode) {
         options.forgegraphProductionNode =
           opts.forgegraphProductionNode as string;
+      }
+      if (opts.forgegraphPreviewDomain) {
+        options.forgegraphPreviewDomain =
+          opts.forgegraphPreviewDomain as string;
+      }
+      if (opts.forgegraphProductionDomain) {
+        options.forgegraphProductionDomain =
+          opts.forgegraphProductionDomain as string;
       }
     }
 

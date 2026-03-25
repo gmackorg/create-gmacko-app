@@ -203,7 +203,9 @@ export async function provisionForgeGraph(
       ),
     );
     p.log.message(
-      pc.cyan(`   Then: fg deploy ${config.appName} --stage production`),
+      pc.cyan(
+        `   Then: fg app create ${config.appName} --flake-ref . && fg stage add production --node <node-id> && fg deploy create production --wait`,
+      ),
     );
   }
 

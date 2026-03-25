@@ -67,8 +67,8 @@ fi
 
 if [ -f "$ROOT_DIR/.forgegraph.yaml" ]; then
   ok ".forgegraph.yaml present"
-  if grep -q "forge.example.com\|change-me-staging-node\|change-me-production-node" "$ROOT_DIR/.forgegraph.yaml"; then
-    warn ".forgegraph.yaml still has placeholder ForgeGraph values; update server and stage node IDs before deploying"
+  if grep -q "forge.example.com\|change-me-staging-node\|change-me-production-node\|change-me.preview.example.com\|change-me.example.com" "$ROOT_DIR/.forgegraph.yaml"; then
+    warn ".forgegraph.yaml still has placeholder ForgeGraph values; update server, domains, and stage node IDs before deploying"
   fi
 else
   warn ".forgegraph.yaml is missing; ForgeGraph deployment metadata has not been configured"
