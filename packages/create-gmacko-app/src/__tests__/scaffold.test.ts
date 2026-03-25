@@ -678,6 +678,12 @@ describe("create-gmacko-app scaffold", () => {
         "Checking local development prerequisites",
       );
       expect(doctorScript).toContain("ForgeGraph CLI");
+      expect(doctorScript).toContain(
+        ".forgegraph.yaml still has placeholder ForgeGraph values",
+      );
+      expect(doctorScript).toContain("Cloudflare Workers lane detected");
+      expect(doctorScript).toContain("Wrangler CLI available");
+      expect(doctorScript).toContain("Cloudflare Workers credentials present");
       expect(
         fs.statSync(path.join(result.appPath, "scripts/setup.sh")).mode & 0o111,
       ).toBeTruthy();

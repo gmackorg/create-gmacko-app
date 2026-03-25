@@ -169,7 +169,7 @@ pnpm --filter @gmacko/auth generate
 pnpm check:fast
 ```
 
-`pnpm doctor` checks the local baseline for Node, pnpm, Docker Compose, `jj`, `fg`, `.env`, and `.forgegraph.yaml`.
+`pnpm doctor` checks the local baseline for Node, pnpm, Docker Compose, `jj`, `fg`, `.env`, and `.forgegraph.yaml`. It also warns when ForgeGraph metadata still contains scaffold placeholders and, for `--vinext` apps, checks for Wrangler plus `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`.
 
 ## Maintaining The CLI
 

@@ -276,6 +276,7 @@ Generated apps are set up for current agent-native and platform-native workflows
   - `apps/nextjs/worker/index.ts` as the generated Worker entry
   - `apps/nextjs/src/cloudflare-env.ts` plus Cloudflare env stubs in `.env.example`
   - `prebuild:vinext`, `build:vinext`, `deploy:cloudflare:staging`, and `deploy:cloudflare:production`
+- `pnpm doctor` now warns when `.forgegraph.yaml` still contains scaffold placeholders and, when the `vinext` lane exists, checks for Wrangler plus `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in `.env`
 
 See [docs/ai/DEVELOPER_EXPERIENCE.md](./docs/ai/DEVELOPER_EXPERIENCE.md) for the current support matrix and recommendations.
 

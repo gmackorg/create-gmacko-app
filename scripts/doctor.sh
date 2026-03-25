@@ -67,6 +67,9 @@ fi
 
 if [ -f "$ROOT_DIR/.forgegraph.yaml" ]; then
   ok ".forgegraph.yaml present"
+  if grep -q "forge.example.com\|change-me-staging-node\|change-me-production-node" "$ROOT_DIR/.forgegraph.yaml"; then
+    warn ".forgegraph.yaml still has placeholder ForgeGraph values; update server and stage node IDs before deploying"
+  fi
 else
   warn ".forgegraph.yaml is missing; ForgeGraph deployment metadata has not been configured"
 fi
@@ -87,6 +90,26 @@ if command -v fg >/dev/null 2>&1; then
   ok "ForgeGraph CLI available"
 else
   warn "ForgeGraph CLI (fg) not installed; install/use fg from ../ForgeGraph for deploy workflows"
+fi
+
+if [ -f "$ROOT_DIR/apps/nextjs/wrangler.jsonc" ]; then
+  ok "Cloudflare Workers lane detected"
+
+  if command -v wrangler >/dev/null 2>&1; then
+    ok "Wrangler CLI available"
+  else
+    warn "Wrangler CLI not installed; vinext deploy workflows will be unavailable"
+  fi
+
+  if [ -f "$ROOT_DIR/.env" ]; then
+    if grep -q '^CLOUDFLARE_ACCOUNT_ID=' "$ROOT_DIR/.env" && grep -q '^CLOUDFLARE_API_TOKEN=' "$ROOT_DIR/.env"; then
+      ok "Cloudflare Workers credentials present"
+    else
+      warn "Cloudflare Workers lane detected but CLOUDFLARE_ACCOUNT_ID/CLOUDFLARE_API_TOKEN are missing from .env"
+    fi
+  else
+    warn "Cloudflare Workers lane detected but .env is missing; add CLOUDFLARE_ACCOUNT_ID/CLOUDFLARE_API_TOKEN before deploying"
+  fi
 fi
 
 echo ""
