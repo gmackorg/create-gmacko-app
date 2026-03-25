@@ -623,11 +623,14 @@ describe("create-gmacko-app scaffold", () => {
       expect(fileExists(result.appPath, "lefthook.yml")).toBe(true);
       expect(fileExists(result.appPath, "commitlint.config.mjs")).toBe(true);
       expect(fileExists(result.appPath, "knip.json")).toBe(true);
+      expect(fileExists(result.appPath, "scripts/doctor.sh")).toBe(true);
 
       const pkg = readJson<{
         scripts?: Record<string, string>;
         devDependencies?: Record<string, string>;
       }>(result.appPath, "package.json");
+      const setupScript = readFile(result.appPath, "scripts/setup.sh");
+      const doctorScript = readFile(result.appPath, "scripts/doctor.sh");
 
       expect(pkg.devDependencies?.["@biomejs/biome"]).toBeDefined();
       expect(pkg.devDependencies?.oxlint).toBeDefined();
@@ -638,6 +641,13 @@ describe("create-gmacko-app scaffold", () => {
       expect(pkg.scripts?.["lint:ox"]).toBeDefined();
       expect(pkg.scripts?.["format:check"]).toBeDefined();
       expect(pkg.scripts?.["format:fix"]).toBeDefined();
+      expect(pkg.scripts?.doctor).toBe("./scripts/doctor.sh");
+      expect(pkg.scripts?.["check:fast"]).toBe("pnpm lint && pnpm typecheck");
+      expect(pkg.scripts?.check).toBe(
+        "pnpm check:fast && pnpm test && pnpm build",
+      );
+      expect(pkg.scripts?.["release:cli:dry-run"]).toBeDefined();
+      expect(pkg.scripts?.["check:release"]).toBeDefined();
       expect(pkg.scripts?.["fg:init"]).toBe("fg init --full");
       expect(pkg.scripts?.["fg:doctor"]).toBe("fg doctor");
       expect(pkg.scripts?.["fg:status"]).toBe("fg status");
@@ -645,6 +655,13 @@ describe("create-gmacko-app scaffold", () => {
       expect(pkg.scripts?.prepare).toBe(
         "git rev-parse --git-dir >/dev/null 2>&1 && lefthook install || true",
       );
+      expect(setupScript).toContain('REQUIRED_NODE_VERSION="24"');
+      expect(setupScript).toContain("pnpm doctor");
+      expect(setupScript).toContain("pnpm check:fast");
+      expect(doctorScript).toContain("Checking local development prerequisites");
+      expect(doctorScript).toContain("ForgeGraph CLI");
+      expect(fs.statSync(path.join(result.appPath, "scripts/setup.sh")).mode & 0o111).toBeTruthy();
+      expect(fs.statSync(path.join(result.appPath, "scripts/doctor.sh")).mode & 0o111).toBeTruthy();
     }, 120000);
 
     it("should initialize a jj repo by default", async () => {

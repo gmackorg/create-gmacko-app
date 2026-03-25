@@ -131,17 +131,17 @@ export async function scaffold(options: CliOptions): Promise<void> {
   }
 
   console.log(`
-${pc.bold("Next steps:")}
+  ${pc.bold("Next steps:")}
 
   ${pc.cyan("cd")} ${options.appName}
+  ${pc.cyan("pnpm")} doctor
   ${pc.cyan("cp")} .env.example .env
   ${pc.dim("# Update .env with your credentials")}
   ${pc.dim("# Update .forgegraph.yaml with your real ForgeGraph server")}
   ${pc.cyan("docker compose")} up -d postgres
   ${pc.cyan("pnpm")} db:push
   ${pc.cyan("pnpm")} fg:doctor
-  ${pc.cyan("pnpm")} format:check
-  ${pc.cyan("pnpm")} lint:ox
+  ${pc.cyan("pnpm")} check:fast
   ${pc.cyan("pnpm")} dev
 `);
 }

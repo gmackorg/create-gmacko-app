@@ -123,6 +123,9 @@ To get it running, follow the steps below:
 # Install dependencies
 pnpm i
 
+# Check local prerequisites and repo metadata
+pnpm doctor
+
 # Configure environment variables
 # There is an `.env.example` in the root directory you can use for reference
 cp .env.example .env
@@ -138,6 +141,9 @@ pnpm db:push
 
 # Verify the repo is ready for ForgeGraph workflows
 pnpm fg:doctor
+
+# Verify linting and types before you start iterating
+pnpm check:fast
 ```
 
 ### 2. Generate Better Auth Schema

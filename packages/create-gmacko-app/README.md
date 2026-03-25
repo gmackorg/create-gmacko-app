@@ -8,7 +8,7 @@ Create a new Gmacko app with Next.js, Expo, Storybook, tRPC, ForgeGraph-first de
 ## Quick Start
 
 ```bash
-npx create-gmacko-app my-app
+pnpm dlx create-gmacko-app@latest my-app
 ```
 
 ## Description
@@ -49,7 +49,7 @@ create-gmacko-app is a CLI tool designed to bootstrap production-ready, full-sta
 Includes Next.js, Expo, Sentry, and PostHog.
 
 ```bash
-npx create-gmacko-app my-app
+pnpm dlx create-gmacko-app@latest my-app
 ```
 
 ### Core Minimal Setup
@@ -57,7 +57,7 @@ npx create-gmacko-app my-app
 Only the bare essentials without additional integrations.
 
 ```bash
-npx create-gmacko-app my-app --integrations ""
+pnpm dlx create-gmacko-app@latest my-app --integrations ""
 ```
 
 ### Full Featured Setup
@@ -65,7 +65,7 @@ npx create-gmacko-app my-app --integrations ""
 Enable all integrations and extra apps.
 
 ```bash
-npx create-gmacko-app my-app --tanstack-start --integrations sentry,posthog,stripe,revenuecat,notifications,email,realtime,storage
+pnpm dlx create-gmacko-app@latest my-app --tanstack-start --integrations sentry,posthog,stripe,revenuecat,notifications,email,realtime,storage
 ```
 
 ### Web Only Setup
@@ -73,7 +73,7 @@ npx create-gmacko-app my-app --tanstack-start --integrations sentry,posthog,stri
 Skip the mobile app and AI features.
 
 ```bash
-npx create-gmacko-app my-app --no-mobile --no-ai
+pnpm dlx create-gmacko-app@latest my-app --no-mobile --no-ai
 ```
 
 ### Experimental Cloudflare Setup
@@ -81,7 +81,7 @@ npx create-gmacko-app my-app --no-mobile --no-ai
 Add the `vinext` Workers lane to the generated Next app.
 
 ```bash
-npx create-gmacko-app my-app --no-mobile --no-ai --vinext
+pnpm dlx create-gmacko-app@latest my-app --no-mobile --no-ai --vinext
 ```
 
 ## Tech Stack
@@ -154,6 +154,22 @@ Generated apps should be guided toward:
 - a modern baseline of `oxlint`, `biome`, `lefthook`, `commitlint`, and `knip`
 
 For Cloudflare-specific commands and operating notes after scaffolding, see [../../deploy/cloudflare/README.md](/Volumes/dev/create-gmacko-app/deploy/cloudflare/README.md).
+
+## First-Run Checklist
+
+After scaffolding a new repo:
+
+```bash
+cd my-app
+pnpm doctor
+cp .env.example .env
+docker compose up -d postgres
+pnpm db:push
+pnpm --filter @gmacko/auth generate
+pnpm check:fast
+```
+
+`pnpm doctor` checks the local baseline for Node, pnpm, Docker Compose, `jj`, `fg`, `.env`, and `.forgegraph.yaml`.
 
 ## License
 

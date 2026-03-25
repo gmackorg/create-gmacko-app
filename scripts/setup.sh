@@ -7,7 +7,7 @@ echo "==================================="
 echo ""
 
 # Check Node.js version
-REQUIRED_NODE_VERSION="22"
+REQUIRED_NODE_VERSION="24"
 CURRENT_NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
 
 if [ "$CURRENT_NODE_VERSION" -lt "$REQUIRED_NODE_VERSION" ]; then
@@ -17,6 +17,11 @@ fi
 
 echo "Node.js version: $(node -v)"
 echo "pnpm version: $(pnpm -v)"
+echo ""
+
+# Run doctor checks before installing dependencies
+echo "Running doctor checks..."
+pnpm doctor
 echo ""
 
 # Install dependencies
@@ -46,5 +51,6 @@ echo "  1. Update .env with your credentials (DATABASE_URL, AUTH_SECRET, etc.)"
 echo "  2. Run 'docker compose up -d postgres' to start the local database"
 echo "  3. Run 'pnpm db:push' to push schema to database"
 echo "  4. Run 'pnpm --filter @gmacko/auth generate' to generate auth schema"
-echo "  5. Run 'pnpm dev' to start development servers"
+echo "  5. Run 'pnpm check:fast' to validate linting and typecheck"
+echo "  6. Run 'pnpm dev' to start development servers"
 echo ""

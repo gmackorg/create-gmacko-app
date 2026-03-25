@@ -1,8 +1,12 @@
 {
   "name": "create-gmacko-app",
   "version": "0.1.1",
-  "description": "Create a new Gmacko app with Next.js, Expo, tRPC, and more",
+  "description": "Create a modern SaaS app with Next.js, Expo, ForgeGraph guidance, and agent-native DX defaults",
   "type": "module",
+  "engines": {
+    "node": "^24.0.0",
+    "pnpm": "^10.32.1"
+  },
   "bin": {
     "create-gmacko-app": "./dist/index.js"
   },
@@ -26,6 +30,23 @@
     "fs-extra": "^11.3.4",
     "picocolors": "^1.1.1",
     "validate-npm-package-name": "^7.0.2"
+  },
+  "keywords": [
+    "saas",
+    "template",
+    "nextjs",
+    "expo",
+    "turborepo",
+    "forgegraph",
+    "vinext"
+  ],
+  "homepage": "https://github.com/gmackorg/create-gmacko-app#readme",
+  "bugs": {
+    "url": "https://github.com/gmackorg/create-gmacko-app/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gmackorg/create-gmacko-app.git"
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
