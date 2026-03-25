@@ -805,6 +805,9 @@ describe("create-gmacko-app scaffold", () => {
           "--yes",
           "--no-install",
           "--no-git",
+          "--no-mobile",
+          "--no-ai",
+          "--vinext",
           "--prune",
           "--integrations",
           "", // No integrations = prune all optional packages
@@ -820,6 +823,37 @@ describe("create-gmacko-app scaffold", () => {
       expect(fileExists(result.appPath, "packages/monitoring")).toBe(false);
       expect(fileExists(result.appPath, "packages/analytics")).toBe(false);
       expect(fileExists(result.appPath, "packages/payments")).toBe(false);
+      expect(fileExists(result.appPath, "apps/nextjs/sentry.client.config.ts")).toBe(
+        false,
+      );
+      expect(fileExists(result.appPath, "apps/nextjs/sentry.edge.config.ts")).toBe(
+        false,
+      );
+      expect(fileExists(result.appPath, "apps/nextjs/sentry.server.config.ts")).toBe(
+        false,
+      );
+
+      const nextProviders = readFile(result.appPath, "apps/nextjs/src/app/providers.tsx");
+      const nextErrorPage = readFile(result.appPath, "apps/nextjs/src/app/error.tsx");
+      const nextGlobalError = readFile(
+        result.appPath,
+        "apps/nextjs/src/app/global-error.tsx",
+      );
+      const nextErrorBoundary = readFile(
+        result.appPath,
+        "apps/nextjs/src/components/error-boundary.tsx",
+      );
+      const nextInstrumentation = readFile(
+        result.appPath,
+        "apps/nextjs/src/instrumentation.ts",
+      );
+
+      expect(nextProviders).not.toContain("@gmacko/analytics/web");
+      expect(nextErrorPage).not.toContain("@gmacko/monitoring/web");
+      expect(nextGlobalError).not.toContain("@gmacko/monitoring/web");
+      expect(nextErrorBoundary).not.toContain("@gmacko/monitoring/web");
+      expect(nextInstrumentation).not.toContain("sentry.server.config");
+      expect(nextInstrumentation).not.toContain("sentry.edge.config");
     }, 120000);
   });
 

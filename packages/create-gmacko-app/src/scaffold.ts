@@ -518,6 +518,14 @@ function pruneIntegrations(
     }
   }
 
+  if (!integrations.sentry) {
+    pruneNextSentryFiles(targetDir);
+  }
+
+  if (!integrations.posthog) {
+    pruneNextAnalyticsFiles(targetDir);
+  }
+
   for (const app of ["nextjs", "expo", "tanstack-start"]) {
     const appPkgPath = path.join(targetDir, `apps/${app}/package.json`);
     if (fs.existsSync(appPkgPath)) {
@@ -529,6 +537,105 @@ function pruneIntegrations(
       fs.writeJsonSync(appPkgPath, pkg, { spaces: 2 });
     }
   }
+}
+
+function pruneNextSentryFiles(targetDir: string): void {
+  const sentryFiles = [
+    "apps/nextjs/sentry.client.config.ts",
+    "apps/nextjs/sentry.edge.config.ts",
+    "apps/nextjs/sentry.server.config.ts",
+  ];
+
+  for (const relativePath of sentryFiles) {
+    const filePath = path.join(targetDir, relativePath);
+    if (fs.existsSync(filePath)) {
+      fs.removeSync(filePath);
+    }
+  }
+
+  removeSnippet(
+    path.join(targetDir, "apps/nextjs/src/app/error.tsx"),
+    'import { captureException } from "@gmacko/monitoring/web";\n',
+  );
+  removeSnippet(
+    path.join(targetDir, "apps/nextjs/src/app/error.tsx"),
+    `    // Report error to Sentry if enabled
+    if (integrations.sentry) {
+      captureException(error);
+    }
+
+`,
+  );
+
+  removeSnippet(
+    path.join(targetDir, "apps/nextjs/src/app/global-error.tsx"),
+    'import { captureException } from "@gmacko/monitoring/web";\n',
+  );
+  removeSnippet(
+    path.join(targetDir, "apps/nextjs/src/app/global-error.tsx"),
+    `    // Report error to Sentry if enabled
+    if (integrations.sentry) {
+      captureException(error);
+    }
+
+`,
+  );
+
+  removeSnippet(
+    path.join(targetDir, "apps/nextjs/src/components/error-boundary.tsx"),
+    'import { captureException } from "@gmacko/monitoring/web";\n',
+  );
+  removeSnippet(
+    path.join(targetDir, "apps/nextjs/src/components/error-boundary.tsx"),
+    `    // Report to Sentry if enabled
+    if (integrations.sentry) {
+      captureException(error);
+    }
+
+`,
+  );
+
+  const instrumentationPath = path.join(
+    targetDir,
+    "apps/nextjs/src/instrumentation.ts",
+  );
+  if (fs.existsSync(instrumentationPath)) {
+    fs.writeFileSync(
+      instrumentationPath,
+      `export async function register() {}
+`,
+    );
+  }
+}
+
+function pruneNextAnalyticsFiles(targetDir: string): void {
+  const providersPath = path.join(targetDir, "apps/nextjs/src/app/providers.tsx");
+  if (!fs.existsSync(providersPath)) return;
+
+  fs.writeFileSync(
+    providersPath,
+    `"use client";
+
+import type { ReactNode } from "react";
+
+interface ProvidersProps {
+  children: ReactNode;
+}
+
+export function Providers({ children }: ProvidersProps) {
+  return <>{children}</>;
+}
+`,
+  );
+}
+
+function removeSnippet(filePath: string, snippet: string): void {
+  if (!fs.existsSync(filePath)) return;
+
+  const content = fs.readFileSync(filePath, "utf-8");
+  if (!content.includes(snippet)) return;
+
+  fs.writeFileSync(filePath, content.replace(snippet, ""));
 }
 
 function getAllFiles(dir: string): string[] {
