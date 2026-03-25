@@ -4,7 +4,6 @@ import validateNpmPackageName from "validate-npm-package-name";
 import { getDefaultOptions, runPrompts } from "./prompts.js";
 import { scaffold } from "./scaffold.js";
 import type { CliOptions, IntegrationConfig } from "./types.js";
-import { DEFAULT_INTEGRATIONS } from "./types.js";
 
 const program = new Command();
 
@@ -88,7 +87,6 @@ program
           opts.integrations as string,
           opts.emailProvider as string | undefined,
           opts.realtimeProvider as string | undefined,
-          opts.storageProvider as string | undefined,
         );
       }
     } else {
@@ -118,7 +116,6 @@ function parseIntegrations(
   list: string,
   emailProvider?: string,
   realtimeProvider?: string,
-  storageProvider?: string,
 ): IntegrationConfig {
   const items = list.split(",").map((s) => s.trim().toLowerCase());
   const set = new Set(items);

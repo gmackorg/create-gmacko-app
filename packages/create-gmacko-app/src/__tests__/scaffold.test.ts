@@ -1,6 +1,6 @@
 import path from "node:path";
 import fs from "fs-extra";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   cleanupApp,
@@ -809,6 +809,36 @@ describe("create-gmacko-app scaffold", () => {
     expect(biomeConfig.css?.parser?.tailwindDirectives).toBe(true);
     expect(() => JSON.parse(compiledTsconfig)).not.toThrow();
     expect(() => JSON.parse(baseTsconfig)).not.toThrow();
+  });
+
+  it("keeps repo lint noise focused on first-party files", () => {
+    const oxlintConfig = JSON.parse(
+      fs.readFileSync(
+        path.resolve(process.cwd(), "../../.oxlintrc.json"),
+        "utf8",
+      ),
+    ) as {
+      ignorePatterns?: string[];
+    };
+    const indexSource = fs.readFileSync(
+      path.resolve(process.cwd(), "src/index.ts"),
+      "utf8",
+    );
+    const promptsSource = fs.readFileSync(
+      path.resolve(process.cwd(), "src/prompts.ts"),
+      "utf8",
+    );
+    const testSource = fs.readFileSync(
+      path.resolve(process.cwd(), "src/__tests__/scaffold.test.ts"),
+      "utf8",
+    );
+    const testImportBlock = testSource.split("\n").slice(0, 4).join("\n");
+
+    expect(oxlintConfig.ignorePatterns).toContain(".claude/**");
+    expect(indexSource).not.toContain("DEFAULT_INTEGRATIONS");
+    expect(indexSource).not.toContain("storageProvider?: string");
+    expect(promptsSource).not.toContain("PlatformConfig");
+    expect(testImportBlock).not.toContain("beforeEach");
   });
 
   describe("platform options", () => {

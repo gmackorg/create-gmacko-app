@@ -458,9 +458,7 @@ function sortObjectKeys(
   record: Record<string, string>,
 ): Record<string, string> {
   return Object.fromEntries(
-    [...Object.entries(record)].sort(([left], [right]) =>
-      left.localeCompare(right),
-    ),
+    Object.entries(record).sort(([left], [right]) => left.localeCompare(right)),
   );
 }
 

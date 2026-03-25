@@ -5,7 +5,6 @@ import type {
   CliOptions,
   IntegrationConfig,
   IntegrationPreset,
-  PlatformConfig,
 } from "./types.js";
 import {
   CORE_INTEGRATIONS,
