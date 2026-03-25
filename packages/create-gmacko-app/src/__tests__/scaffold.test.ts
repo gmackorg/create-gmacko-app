@@ -778,6 +778,16 @@ describe("create-gmacko-app scaffold", () => {
     expect(e2eWorkflow).toContain(
       "pnpm --dir packages/create-gmacko-app build",
     );
+    expect(e2eWorkflow).toContain('AUTH_DISCORD_ID="test-discord-client-id"');
+    expect(e2eWorkflow).toContain(
+      'AUTH_DISCORD_SECRET="test-discord-client-secret"',
+    );
+    expect(e2eWorkflow).toContain(
+      'EXPO_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"',
+    );
+    expect(e2eWorkflow).toContain("pnpm --filter @gmacko/nextjs build");
+    expect(e2eWorkflow).toContain("pnpm --filter @gmacko/tanstack-start build");
+    expect(e2eWorkflow).toContain("pnpm --filter @gmacko/expo typecheck");
   });
 
   it("keeps repo formatting focused on first-party files", () => {

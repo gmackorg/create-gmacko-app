@@ -95,8 +95,11 @@ jobs:
           cat > .env << 'EOF'
           DATABASE_URL="postgresql://test:test@localhost:5432/test"
           AUTH_SECRET="test-secret-key-for-testing-only"
+          AUTH_DISCORD_ID="test-discord-client-id"
+          AUTH_DISCORD_SECRET="test-discord-client-secret"
           AUTH_URL="http://localhost:3000"
           NEXT_PUBLIC_APP_URL="http://localhost:3000"
+          NEXT_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
           EOF
         working-directory: /tmp/e2e-test/test-app-default
 
@@ -108,8 +111,8 @@ jobs:
         run: pnpm check:fast
         working-directory: /tmp/e2e-test/test-app-default
 
-      - name: Run build
-        run: pnpm build
+      - name: Run Next.js build
+        run: pnpm --filter @gmacko/nextjs build
         working-directory: /tmp/e2e-test/test-app-default
 
   e2e-minimal:
@@ -155,8 +158,11 @@ jobs:
           cat > .env << 'EOF'
           DATABASE_URL="postgresql://test:test@localhost:5432/test"
           AUTH_SECRET="test-secret-key-for-testing-only"
+          AUTH_DISCORD_ID="test-discord-client-id"
+          AUTH_DISCORD_SECRET="test-discord-client-secret"
           AUTH_URL="http://localhost:3000"
           NEXT_PUBLIC_APP_URL="http://localhost:3000"
+          NEXT_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
           EOF
         working-directory: /tmp/e2e-test/test-app-minimal
 
@@ -176,8 +182,8 @@ jobs:
         run: pnpm check:fast
         working-directory: /tmp/e2e-test/test-app-minimal
 
-      - name: Run build
-        run: pnpm build
+      - name: Run Next.js build
+        run: pnpm --filter @gmacko/nextjs build
         working-directory: /tmp/e2e-test/test-app-minimal
 
   e2e-custom-scope:
@@ -224,8 +230,11 @@ jobs:
           cat > .env << 'EOF'
           DATABASE_URL="postgresql://test:test@localhost:5432/test"
           AUTH_SECRET="test-secret-key-for-testing-only"
+          AUTH_DISCORD_ID="test-discord-client-id"
+          AUTH_DISCORD_SECRET="test-discord-client-secret"
           AUTH_URL="http://localhost:3000"
           NEXT_PUBLIC_APP_URL="http://localhost:3000"
+          NEXT_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
           EOF
         working-directory: /tmp/e2e-test/test-app-scope
 
@@ -244,8 +253,8 @@ jobs:
         run: pnpm check:fast
         working-directory: /tmp/e2e-test/test-app-scope
 
-      - name: Run build
-        run: pnpm build
+      - name: Run Next.js build
+        run: pnpm --filter @mycompany/nextjs build
         working-directory: /tmp/e2e-test/test-app-scope
 
   e2e-full:
@@ -292,10 +301,20 @@ jobs:
           cat > .env << 'EOF'
           DATABASE_URL="postgresql://test:test@localhost:5432/test"
           AUTH_SECRET="test-secret-key-for-testing-only"
+          AUTH_DISCORD_ID="test-discord-client-id"
+          AUTH_DISCORD_SECRET="test-discord-client-secret"
           AUTH_URL="http://localhost:3000"
           NEXT_PUBLIC_APP_URL="http://localhost:3000"
           SENTRY_DSN="https://test@test.ingest.sentry.io/test"
           NEXT_PUBLIC_POSTHOG_KEY="phc_test"
+          NEXT_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
+          EXPO_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
+          EXPO_PUBLIC_POSTHOG_KEY_DEV="phc_test_dev"
+          EXPO_PUBLIC_POSTHOG_KEY_STAGING="phc_test_staging"
+          EXPO_PUBLIC_POSTHOG_KEY_PROD="phc_test_prod"
+          EXPO_PUBLIC_SENTRY_DSN_DEV="https://test@example.ingest.sentry.io/123"
+          EXPO_PUBLIC_SENTRY_DSN_STAGING="https://test@example.ingest.sentry.io/456"
+          EXPO_PUBLIC_SENTRY_DSN_PROD="https://test@example.ingest.sentry.io/789"
           STRIPE_SECRET_KEY="sk_test_123"
           RESEND_API_KEY="re_test_123"
           EOF
@@ -321,8 +340,16 @@ jobs:
         run: pnpm check:fast
         working-directory: /tmp/e2e-test/test-app-full
 
-      - name: Run build
-        run: pnpm build
+      - name: Run Next.js build
+        run: pnpm --filter @gmacko/nextjs build
+        working-directory: /tmp/e2e-test/test-app-full
+
+      - name: Run TanStack Start build
+        run: pnpm --filter @gmacko/tanstack-start build
+        working-directory: /tmp/e2e-test/test-app-full
+
+      - name: Run Expo typecheck
+        run: pnpm --filter @gmacko/expo typecheck
         working-directory: /tmp/e2e-test/test-app-full
 
   e2e-vinext:
@@ -367,8 +394,11 @@ jobs:
           cat > .env << 'EOF'
           DATABASE_URL="postgresql://test:test@localhost:5432/test"
           AUTH_SECRET="test-secret-key-for-testing-only"
+          AUTH_DISCORD_ID="test-discord-client-id"
+          AUTH_DISCORD_SECRET="test-discord-client-secret"
           AUTH_URL="http://localhost:3000"
           NEXT_PUBLIC_APP_URL="http://localhost:3000"
+          NEXT_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
           EOF
         working-directory: /tmp/e2e-test/test-app-vinext
 

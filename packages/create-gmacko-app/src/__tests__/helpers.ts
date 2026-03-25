@@ -233,8 +233,18 @@ export function createMockEnv(appPath: string): void {
 # Mock environment for testing
 DATABASE_URL="postgresql://test:test@localhost:5432/test"
 AUTH_SECRET="test-secret-key-for-testing-only"
+AUTH_DISCORD_ID="test-discord-client-id"
+AUTH_DISCORD_SECRET="test-discord-client-secret"
 AUTH_URL="http://localhost:3000"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
+NEXT_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
+EXPO_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
+EXPO_PUBLIC_POSTHOG_KEY_DEV="phc_test_dev"
+EXPO_PUBLIC_POSTHOG_KEY_STAGING="phc_test_staging"
+EXPO_PUBLIC_POSTHOG_KEY_PROD="phc_test_prod"
+EXPO_PUBLIC_SENTRY_DSN_DEV="https://test@example.ingest.sentry.io/123"
+EXPO_PUBLIC_SENTRY_DSN_STAGING="https://test@example.ingest.sentry.io/456"
+EXPO_PUBLIC_SENTRY_DSN_PROD="https://test@example.ingest.sentry.io/789"
 `;
 
   fs.writeFileSync(path.join(appPath, ".env"), envContent.trim());
