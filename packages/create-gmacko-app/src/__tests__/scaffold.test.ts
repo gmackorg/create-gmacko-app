@@ -811,11 +811,20 @@ describe("create-gmacko-app scaffold", () => {
       'AUTH_DISCORD_SECRET="test-discord-client-secret"',
     );
     expect(e2eWorkflow).toContain(
+      'CLOUDFLARE_ACCOUNT_ID="test-cloudflare-account"',
+    );
+    expect(e2eWorkflow).toContain(
+      'CLOUDFLARE_API_TOKEN="test-cloudflare-token"',
+    );
+    expect(e2eWorkflow).toContain(
       'EXPO_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"',
     );
     expect(e2eWorkflow).toContain("pnpm --filter @gmacko/nextjs build");
     expect(e2eWorkflow).toContain("pnpm --filter @gmacko/tanstack-start build");
     expect(e2eWorkflow).toContain("pnpm --filter @gmacko/expo typecheck");
+    expect(e2eWorkflow).toContain("pnpm fg:stages");
+    expect(e2eWorkflow).toContain("pnpm fg:deploy:staging");
+    expect(e2eWorkflow).toContain("Cloudflare Workers credentials present");
   });
 
   it("keeps repo formatting focused on first-party files", () => {

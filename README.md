@@ -114,7 +114,7 @@ For `create-gmacko-app` release validation, use the scoped CLI publish check ins
 pnpm check:release
 ```
 
-That command runs the `packages/create-gmacko-app` test suite, builds only the CLI package, and verifies the publish tarball. Generated-app coverage lives separately in [`.github/workflows/cli-e2e.yml`](/Volumes/dev/create-gmacko-app/.github/workflows/cli-e2e.yml), which exercises default, minimal, custom-scope, full, and `vinext` scaffolds on a nightly and manual basis.
+That command runs the `packages/create-gmacko-app` test suite, builds only the CLI package, and verifies the publish tarball. Generated-app coverage lives separately in [`.github/workflows/cli-e2e.yml`](/Volumes/dev/create-gmacko-app/.github/workflows/cli-e2e.yml), which exercises default, minimal, custom-scope, full, and `vinext` scaffolds on a nightly and manual basis, including ForgeGraph script smoke checks and `vinext` doctor assertions for Cloudflare credentials.
 
 ## Quick Start
 

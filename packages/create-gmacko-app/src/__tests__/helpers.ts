@@ -245,9 +245,28 @@ EXPO_PUBLIC_POSTHOG_KEY_PROD="phc_test_prod"
 EXPO_PUBLIC_SENTRY_DSN_DEV="https://test@example.ingest.sentry.io/123"
 EXPO_PUBLIC_SENTRY_DSN_STAGING="https://test@example.ingest.sentry.io/456"
 EXPO_PUBLIC_SENTRY_DSN_PROD="https://test@example.ingest.sentry.io/789"
+CLOUDFLARE_ACCOUNT_ID="test-cloudflare-account"
+CLOUDFLARE_API_TOKEN="test-cloudflare-token"
 `;
 
   fs.writeFileSync(path.join(appPath, ".env"), envContent.trim());
+}
+
+export function createFakeCliBin(
+  appPath: string,
+  commands: Record<string, string>,
+): string {
+  const binDir = path.join(appPath, ".test-bin");
+  fs.ensureDirSync(binDir);
+
+  for (const [command, body] of Object.entries(commands)) {
+    const scriptPath = path.join(binDir, command);
+    fs.writeFileSync(scriptPath, `#!/bin/sh\n${body}\n`, {
+      mode: 0o755,
+    });
+  }
+
+  return binDir;
 }
 
 /**

@@ -20,10 +20,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   cleanupApp,
+  createFakeCliBin,
   createMockEnv,
   ensureTempDir,
   fileExists,
   generateAppName,
+  readFile,
   runCli,
   runInApp,
 } from "./helpers.js";
@@ -124,6 +126,38 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
 
       expect(result.success).toBe(true);
     }, 900000);
+
+    it("should exercise ForgeGraph repo-local scripts", () => {
+      console.log("[E2E] Running ForgeGraph script smoke test...");
+      createMockEnv(appPath);
+
+      const fakeBin = createFakeCliBin(appPath, {
+        fg: 'echo "fake-fg $@"',
+      });
+
+      const result = runInApp(
+        appPath,
+        "pnpm fg:stages && pnpm fg:deploy:staging && pnpm fg:deploy:production",
+        {
+          env: {
+            PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+          },
+          timeout: 120000,
+        },
+      );
+
+      if (!result.success) {
+        console.error("[E2E] ForgeGraph scripts failed:");
+        console.error(result.stderr || result.stdout);
+      }
+
+      expect(result.success).toBe(true);
+      expect(result.stdout).toContain("fake-fg stage list");
+      expect(result.stdout).toContain("fake-fg deploy create staging --wait");
+      expect(result.stdout).toContain(
+        "fake-fg deploy create production --wait",
+      );
+    }, 180000);
   });
 
   describe("minimal configuration", () => {
@@ -220,6 +254,7 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
 
     it("should build the vinext lane", () => {
       console.log("[E2E] Running vinext build...");
+      createMockEnv(appPath);
 
       const result = runInApp(
         appPath,
@@ -239,6 +274,44 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
 
       expect(result.success).toBe(true);
     }, 900000);
+
+    it("should validate Cloudflare doctor signals for vinext", () => {
+      console.log("[E2E] Running doctor (vinext)...");
+      createMockEnv(appPath);
+
+      const doctorResult = runInApp(appPath, "pnpm doctor", {
+        timeout: 120000,
+      });
+
+      if (!doctorResult.success) {
+        console.error("[E2E] Doctor failed:");
+        console.error(doctorResult.stderr || doctorResult.stdout);
+      }
+
+      expect(doctorResult.success).toBe(true);
+      expect(doctorResult.stdout).toContain("Cloudflare Workers lane detected");
+      expect(doctorResult.stdout).toContain("Wrangler CLI available");
+      expect(doctorResult.stdout).toContain(
+        "Cloudflare Workers credentials present",
+      );
+      expect(doctorResult.stdout).not.toContain(
+        "CLOUDFLARE_ACCOUNT_ID/CLOUDFLARE_API_TOKEN are missing",
+      );
+    }, 180000);
+
+    it("should scaffold the expected Cloudflare runtime contract", () => {
+      const wranglerConfig = readFile(appPath, "apps/nextjs/wrangler.jsonc");
+      const cloudflareEnv = readFile(
+        appPath,
+        "apps/nextjs/src/cloudflare-env.ts",
+      );
+
+      expect(wranglerConfig).toContain('"main": "./worker/index.ts"');
+      expect(wranglerConfig).toContain('"APP_ENV": "production"');
+      expect(wranglerConfig).toContain('"staging"');
+      expect(cloudflareEnv).toContain("CLOUDFLARE_ACCOUNT_ID");
+      expect(cloudflareEnv).toContain("CLOUDFLARE_API_TOKEN");
+    });
   });
 
   describe("full configuration", () => {
