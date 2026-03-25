@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
-
 import { integrations } from "@gmacko/config";
 import { captureException } from "@gmacko/monitoring/web";
+import { useEffect } from "react";
 
 interface GlobalErrorProps {
   error: Error & { digest?: string };

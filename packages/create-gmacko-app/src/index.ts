@@ -1,10 +1,9 @@
 import { Command } from "commander";
 import pc from "picocolors";
 import validateNpmPackageName from "validate-npm-package-name";
-
-import type { CliOptions, IntegrationConfig } from "./types.js";
 import { getDefaultOptions, runPrompts } from "./prompts.js";
 import { scaffold } from "./scaffold.js";
+import type { CliOptions, IntegrationConfig } from "./types.js";
 import { DEFAULT_INTEGRATIONS } from "./types.js";
 
 const program = new Command();
@@ -80,7 +79,8 @@ program
         options.forgegraphStagingNode = opts.forgegraphStagingNode as string;
       }
       if (opts.forgegraphProductionNode) {
-        options.forgegraphProductionNode = opts.forgegraphProductionNode as string;
+        options.forgegraphProductionNode =
+          opts.forgegraphProductionNode as string;
       }
       if (opts.packageScope) options.packageScope = opts.packageScope as string;
       if (opts.integrations !== undefined) {
@@ -106,7 +106,8 @@ program
         options.forgegraphStagingNode = opts.forgegraphStagingNode as string;
       }
       if (opts.forgegraphProductionNode) {
-        options.forgegraphProductionNode = opts.forgegraphProductionNode as string;
+        options.forgegraphProductionNode =
+          opts.forgegraphProductionNode as string;
       }
     }
 

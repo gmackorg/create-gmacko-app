@@ -1,12 +1,11 @@
-import { useState } from "react";
-import { Modal, Pressable, Text, View } from "react-native";
-
 import type { Locale } from "@gmacko/i18n/native";
 import {
   supportedLocales,
   useLocaleNative,
   useTranslationsNative,
 } from "@gmacko/i18n/native";
+import { useState } from "react";
+import { Modal, Pressable, Text, View } from "react-native";
 
 import { setLocale } from "~/utils/i18n";
 

@@ -1,12 +1,3 @@
-import { Suspense } from "react";
-import { useForm } from "@tanstack/react-form";
-import {
-  useMutation,
-  useQueryClient,
-  useSuspenseQuery,
-} from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
-
 import type { RouterOutputs } from "@gmacko/api";
 import { CreatePostSchema } from "@gmacko/db/schema";
 import { cn } from "@gmacko/ui";
@@ -20,6 +11,14 @@ import {
 } from "@gmacko/ui/field";
 import { Input } from "@gmacko/ui/input";
 import { toast } from "@gmacko/ui/toast";
+import { useForm } from "@tanstack/react-form";
+import {
+  useMutation,
+  useQueryClient,
+  useSuspenseQuery,
+} from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
+import { Suspense } from "react";
 
 import { AuthShowcase } from "~/component/auth-showcase";
 import { useTRPC } from "~/lib/trpc";

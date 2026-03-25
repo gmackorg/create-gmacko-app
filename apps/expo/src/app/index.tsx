@@ -1,11 +1,10 @@
+import { useTranslationsNative } from "@gmacko/i18n/native";
+import { LegendList } from "@legendapp/list";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, Stack } from "expo-router";
 import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Link, Stack } from "expo-router";
-import { LegendList } from "@legendapp/list";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-
-import { useTranslationsNative } from "@gmacko/i18n/native";
 
 import type { RouterOutputs } from "~/utils/api";
 import { trpc } from "~/utils/api";
@@ -36,7 +35,9 @@ function PostCard(props: {
         </Link>
       </View>
       <Pressable onPress={props.onDelete}>
-        <Text className="text-primary font-bold uppercase">{t("common.delete")}</Text>
+        <Text className="text-primary font-bold uppercase">
+          {t("common.delete")}
+        </Text>
       </Pressable>
     </View>
   );

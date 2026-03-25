@@ -8,14 +8,13 @@
  * When creating v2, copy this pattern and modify routes as needed.
  */
 
+// For convenience, also export a combined v1 router configuration
+export {
+  type AppRouter as V1AppRouter,
+  appRouter as v1AppRouter,
+} from "../../root";
 // Re-export all existing routers as v1 routes
 export { adminRouter } from "../admin";
 export { authRouter } from "../auth";
 export { postRouter } from "../post";
 export { settingsRouter } from "../settings";
-
-// For convenience, also export a combined v1 router configuration
-export {
-  appRouter as v1AppRouter,
-  type AppRouter as V1AppRouter,
-} from "../../root";

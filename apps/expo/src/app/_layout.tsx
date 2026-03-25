@@ -1,7 +1,7 @@
-import { useColorScheme } from "react-native";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { useColorScheme } from "react-native";
 
 import { ErrorBoundary } from "~/components/error-boundary";
 import { queryClient } from "~/utils/api";

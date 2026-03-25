@@ -16,26 +16,23 @@
 
 "use client";
 
+import type { ReactNode } from "react";
 import {
   createContext,
   useCallback,
   useContext,
   useMemo,
-  useState
-  
+  useState,
 } from "react";
-import type {ReactNode} from "react";
-
-import type { FlagContext, FlagEvaluationResult } from "./types";
+import type { RuntimeFlagName } from "./flags";
 import {
   flags,
-  
+  getAllFlags as getAllFlagsFromStore,
   getFlag as getFlagFromStore,
   getFlagValue as getFlagValueFromStore,
   isEnabled as isEnabledFromStore,
-  getAllFlags as getAllFlagsFromStore
 } from "./flags";
-import type {RuntimeFlagName} from "./flags";
+import type { FlagContext, FlagEvaluationResult } from "./types";
 
 /**
  * Context value for the flags provider
@@ -64,7 +61,10 @@ interface FlagsProviderProps {
  * Provider component for feature flags
  * Provides context for flag evaluation throughout the component tree
  */
-export function FlagsProvider({ children, context: initialContext = {} }: FlagsProviderProps) {
+export function FlagsProvider({
+  children,
+  context: initialContext = {},
+}: FlagsProviderProps) {
   const [context, setContext] = useState<FlagContext>(initialContext);
 
   const mergeContext = useCallback((newContext: Partial<FlagContext>) => {
@@ -98,10 +98,14 @@ export function useFlagsContext(): FlagsContextValue {
     return {
       context: {},
       setContext: () => {
-        console.warn("FlagsProvider not found. Flag context will not be applied.");
+        console.warn(
+          "FlagsProvider not found. Flag context will not be applied.",
+        );
       },
       mergeContext: () => {
-        console.warn("FlagsProvider not found. Flag context will not be applied.");
+        console.warn(
+          "FlagsProvider not found. Flag context will not be applied.",
+        );
       },
     };
   }
@@ -193,10 +197,7 @@ export function useIsEnabled<K extends RuntimeFlagName>(flagName: K): boolean {
  */
 export function useAllFlags(): Record<RuntimeFlagName, boolean> {
   const { context } = useFlagsContext();
-  return useMemo(
-    () => getAllFlagsFromStore(context),
-    [context],
-  );
+  return useMemo(() => getAllFlagsFromStore(context), [context]);
 }
 
 /**

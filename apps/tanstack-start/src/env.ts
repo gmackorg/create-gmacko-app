@@ -1,7 +1,6 @@
+import { authEnv } from "@gmacko/auth/env";
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod/v4";
-
-import { authEnv } from "@gmacko/auth/env";
 
 export const env = createEnv({
   clientPrefix: "VITE_",

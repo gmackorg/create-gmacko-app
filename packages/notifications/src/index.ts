@@ -1,8 +1,7 @@
+import { integrations } from "@gmacko/config";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
-
-import { integrations } from "@gmacko/config";
 
 export interface NotificationConfig {
   projectId?: string;

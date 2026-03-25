@@ -1,13 +1,12 @@
-import { createHash, randomBytes } from "crypto";
-import type { TRPCRouterRecord } from "@trpc/server";
-import { z } from "zod/v4";
-
 import { and, eq, isNull } from "@gmacko/db";
 import {
   apiKeys,
   UpdateUserPreferencesSchema,
   userPreferences,
 } from "@gmacko/db/schema";
+import type { TRPCRouterRecord } from "@trpc/server";
+import { createHash, randomBytes } from "crypto";
+import { z } from "zod/v4";
 
 import { protectedProcedure } from "../trpc";
 

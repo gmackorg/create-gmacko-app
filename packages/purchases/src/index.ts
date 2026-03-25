@@ -1,11 +1,10 @@
+import { integrations } from "@gmacko/config";
 import type {
   CustomerInfo,
   PurchasesOfferings,
   PurchasesPackage,
 } from "react-native-purchases";
 import Purchases, { LOG_LEVEL } from "react-native-purchases";
-
-import { integrations } from "@gmacko/config";
 
 export interface RevenueCatConfig {
   apiKey: string;
@@ -129,5 +128,5 @@ export function hasActiveEntitlement(
   return customerInfo.entitlements.active[entitlementId] !== undefined;
 }
 
-export { Purchases };
 export type { CustomerInfo, PurchasesOfferings, PurchasesPackage };
+export { Purchases };

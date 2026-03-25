@@ -1,6 +1,5 @@
-import { getRequestConfig } from "next-intl/server";
-
 import { integrations } from "@gmacko/config";
+import { getRequestConfig } from "next-intl/server";
 
 import { routing } from "./routing";
 

@@ -1,3 +1,11 @@
+import {
+  supportedLocales,
+  useLocaleNative,
+  useTranslationsNative,
+} from "@gmacko/i18n/native";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import * as Clipboard from "expo-clipboard";
+import { Stack } from "expo-router";
 import { useState } from "react";
 import {
   Alert,
@@ -8,15 +16,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import * as Clipboard from "expo-clipboard";
-import { Stack } from "expo-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-
-import {
-  supportedLocales,
-  useLocaleNative,
-  useTranslationsNative,
-} from "@gmacko/i18n/native";
 
 import { trpc } from "~/utils/api";
 import { setLocale } from "~/utils/i18n";

@@ -1,13 +1,12 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { integrations } from "@gmacko/config";
 import {
   NextIntlClientProvider,
   useLocale as useNextIntlLocale,
   useTranslations as useNextIntlTranslations,
 } from "next-intl";
-
-import { integrations } from "@gmacko/config";
+import type { ReactNode } from "react";
 
 export type Messages = Record<string, Record<string, string>>;
 export type Locale = string;

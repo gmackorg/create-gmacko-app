@@ -1,3 +1,4 @@
+import * as Api from "@gmacko/api";
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import {
@@ -8,8 +9,6 @@ import {
 } from "@trpc/client";
 import { createTRPCContext } from "@trpc/tanstack-react-query";
 import SuperJSON from "superjson";
-
-import * as Api from "@gmacko/api";
 
 import { auth } from "~/auth/server";
 import { env } from "~/env";

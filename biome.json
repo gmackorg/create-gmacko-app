@@ -9,6 +9,8 @@
     "ignoreUnknown": true,
     "includes": [
       "**",
+      "!**/.claude",
+      "!**/.claude/**",
       "!**/.git",
       "!**/.jj",
       "!**/.next",
@@ -21,6 +23,11 @@
   "formatter": {
     "enabled": true,
     "indentStyle": "space"
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
   },
   "linter": {
     "enabled": false

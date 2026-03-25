@@ -1,6 +1,5 @@
-import { defineRouting } from "next-intl/routing";
-
 import { integrations } from "@gmacko/config";
+import { defineRouting } from "next-intl/routing";
 
 export const defaultLocale = "en";
 export const locales = ["en", "es"] as const;

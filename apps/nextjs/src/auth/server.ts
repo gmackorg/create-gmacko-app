@@ -1,10 +1,9 @@
 import "server-only";
 
-import { cache } from "react";
-import { headers } from "next/headers";
-import { nextCookies } from "better-auth/next-js";
-
 import { initAuth } from "@gmacko/auth";
+import { nextCookies } from "better-auth/next-js";
+import { headers } from "next/headers";
+import { cache } from "react";
 
 import { env } from "~/env";
 

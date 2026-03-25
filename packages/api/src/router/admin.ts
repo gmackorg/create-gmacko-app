@@ -1,9 +1,8 @@
+import { eq } from "@gmacko/db";
+import { user, userRoleEnum } from "@gmacko/db/schema";
 import type { TRPCRouterRecord } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod/v4";
-
-import { eq } from "@gmacko/db";
-import { user, userRoleEnum } from "@gmacko/db/schema";
 
 import { protectedProcedure } from "../trpc";
 

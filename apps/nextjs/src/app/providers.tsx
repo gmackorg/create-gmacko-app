@@ -1,9 +1,8 @@
 "use client";
 
-import type { ReactNode } from "react";
-
 import { PostHogProvider } from "@gmacko/analytics/web";
 import { integrations } from "@gmacko/config";
+import type { ReactNode } from "react";
 
 import { env } from "~/env";
 

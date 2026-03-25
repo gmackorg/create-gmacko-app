@@ -1,9 +1,8 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { usePathname, useRouter } from "next/navigation";
-
 import { integrations } from "@gmacko/config";
+import { usePathname, useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 
 import { defaultLocale, supportedLocales, useLocale } from "./index";
 

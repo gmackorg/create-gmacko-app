@@ -1,10 +1,9 @@
-import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { integrations } from "@gmacko/config";
 import { getLocales } from "expo-localization";
 import i18next from "i18next";
+import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { I18nextProvider, useTranslation } from "react-i18next";
-
-import { integrations } from "@gmacko/config";
 
 export type Messages = Record<string, Record<string, string>>;
 export type Locale = string;

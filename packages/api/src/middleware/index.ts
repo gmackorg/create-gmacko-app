@@ -1,3 +1,4 @@
+export type { DeprecationMeta, VersionRequirement } from "./deprecation";
 export {
   deprecated,
   deprecationRegistry,
@@ -5,8 +6,7 @@ export {
   getDeprecationHeaders,
   isEndpointAvailableInVersion,
 } from "./deprecation";
-export type { DeprecationMeta, VersionRequirement } from "./deprecation";
-
+export type { VersionedContext } from "./versioning";
 export {
   assertMaxVersion,
   assertMinVersion,
@@ -14,4 +14,3 @@ export {
   getVersionResponseHeaders,
   validateVersionHeader,
 } from "./versioning";
-export type { VersionedContext } from "./versioning";

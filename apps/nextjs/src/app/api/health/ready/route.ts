@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
-
 import { db } from "@gmacko/db/client";
+import { NextResponse } from "next/server";
 
 /**
  * Readiness probe endpoint for Kubernetes

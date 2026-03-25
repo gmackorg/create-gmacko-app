@@ -1,8 +1,7 @@
+import { integrations } from "@gmacko/config";
 import type { FileRouter } from "uploadthing/next";
 import { createUploadthing } from "uploadthing/next";
 import { UploadThingError } from "uploadthing/server";
-
-import { integrations } from "@gmacko/config";
 
 /**
  * Create an UploadThing file router
@@ -38,5 +37,5 @@ export function createGuardedRouter<T extends FileRouter>(
   return routerFn();
 }
 
-export { createUploadthing, UploadThingError };
 export type { FileRouter };
+export { createUploadthing, UploadThingError };

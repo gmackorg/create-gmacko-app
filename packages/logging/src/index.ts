@@ -1,6 +1,5 @@
-import pino from "pino";
-
 import { integrations } from "@gmacko/config";
+import pino from "pino";
 
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
 
@@ -557,9 +556,7 @@ export function createRequestLoggingHandler(
       context: LogContext = {},
     ) => {
       // Skip ignored paths
-      const shouldIgnore = ignorePaths.some(
-        (p) => request.path.startsWith(p),
-      );
+      const shouldIgnore = ignorePaths.some((p) => request.path.startsWith(p));
       if (shouldIgnore) {
         return null;
       }
@@ -606,9 +603,7 @@ export function createRequestLoggingHandler(
       context: LogContext = {},
     ) => {
       // Skip ignored paths
-      const shouldIgnore = ignorePaths.some(
-        (p) => request.path.startsWith(p),
-      );
+      const shouldIgnore = ignorePaths.some((p) => request.path.startsWith(p));
       if (shouldIgnore) {
         return;
       }

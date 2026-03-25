@@ -206,13 +206,7 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
 
       const result = await runCli({
         appName,
-        flags: [
-          "--yes",
-          "--no-git",
-          "--no-mobile",
-          "--no-ai",
-          "--vinext",
-        ],
+        flags: ["--yes", "--no-git", "--no-mobile", "--no-ai", "--vinext"],
         cwd: tempDir,
         timeout: 600000,
       });
@@ -227,12 +221,16 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
     it("should build the vinext lane", () => {
       console.log("[E2E] Running vinext build...");
 
-      const result = runInApp(appPath, "pnpm --filter @gmacko/nextjs build:vinext", {
-        env: {
-          CI: "true",
+      const result = runInApp(
+        appPath,
+        "pnpm --filter @gmacko/nextjs build:vinext",
+        {
+          env: {
+            CI: "true",
+          },
+          timeout: 600000,
         },
-        timeout: 600000,
-      });
+      );
 
       if (!result.success) {
         console.error("[E2E] Vinext build failed:");
@@ -432,9 +430,13 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
       console.log("[E2E] Running typecheck (vinext)...");
       createMockEnv(appPath);
 
-      const result = runInApp(appPath, "pnpm --filter @gmacko/nextjs typecheck", {
-        timeout: 300000,
-      });
+      const result = runInApp(
+        appPath,
+        "pnpm --filter @gmacko/nextjs typecheck",
+        {
+          timeout: 300000,
+        },
+      );
 
       if (!result.success) {
         console.error("[E2E] Typecheck failed:");

@@ -1,6 +1,5 @@
-import { Resend } from "resend";
-
 import { integrations } from "@gmacko/config";
+import { Resend } from "resend";
 
 let resendClient: Resend | null = null;
 

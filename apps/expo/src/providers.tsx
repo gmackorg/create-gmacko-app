@@ -1,12 +1,11 @@
-import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
-
 import { PostHogNativeProvider } from "@gmacko/analytics/native";
 import { integrations } from "@gmacko/config";
 import en from "@gmacko/i18n/messages/en.json";
 import es from "@gmacko/i18n/messages/es.json";
 import { I18nNativeProvider } from "@gmacko/i18n/native";
 import { initSentryNative } from "@gmacko/monitoring/native";
+import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 
 import { env } from "./config/env";
 import { getStoredLocale } from "./utils/i18n";

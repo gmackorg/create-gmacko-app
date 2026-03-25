@@ -1,6 +1,5 @@
-import Stripe from "stripe";
-
 import { integrations } from "@gmacko/config";
+import Stripe from "stripe";
 
 let stripeClient: Stripe | null = null;
 

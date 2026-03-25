@@ -116,7 +116,6 @@ export function createClient(options: CreateClientOptions): TRPCClient {
     linkOptions.fetch = customFetch;
   }
 
-   
   const link: TRPCLink<AppRouter> = batch
     ? httpBatchLink(linkOptions)
     : httpLink(linkOptions);

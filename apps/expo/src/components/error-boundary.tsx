@@ -1,10 +1,9 @@
+import { integrations } from "@gmacko/config";
+import { captureExceptionNative } from "@gmacko/monitoring/native";
 import type { ErrorInfo, ReactNode } from "react";
 import { Component } from "react";
 import { Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-import { integrations } from "@gmacko/config";
-import { captureExceptionNative } from "@gmacko/monitoring/native";
 
 interface ErrorBoundaryProps {
   children: ReactNode;

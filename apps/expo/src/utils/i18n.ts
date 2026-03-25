@@ -1,5 +1,3 @@
-import * as SecureStore from "expo-secure-store";
-
 import type { Locale, Messages } from "@gmacko/i18n/native";
 import {
   changeLocaleNative,
@@ -7,6 +5,7 @@ import {
   getDeviceLocale,
   initI18nNative,
 } from "@gmacko/i18n/native";
+import * as SecureStore from "expo-secure-store";
 
 const LOCALE_KEY = "user_locale";
 
@@ -39,5 +38,5 @@ export async function initializeI18n(
   return storedLocale;
 }
 
-export { defaultLocale, getDeviceLocale };
 export type { Locale, Messages };
+export { defaultLocale, getDeviceLocale };

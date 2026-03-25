@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
-
 import { integrations } from "@gmacko/config";
 import { captureException } from "@gmacko/monitoring/web";
 import { Button } from "@gmacko/ui/button";
+import { useEffect } from "react";
 
 interface ErrorPageProps {
   error: Error & { digest?: string };

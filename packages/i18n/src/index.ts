@@ -1,24 +1,23 @@
-export type { Messages, Locale } from "./web";
-export { defaultLocale, supportedLocales } from "./web";
-
 export {
-  isI18nEnabled,
-  I18nProvider,
-  useTranslations,
-  useLocale,
+  changeLocaleNative,
+  getDeviceLocale,
+  I18nNativeProvider,
+  i18next,
+  initI18nNative,
+  isI18nNativeEnabled,
+  useLocaleNative,
+  useTranslationsNative,
+} from "./native";
+export type { Locale, Messages } from "./web";
+export {
+  defaultLocale,
   getLocaleFromPath,
   getPathWithLocale,
-  loadMessages,
+  I18nProvider,
+  isI18nEnabled,
   LocaleSwitcher,
+  loadMessages,
+  supportedLocales,
+  useLocale,
+  useTranslations,
 } from "./web";
-
-export {
-  isI18nNativeEnabled,
-  getDeviceLocale,
-  initI18nNative,
-  I18nNativeProvider,
-  useTranslationsNative,
-  useLocaleNative,
-  changeLocaleNative,
-  i18next,
-} from "./native";

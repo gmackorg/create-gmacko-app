@@ -1,8 +1,7 @@
+import { integrations } from "@gmacko/config";
 import { withSentryConfig } from "@sentry/nextjs";
 import { createJiti } from "jiti";
 import createNextIntlPlugin from "next-intl/plugin";
-
-import { integrations } from "@gmacko/config";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 

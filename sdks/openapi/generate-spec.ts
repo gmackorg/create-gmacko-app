@@ -1,4 +1,11 @@
 #!/usr/bin/env tsx
+
+import type { OpenApiConfig } from "@gmacko/api/openapi";
+import {
+  generateAllVersionedSpecs,
+  generateApiDocument,
+  getAvailableApiVersions,
+} from "@gmacko/api/openapi";
 /**
  * OpenAPI spec generation script
  *
@@ -11,13 +18,6 @@
  */
 import { writeFileSync } from "fs";
 import { resolve } from "path";
-
-import type { OpenApiConfig } from "@gmacko/api/openapi";
-import {
-  generateAllVersionedSpecs,
-  generateApiDocument,
-  getAvailableApiVersions,
-} from "@gmacko/api/openapi";
 
 import type { ApiVersion } from "../../packages/api/src/versioning";
 

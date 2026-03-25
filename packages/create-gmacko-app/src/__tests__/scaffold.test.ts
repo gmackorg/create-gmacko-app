@@ -4,8 +4,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
   cleanupApp,
-  ensureTempDir,
   EXPECTED_FILES,
+  ensureTempDir,
   fileExists,
   generateAppName,
   readFile,
@@ -268,8 +268,12 @@ describe("create-gmacko-app scaffold", () => {
       appsToClean.push(result.appPath);
 
       expect(result.exitCode).toBe(0);
-      expect(fileExists(result.appPath, "apps/nextjs/vite.config.ts")).toBe(true);
-      expect(fileExists(result.appPath, "apps/nextjs/wrangler.jsonc")).toBe(true);
+      expect(fileExists(result.appPath, "apps/nextjs/vite.config.ts")).toBe(
+        true,
+      );
+      expect(fileExists(result.appPath, "apps/nextjs/wrangler.jsonc")).toBe(
+        true,
+      );
       expect(fileExists(result.appPath, "apps/nextjs/worker/index.ts")).toBe(
         true,
       );
@@ -301,8 +305,12 @@ describe("create-gmacko-app scaffold", () => {
       expect(nextPkg.scripts?.["prebuild:vinext"]).toBe(
         "pnpm --dir ../.. --filter @gmacko/nextjs^... build",
       );
-      expect(nextPkg.scripts?.["build:vinext"]).toContain("pnpm prebuild:vinext");
-      expect(nextPkg.scripts?.["build:vinext"]).toContain("pnpm with-env vinext build");
+      expect(nextPkg.scripts?.["build:vinext"]).toContain(
+        "pnpm prebuild:vinext",
+      );
+      expect(nextPkg.scripts?.["build:vinext"]).toContain(
+        "pnpm with-env vinext build",
+      );
       expect(nextPkg.scripts?.["deploy:cloudflare:staging"]).toContain(
         "pnpm with-env wrangler deploy --env staging",
       );
@@ -319,7 +327,7 @@ describe("create-gmacko-app scaffold", () => {
       expect(nextPkg.devDependencies?.vite).toBeDefined();
       expect(nextPkg.devDependencies?.wrangler).toBeDefined();
       expect(nextPkg.devDependencies?.["@vitejs/plugin-rsc"]).toBeDefined();
-      expect(viteConfig).toContain('@cloudflare/vite-plugin');
+      expect(viteConfig).toContain("@cloudflare/vite-plugin");
       expect(viteConfig).toContain("cloudflare({");
       expect(wranglerConfig).toContain(`"name": "${appName}"`);
       expect(wranglerConfig).toContain('"compatibility_date"');
@@ -338,7 +346,9 @@ describe("create-gmacko-app scaffold", () => {
       expect(cloudflareEnv).toContain("CLOUDFLARE_API_TOKEN");
       expect(envExample).toContain("CLOUDFLARE_ACCOUNT_ID");
       expect(envExample).toContain("CLOUDFLARE_API_TOKEN");
-      expect(cloudflareReadme).toContain("pnpm --filter @gmacko/nextjs build:vinext");
+      expect(cloudflareReadme).toContain(
+        "pnpm --filter @gmacko/nextjs build:vinext",
+      );
       expect(cloudflareReadme).toContain(
         "pnpm --filter @gmacko/nextjs deploy:cloudflare:staging",
       );
@@ -523,7 +533,9 @@ describe("create-gmacko-app scaffold", () => {
         "../ForgeGraph",
       );
       expect(openCodeConfig.instructions).toContain("AGENTS.md");
-      expect(openCodeConfig.instructions).toContain("docs/ai/DEVELOPER_EXPERIENCE.md");
+      expect(openCodeConfig.instructions).toContain(
+        "docs/ai/DEVELOPER_EXPERIENCE.md",
+      );
       expect(mcpConfig.mcpServers?.["next-devtools"]?.command).toBe("npx");
       expect(mcpConfig.mcpServers?.["next-devtools"]?.args).toContain(
         "next-devtools-mcp@latest",
@@ -564,10 +576,7 @@ describe("create-gmacko-app scaffold", () => {
         "../../../../docs/plans/2026-01-14-e2e-implementation.md",
         "../../../../docs/plans/2026-01-14-e2e-testing-plan.md",
       ].map((relativePath) =>
-        fs.readFileSync(
-          new URL(relativePath, import.meta.url),
-          "utf8",
-        ),
+        fs.readFileSync(new URL(relativePath, import.meta.url), "utf8"),
       );
 
       for (const doc of activeDocs) {
@@ -579,7 +588,10 @@ describe("create-gmacko-app scaffold", () => {
     it("should provide substantive current-era implementation plans", () => {
       const activePlans = [
         fs.readFileSync(
-          new URL("../../../../docs/ai/IMPLEMENTATION_PLAN.md", import.meta.url),
+          new URL(
+            "../../../../docs/ai/IMPLEMENTATION_PLAN.md",
+            import.meta.url,
+          ),
           "utf8",
         ),
         fs.readFileSync(
@@ -636,7 +648,9 @@ describe("create-gmacko-app scaffold", () => {
       expect(pkg.devDependencies?.oxlint).toBeDefined();
       expect(pkg.devDependencies?.lefthook).toBeDefined();
       expect(pkg.devDependencies?.["@commitlint/cli"]).toBeDefined();
-      expect(pkg.devDependencies?.["@commitlint/config-conventional"]).toBeDefined();
+      expect(
+        pkg.devDependencies?.["@commitlint/config-conventional"],
+      ).toBeDefined();
       expect(pkg.devDependencies?.knip).toBeDefined();
       expect(pkg.scripts?.["lint:ox"]).toBeDefined();
       expect(pkg.scripts?.["format:check"]).toBeDefined();
@@ -660,10 +674,17 @@ describe("create-gmacko-app scaffold", () => {
       expect(setupScript).toContain('REQUIRED_NODE_VERSION="24"');
       expect(setupScript).toContain("pnpm doctor");
       expect(setupScript).toContain("pnpm check:fast");
-      expect(doctorScript).toContain("Checking local development prerequisites");
+      expect(doctorScript).toContain(
+        "Checking local development prerequisites",
+      );
       expect(doctorScript).toContain("ForgeGraph CLI");
-      expect(fs.statSync(path.join(result.appPath, "scripts/setup.sh")).mode & 0o111).toBeTruthy();
-      expect(fs.statSync(path.join(result.appPath, "scripts/doctor.sh")).mode & 0o111).toBeTruthy();
+      expect(
+        fs.statSync(path.join(result.appPath, "scripts/setup.sh")).mode & 0o111,
+      ).toBeTruthy();
+      expect(
+        fs.statSync(path.join(result.appPath, "scripts/doctor.sh")).mode &
+          0o111,
+      ).toBeTruthy();
     }, 120000);
 
     it("should initialize a jj repo by default", async () => {
@@ -694,8 +715,12 @@ describe("create-gmacko-app scaffold", () => {
       expect(result.exitCode).toBe(0);
       expect(fileExists(result.appPath, "tooling/eslint")).toBe(false);
       expect(fileExists(result.appPath, "tooling/prettier")).toBe(false);
-      expect(fileExists(result.appPath, "apps/nextjs/eslint.config.ts")).toBe(false);
-      expect(fileExists(result.appPath, "packages/db/eslint.config.ts")).toBe(false);
+      expect(fileExists(result.appPath, "apps/nextjs/eslint.config.ts")).toBe(
+        false,
+      );
+      expect(fileExists(result.appPath, "packages/db/eslint.config.ts")).toBe(
+        false,
+      );
 
       const rootPkg = readJson<{
         scripts?: Record<string, string>;
@@ -726,11 +751,17 @@ describe("create-gmacko-app scaffold", () => {
       "utf8",
     );
 
-    expect(releaseWorkflow).toContain("pnpm --dir packages/create-gmacko-app test");
-    expect(releaseWorkflow).toContain("pnpm --dir packages/create-gmacko-app build");
+    expect(releaseWorkflow).toContain(
+      "pnpm --dir packages/create-gmacko-app test",
+    );
+    expect(releaseWorkflow).toContain(
+      "pnpm --dir packages/create-gmacko-app build",
+    );
     expect(releaseWorkflow).toContain("pnpm release:cli:dry-run");
     expect(releaseWorkflow).not.toContain("pnpm check:release");
-    expect(releaseWorkflow).not.toContain("pnpm --filter create-gmacko-app test");
+    expect(releaseWorkflow).not.toContain(
+      "pnpm --filter create-gmacko-app test",
+    );
   });
 
   it("keeps the CLI E2E workflow aligned with the current template baseline", () => {
@@ -744,7 +775,40 @@ describe("create-gmacko-app scaffold", () => {
     expect(e2eWorkflow).not.toContain("2>&1 || true");
     expect(e2eWorkflow).toContain("pnpm doctor");
     expect(e2eWorkflow).toContain("pnpm check:fast");
-    expect(e2eWorkflow).toContain("pnpm --dir packages/create-gmacko-app build");
+    expect(e2eWorkflow).toContain(
+      "pnpm --dir packages/create-gmacko-app build",
+    );
+  });
+
+  it("keeps repo formatting focused on first-party files", () => {
+    const biomeConfig = JSON.parse(
+      fs.readFileSync(path.resolve(process.cwd(), "../../biome.json"), "utf8"),
+    ) as {
+      files?: {
+        includes?: string[];
+      };
+      css?: {
+        parser?: {
+          tailwindDirectives?: boolean;
+        };
+      };
+    };
+    const compiledTsconfig = fs.readFileSync(
+      path.resolve(
+        process.cwd(),
+        "../../tooling/typescript/compiled-package.json",
+      ),
+      "utf8",
+    );
+    const baseTsconfig = fs.readFileSync(
+      path.resolve(process.cwd(), "../../tooling/typescript/base.json"),
+      "utf8",
+    );
+
+    expect(biomeConfig.files?.includes).toContain("!**/.claude");
+    expect(biomeConfig.css?.parser?.tailwindDirectives).toBe(true);
+    expect(() => JSON.parse(compiledTsconfig)).not.toThrow();
+    expect(() => JSON.parse(baseTsconfig)).not.toThrow();
   });
 
   describe("platform options", () => {
@@ -869,18 +933,24 @@ describe("create-gmacko-app scaffold", () => {
       expect(fileExists(result.appPath, "packages/monitoring")).toBe(false);
       expect(fileExists(result.appPath, "packages/analytics")).toBe(false);
       expect(fileExists(result.appPath, "packages/payments")).toBe(false);
-      expect(fileExists(result.appPath, "apps/nextjs/sentry.client.config.ts")).toBe(
-        false,
-      );
-      expect(fileExists(result.appPath, "apps/nextjs/sentry.edge.config.ts")).toBe(
-        false,
-      );
-      expect(fileExists(result.appPath, "apps/nextjs/sentry.server.config.ts")).toBe(
-        false,
-      );
+      expect(
+        fileExists(result.appPath, "apps/nextjs/sentry.client.config.ts"),
+      ).toBe(false);
+      expect(
+        fileExists(result.appPath, "apps/nextjs/sentry.edge.config.ts"),
+      ).toBe(false);
+      expect(
+        fileExists(result.appPath, "apps/nextjs/sentry.server.config.ts"),
+      ).toBe(false);
 
-      const nextProviders = readFile(result.appPath, "apps/nextjs/src/app/providers.tsx");
-      const nextErrorPage = readFile(result.appPath, "apps/nextjs/src/app/error.tsx");
+      const nextProviders = readFile(
+        result.appPath,
+        "apps/nextjs/src/app/providers.tsx",
+      );
+      const nextErrorPage = readFile(
+        result.appPath,
+        "apps/nextjs/src/app/error.tsx",
+      );
       const nextGlobalError = readFile(
         result.appPath,
         "apps/nextjs/src/app/global-error.tsx",

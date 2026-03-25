@@ -1,6 +1,5 @@
-import * as Sentry from "@sentry/nextjs";
-
 import { integrations } from "@gmacko/config";
+import * as Sentry from "@sentry/nextjs";
 
 export interface SentryWebConfig {
   dsn: string;

@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
-
 import { Button } from "@gmacko/ui/button";
+import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 
 import { useTRPC } from "~/trpc/react";
 

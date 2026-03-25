@@ -3,9 +3,8 @@ import path from "node:path";
 import * as p from "@clack/prompts";
 import fs from "fs-extra";
 import pc from "picocolors";
-
-import type { CliOptions, IntegrationConfig } from "./types.js";
 import { runProvisioning } from "./provision.js";
+import type { CliOptions, IntegrationConfig } from "./types.js";
 
 const TEMPLATE_REPO =
   process.env.CREATE_GMACKO_APP_TEMPLATE_REPO ??
@@ -292,7 +291,8 @@ function configureVinext(targetDir: string): void {
 
   nextPkg.scripts["prebuild:vinext"] =
     "pnpm --dir ../.. --filter @gmacko/nextjs^... build";
-  nextPkg.scripts["dev:vinext"] = "pnpm prebuild:vinext && pnpm with-env vinext dev";
+  nextPkg.scripts["dev:vinext"] =
+    "pnpm prebuild:vinext && pnpm with-env vinext dev";
   nextPkg.scripts["build:vinext"] =
     "pnpm prebuild:vinext && pnpm with-env vinext build";
   nextPkg.scripts["start:vinext"] = "pnpm with-env vinext start";
@@ -609,7 +609,10 @@ function pruneNextSentryFiles(targetDir: string): void {
 }
 
 function pruneNextAnalyticsFiles(targetDir: string): void {
-  const providersPath = path.join(targetDir, "apps/nextjs/src/app/providers.tsx");
+  const providersPath = path.join(
+    targetDir,
+    "apps/nextjs/src/app/providers.tsx",
+  );
   if (!fs.existsSync(providersPath)) return;
 
   fs.writeFileSync(

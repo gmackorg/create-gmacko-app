@@ -1,9 +1,9 @@
-export { routing, locales, defaultLocale } from "./routing";
-export type { Locale } from "./routing";
 export {
+  getPathname,
   Link,
   redirect,
   usePathname,
   useRouter,
-  getPathname,
 } from "./navigation";
+export type { Locale } from "./routing";
+export { defaultLocale, locales, routing } from "./routing";

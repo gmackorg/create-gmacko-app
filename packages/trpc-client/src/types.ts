@@ -6,12 +6,11 @@
  * import these types directly from there for the full type definitions.
  */
 
-import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
-
 // Import the AppRouter type from @gmacko/api
 // This is a devDependency, so it will be available during build
 // Users who want full type inference should install @gmacko/api as a peer dep
 import type { AppRouter } from "@gmacko/api";
+import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 
 /**
  * Inference helpers for input types

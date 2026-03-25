@@ -14,7 +14,6 @@
  *     });
  */
 import type { RuntimeFlagName } from "./flags";
-import type { FlagContext, FlagEvaluationResult } from "./types";
 import {
   clearOverride,
   flags,
@@ -25,6 +24,7 @@ import {
   setEnvironment,
   setOverride,
 } from "./flags";
+import type { FlagContext, FlagEvaluationResult } from "./types";
 
 /**
  * Create a flag context from a user object
@@ -190,13 +190,13 @@ export class FlagAdmin {
 
 // Re-export core functions for direct server-side use
 export {
+  clearOverride,
   flags,
+  getAllFlags,
   getFlag,
   getFlagValue,
   isEnabled,
-  getAllFlags,
-  setOverride,
-  clearOverride,
-  setEnvironment,
   type RuntimeFlagName,
+  setEnvironment,
+  setOverride,
 };

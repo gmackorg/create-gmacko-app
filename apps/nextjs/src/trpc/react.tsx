@@ -1,7 +1,7 @@
 "use client";
 
+import type { AppRouter } from "@gmacko/api";
 import type { QueryClient } from "@tanstack/react-query";
-import { useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import {
   createTRPCClient,
@@ -9,9 +9,8 @@ import {
   loggerLink,
 } from "@trpc/client";
 import { createTRPCContext } from "@trpc/tanstack-react-query";
+import { useState } from "react";
 import SuperJSON from "superjson";
-
-import type { AppRouter } from "@gmacko/api";
 
 import { env } from "~/env";
 import { createQueryClient } from "./query-client";

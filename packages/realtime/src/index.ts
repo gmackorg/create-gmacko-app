@@ -1,7 +1,6 @@
+import { integrations } from "@gmacko/config";
 import Pusher from "pusher";
 import PusherClient from "pusher-js";
-
-import { integrations } from "@gmacko/config";
 
 let pusherServer: Pusher | null = null;
 let pusherClient: PusherClient | null = null;

@@ -15,8 +15,8 @@
  *   const enabled = isEnabled("betaFeature", { userId: "user-123" });
  */
 
-import type { FlagDefinition } from "./types";
 import { createFlagStore } from "./store";
+import type { FlagDefinition } from "./types";
 
 /**
  * Define your feature flags here

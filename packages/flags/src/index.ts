@@ -30,6 +30,24 @@
  * ```
  */
 
+// Export default flags and convenience functions
+export {
+  clearAllOverrides,
+  clearOverride,
+  flagDefinitions,
+  flags,
+  getAllFlags,
+  getEnvironment,
+  getFlag,
+  getFlagValue,
+  isEnabled,
+  type RuntimeFlagName,
+  setEnvironment,
+  setOverride,
+} from "./flags";
+
+// Export store factory
+export { createFlagStore, type FlagStore } from "./store";
 // Export types
 export type {
   FlagContext,
@@ -41,22 +59,3 @@ export type {
   FlagValue,
   RolloutConfig,
 } from "./types";
-
-// Export store factory
-export { createFlagStore, type FlagStore } from "./store";
-
-// Export default flags and convenience functions
-export {
-  flagDefinitions,
-  flags,
-  getFlag,
-  getFlagValue,
-  getAllFlags,
-  isEnabled,
-  setOverride,
-  clearOverride,
-  clearAllOverrides,
-  setEnvironment,
-  getEnvironment,
-  type RuntimeFlagName,
-} from "./flags";

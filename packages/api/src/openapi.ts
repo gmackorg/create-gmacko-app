@@ -1,6 +1,5 @@
-import type { OpenAPIV3 } from "openapi-types";
-
 import { integrations } from "@gmacko/config";
+import type { OpenAPIV3 } from "openapi-types";
 
 import type { ApiVersion } from "./versioning";
 import {

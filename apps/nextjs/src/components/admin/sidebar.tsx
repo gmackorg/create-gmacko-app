@@ -1,11 +1,10 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-
 import { cn } from "@gmacko/ui";
 import { Button } from "@gmacko/ui/button";
 import { Separator } from "@gmacko/ui/separator";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const navItems = [
   {

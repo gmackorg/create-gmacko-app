@@ -1,9 +1,9 @@
+import * as p from "@clack/prompts";
 import { exec, execSync } from "child_process";
 import { existsSync } from "fs";
 import path from "path";
-import { promisify } from "util";
-import * as p from "@clack/prompts";
 import pc from "picocolors";
+import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
@@ -193,10 +193,14 @@ export async function provisionForgeGraph(
   );
   if (hasLocalReference) {
     p.log.message(
-      pc.cyan(`4. Use the local ForgeGraph repo at ${forgeGraphPath} and deploy with fg.`),
+      pc.cyan(
+        `4. Use the local ForgeGraph repo at ${forgeGraphPath} and deploy with fg.`,
+      ),
     );
     p.log.message(
-      pc.cyan(`   Example flow: fg login --server <forgegraph-url> --token <token>`),
+      pc.cyan(
+        `   Example flow: fg login --server <forgegraph-url> --token <token>`,
+      ),
     );
     p.log.message(
       pc.cyan(`   Then: fg deploy ${config.appName} --stage production`),
@@ -276,7 +280,9 @@ export async function provisionPostgres(
       stdio: "ignore",
     });
   } catch {
-    p.log.warn("Docker Compose is required to start the local Postgres service");
+    p.log.warn(
+      "Docker Compose is required to start the local Postgres service",
+    );
     return false;
   }
 
@@ -306,7 +312,9 @@ export async function provisionPostgres(
   spinner.stop("Postgres started!");
   p.log.info("Use this connection string in your .env file:");
   p.log.message(
-    pc.cyan(`DATABASE_URL="postgresql://postgres:postgres@localhost:5432/gmacko_dev"`),
+    pc.cyan(
+      `DATABASE_URL="postgresql://postgres:postgres@localhost:5432/gmacko_dev"`,
+    ),
   );
 
   return true;

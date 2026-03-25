@@ -1,11 +1,10 @@
-import { createHash } from "crypto";
-import { initTRPC, TRPCError } from "@trpc/server";
-import superjson from "superjson";
-import { z, ZodError } from "zod/v4";
-
 import { and, eq, isNull } from "@gmacko/db";
 import { db } from "@gmacko/db/client";
 import { apiKeys, user } from "@gmacko/db/schema";
+import { initTRPC, TRPCError } from "@trpc/server";
+import { createHash } from "crypto";
+import superjson from "superjson";
+import { ZodError, z } from "zod/v4";
 
 export type ApiKeyPermission = "read" | "write" | "delete" | "admin";
 
@@ -36,12 +35,10 @@ export interface SessionRecord {
   userAgent?: string | null;
 }
 
-export type AuthSession =
-  | {
-      user: AuthUser;
-      session: SessionRecord | null;
-    }
-  | null;
+export type AuthSession = {
+  user: AuthUser;
+  session: SessionRecord | null;
+} | null;
 
 export interface AuthApi {
   getSession(input: { headers: Headers }): Promise<AuthSession>;

@@ -1,9 +1,8 @@
-import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { integrations } from "@gmacko/config";
 import Constants from "expo-constants";
 import { PostHogProvider as PHProvider, PostHog } from "posthog-react-native";
-
-import { integrations } from "@gmacko/config";
+import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 
 export interface PostHogNativeConfig {
   apiKey: string;

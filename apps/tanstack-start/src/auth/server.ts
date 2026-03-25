@@ -1,6 +1,5 @@
-import { tanstackStartCookies } from "better-auth/tanstack-start";
-
 import { initAuth } from "@gmacko/auth";
+import { tanstackStartCookies } from "better-auth/tanstack-start";
 
 import { env } from "~/env";
 import { getBaseUrl } from "~/lib/url";

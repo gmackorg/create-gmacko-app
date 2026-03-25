@@ -1,12 +1,11 @@
 "use client";
 
-import type { ErrorInfo, ReactNode } from "react";
-import { Component } from "react";
-
 import { integrations } from "@gmacko/config";
 import { captureException } from "@gmacko/monitoring/web";
 import { cn } from "@gmacko/ui";
 import { Button } from "@gmacko/ui/button";
+import type { ErrorInfo, ReactNode } from "react";
+import { Component } from "react";
 
 interface ErrorBoundaryProps {
   children: ReactNode;

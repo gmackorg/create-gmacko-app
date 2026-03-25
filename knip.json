@@ -1,6 +1,4 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignore": [
-    "apps/tanstack-start/src/routeTree.gen.ts"
-  ]
+  "ignore": ["apps/tanstack-start/src/routeTree.gen.ts"]
 }

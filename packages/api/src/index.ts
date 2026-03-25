@@ -7,8 +7,6 @@ type RouterOutputs = inferRouterOutputs<AppRouter>;
 
 export { type AppRouter, appRouter } from "./root";
 export { createTRPCContext } from "./trpc";
-export type { RouterInputs, RouterOutputs };
-
 export type {
   ApiVersion,
   VersionContext,
@@ -17,10 +15,11 @@ export type {
 export {
   API_VERSIONS,
   CURRENT_API_VERSION,
-  DEFAULT_API_VERSION,
   createVersionContext,
+  DEFAULT_API_VERSION,
   extractVersionFromHeaders,
   extractVersionFromUrl,
   getVersionResponseHeaders,
   resolveApiVersion,
 } from "./versioning";
+export type { RouterInputs, RouterOutputs };
