@@ -871,6 +871,7 @@ describe("create-gmacko-app scaffold", () => {
         "scripts/bootstrap-local.sh",
       );
       const envExample = readFile(result.appPath, ".env.example");
+      const rootReadme = readFile(result.appPath, "README.md");
 
       expect(pkg.devDependencies?.["@biomejs/biome"]).toBeDefined();
       expect(pkg.devDependencies?.oxlint).toBeDefined();
@@ -917,6 +918,8 @@ describe("create-gmacko-app scaffold", () => {
       );
       expect(setupScript).toContain('REQUIRED_NODE_VERSION="24"');
       expect(setupScript).toContain("pnpm bootstrap:local");
+      expect(setupScript).toContain("@forgegraph/cli");
+      expect(setupScript).toContain("pnpm forge:doctor");
       expect(bootstrapScript).toContain("pnpm doctor");
       expect(bootstrapScript).toContain("pnpm auth:generate");
       expect(bootstrapScript).toContain("pnpm db:generate");
@@ -933,6 +936,7 @@ describe("create-gmacko-app scaffold", () => {
         "Checking local development prerequisites",
       );
       expect(doctorScript).toContain("ForgeGraph CLI");
+      expect(doctorScript).toContain("@forgegraph/cli");
       expect(doctorScript).toContain("Core app env values");
       expect(doctorScript).toContain("ForgeGraph deploy values");
       expect(doctorScript).toContain("Cloudflare Workers env values");
@@ -951,6 +955,7 @@ describe("create-gmacko-app scaffold", () => {
         'DATABASE_URL="postgresql://postgres:postgres@localhost:5432/gmacko_dev"',
       );
       expect(envExample).toContain('# AUTH_SECRET="replace-me-in-forgegraph"');
+      expect(rootReadme).toContain("@forgegraph/cli");
       expect(
         fs.statSync(path.join(result.appPath, "scripts/setup.sh")).mode & 0o111,
       ).toBeTruthy();
