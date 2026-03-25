@@ -444,6 +444,18 @@ jobs:
         env:
           CI: "true"
 
+      - name: Smoke Cloudflare deploy script
+        run: |
+          mkdir -p /tmp/fake-bin
+          cat > /tmp/fake-bin/wrangler << 'EOF'
+          #!/bin/sh
+          echo "fake-wrangler $@"
+          EOF
+          chmod +x /tmp/fake-bin/wrangler
+          PATH="/tmp/fake-bin:$PATH" pnpm --filter @gmacko/nextjs deploy:cloudflare:staging | tee /tmp/e2e-test/vinext-deploy.log
+          grep 'fake-wrangler deploy --env staging' /tmp/e2e-test/vinext-deploy.log || (echo "Cloudflare deploy script did not invoke wrangler correctly" && exit 1)
+        working-directory: /tmp/e2e-test/test-app-vinext
+
   report:
     name: Report Results
     needs: [e2e-default, e2e-minimal, e2e-custom-scope, e2e-full, e2e-vinext]

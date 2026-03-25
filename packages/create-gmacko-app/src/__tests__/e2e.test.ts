@@ -385,6 +385,42 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
 
       expect(result.success).toBe(true);
     }, 900000);
+
+    it("should build TanStack Start explicitly", () => {
+      console.log("[E2E] Running TanStack Start build (full)...");
+      createMockEnv(appPath);
+
+      const result = runInApp(
+        appPath,
+        "pnpm --filter @gmacko/tanstack-start build",
+        {
+          timeout: 600000,
+        },
+      );
+
+      if (!result.success) {
+        console.error("[E2E] TanStack Start build failed:");
+        console.error(result.stderr || result.stdout);
+      }
+
+      expect(result.success).toBe(true);
+    }, 900000);
+
+    it("should typecheck Expo explicitly", () => {
+      console.log("[E2E] Running Expo typecheck (full)...");
+      createMockEnv(appPath);
+
+      const result = runInApp(appPath, "pnpm --filter @gmacko/expo typecheck", {
+        timeout: 300000,
+      });
+
+      if (!result.success) {
+        console.error("[E2E] Expo typecheck failed:");
+        console.error(result.stderr || result.stdout);
+      }
+
+      expect(result.success).toBe(true);
+    }, 600000);
   });
 
   describe("custom package scope", () => {
@@ -468,13 +504,13 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
     }, 900000);
   });
 
-  describe("vinext configuration", () => {
+  describe("pruned vinext configuration", () => {
     let appPath: string;
     let appName: string;
 
     beforeAll(async () => {
-      appName = generateAppName("e2e-vinext");
-      console.log(`\n[E2E] Scaffolding vinext ${appName}...`);
+      appName = generateAppName("e2e-vinext-pruned");
+      console.log(`\n[E2E] Scaffolding pruned vinext ${appName}...`);
 
       const result = await runCli({
         appName,
@@ -500,7 +536,7 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
     }, 900000);
 
     it("should typecheck with vinext enabled", () => {
-      console.log("[E2E] Running typecheck (vinext)...");
+      console.log("[E2E] Running typecheck (pruned vinext)...");
       createMockEnv(appPath);
 
       const result = runInApp(
@@ -518,5 +554,33 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
 
       expect(result.success).toBe(true);
     }, 600000);
+
+    it("should exercise the Cloudflare deploy script with a fake wrangler", () => {
+      console.log("[E2E] Running fake Cloudflare deploy smoke test...");
+      createMockEnv(appPath);
+
+      const fakeBin = createFakeCliBin(appPath, {
+        wrangler: 'echo "fake-wrangler $@"',
+      });
+
+      const result = runInApp(
+        appPath,
+        "pnpm --filter @gmacko/nextjs deploy:cloudflare:staging",
+        {
+          env: {
+            PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+          },
+          timeout: 600000,
+        },
+      );
+
+      if (!result.success) {
+        console.error("[E2E] Fake Cloudflare deploy failed:");
+        console.error(result.stderr || result.stdout);
+      }
+
+      expect(result.success).toBe(true);
+      expect(result.stdout).toContain("fake-wrangler deploy --env staging");
+    }, 900000);
   });
 });
