@@ -52,3 +52,5 @@ The previous implementation plan now lives at [`/Volumes/dev/create-gmacko-app/d
 ## Related Roadmap
 
 For the broader “make this a showcase and highly adoptable starter” roadmap, see [`/Volumes/dev/create-gmacko-app/docs/plans/2026-03-25-template-showcase-roadmap.md`](/Volumes/dev/create-gmacko-app/docs/plans/2026-03-25-template-showcase-roadmap.md).
+
+For the execution-grade breakdown of that roadmap, including task order, files, and verification gates, see [`/Volumes/dev/create-gmacko-app/docs/plans/2026-03-25-template-showcase-execution-plan.md`](/Volumes/dev/create-gmacko-app/docs/plans/2026-03-25-template-showcase-execution-plan.md).

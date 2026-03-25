@@ -235,6 +235,8 @@ The highest-value next batch after this roadmap:
 4. create a showcase demo mode and sharper landing README positioning
 5. turn the new first-run flow into a more guided local success path with better failure recovery hints
 
+For the execution-grade task list, exact file targets, and verification gates, see [`/Volumes/dev/create-gmacko-app/docs/plans/2026-03-25-template-showcase-execution-plan.md`](/Volumes/dev/create-gmacko-app/docs/plans/2026-03-25-template-showcase-execution-plan.md).
+
 ## Source Notes
 
 This roadmap reflects the current official direction from:
