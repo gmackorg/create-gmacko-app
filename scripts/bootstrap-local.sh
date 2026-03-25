@@ -71,12 +71,13 @@ echo "Recommended next commands:"
 if [ "$HAS_PLACEHOLDER_FORGEGRAPH" -eq 1 ]; then
   echo "ForgeGraph placeholders are still present in .forgegraph.yaml."
   echo "Update server, domains, and node IDs, then run:"
-  echo "  pnpm dlx @forgegraph/cli@latest --help  # if forge is not installed yet"
+  echo "  pnpm forge:doctor"
+  echo "  pnpm dlx @forgegraph/cli@latest --help  # optional global/published CLI"
   echo "  pnpm forge:diff"
   echo "  pnpm forge:apply"
 else
-  echo "  pnpm dlx @forgegraph/cli@latest --help  # if forge is not installed yet"
   echo "  pnpm forge:doctor"
+  echo "  pnpm dlx @forgegraph/cli@latest --help  # optional global/published CLI"
 fi
 
 if [ "$HAS_DOCKER_COMPOSE" -eq 1 ]; then

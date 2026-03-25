@@ -880,6 +880,7 @@ describe("create-gmacko-app scaffold", () => {
       expect(
         pkg.devDependencies?.["@commitlint/config-conventional"],
       ).toBeDefined();
+      expect(pkg.devDependencies?.["@forgegraph/cli"]).toBe("^0.3.0");
       expect(pkg.devDependencies?.knip).toBeDefined();
       expect(pkg.scripts?.["lint:ox"]).toBeDefined();
       expect(pkg.scripts?.["format:check"]).toBeDefined();

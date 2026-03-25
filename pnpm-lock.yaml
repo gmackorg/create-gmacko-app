@@ -121,6 +121,9 @@ importers:
       '@commitlint/config-conventional':
         specifier: 'catalog:'
         version: 20.5.0
+      '@forgegraph/cli':
+        specifier: ^0.3.0
+        version: 0.3.0
       '@turbo/gen':
         specifier: ^2.8.18
         version: 2.8.18(@types/node@25.5.0)
@@ -3202,6 +3205,34 @@ packages:
 
   '@fontsource-variable/geist@5.2.8':
     resolution: {integrity: sha512-cJ6m9e+8MQ5dCYJsLylfZrgBh6KkG4bOLckB35Tr9J/EqdkEM6QllH5PxqP1dhTvFup+HtMRPuz9xOjxXJggxw==}
+
+  '@forgegraph/cli-darwin-arm64@0.3.0':
+    resolution: {integrity: sha512-pLGpGZqeH0RnTIygEPcf0y9NjX6sfhmS4xvVgzGNTAXnItd+sRlvDi6EFNl4Q71cSr7yP1vgvBmDSOJUsWHAAw==}
+    cpu: [arm64]
+    os: [darwin]
+    hasBin: true
+
+  '@forgegraph/cli-darwin-x64@0.3.0':
+    resolution: {integrity: sha512-wF54pSMStIUR45OEXVUdKDtO5M+3/WYHRf2E66zLDtFwsQKh5NBaTnLFN+WcC1hvnxNZukc+sdS2hmBADK0mFw==}
+    cpu: [x64]
+    os: [darwin]
+    hasBin: true
+
+  '@forgegraph/cli-linux-arm64@0.3.0':
+    resolution: {integrity: sha512-BbHtcz/hIeYQdCUuePDkVKcyfIwArngyWSY+U6sxb5ag70thkPrWOA3uNQR1CF44MxgcOD5JCFwrKZIuEITKrA==}
+    cpu: [arm64]
+    os: [linux]
+    hasBin: true
+
+  '@forgegraph/cli-linux-x64@0.3.0':
+    resolution: {integrity: sha512-r+L1LzBWaftnpYqJAieCzjInW0XU7XdOqFLxPPpByxwrFTt7MuaLJ6oLmayNwyHZePUEjY/ooE93RW7+3OA8Kw==}
+    cpu: [x64]
+    os: [linux]
+    hasBin: true
+
+  '@forgegraph/cli@0.3.0':
+    resolution: {integrity: sha512-OSaHvuvNwuA2wrK4tgUIhZ4dsRK9Kk6tRU4mpb9UkqWs6oIlXZutpe+M73f0TpKi7jpsEPwc2aEcUWMPRs2pPQ==}
+    hasBin: true
 
   '@formatjs/ecma402-abstract@3.1.2':
     resolution: {integrity: sha512-ApPcse35dtr+snmBbDtnBkc9bvAZCxr9DDzgUR3nXiHZgpwU+85g1Mz0KRqjh7kIgJ6rgIQLQVqYx56rf58XZg==}
@@ -15966,6 +15997,25 @@ snapshots:
 
   '@fontsource-variable/geist@5.2.8': {}
 
+  '@forgegraph/cli-darwin-arm64@0.3.0':
+    optional: true
+
+  '@forgegraph/cli-darwin-x64@0.3.0':
+    optional: true
+
+  '@forgegraph/cli-linux-arm64@0.3.0':
+    optional: true
+
+  '@forgegraph/cli-linux-x64@0.3.0':
+    optional: true
+
+  '@forgegraph/cli@0.3.0':
+    optionalDependencies:
+      '@forgegraph/cli-darwin-arm64': 0.3.0
+      '@forgegraph/cli-darwin-x64': 0.3.0
+      '@forgegraph/cli-linux-arm64': 0.3.0
+      '@forgegraph/cli-linux-x64': 0.3.0
+
   '@formatjs/ecma402-abstract@3.1.2':
     dependencies:
       '@formatjs/fast-memoize': 3.1.1
@@ -18424,7 +18474,7 @@ snapshots:
       debug: 4.4.3
       invariant: 2.2.4
       metro: 0.83.5(bufferutil@4.1.0)
-      metro-config: 0.83.5(bufferutil@4.1.0)(utf-8-validate@6.0.4)
+      metro-config: 0.83.5(bufferutil@4.1.0)
       metro-core: 0.83.5
       semver: 7.7.4
     transitivePeerDependencies:
@@ -23856,6 +23906,21 @@ snapshots:
       - supports-color
       - utf-8-validate
 
+  metro-config@0.83.5(bufferutil@4.1.0):
+    dependencies:
+      connect: 3.7.0
+      flow-enums-runtime: 0.0.6
+      jest-validate: 29.7.0
+      metro: 0.83.5(bufferutil@4.1.0)
+      metro-cache: 0.83.5
+      metro-core: 0.83.5
+      metro-runtime: 0.83.5
+      yaml: 2.8.2
+    transitivePeerDependencies:
+      - bufferutil
+      - supports-color
+      - utf-8-validate
+
   metro-config@0.83.5(bufferutil@4.1.0)(utf-8-validate@6.0.4):
     dependencies:
       connect: 3.7.0
@@ -24350,7 +24415,7 @@ snapshots:
       metro-babel-transformer: 0.83.5
       metro-cache: 0.83.5
       metro-cache-key: 0.83.5
-      metro-config: 0.83.5(bufferutil@4.1.0)(utf-8-validate@6.0.4)
+      metro-config: 0.83.5(bufferutil@4.1.0)
       metro-core: 0.83.5
       metro-file-map: 0.83.5
       metro-resolver: 0.83.5
