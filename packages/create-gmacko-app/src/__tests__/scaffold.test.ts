@@ -299,6 +299,9 @@ describe("create-gmacko-app scaffold", () => {
       expect(fileExists(result.appPath, "apps/nextjs/wrangler.jsonc")).toBe(
         true,
       );
+      expect(
+        fileExists(result.appPath, "apps/nextjs/README.cloudflare.md"),
+      ).toBe(true);
       expect(fileExists(result.appPath, "apps/nextjs/worker/index.ts")).toBe(
         true,
       );
@@ -320,6 +323,10 @@ describe("create-gmacko-app scaffold", () => {
       const cloudflareReadme = readFile(
         result.appPath,
         "deploy/cloudflare/README.md",
+      );
+      const appLocalCloudflareReadme = readFile(
+        result.appPath,
+        "apps/nextjs/README.cloudflare.md",
       );
 
       expect(nextPkg.scripts?.["dev:vinext"]).toBeDefined();
@@ -380,6 +387,19 @@ describe("create-gmacko-app scaffold", () => {
       expect(cloudflareReadme).toContain(
         "pnpm --filter @gmacko/nextjs deploy:cloudflare:production",
       );
+      expect(appLocalCloudflareReadme).toContain("vinext");
+      expect(appLocalCloudflareReadme).toContain("experimental");
+      expect(appLocalCloudflareReadme).toContain(
+        "pnpm --filter @gmacko/nextjs dev:vinext",
+      );
+      expect(appLocalCloudflareReadme).toContain(
+        "pnpm --filter @gmacko/nextjs build:vinext",
+      );
+      expect(appLocalCloudflareReadme).toContain(
+        "pnpm --filter @gmacko/nextjs deploy:cloudflare:staging",
+      );
+      expect(appLocalCloudflareReadme).toContain("CLOUDFLARE_ACCOUNT_ID");
+      expect(appLocalCloudflareReadme).toContain("CLOUDFLARE_API_TOKEN");
     }, 120000);
 
     it("should scaffold stronger Expo development-build defaults", async () => {
@@ -401,16 +421,36 @@ describe("create-gmacko-app scaffold", () => {
       const expoReadme = readFile(result.appPath, "apps/expo/README.md");
       const expoConfig = readFile(result.appPath, "apps/expo/app.config.ts");
       const rootReadme = readFile(result.appPath, "README.md");
+      const expectedDisplayName = appName
+        .split("-")
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
 
       expect(expoPkg.scripts?.["dev:client"]).toBeDefined();
       expect(expoPkg.scripts?.["build:device:ios"]).toBeDefined();
       expect(expoPkg.scripts?.["build:device:android"]).toBeDefined();
       expect(expoReadme).toContain("Expo Orbit");
       expect(expoReadme).toContain("development build");
+      expect(expoReadme).toContain("EXPO_PUBLIC_APP_DOMAIN");
+      expect(expoReadme).toContain("associated domains");
+      expect(expoReadme).toContain("bundle identifier");
       expect(expoConfig).toContain(`slug: "${appName}"`);
       expect(expoConfig).toContain(`scheme: "${appName}"`);
       expect(expoConfig).toContain(
         `const base = "com.gmacko.${appName.replace(/-/g, "")}"`,
+      );
+      expect(expoConfig).toContain(`return "${expectedDisplayName}";`);
+      expect(expoConfig).toContain(`return "${expectedDisplayName} (Beta)";`);
+      expect(expoConfig).toContain(`return "${expectedDisplayName} (Dev)";`);
+      expect(expoConfig).toContain("EXPO_PUBLIC_APP_DOMAIN");
+      expect(expoConfig).toContain('"change-me.example.com"');
+      expect(expoConfig).toContain(
+        "associatedDomains: [`applinks:${ASSOCIATED_DOMAIN}`]",
+      );
+      expect(expoConfig).toContain('scheme: "https"');
+      expect(expoConfig).toContain("host: ASSOCIATED_DOMAIN");
+      expect(expoConfig).toContain(
+        "Scaffold note: replace these app identifiers and domains before store submission.",
       );
       expect(rootReadme).toContain("Scaffold profile");
       expect(rootReadme).toContain("Platforms: Next.js, Expo");

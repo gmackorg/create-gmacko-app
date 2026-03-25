@@ -149,6 +149,7 @@ Generated apps should be guided toward:
   - `apps/nextjs/wrangler.jsonc`
   - `apps/nextjs/worker/index.ts`
   - `apps/nextjs/src/cloudflare-env.ts`
+  - `apps/nextjs/README.cloudflare.md`
   - `prebuild:vinext`, `build:vinext`, `deploy:cloudflare:staging`, and `deploy:cloudflare:production`
 - Expo development-build scripts and an app-local mobile README geared around Expo Orbit
 - hosted Postgres only after the product has enough customers to justify the added operational split

@@ -47,6 +47,7 @@ What gets generated:
 - `apps/nextjs/vite.config.ts` for `vinext`
 - `apps/nextjs/wrangler.jsonc` with `nodejs_compat` and a `staging` env block
 - `apps/nextjs/src/cloudflare-env.ts` for Workers-specific env validation
+- `apps/nextjs/README.cloudflare.md` as the app-local operating guide for this lane
 - `.env.example` entries for `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`
 
 The generated `build:vinext` script first builds the Next app's workspace dependencies and then runs `vinext build` through the existing `.env` loader. The production deploy script reuses that build output and then runs `wrangler deploy`; the staging deploy script does the same with `wrangler deploy --env staging`.

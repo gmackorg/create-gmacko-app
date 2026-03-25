@@ -9,3 +9,9 @@ Use development builds as the default mobile workflow for this app.
 3. Start the app with `pnpm --filter @gmacko/expo dev:client`.
 
 Expo Go is useful for quick checks, but the long-term default for product work should be a development build.
+
+## Release Readiness
+
+- Set `EXPO_PUBLIC_APP_DOMAIN` before you configure associated domains and deep-link verification.
+- Replace the scaffold bundle identifier values in `app.config.ts` before store submission.
+- Keep staging and production API URLs explicit so the dev client, beta builds, and store builds do not drift.

@@ -69,7 +69,7 @@ export async function scaffold(options: CliOptions): Promise<void> {
   }
 
   if (options.platforms.mobile) {
-    configureExpoApp(targetDir, options.appName);
+    configureExpoApp(targetDir, options.appName, options.displayName);
   }
 
   customizeGeneratedReadme(targetDir, options);
@@ -572,6 +572,34 @@ export default {
 `,
     );
   }
+
+  fs.writeFileSync(
+    path.join(targetDir, "apps/nextjs/README.cloudflare.md"),
+    `# Cloudflare Workers Lane
+
+This app includes an experimental \`vinext\` lane for Cloudflare Workers.
+
+## Commands
+
+\`\`\`bash
+pnpm --filter @gmacko/nextjs dev:vinext
+pnpm --filter @gmacko/nextjs build:vinext
+pnpm --filter @gmacko/nextjs deploy:cloudflare:staging
+pnpm --filter @gmacko/nextjs deploy:cloudflare:production
+\`\`\`
+
+## Required Env
+
+- \`CLOUDFLARE_ACCOUNT_ID\`
+- \`CLOUDFLARE_API_TOKEN\`
+
+## Notes
+
+- This lane is experimental and should not replace the default ForgeGraph + Nix deployment path by accident.
+- The generated Worker config lives in \`apps/nextjs/wrangler.jsonc\`.
+- Prefer the root deployment guidance for the stable Hetzner VPS path.
+`,
+  );
 }
 
 function sortObjectKeys(
@@ -582,7 +610,11 @@ function sortObjectKeys(
   );
 }
 
-function configureExpoApp(targetDir: string, appName: string): void {
+function configureExpoApp(
+  targetDir: string,
+  appName: string,
+  displayName: string,
+): void {
   const expoConfigPath = path.join(targetDir, "apps/expo/app.config.ts");
   const sanitizedId = appName.replace(/[^a-z0-9-]/gi, "").toLowerCase();
   const bundleSegment = sanitizedId.replace(/-/g, "");
@@ -591,6 +623,15 @@ function configureExpoApp(targetDir: string, appName: string): void {
   content = content.replace(
     /const base = "com\.gmacko\.app";/,
     `const base = "com.gmacko.${bundleSegment}";`,
+  );
+  content = content.replace(/return "Gmacko";/, `return "${displayName}";`);
+  content = content.replace(
+    /return "Gmacko \(Beta\)";/,
+    `return "${displayName} (Beta)";`,
+  );
+  content = content.replace(
+    /return "Gmacko \(Dev\)";/,
+    `return "${displayName} (Dev)";`,
   );
   content = content.replace(/slug: "gmacko",/, `slug: "${sanitizedId}",`);
   content = content.replace(/scheme: "gmacko",/, `scheme: "${sanitizedId}",`);

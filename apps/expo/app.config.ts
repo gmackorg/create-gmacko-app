@@ -2,6 +2,8 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
 
 const APP_ENV = process.env.APP_ENV ?? "development";
 const API_URL = process.env.API_URL ?? "http://localhost:3000";
+const ASSOCIATED_DOMAIN =
+  process.env.EXPO_PUBLIC_APP_DOMAIN ?? "change-me.example.com";
 
 const SENTRY_DSN = process.env.SENTRY_DSN;
 const POSTHOG_KEY = process.env.POSTHOG_KEY;
@@ -19,6 +21,7 @@ const getAppName = (): string => {
 };
 
 const getBundleId = (): string => {
+  // Scaffold note: replace these app identifiers and domains before store submission.
   const base = "com.gmacko.app";
   switch (APP_ENV) {
     case "production":
@@ -85,6 +88,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ios: {
       bundleIdentifier: getBundleId(),
       supportsTablet: true,
+      associatedDomains: [`applinks:${ASSOCIATED_DOMAIN}`],
       icon: {
         light: "./assets/icon-light.png",
         dark: "./assets/icon-dark.png",
@@ -95,6 +99,20 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     android: {
       package: getBundleId(),
+      intentFilters: [
+        {
+          action: "VIEW",
+          autoVerify: true,
+          data: [
+            {
+              scheme: "https",
+              host: ASSOCIATED_DOMAIN,
+              pathPrefix: "/",
+            },
+          ],
+          category: ["BROWSABLE", "DEFAULT"],
+        },
+      ],
       adaptiveIcon: {
         foregroundImage: "./assets/icon-light.png",
         backgroundColor: "#1F104A",
