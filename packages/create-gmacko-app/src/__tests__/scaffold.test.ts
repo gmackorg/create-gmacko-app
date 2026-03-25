@@ -718,6 +718,18 @@ describe("create-gmacko-app scaffold", () => {
     }, 120000);
   });
 
+  it("keeps the template release workflow scoped to the CLI package", () => {
+    const releaseWorkflow = fs.readFileSync(
+      path.resolve(process.cwd(), "../../.github/workflows/release.yml"),
+      "utf8",
+    );
+
+    expect(releaseWorkflow).toContain("pnpm --filter create-gmacko-app test");
+    expect(releaseWorkflow).toContain("pnpm --filter create-gmacko-app build");
+    expect(releaseWorkflow).toContain("pnpm release:cli:dry-run");
+    expect(releaseWorkflow).not.toContain("pnpm check:release");
+  });
+
   describe("platform options", () => {
     it("should exclude web app when --no-web is passed", async () => {
       const appName = generateAppName("no-web");

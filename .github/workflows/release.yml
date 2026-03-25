@@ -36,8 +36,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Release readiness checks
-        run: pnpm check:release
+      - name: Run CLI tests
+        run: pnpm --filter create-gmacko-app test
+
+      - name: Build CLI package
+        run: pnpm --filter create-gmacko-app build
+
+      - name: Verify CLI publish tarball
+        run: pnpm release:cli:dry-run
 
       - name: Create Release Pull Request or Publish
         id: changesets
