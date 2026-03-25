@@ -129,6 +129,21 @@ jobs:
           grep 'fake-fg deploy create staging --wait' /tmp/e2e-test/fg-deploy-staging.log || (echo "ForgeGraph deploy script did not invoke fg correctly" && exit 1)
         working-directory: /tmp/e2e-test/test-app-default
 
+      - name: Run auth and db bootstrap commands
+        run: |
+          pnpm auth:generate
+          pnpm db:generate
+          test -f packages/db/src/auth-schema.ts || (echo "Auth schema output missing after bootstrap commands" && exit 1)
+        working-directory: /tmp/e2e-test/test-app-default
+
+      - name: Validate health route scaffold
+        run: |
+          grep 'status: "healthy"' apps/nextjs/src/app/api/health/route.ts || (echo "Missing healthy status in health route" && exit 1)
+          grep 'status: "degraded"' apps/nextjs/src/app/api/health/route.ts || (echo "Missing degraded status in health route" && exit 1)
+          grep 'status: "unhealthy"' apps/nextjs/src/app/api/health/route.ts || (echo "Missing unhealthy status in health route" && exit 1)
+          grep 'return NextResponse.json' apps/nextjs/src/app/api/health/route.ts || (echo "Missing NextResponse health route return" && exit 1)
+        working-directory: /tmp/e2e-test/test-app-default
+
       - name: Run fast checks
         run: pnpm check:fast
         working-directory: /tmp/e2e-test/test-app-default

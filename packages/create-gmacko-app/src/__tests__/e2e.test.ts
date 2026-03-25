@@ -158,6 +158,46 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
         "fake-fg deploy create production --wait",
       );
     }, 180000);
+
+    it("should complete auth and db bootstrap commands", () => {
+      console.log("[E2E] Running auth/db bootstrap checks...");
+      createMockEnv(appPath);
+
+      const authResult = runInApp(appPath, "pnpm auth:generate", {
+        timeout: 300000,
+      });
+
+      if (!authResult.success) {
+        console.error("[E2E] Auth generate failed:");
+        console.error(authResult.stderr || authResult.stdout);
+      }
+
+      expect(authResult.success).toBe(true);
+
+      const dbGenerateResult = runInApp(appPath, "pnpm db:generate", {
+        timeout: 300000,
+      });
+
+      if (!dbGenerateResult.success) {
+        console.error("[E2E] DB generate failed:");
+        console.error(dbGenerateResult.stderr || dbGenerateResult.stdout);
+      }
+
+      expect(dbGenerateResult.success).toBe(true);
+      expect(fileExists(appPath, "packages/db/src/auth-schema.ts")).toBe(true);
+    }, 600000);
+
+    it("should keep the Next.js health route scaffolded", () => {
+      const healthRoute = readFile(
+        appPath,
+        "apps/nextjs/src/app/api/health/route.ts",
+      );
+
+      expect(healthRoute).toContain('status: "healthy"');
+      expect(healthRoute).toContain('status: "degraded"');
+      expect(healthRoute).toContain('status: "unhealthy"');
+      expect(healthRoute).toContain("return NextResponse.json");
+    });
   });
 
   describe("minimal configuration", () => {

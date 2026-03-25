@@ -675,6 +675,9 @@ describe("create-gmacko-app scaffold", () => {
       expect(pkg.scripts?.check).toBe(
         "pnpm check:fast && pnpm test && pnpm build",
       );
+      expect(pkg.scripts?.["e2e:cli:full"]).toBe(
+        "RUN_E2E=true pnpm --dir packages/create-gmacko-app vitest run src/__tests__/e2e.test.ts",
+      );
       expect(pkg.scripts?.["release:cli:dry-run"]).toBeDefined();
       expect(pkg.scripts?.["check:release"]).toBe(
         "pnpm --dir packages/create-gmacko-app test && pnpm --dir packages/create-gmacko-app build && pnpm release:cli:dry-run",
@@ -833,6 +836,11 @@ describe("create-gmacko-app scaffold", () => {
     );
     expect(e2eWorkflow).toContain("pnpm fg:stages");
     expect(e2eWorkflow).toContain("pnpm fg:deploy:staging");
+    expect(e2eWorkflow).toContain("pnpm auth:generate");
+    expect(e2eWorkflow).toContain("pnpm db:generate");
+    expect(e2eWorkflow).toContain(
+      "grep 'status: \"healthy\"' apps/nextjs/src/app/api/health/route.ts",
+    );
     expect(e2eWorkflow).toContain("Cloudflare Workers credentials present");
     expect(e2eWorkflow).toContain("fake-wrangler deploy --env staging");
     expect(e2eWorkflow).toContain('RUN_E2E: "true"');

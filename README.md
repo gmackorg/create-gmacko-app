@@ -112,9 +112,12 @@ For `create-gmacko-app` release validation, use the scoped CLI publish check ins
 
 ```bash
 pnpm check:release
+
+# Run the full generated-app E2E suite locally when you want the slow path
+pnpm e2e:cli:full
 ```
 
-That command runs the `packages/create-gmacko-app` test suite, builds only the CLI package, and verifies the publish tarball. Generated-app coverage lives separately in [`.github/workflows/cli-e2e.yml`](/Volumes/dev/create-gmacko-app/.github/workflows/cli-e2e.yml), which exercises default, minimal, custom-scope, full, and `vinext` scaffolds on a nightly and manual basis, including ForgeGraph script smoke checks, Expo dev-client/config smoke checks, and `vinext` doctor assertions for Cloudflare credentials. The same workflow also exposes a manual full-suite job that runs `src/__tests__/e2e.test.ts` with `RUN_E2E=true`.
+`pnpm check:release` keeps validation scoped to the publishable CLI surface. `pnpm e2e:cli:full` runs the slower generated-app Vitest suite locally with `RUN_E2E=true`. Generated-app coverage also lives in [`.github/workflows/cli-e2e.yml`](/Volumes/dev/create-gmacko-app/.github/workflows/cli-e2e.yml), which exercises default, minimal, custom-scope, full, and `vinext` scaffolds on a nightly and manual basis, including ForgeGraph script smoke checks, auth/db bootstrap checks, health-route assertions, Expo dev-client/config smoke checks, and `vinext` doctor assertions for Cloudflare credentials. The same workflow also exposes a manual full-suite job that runs `src/__tests__/e2e.test.ts` with `RUN_E2E=true`.
 
 ## Quick Start
 

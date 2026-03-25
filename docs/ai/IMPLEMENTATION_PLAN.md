@@ -48,3 +48,7 @@ Any migration or cleanup against this plan should verify:
 ## Archive
 
 The previous implementation plan now lives at [`/Volumes/dev/create-gmacko-app/docs/legacy/ai/IMPLEMENTATION_PLAN.md`](/Volumes/dev/create-gmacko-app/docs/legacy/ai/IMPLEMENTATION_PLAN.md).
+
+## Related Roadmap
+
+For the broader “make this a showcase and highly adoptable starter” roadmap, see [`/Volumes/dev/create-gmacko-app/docs/plans/2026-03-25-template-showcase-roadmap.md`](/Volumes/dev/create-gmacko-app/docs/plans/2026-03-25-template-showcase-roadmap.md).
