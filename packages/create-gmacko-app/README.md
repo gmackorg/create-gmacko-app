@@ -163,11 +163,7 @@ After scaffolding a new repo:
 
 ```bash
 cd my-app
-pnpm doctor
-cp .env.example .env
-docker compose up -d postgres
-pnpm db:push
-pnpm --filter @gmacko/auth generate
+pnpm bootstrap:local
 pnpm check:fast
 ```
 

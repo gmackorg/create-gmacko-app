@@ -12,6 +12,7 @@
     "clean:workspaces": "turbo run clean",
     "doctor": "./scripts/doctor.sh",
     "setup": "./scripts/setup.sh",
+    "bootstrap:local": "./scripts/bootstrap-local.sh",
     "provision": "./scripts/provision.sh",
     "auth:generate": "pnpm -F @gmacko/auth generate",
     "db:generate": "pnpm -F @gmacko/db generate",

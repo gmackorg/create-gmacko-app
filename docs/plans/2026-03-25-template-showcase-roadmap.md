@@ -45,6 +45,8 @@ The template already has:
 - Expo development-build defaults and Orbit-aware docs
 - agent-native repo instructions and MCP support
 - stronger generated-app smoke coverage across ForgeGraph, Cloudflare, Expo, and TanStack Start
+- adaptive scaffold README profile summaries
+- a generated `bootstrap:local` flow for the default local path
 
 ## Remaining Work
 
@@ -54,11 +56,11 @@ The template already has:
 
 Remaining work:
 
-- make the generated `.env.example` easier to understand by grouping variables by app, package, and deployment lane
-- add explicit sample values and comments for optional integrations
-- improve the generated first-run output so it points users to the right commands for web-only, full-stack, or mobile-first starts
-- add a root `pnpm bootstrap:local` flow that sequences doctor, env setup hints, auth generation, DB generation, and DB push
-- make the generated README adapt more aggressively to selected platforms and integrations instead of staying mostly static
+- keep improving the generated `.env.example` so variables are grouped more clearly by app, package, and deployment lane
+- add clearer sample values and setup notes for optional integrations
+- make the generated first-run output even more profile-aware for web-only, full-stack, mobile-only, and Workers-first starts
+- add a more guided first-run handoff after `pnpm bootstrap:local`, including what to do when Docker or ForgeGraph config is missing
+- make the generated README adapt more aggressively to selected integrations instead of mostly adapting by platform
 
 ### 2. Deployment Realism
 
@@ -227,11 +229,11 @@ Use measurable signals:
 
 The highest-value next batch after this roadmap:
 
-1. add a generated `bootstrap:local` script and adaptive README sections
-2. tighten `.forgegraph.yaml` against the live ForgeGraph schema
-3. improve `vinext` documentation and config validation beyond deploy-script smoke checks
-4. add stronger mobile release and deep-link scaffolding
-5. create a showcase demo mode and sharper landing README positioning
+1. tighten `.forgegraph.yaml` against the live ForgeGraph schema
+2. improve `vinext` documentation and config validation beyond deploy-script smoke checks
+3. add stronger mobile release and deep-link scaffolding
+4. create a showcase demo mode and sharper landing README positioning
+5. turn the new first-run flow into a more guided local success path with better failure recovery hints
 
 ## Source Notes
 

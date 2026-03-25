@@ -124,6 +124,10 @@ pnpm e2e:cli:full
 > **Note**
 > The recommended operating model is to run Postgres alongside the app during the early stages of the product. On the Hetzner VPS, use the sibling [`../ForgeGraph`](../ForgeGraph) deployment setup as the deployment reference, keep the database colocated with the app, and only move to a hosted Postgres provider once you have real customer and operational pressure to justify it.
 
+<!-- SCAFFOLD_PROFILE_START -->
+> Generated repos replace this block with a scaffold-specific profile summary.
+<!-- SCAFFOLD_PROFILE_END -->
+
 To get it running, follow the steps below:
 
 ### 1. Setup dependencies
@@ -136,27 +140,8 @@ To get it running, follow the steps below:
 # Install dependencies
 pnpm i
 
-# Check local prerequisites and repo metadata
-pnpm doctor
-
-# Configure environment variables
-# There is an `.env.example` in the root directory you can use for reference
-cp .env.example .env
-
-# Update the generated ForgeGraph repo metadata with your real server, domains, and node IDs
-$EDITOR .forgegraph.yaml
-
-# Start the local Postgres service if you are using the included compose setup
-docker compose up -d postgres
-
-# Push the Drizzle schema to the database
-pnpm db:push
-
-# Verify the repo is ready for ForgeGraph workflows
-pnpm fg:doctor
-
-# Trigger a stage deployment through the repo-local ForgeGraph scripts
-pnpm fg:deploy:staging
+# Run the guided local bootstrap path
+pnpm bootstrap:local
 
 # Verify linting and types before you start iterating
 pnpm check:fast

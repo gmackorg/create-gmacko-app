@@ -72,6 +72,8 @@ export async function scaffold(options: CliOptions): Promise<void> {
     configureExpoApp(targetDir, options.appName);
   }
 
+  customizeGeneratedReadme(targetDir, options);
+
   if (!options.includeAi) {
     fs.removeSync(path.join(targetDir, ".claude"));
     fs.removeSync(path.join(targetDir, ".opencode"));
@@ -134,12 +136,8 @@ export async function scaffold(options: CliOptions): Promise<void> {
   ${pc.bold("Next steps:")}
 
   ${pc.cyan("cd")} ${options.appName}
-  ${pc.cyan("pnpm")} doctor
-  ${pc.cyan("cp")} .env.example .env
-  ${pc.dim("# Update .env with your credentials")}
-  ${pc.dim("# Update .forgegraph.yaml with your real ForgeGraph server")}
-  ${pc.cyan("docker compose")} up -d postgres
-  ${pc.cyan("pnpm")} db:push
+  ${pc.cyan("pnpm")} bootstrap:local
+  ${pc.dim("# Update .forgegraph.yaml with your real server, domains, and nodes")}
   ${pc.cyan("pnpm")} fg:doctor
   ${pc.cyan("pnpm")} check:fast
   ${pc.cyan("pnpm")} dev
@@ -264,6 +262,84 @@ function createManifest(targetDir: string, options: CliOptions): void {
   });
 }
 
+function customizeGeneratedReadme(
+  targetDir: string,
+  options: CliOptions,
+): void {
+  const readmePath = path.join(targetDir, "README.md");
+  const startMarker = "<!-- SCAFFOLD_PROFILE_START -->";
+  const endMarker = "<!-- SCAFFOLD_PROFILE_END -->";
+
+  if (!fs.existsSync(readmePath)) {
+    return;
+  }
+
+  const readme = fs.readFileSync(readmePath, "utf8");
+  const profileBlock = buildScaffoldProfileBlock(options);
+  const startIndex = readme.indexOf(startMarker);
+  const endIndex = readme.indexOf(endMarker);
+
+  if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {
+    return;
+  }
+
+  const updatedReadme =
+    readme.slice(0, startIndex) +
+    profileBlock +
+    readme.slice(endIndex + endMarker.length);
+
+  fs.writeFileSync(readmePath, updatedReadme);
+}
+
+function buildScaffoldProfileBlock(options: CliOptions): string {
+  const platforms = [
+    options.platforms.web ? "Next.js" : null,
+    options.platforms.mobile ? "Expo" : null,
+    options.platforms.tanstackStart ? "TanStack Start" : null,
+  ].filter(Boolean);
+
+  const integrations = [
+    options.integrations.sentry ? "Sentry" : null,
+    options.integrations.posthog ? "PostHog" : null,
+    options.integrations.stripe ? "Stripe" : null,
+    options.integrations.revenuecat ? "RevenueCat" : null,
+    options.integrations.notifications ? "Push notifications" : null,
+    options.integrations.email.enabled
+      ? `Email (${options.integrations.email.provider})`
+      : null,
+    options.integrations.realtime.enabled
+      ? `Realtime (${options.integrations.realtime.provider})`
+      : null,
+    options.integrations.storage.enabled
+      ? `Storage (${options.integrations.storage.provider})`
+      : null,
+  ].filter(Boolean);
+
+  const preferredDevCommands = [
+    "- `pnpm bootstrap:local`",
+    options.platforms.web ? "- `pnpm dev:next`" : null,
+    options.platforms.mobile
+      ? "- `pnpm --filter @gmacko/expo dev:client`"
+      : null,
+    options.platforms.tanstackStart
+      ? "- `pnpm --filter @gmacko/tanstack-start dev`"
+      : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return `<!-- SCAFFOLD_PROFILE_START -->
+> **Scaffold profile**
+> - Platforms: ${platforms.join(", ") || "none selected"}
+> - Integrations: ${integrations.join(", ") || "core only"}
+> - Default deploy path: ForgeGraph + Nix + colocated Postgres
+> - Workers lane: ${options.vinext ? "vinext enabled (experimental)" : "not scaffolded"}
+>
+> **Recommended first commands**
+${preferredDevCommands}
+<!-- SCAFFOLD_PROFILE_END -->`;
+}
+
 function createForgeGraphConfig(targetDir: string, options: CliOptions): void {
   fs.writeFileSync(
     path.join(targetDir, ".forgegraph.yaml"),
@@ -289,6 +365,21 @@ stages:
     sortOrder: 20
 `,
   );
+}
+
+function addForgeGraphScripts(targetDir: string): void {
+  const rootPackagePath = path.join(targetDir, "package.json");
+  const rootPackage = fs.readJsonSync(rootPackagePath) as {
+    scripts?: Record<string, string>;
+  };
+
+  rootPackage.scripts ??= {};
+  rootPackage.scripts["fg:deploy:staging"] = "fg deploy create staging --wait";
+  rootPackage.scripts["fg:deploy:production"] =
+    "fg deploy create production --wait";
+  rootPackage.scripts["fg:stages"] = "fg stage list";
+
+  fs.writeJsonSync(rootPackagePath, rootPackage, { spaces: 2 });
 }
 
 function configureVinext(targetDir: string): void {
@@ -412,21 +503,6 @@ interface Env {
   };
 }
 
-function addForgeGraphScripts(targetDir: string): void {
-  const rootPackagePath = path.join(targetDir, "package.json");
-  const rootPackage = fs.readJsonSync(rootPackagePath) as {
-    scripts?: Record<string, string>;
-  };
-
-  rootPackage.scripts ??= {};
-  rootPackage.scripts["fg:deploy:staging"] = "fg deploy create staging --wait";
-  rootPackage.scripts["fg:deploy:production"] =
-    "fg deploy create production --wait";
-  rootPackage.scripts["fg:stages"] = "fg stage list";
-
-  fs.writeJsonSync(rootPackagePath, rootPackage, { spaces: 2 });
-}
-
 interface ExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
   passThroughOnException(): void;
@@ -496,11 +572,11 @@ function configureExpoApp(targetDir: string, appName: string): void {
 
   let content = fs.readFileSync(expoConfigPath, "utf-8");
   content = content.replace(
-    'const base = "com.gmacko.app";',
+    /const base = "com\.gmacko\.app";/,
     `const base = "com.gmacko.${bundleSegment}";`,
   );
-  content = content.replace('slug: "gmacko",', `slug: "${sanitizedId}",`);
-  content = content.replace('scheme: "gmacko",', `scheme: "${sanitizedId}",`);
+  content = content.replace(/slug: "gmacko",/, `slug: "${sanitizedId}",`);
+  content = content.replace(/scheme: "gmacko",/, `scheme: "${sanitizedId}",`);
 
   fs.writeFileSync(expoConfigPath, content);
 }

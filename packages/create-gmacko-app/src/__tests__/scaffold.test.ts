@@ -402,6 +402,15 @@ describe("create-gmacko-app scaffold", () => {
       expect(expoConfig).toContain(
         `const base = "com.gmacko.${appName.replace(/-/g, "")}"`,
       );
+      expect(rootReadme).toContain("Scaffold profile");
+      expect(rootReadme).toContain("Platforms: Next.js, Expo");
+      expect(rootReadme).toContain(
+        "Default deploy path: ForgeGraph + Nix + colocated Postgres",
+      );
+      expect(rootReadme).toContain("pnpm bootstrap:local");
+      expect(rootReadme).not.toContain(
+        "Generated repos replace this block with a scaffold-specific profile summary.",
+      );
       expect(rootReadme).toContain("Expo Orbit");
       expect(rootReadme).toContain("dev:client");
     }, 120000);
@@ -651,6 +660,9 @@ describe("create-gmacko-app scaffold", () => {
       expect(fileExists(result.appPath, "commitlint.config.mjs")).toBe(true);
       expect(fileExists(result.appPath, "knip.json")).toBe(true);
       expect(fileExists(result.appPath, "scripts/doctor.sh")).toBe(true);
+      expect(fileExists(result.appPath, "scripts/bootstrap-local.sh")).toBe(
+        true,
+      );
 
       const pkg = readJson<{
         scripts?: Record<string, string>;
@@ -658,6 +670,10 @@ describe("create-gmacko-app scaffold", () => {
       }>(result.appPath, "package.json");
       const setupScript = readFile(result.appPath, "scripts/setup.sh");
       const doctorScript = readFile(result.appPath, "scripts/doctor.sh");
+      const bootstrapScript = readFile(
+        result.appPath,
+        "scripts/bootstrap-local.sh",
+      );
 
       expect(pkg.devDependencies?.["@biomejs/biome"]).toBeDefined();
       expect(pkg.devDependencies?.oxlint).toBeDefined();
@@ -671,6 +687,9 @@ describe("create-gmacko-app scaffold", () => {
       expect(pkg.scripts?.["format:check"]).toBeDefined();
       expect(pkg.scripts?.["format:fix"]).toBeDefined();
       expect(pkg.scripts?.doctor).toBe("./scripts/doctor.sh");
+      expect(pkg.scripts?.["bootstrap:local"]).toBe(
+        "./scripts/bootstrap-local.sh",
+      );
       expect(pkg.scripts?.["check:fast"]).toBe("pnpm lint && pnpm typecheck");
       expect(pkg.scripts?.check).toBe(
         "pnpm check:fast && pnpm test && pnpm build",
@@ -697,8 +716,12 @@ describe("create-gmacko-app scaffold", () => {
         "git rev-parse --git-dir >/dev/null 2>&1 && lefthook install || true",
       );
       expect(setupScript).toContain('REQUIRED_NODE_VERSION="24"');
-      expect(setupScript).toContain("pnpm doctor");
-      expect(setupScript).toContain("pnpm check:fast");
+      expect(setupScript).toContain("pnpm bootstrap:local");
+      expect(bootstrapScript).toContain("pnpm doctor");
+      expect(bootstrapScript).toContain("pnpm auth:generate");
+      expect(bootstrapScript).toContain("pnpm db:generate");
+      expect(bootstrapScript).toContain("pnpm db:push");
+      expect(bootstrapScript).toContain("pnpm check:fast");
       expect(doctorScript).toContain(
         "Checking local development prerequisites",
       );
@@ -715,6 +738,10 @@ describe("create-gmacko-app scaffold", () => {
       expect(
         fs.statSync(path.join(result.appPath, "scripts/doctor.sh")).mode &
           0o111,
+      ).toBeTruthy();
+      expect(
+        fs.statSync(path.join(result.appPath, "scripts/bootstrap-local.sh"))
+          .mode & 0o111,
       ).toBeTruthy();
     }, 120000);
 
