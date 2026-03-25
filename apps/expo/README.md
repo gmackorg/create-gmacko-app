@@ -14,4 +14,8 @@ Expo Go is useful for quick checks, but the long-term default for product work s
 
 - Set `EXPO_PUBLIC_APP_DOMAIN` before you configure associated domains and deep-link verification.
 - Replace the scaffold bundle identifier values in `app.config.ts` before store submission.
+- Configure Sign in with Apple credentials before shipping iOS builds with social login.
+- Verify the in-app account deletion flow on a real device before App Store submission.
 - Keep staging and production API URLs explicit so the dev client, beta builds, and store builds do not drift.
+- Run `pnpm --filter @gmacko/expo check:app-store` and clear every placeholder before a release candidate.
+- Work through the [mobile QA checklist](./docs/mobile-qa.md) before shipping a release candidate.

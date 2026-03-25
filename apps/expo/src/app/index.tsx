@@ -1,9 +1,10 @@
 import { useTranslationsNative } from "@gmacko/i18n/native";
 import { LegendList } from "@legendapp/list";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import * as AppleAuthentication from "expo-apple-authentication";
 import { Link, Stack } from "expo-router";
-import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Platform, Pressable, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import type { RouterOutputs } from "~/utils/api";
@@ -107,6 +108,37 @@ function CreatePost() {
 function MobileAuth() {
   const { data: session } = authClient.useSession();
   const t = useTranslationsNative();
+  const [appleAuthAvailable, setAppleAuthAvailable] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS !== "ios") {
+      return;
+    }
+
+    void AppleAuthentication.isAvailableAsync().then(setAppleAuthAvailable);
+  }, []);
+
+  const handleAppleSignIn = async () => {
+    const credential = await AppleAuthentication.signInAsync({
+      requestedScopes: [
+        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+        AppleAuthentication.AppleAuthenticationScope.EMAIL,
+      ],
+    });
+
+    if (!credential.identityToken) {
+      throw new Error("Apple sign-in did not return an identity token.");
+    }
+
+    await authClient.signIn.social({
+      provider: "apple",
+      idToken: {
+        token: credential.identityToken,
+        accessToken: credential.authorizationCode ?? undefined,
+      },
+      callbackURL: "/",
+    });
+  };
 
   return (
     <>
@@ -130,6 +162,17 @@ function MobileAuth() {
           {session ? t("auth.signOut") : t("auth.signIn") + " With Discord"}
         </Text>
       </Pressable>
+      {!session && appleAuthAvailable ? (
+        <AppleAuthentication.AppleAuthenticationButton
+          buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+          buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+          cornerRadius={8}
+          onPress={() => {
+            void handleAppleSignIn();
+          }}
+          style={{ height: 44, marginTop: 12, width: "100%" }}
+        />
+      ) : null}
     </>
   );
 }

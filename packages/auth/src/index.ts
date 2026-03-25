@@ -14,6 +14,9 @@ export function initAuth<
 
   discordClientId: string;
   discordClientSecret: string;
+  appleClientId?: string;
+  appleClientSecret?: string;
+  appleBundleIdentifier?: string;
   extraPlugins?: TExtraPlugins;
 }) {
   const config = {
@@ -35,8 +38,17 @@ export function initAuth<
         clientSecret: options.discordClientSecret,
         redirectURI: `${options.productionUrl}/api/auth/callback/discord`,
       },
+      ...(options.appleClientId && options.appleClientSecret
+        ? {
+            apple: {
+              clientId: options.appleClientId,
+              clientSecret: options.appleClientSecret,
+              appBundleIdentifier: options.appleBundleIdentifier,
+            },
+          }
+        : {}),
     },
-    trustedOrigins: ["expo://"],
+    trustedOrigins: ["expo://", "https://appleid.apple.com"],
     onAPIError: {
       onError(error, ctx) {
         console.error("BETTER AUTH API ERROR", error, ctx);

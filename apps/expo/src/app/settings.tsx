@@ -18,6 +18,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { trpc } from "~/utils/api";
+import { authClient } from "~/utils/auth";
 import { setLocale } from "~/utils/i18n";
 
 const PERMISSIONS = ["read", "write", "delete", "admin"] as const;
@@ -375,6 +376,53 @@ function ApiKeysSection() {
   );
 }
 
+function AccountSection() {
+  const { mutate: deleteAccount, isPending } = useMutation(
+    trpc.settings.deleteAccount.mutationOptions({
+      onSuccess: async () => {
+        await authClient.signOut();
+        Alert.alert("Account deleted", "Your account has been deleted.");
+      },
+    }),
+  );
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete Account",
+      "This permanently deletes your account, sessions, API keys, and preferences.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete Account",
+          style: "destructive",
+          onPress: () => deleteAccount(),
+        },
+      ],
+    );
+  };
+
+  return (
+    <View className="border-border bg-card mt-4 rounded-lg border p-4">
+      <Text className="text-foreground mb-2 text-lg font-semibold">
+        Account
+      </Text>
+      <Text className="text-muted-foreground mb-4">
+        App Store review requires in-app account deletion when account creation
+        is supported.
+      </Text>
+      <Pressable
+        onPress={handleDeleteAccount}
+        disabled={isPending}
+        className="bg-destructive rounded-md px-4 py-3"
+      >
+        <Text className="text-destructive-foreground text-center font-medium">
+          {isPending ? "Deleting…" : "Delete Account"}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
 export default function SettingsScreen() {
   return (
     <SafeAreaView className="bg-background flex-1">
@@ -385,6 +433,7 @@ export default function SettingsScreen() {
         </Text>
         <PreferencesSection />
         <ApiKeysSection />
+        <AccountSection />
       </ScrollView>
     </SafeAreaView>
   );

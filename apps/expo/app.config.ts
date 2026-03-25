@@ -48,6 +48,7 @@ const getSentryConfig = () => {
 export default ({ config }: ConfigContext): ExpoConfig => {
   const sentryPlugin = getSentryConfig();
   const plugins: ExpoConfig["plugins"] = [
+    "expo-apple-authentication",
     "expo-router",
     "expo-secure-store",
     "expo-web-browser",
@@ -88,6 +89,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ios: {
       bundleIdentifier: getBundleId(),
       supportsTablet: true,
+      usesAppleSignIn: true,
       associatedDomains: [`applinks:${ASSOCIATED_DOMAIN}`],
       icon: {
         light: "./assets/icon-light.png",

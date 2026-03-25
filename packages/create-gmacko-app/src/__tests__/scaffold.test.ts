@@ -417,9 +417,22 @@ describe("create-gmacko-app scaffold", () => {
 
       const expoPkg = readJson<{
         scripts?: Record<string, string>;
+        dependencies?: Record<string, string>;
       }>(result.appPath, "apps/expo/package.json");
       const expoReadme = readFile(result.appPath, "apps/expo/README.md");
       const expoConfig = readFile(result.appPath, "apps/expo/app.config.ts");
+      const expoIndex = readFile(result.appPath, "apps/expo/src/app/index.tsx");
+      const expoSettings = readFile(
+        result.appPath,
+        "apps/expo/src/app/settings.tsx",
+      );
+      const settingsRouter = readFile(
+        result.appPath,
+        "packages/api/src/router/settings.ts",
+      );
+      const authEnv = readFile(result.appPath, "packages/auth/env.ts");
+      const authIndex = readFile(result.appPath, "packages/auth/src/index.ts");
+      const mobileQa = readFile(result.appPath, "apps/expo/docs/mobile-qa.md");
       const rootReadme = readFile(result.appPath, "README.md");
       const expectedDisplayName = appName
         .split("-")
@@ -429,11 +442,17 @@ describe("create-gmacko-app scaffold", () => {
       expect(expoPkg.scripts?.["dev:client"]).toBeDefined();
       expect(expoPkg.scripts?.["build:device:ios"]).toBeDefined();
       expect(expoPkg.scripts?.["build:device:android"]).toBeDefined();
+      expect(expoPkg.scripts?.["check:app-store"]).toBe(
+        "node ./scripts/check-app-store-readiness.mjs",
+      );
+      expect(expoPkg.dependencies?.["expo-apple-authentication"]).toBeDefined();
       expect(expoReadme).toContain("Expo Orbit");
       expect(expoReadme).toContain("development build");
       expect(expoReadme).toContain("EXPO_PUBLIC_APP_DOMAIN");
       expect(expoReadme).toContain("associated domains");
       expect(expoReadme).toContain("bundle identifier");
+      expect(expoReadme).toContain("Sign in with Apple");
+      expect(expoReadme).toContain("account deletion");
       expect(expoConfig).toContain(`slug: "${appName}"`);
       expect(expoConfig).toContain(`scheme: "${appName}"`);
       expect(expoConfig).toContain(
@@ -444,6 +463,8 @@ describe("create-gmacko-app scaffold", () => {
       expect(expoConfig).toContain(`return "${expectedDisplayName} (Dev)";`);
       expect(expoConfig).toContain("EXPO_PUBLIC_APP_DOMAIN");
       expect(expoConfig).toContain('"change-me.example.com"');
+      expect(expoConfig).toContain("usesAppleSignIn: true");
+      expect(expoConfig).toContain('"expo-apple-authentication"');
       expect(expoConfig).toContain(
         "associatedDomains: [`applinks:${ASSOCIATED_DOMAIN}`]",
       );
@@ -452,6 +473,20 @@ describe("create-gmacko-app scaffold", () => {
       expect(expoConfig).toContain(
         "Scaffold note: replace these app identifiers and domains before store submission.",
       );
+      expect(expoIndex).toContain("AppleAuthenticationButton");
+      expect(expoIndex).toContain('provider: "apple"');
+      expect(expoSettings).toContain("Delete Account");
+      expect(expoSettings).toContain("deleteAccount");
+      expect(settingsRouter).toContain("deleteAccount:");
+      expect(settingsRouter).toContain(".delete(user)");
+      expect(authEnv).toContain("AUTH_APPLE_ID");
+      expect(authEnv).toContain("AUTH_APPLE_SECRET");
+      expect(authEnv).toContain("AUTH_APPLE_BUNDLE_ID");
+      expect(authIndex).toContain("apple:");
+      expect(authIndex).toContain("appBundleIdentifier");
+      expect(authIndex).toContain("https://appleid.apple.com");
+      expect(mobileQa).toContain("Sign in with Apple");
+      expect(mobileQa).toContain("account deletion");
       expect(rootReadme).toContain("Scaffold profile");
       expect(rootReadme).toContain("Platforms: Next.js, Expo");
       expect(rootReadme).toContain(
@@ -463,6 +498,37 @@ describe("create-gmacko-app scaffold", () => {
       );
       expect(rootReadme).toContain("Expo Orbit");
       expect(rootReadme).toContain("dev:client");
+    }, 120000);
+
+    it("should scaffold an app-store readiness script for Expo", async () => {
+      const appName = generateAppName("expo-app-store");
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-install", "--no-git"],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+      expect(
+        fileExists(
+          result.appPath,
+          "apps/expo/scripts/check-app-store-readiness.mjs",
+        ),
+      ).toBe(true);
+
+      const appStoreCheck = readFile(
+        result.appPath,
+        "apps/expo/scripts/check-app-store-readiness.mjs",
+      );
+
+      expect(appStoreCheck).toContain("change-me.example.com");
+      expect(appStoreCheck).toContain("your-project-id");
+      expect(appStoreCheck).toContain("Your App Name");
+      expect(appStoreCheck).toContain("privacy_url.txt");
+      expect(appStoreCheck).toContain("support_url.txt");
+      expect(appStoreCheck).toContain("process.exit(1)");
     }, 120000);
 
     it("should scaffold web env files without vercel presets", async () => {
@@ -614,6 +680,71 @@ describe("create-gmacko-app scaffold", () => {
       expect(mcpConfig.mcpServers?.["next-devtools"]?.args).toContain(
         "next-devtools-mcp@latest",
       );
+
+      const rootReadme = readFile(result.appPath, "README.md");
+      expect(rootReadme).toContain("Agent quickstart");
+      expect(rootReadme).toContain("AGENTS.md");
+      expect(rootReadme).toContain(".mcp.json");
+      expect(rootReadme).toContain(".claude/settings.json");
+      expect(rootReadme).toContain("opencode.json");
+    }, 120000);
+
+    it("should omit the generated agent quickstart when AI workflow files are excluded", async () => {
+      const appName = generateAppName("no-ai-quickstart");
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-install", "--no-git", "--no-ai"],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+
+      const rootReadme = readFile(result.appPath, "README.md");
+      expect(rootReadme).not.toContain("## Agent quickstart");
+    }, 120000);
+
+    it("should scaffold a mobile QA checklist when Expo is included", async () => {
+      const appName = generateAppName("mobile-qa");
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-install", "--no-git"],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+      expect(fileExists(result.appPath, "apps/expo/docs/mobile-qa.md")).toBe(
+        true,
+      );
+
+      const expoReadme = readFile(result.appPath, "apps/expo/README.md");
+      const mobileQa = readFile(result.appPath, "apps/expo/docs/mobile-qa.md");
+
+      expect(expoReadme).toContain("mobile QA checklist");
+      expect(mobileQa).toContain("dev client");
+      expect(mobileQa).toContain("deep link");
+      expect(mobileQa).toContain("auth callback");
+      expect(mobileQa).toContain("store metadata");
+      expect(mobileQa).toContain("release build");
+    }, 120000);
+
+    it("should not generate the mobile QA checklist when Expo is excluded", async () => {
+      const appName = generateAppName("no-mobile-qa");
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-install", "--no-git", "--no-mobile"],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+      expect(fileExists(result.appPath, "apps/expo/docs/mobile-qa.md")).toBe(
+        false,
+      );
     }, 120000);
 
     it("should avoid legacy eslint suppression comments in scaffold source files", async () => {
@@ -691,6 +822,21 @@ describe("create-gmacko-app scaffold", () => {
         expect(plan).toContain("ForgeGraph");
         expect(plan).toContain("Postgres");
       }
+    });
+
+    it("should keep the workers support matrix explicit about maturity by integration", () => {
+      const developerExperience = fs.readFileSync(
+        new URL("../../../../docs/ai/DEVELOPER_EXPERIENCE.md", import.meta.url),
+        "utf8",
+      );
+
+      expect(developerExperience).toContain("Workers Integration Matrix");
+      expect(developerExperience).toContain("Sentry");
+      expect(developerExperience).toContain("PostHog");
+      expect(developerExperience).toContain("Stripe");
+      expect(developerExperience).toContain("stable");
+      expect(developerExperience).toContain("experimental");
+      expect(developerExperience).toContain("unsupported");
     });
 
     it("should scaffold a modern tooling baseline", async () => {

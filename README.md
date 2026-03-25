@@ -178,9 +178,10 @@ Expo development should prefer development builds plus Expo Orbit over long-term
 ```bash
 pnpm --filter @gmacko/expo build:device:ios
 pnpm --filter @gmacko/expo dev:client
+pnpm --filter @gmacko/expo check:app-store
 ```
 
-Orbit gives you a cleaner device/simulator install loop once the development build exists.
+Orbit gives you a cleaner device/simulator install loop once the development build exists. `check:app-store` fails fast if the scaffold still contains placeholder App Store metadata, Expo project IDs, or associated-domain values.
 
 #### Use iOS Simulator
 
@@ -215,6 +216,8 @@ In order to get Better-Auth to work with Expo, you must either:
 Better-auth comes with an [auth proxy plugin](https://www.better-auth.com/docs/plugins/oauth-proxy). By deploying the Next.js app, you can get OAuth working in preview deployments and development for Expo apps.
 
 By using the proxy plugin, the Next.js apps will forward any auth requests to the proxy server, which will handle the OAuth flow and then redirect back to the Next.js app. This makes it easy to get OAuth working since you'll have a stable URL that is publicly accessible and doesn't change for every deployment and doesn't rely on what port the app is running on. So if port 3000 is taken and your Next.js app starts at port 3001 instead, your auth should still work without having to reconfigure the OAuth provider.
+
+For iOS releases, if you keep third-party sign-in enabled, also configure Sign in with Apple and verify the in-app account deletion flow before submission.
 
 #### Add your local IP to your OAuth provider
 

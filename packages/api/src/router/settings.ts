@@ -2,6 +2,7 @@ import { and, eq, isNull } from "@gmacko/db";
 import {
   apiKeys,
   UpdateUserPreferencesSchema,
+  user,
   userPreferences,
 } from "@gmacko/db/schema";
 import type { TRPCRouterRecord } from "@trpc/server";
@@ -144,4 +145,13 @@ export const settingsRouter = {
 
       return { success: !!revoked };
     }),
+
+  deleteAccount: protectedProcedure.mutation(async ({ ctx }) => {
+    const [deletedUser] = await ctx.db
+      .delete(user)
+      .where(eq(user.id, ctx.session.user.id))
+      .returning({ id: user.id });
+
+    return { success: !!deletedUser };
+  }),
 } satisfies TRPCRouterRecord;

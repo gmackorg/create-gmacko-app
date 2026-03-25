@@ -24,4 +24,7 @@ export const auth = initAuth({
   secret: "secret",
   discordClientId: "1234567890",
   discordClientSecret: "1234567890",
+  appleClientId: "com.gmacko.app",
+  appleClientSecret: "apple-client-secret",
+  appleBundleIdentifier: "com.gmacko.app",
 });

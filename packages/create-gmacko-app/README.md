@@ -152,6 +152,7 @@ Generated apps should be guided toward:
   - `apps/nextjs/README.cloudflare.md`
   - `prebuild:vinext`, `build:vinext`, `deploy:cloudflare:staging`, and `deploy:cloudflare:production`
 - Expo development-build scripts and an app-local mobile README geared around Expo Orbit
+- Expo Sign in with Apple scaffolding, in-app account deletion, and `check:app-store` placeholder validation for App Store readiness
 - hosted Postgres only after the product has enough customers to justify the added operational split
 - `jj` as the default repo shape, with colocated Git compatibility for GitHub and other tooling
 - a modern baseline of `oxlint`, `biome`, `lefthook`, `commitlint`, and `knip`
