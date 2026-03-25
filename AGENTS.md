@@ -8,7 +8,7 @@ This repository is set up to work well with `Codex`, `Claude Code`, and `OpenCod
 - Keep `docs/ai/INITIAL_PROPOSAL.md`, `docs/ai/IMPLEMENTATION_PLAN.md`, and `DESIGN.md` aligned with major product and implementation changes.
 - Prefer `jj` for local version control workflows. The repo is colocated with Git for interoperability.
 - Use `pnpm`, `oxlint`, `biome`, and `turbo` as the default tooling surface.
-- Use ForgeGraph for deployment workflows and `fg` from [`../ForgeGraph`](../ForgeGraph) when working against the real deployment control plane.
+- Use ForgeGraph for deployment workflows and `forge` from [`../ForgeGraph`](../ForgeGraph) when working against the real deployment control plane.
 - Treat [docs/ai/DEVELOPER_EXPERIENCE.md](./docs/ai/DEVELOPER_EXPERIENCE.md) as the current support matrix for agent tooling, Cloudflare Workers, ForgeGraph, Nix, and mobile DX choices.
 
 ## Planning Flow

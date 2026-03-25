@@ -138,7 +138,7 @@ export async function scaffold(options: CliOptions): Promise<void> {
   ${pc.cyan("cd")} ${options.appName}
   ${pc.cyan("pnpm")} bootstrap:local
   ${pc.dim("# Update .forgegraph.yaml with your real server, domains, and nodes")}
-  ${pc.cyan("pnpm")} fg:doctor
+  ${pc.cyan("pnpm")} forge:doctor
   ${pc.cyan("pnpm")} check:fast
   ${pc.cyan("pnpm")} dev
 `);
@@ -402,13 +402,14 @@ function addForgeGraphScripts(targetDir: string): void {
   };
 
   rootPackage.scripts ??= {};
-  rootPackage.scripts["fg:diff"] = "fg diff";
-  rootPackage.scripts["fg:apply"] = "fg apply";
-  rootPackage.scripts["fg:pull"] = "fg pull";
-  rootPackage.scripts["fg:deploy:staging"] = "fg deploy create staging --wait";
-  rootPackage.scripts["fg:deploy:production"] =
-    "fg deploy create production --wait";
-  rootPackage.scripts["fg:stages"] = "fg stage list";
+  rootPackage.scripts["forge:diff"] = "forge diff";
+  rootPackage.scripts["forge:apply"] = "forge apply";
+  rootPackage.scripts["forge:pull"] = "forge pull";
+  rootPackage.scripts["forge:deploy:staging"] =
+    "forge deploy create staging --wait";
+  rootPackage.scripts["forge:deploy:production"] =
+    "forge deploy create production --wait";
+  rootPackage.scripts["forge:stages"] = "forge stage list";
 
   fs.writeJsonSync(rootPackagePath, rootPackage, { spaces: 2 });
 }

@@ -898,19 +898,19 @@ describe("create-gmacko-app scaffold", () => {
       expect(pkg.scripts?.["check:release"]).toBe(
         "pnpm --dir packages/create-gmacko-app test && pnpm --dir packages/create-gmacko-app build && pnpm release:cli:dry-run",
       );
-      expect(pkg.scripts?.["fg:init"]).toBe("fg init --full");
-      expect(pkg.scripts?.["fg:doctor"]).toBe("fg doctor");
-      expect(pkg.scripts?.["fg:status"]).toBe("fg status");
-      expect(pkg.scripts?.["fg:diff"]).toBe("fg diff");
-      expect(pkg.scripts?.["fg:apply"]).toBe("fg apply");
-      expect(pkg.scripts?.["fg:pull"]).toBe("fg pull");
-      expect(pkg.scripts?.["fg:deploy:staging"]).toBe(
-        "fg deploy create staging --wait",
+      expect(pkg.scripts?.["forge:init"]).toBe("forge init --full");
+      expect(pkg.scripts?.["forge:doctor"]).toBe("forge doctor");
+      expect(pkg.scripts?.["forge:status"]).toBe("forge status");
+      expect(pkg.scripts?.["forge:diff"]).toBe("forge diff");
+      expect(pkg.scripts?.["forge:apply"]).toBe("forge apply");
+      expect(pkg.scripts?.["forge:pull"]).toBe("forge pull");
+      expect(pkg.scripts?.["forge:deploy:staging"]).toBe(
+        "forge deploy create staging --wait",
       );
-      expect(pkg.scripts?.["fg:deploy:production"]).toBe(
-        "fg deploy create production --wait",
+      expect(pkg.scripts?.["forge:deploy:production"]).toBe(
+        "forge deploy create production --wait",
       );
-      expect(pkg.scripts?.["fg:stages"]).toBe("fg stage list");
+      expect(pkg.scripts?.["forge:stages"]).toBe("forge stage list");
       expect(pkg.scripts?.knip).toBeDefined();
       expect(pkg.scripts?.prepare).toBe(
         "git rev-parse --git-dir >/dev/null 2>&1 && lefthook install || true",
@@ -928,7 +928,7 @@ describe("create-gmacko-app scaffold", () => {
       expect(bootstrapScript).toContain(
         "ForgeGraph placeholders are still present in .forgegraph.yaml",
       );
-      expect(bootstrapScript).toContain("pnpm fg:apply");
+      expect(bootstrapScript).toContain("pnpm forge:apply");
       expect(doctorScript).toContain(
         "Checking local development prerequisites",
       );
@@ -1080,8 +1080,8 @@ describe("create-gmacko-app scaffold", () => {
     expect(e2eWorkflow).toContain(
       "pnpm --filter @gmacko/nextjs deploy:cloudflare:staging",
     );
-    expect(e2eWorkflow).toContain("pnpm fg:stages");
-    expect(e2eWorkflow).toContain("pnpm fg:deploy:staging");
+    expect(e2eWorkflow).toContain("pnpm forge:stages");
+    expect(e2eWorkflow).toContain("pnpm forge:deploy:staging");
     expect(e2eWorkflow).toContain("pnpm auth:generate");
     expect(e2eWorkflow).toContain("pnpm db:generate");
     expect(e2eWorkflow).toContain(

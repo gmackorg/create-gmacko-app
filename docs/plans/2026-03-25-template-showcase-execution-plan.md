@@ -86,7 +86,7 @@
 2. Add failing scaffold tests for the desired `.forgegraph.yaml` shape and any new CLI flags needed to fill it.
 3. Update scaffold generation and CLI option parsing to match the real schema instead of placeholders where safe.
 4. Update deployment docs to mirror the exact generated schema and command flow.
-5. Verify the generated repo still passes the fake-`fg` smoke path in CLI E2E.
+5. Verify the generated repo still passes the fake-`forge` smoke path in CLI E2E.
 6. Commit with a message like `feat: align forgegraph scaffold schema`.
 
 ### Task 5: Add generated deployment checklists

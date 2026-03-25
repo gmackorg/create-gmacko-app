@@ -118,15 +118,15 @@ jobs:
       - name: Smoke ForgeGraph scripts
         run: |
           mkdir -p /tmp/fake-bin
-          cat > /tmp/fake-bin/fg << 'EOF'
+          cat > /tmp/fake-bin/forge << 'EOF'
           #!/bin/sh
-          echo "fake-fg $@"
+          echo "fake-forge $@"
           EOF
-          chmod +x /tmp/fake-bin/fg
-          PATH="/tmp/fake-bin:$PATH" pnpm fg:stages | tee /tmp/e2e-test/fg-stages.log
-          PATH="/tmp/fake-bin:$PATH" pnpm fg:deploy:staging | tee /tmp/e2e-test/fg-deploy-staging.log
-          grep 'fake-fg stage list' /tmp/e2e-test/fg-stages.log || (echo "ForgeGraph stage script did not invoke fg correctly" && exit 1)
-          grep 'fake-fg deploy create staging --wait' /tmp/e2e-test/fg-deploy-staging.log || (echo "ForgeGraph deploy script did not invoke fg correctly" && exit 1)
+          chmod +x /tmp/fake-bin/forge
+          PATH="/tmp/fake-bin:$PATH" pnpm forge:stages | tee /tmp/e2e-test/forge-stages.log
+          PATH="/tmp/fake-bin:$PATH" pnpm forge:deploy:staging | tee /tmp/e2e-test/forge-deploy-staging.log
+          grep 'fake-forge stage list' /tmp/e2e-test/forge-stages.log || (echo "ForgeGraph stage script did not invoke forge correctly" && exit 1)
+          grep 'fake-forge deploy create staging --wait' /tmp/e2e-test/forge-deploy-staging.log || (echo "ForgeGraph deploy script did not invoke forge correctly" && exit 1)
         working-directory: /tmp/e2e-test/test-app-default
 
       - name: Run auth and db bootstrap commands

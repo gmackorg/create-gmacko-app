@@ -141,9 +141,9 @@ Generated apps should be guided toward:
 - ForgeGraph-managed deployments as the default operating model
 - Hetzner VPS hosting with Postgres deployed alongside the app in the early stage
 - Nix-based build and runtime definitions as the repo evolves into a ForgeGraph-native deployment target
-- generated `.forgegraph.yaml` aligned to the live `fg` repo contract with `app`, `server`, `stages`, and operator notes as comments
+- generated `.forgegraph.yaml` aligned to the live `forge` repo contract with `app`, `server`, `stages`, and operator notes as comments
 - optional CLI overrides for ForgeGraph server, stage node, and route placeholders
-- `fg:init`, `fg:doctor`, `fg:status`, `fg:diff`, `fg:apply`, `fg:pull`, `fg:stages`, `fg:deploy:staging`, and `fg:deploy:production` as the default repo-level ForgeGraph command surface
+- `forge:init`, `forge:doctor`, `forge:status`, `forge:diff`, `forge:apply`, `forge:pull`, `forge:stages`, `forge:deploy:staging`, and `forge:deploy:production` as the default repo-level ForgeGraph command surface
 - `--vinext` scaffolding that now emits:
   - `apps/nextjs/vite.config.ts`
   - `apps/nextjs/wrangler.jsonc`
@@ -169,7 +169,7 @@ pnpm bootstrap:local
 pnpm check:fast
 ```
 
-`pnpm doctor` checks the local baseline for Node, pnpm, Docker Compose, `jj`, `fg`, `.env`, and `.forgegraph.yaml`. It also warns when ForgeGraph config still contains scaffold placeholders, verifies grouped core/ForgeGraph env values, and, for `--vinext` apps, checks Wrangler plus grouped Cloudflare env values.
+`pnpm doctor` checks the local baseline for Node, pnpm, Docker Compose, `jj`, `forge`, `.env`, and `.forgegraph.yaml`. It also warns when ForgeGraph config still contains scaffold placeholders, verifies grouped core/ForgeGraph env values, and, for `--vinext` apps, checks Wrangler plus grouped Cloudflare env values.
 
 ## Maintaining The CLI
 

@@ -194,17 +194,17 @@ export async function provisionForgeGraph(
   if (hasLocalReference) {
     p.log.message(
       pc.cyan(
-        `4. Use the local ForgeGraph repo at ${forgeGraphPath} and deploy with fg.`,
+        `4. Use the local ForgeGraph repo at ${forgeGraphPath} and deploy with forge.`,
       ),
     );
     p.log.message(
       pc.cyan(
-        `   Example flow: fg login --server <forgegraph-url> --token <token>`,
+        `   Example flow: forge login --server <forgegraph-url> --token <token>`,
       ),
     );
     p.log.message(
       pc.cyan(
-        `   Then: fg app create ${config.appName} --flake-ref . && fg stage add production --node <node-id> && fg deploy create production --wait`,
+        `   Then: forge app create ${config.appName} --flake-ref . && forge stage add production --node <node-id> && forge deploy create production --wait`,
       ),
     );
   }

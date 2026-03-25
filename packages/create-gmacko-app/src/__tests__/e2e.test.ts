@@ -132,12 +132,12 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
       createMockEnv(appPath);
 
       const fakeBin = createFakeCliBin(appPath, {
-        fg: 'echo "fake-fg $@"',
+        forge: 'echo "fake-forge $@"',
       });
 
       const result = runInApp(
         appPath,
-        "pnpm fg:stages && pnpm fg:deploy:staging && pnpm fg:deploy:production",
+        "pnpm forge:stages && pnpm forge:deploy:staging && pnpm forge:deploy:production",
         {
           env: {
             PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
@@ -152,10 +152,12 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
       }
 
       expect(result.success).toBe(true);
-      expect(result.stdout).toContain("fake-fg stage list");
-      expect(result.stdout).toContain("fake-fg deploy create staging --wait");
+      expect(result.stdout).toContain("fake-forge stage list");
       expect(result.stdout).toContain(
-        "fake-fg deploy create production --wait",
+        "fake-forge deploy create staging --wait",
+      );
+      expect(result.stdout).toContain(
+        "fake-forge deploy create production --wait",
       );
     }, 180000);
 

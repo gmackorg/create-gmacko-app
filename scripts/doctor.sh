@@ -88,10 +88,10 @@ else
   warn "jj not installed; Git compatibility still works, but the repo defaults are jj-first"
 fi
 
-if command -v fg >/dev/null 2>&1; then
+if command -v forge >/dev/null 2>&1; then
   ok "ForgeGraph CLI available"
 else
-  warn "ForgeGraph CLI (fg) not installed; install/use fg from ../ForgeGraph for deploy workflows"
+  warn "ForgeGraph CLI (forge) not installed; install @forgegraph/cli or use forge from ../ForgeGraph for deploy workflows"
 fi
 
 echo ""

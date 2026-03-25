@@ -72,8 +72,8 @@ Remaining work:
 - add generated stage-specific secret/env guidance based on enabled integrations
 - add a generated deployment checklist for first production launch and rollback
 - add optional preview-stage metadata generation for teams that want ForgeGraph previews immediately
-- add richer `fg` repo scripts once the CLI surface in `../ForgeGraph` stabilizes
-- add a repo-local deployment status/check script that combines `fg status`, health route checks, and recent deployment context
+- add richer `forge` repo scripts once the CLI surface in `../ForgeGraph` stabilizes
+- add a repo-local deployment status/check script that combines `forge status`, health route checks, and recent deployment context
 
 ### 3. Cloudflare Lane Maturity
 

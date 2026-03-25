@@ -9,27 +9,27 @@ Use this directory as the handoff point between the generated app repo and the F
 3. Store runtime secrets in ForgeGraph rather than embedding deployment-specific config in GitHub Actions.
 4. Promote hosted Postgres only when real customer load or operational constraints justify the split.
 
-## `fg` Workflow
+## `forge` Workflow
 
-If you are working from the sibling [`../ForgeGraph`](../../ForgeGraph) repo, use `fg` as the operator interface:
+If you are working from the sibling [`../ForgeGraph`](../../ForgeGraph) repo, use `forge` as the operator interface. If you want the published CLI, install `@forgegraph/cli`.
 
 ```bash
-fg login --server <forgegraph-url> --token <token>
-fg diff
-fg apply
-fg stage list
-fg deploy create staging --wait
-fg deploy create production --wait
+forge login --server <forgegraph-url> --token <token>
+forge diff
+forge apply
+forge stage list
+forge deploy create staging --wait
+forge deploy create production --wait
 ```
 
-Use `fg logs <app> <stage> --follow` to follow a stage after it starts deploying.
+Use `forge logs <app> <stage> --follow` to follow a stage after it starts deploying.
 
 The generated repo now also includes:
 
-- `.forgegraph.yaml` aligned to the current live `fg` repo contract: `app`, `server`, and `stages`, plus operator notes as comments
-- `pnpm fg:diff`, `pnpm fg:apply`, and `pnpm fg:pull` wrappers for repo-local config sync
-- `pnpm fg:deploy:staging` and `pnpm fg:deploy:production` wrappers around `fg deploy create <stage> --wait`
-- `pnpm fg:stages` as a quick repo-local view of configured ForgeGraph stages
+- `.forgegraph.yaml` aligned to the current live `forge` repo contract: `app`, `server`, and `stages`, plus operator notes as comments
+- `pnpm forge:diff`, `pnpm forge:apply`, and `pnpm forge:pull` wrappers for repo-local config sync
+- `pnpm forge:deploy:staging` and `pnpm forge:deploy:production` wrappers around `forge deploy create <stage> --wait`
+- `pnpm forge:stages` as a quick repo-local view of configured ForgeGraph stages
 
 ## Preview Environments
 
@@ -53,5 +53,5 @@ For production on the Hetzner VPS:
 - run the app under the repo's `flake.nix`
 - run Postgres alongside the app first
 - point your stable domain at the ForgeGraph-managed deployment
-- drive deploys and secret changes through `fg`
+- drive deploys and secret changes through `forge`
 - keep backups and migration steps explicit before moving to hosted Postgres
