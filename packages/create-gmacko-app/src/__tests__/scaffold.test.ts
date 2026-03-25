@@ -827,6 +827,15 @@ describe("create-gmacko-app scaffold", () => {
     expect(() => JSON.parse(baseTsconfig)).not.toThrow();
   });
 
+  it("keeps local release artifacts out of git status", () => {
+    const gitignore = fs.readFileSync(
+      path.resolve(process.cwd(), "../../.gitignore"),
+      "utf8",
+    );
+
+    expect(gitignore).toContain(".artifacts");
+  });
+
   it("keeps repo lint noise focused on first-party files", () => {
     const oxlintConfig = JSON.parse(
       fs.readFileSync(

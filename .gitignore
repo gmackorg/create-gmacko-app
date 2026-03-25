@@ -27,6 +27,7 @@ apps/expo/android
 
 # production
 build
+.artifacts
 
 # misc
 .DS_Store
