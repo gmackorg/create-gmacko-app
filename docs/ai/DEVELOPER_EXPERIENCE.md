@@ -63,6 +63,27 @@ Current default recommendations:
 - `vinext` is the experimental path if we want Next.js semantics on a Vite/Workers runtime.
 - TanStack Start is the cleaner default when we want Cloudflare-native runtime behavior from day one.
 
+### Workers Integration Matrix
+
+Use these labels literally when describing the `vinext` lane:
+
+- `stable`: works well enough to recommend without caveats for the Workers lane
+- `experimental`: plausible, but not a lane we should oversell yet
+- `unsupported`: do not position this as part of the current `vinext` contract
+
+Current direction:
+
+| Integration | TanStack Start on Workers | Next.js via `vinext` |
+| --- | --- | --- |
+| Sentry | experimental | experimental |
+| PostHog | stable | experimental |
+| Stripe | unsupported | unsupported |
+| Email | stable | experimental |
+| Realtime | experimental | experimental |
+| Storage | experimental | experimental |
+
+If a lane is not clearly `stable`, call out the risk in docs and generated guidance instead of implying parity with the ForgeGraph path.
+
 Treat ForgeGraph/Nix and Cloudflare Workers as separate deployment lanes. Do not force one runtime model to satisfy both.
 
 ## Mobile Stack

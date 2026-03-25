@@ -276,6 +276,9 @@ function customizeGeneratedReadme(
 
   const readme = fs.readFileSync(readmePath, "utf8");
   const profileBlock = buildScaffoldProfileBlock(options);
+  const agentQuickstartBlock = options.includeAi
+    ? `\n\n${buildAgentQuickstartBlock()}`
+    : "";
   const startIndex = readme.indexOf(startMarker);
   const endIndex = readme.indexOf(endMarker);
 
@@ -286,9 +289,20 @@ function customizeGeneratedReadme(
   const updatedReadme =
     readme.slice(0, startIndex) +
     profileBlock +
+    agentQuickstartBlock +
     readme.slice(endIndex + endMarker.length);
 
   fs.writeFileSync(readmePath, updatedReadme);
+}
+
+function buildAgentQuickstartBlock(): string {
+  return `## Agent quickstart
+
+- Read \`AGENTS.md\` first for the shared repo rules.
+- Use \`.mcp.json\` for the repo MCP server setup.
+- Claude Code users should check \`.claude/settings.json\`.
+- OpenCode users should check \`opencode.json\`.
+`;
 }
 
 function buildScaffoldProfileBlock(options: CliOptions): string {
