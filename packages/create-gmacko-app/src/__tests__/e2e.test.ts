@@ -161,6 +161,23 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
       );
     }, 180000);
 
+    it("should resolve forge from the local repo install", () => {
+      console.log("[E2E] Verifying local forge CLI resolution...");
+      createMockEnv(appPath);
+
+      const result = runInApp(appPath, "pnpm exec forge --version", {
+        timeout: 120000,
+      });
+
+      if (!result.success) {
+        console.error("[E2E] Local forge CLI resolution failed:");
+        console.error(result.stderr || result.stdout);
+      }
+
+      expect(result.success).toBe(true);
+      expect(result.stdout.trim()).toMatch(/^0\\./);
+    }, 180000);
+
     it("should complete auth and db bootstrap commands", () => {
       console.log("[E2E] Running auth/db bootstrap checks...");
       createMockEnv(appPath);

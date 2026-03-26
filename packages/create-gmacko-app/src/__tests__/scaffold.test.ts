@@ -1086,6 +1086,7 @@ describe("create-gmacko-app scaffold", () => {
     expect(e2eWorkflow).toContain(
       "pnpm --filter @gmacko/nextjs deploy:cloudflare:staging",
     );
+    expect(e2eWorkflow).toContain("pnpm exec forge --version");
     expect(e2eWorkflow).toContain("pnpm forge:stages");
     expect(e2eWorkflow).toContain("pnpm forge:deploy:staging");
     expect(e2eWorkflow).toContain("pnpm auth:generate");
