@@ -22,6 +22,7 @@ import { authClient } from "~/utils/auth";
 import { setLocale } from "~/utils/i18n";
 
 const PERMISSIONS = ["read", "write", "delete", "admin"] as const;
+const COLLABORATION_ROLES = ["member", "admin"] as const;
 
 function PreferencesSection() {
   const queryClient = useQueryClient();
@@ -376,6 +377,145 @@ function ApiKeysSection() {
   );
 }
 
+function CollaborationSection() {
+  const queryClient = useQueryClient();
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"admin" | "member">("member");
+
+  const { data: workspaceContext, isLoading: isWorkspaceLoading } = useQuery(
+    trpc.settings.getWorkspaceContext.queryOptions(),
+  );
+
+  const { data: invites, isLoading: isInvitesLoading } = useQuery({
+    ...trpc.settings.listInvites.queryOptions(),
+    enabled: workspaceContext?.canManageWorkspace ?? false,
+  });
+
+  const { mutate: createInvite, isPending: isCreatingInvite } = useMutation(
+    trpc.settings.createInvite.mutationOptions({
+      onSuccess: async () => {
+        setInviteEmail("");
+        setInviteRole("member");
+        await queryClient.invalidateQueries(
+          trpc.settings.getWorkspaceContext.queryFilter(),
+        );
+        await queryClient.invalidateQueries(
+          trpc.settings.listInvites.queryFilter(),
+        );
+        Alert.alert("Invite created", "The teammate invite is now pending.");
+      },
+      onError: (error) => {
+        Alert.alert(
+          "Could not create invite",
+          error.message || "Try again from the current workspace.",
+        );
+      },
+    }),
+  );
+
+  if (isWorkspaceLoading || !workspaceContext?.canManageWorkspace) {
+    return null;
+  }
+
+  const handleCreateInvite = () => {
+    if (!inviteEmail.trim()) {
+      return;
+    }
+
+    createInvite({
+      email: inviteEmail.trim(),
+      role: inviteRole,
+    });
+  };
+
+  return (
+    <View className="border-border bg-card mt-4 rounded-lg border p-4">
+      <Text className="text-foreground mb-2 text-lg font-semibold">
+        Collaboration
+      </Text>
+      <Text className="text-muted-foreground mb-4">
+        Invite teammates into{" "}
+        {workspaceContext.workspace?.name ?? "this workspace"}. v1 keeps each
+        account on a single active workspace and limits invites to member/admin
+        roles.
+      </Text>
+
+      <Text className="text-foreground mb-2 text-sm font-medium">
+        Invite teammate
+      </Text>
+      <TextInput
+        value={inviteEmail}
+        onChangeText={setInviteEmail}
+        placeholder="teammate@example.com"
+        className="border-border bg-background text-foreground mb-3 rounded-md border px-3 py-2"
+        placeholderTextColor="#888"
+        autoCapitalize="none"
+        keyboardType="email-address"
+      />
+
+      <Text className="text-foreground mb-2 text-sm font-medium">Role</Text>
+      <View className="mb-4 flex-row flex-wrap gap-2">
+        {COLLABORATION_ROLES.map((role) => (
+          <Pressable
+            key={role}
+            onPress={() => setInviteRole(role)}
+            className={`rounded-md px-4 py-2 ${
+              inviteRole === role
+                ? "bg-primary"
+                : "border-border bg-background border"
+            }`}
+          >
+            <Text
+              className={
+                inviteRole === role
+                  ? "text-primary-foreground capitalize"
+                  : "text-foreground capitalize"
+              }
+            >
+              {role}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <Pressable
+        onPress={handleCreateInvite}
+        disabled={isCreatingInvite || inviteEmail.trim().length === 0}
+        className="bg-primary mb-4 rounded-md px-4 py-3"
+      >
+        <Text className="text-primary-foreground text-center font-medium">
+          {isCreatingInvite ? "Sending…" : "Send Invite"}
+        </Text>
+      </Pressable>
+
+      <Text className="text-foreground mb-2 text-sm font-medium">
+        Pending invites
+      </Text>
+      {isInvitesLoading ? (
+        <Text className="text-muted-foreground">Loading…</Text>
+      ) : invites && invites.length > 0 ? (
+        <View className="gap-2">
+          {invites.map((invite) => (
+            <View
+              key={invite.id}
+              className="border-border rounded-lg border p-3"
+            >
+              <Text className="text-foreground font-medium">
+                {invite.email}
+              </Text>
+              <Text className="text-muted-foreground capitalize">
+                {invite.role}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <Text className="text-muted-foreground">No pending invites yet.</Text>
+      )}
+    </View>
+  );
+}
+
 function AccountSection() {
   const { mutate: deleteAccount, isPending } = useMutation(
     trpc.settings.deleteAccount.mutationOptions({
@@ -433,6 +573,7 @@ export default function SettingsScreen() {
         </Text>
         <PreferencesSection />
         <ApiKeysSection />
+        <CollaborationSection />
         <AccountSection />
       </ScrollView>
     </SafeAreaView>

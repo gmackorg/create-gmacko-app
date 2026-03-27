@@ -55,6 +55,10 @@ type TestAllowlistEntry = {
   id: string;
   workspaceId: string;
   email: string;
+  role: "admin" | "member";
+  invitedByUserId: string;
+  createdAt: Date;
+  updatedAt: Date | null;
 };
 
 function createCaller(options?: {
@@ -80,6 +84,7 @@ function createCaller(options?: {
     memberships: [...(options?.memberships ?? [])],
     allowlistEntries: [...(options?.allowlistEntries ?? [])],
     selectedWorkspaceId: null as string | null,
+    selectedInviteId: null as string | null,
   };
 
   const sortMemberships = () =>
@@ -138,6 +143,9 @@ function createCaller(options?: {
 
           return membership;
         }),
+        findMany: vi.fn(async () =>
+          sortMemberships().filter((entry) => entry.userId === state.user.id),
+        ),
       },
       workspace: {
         findFirst: vi.fn(async () => {
@@ -160,9 +168,23 @@ function createCaller(options?: {
         }),
       },
       workspaceInviteAllowlist: {
+        findFirst: vi.fn(async ({ where }: { where?: unknown } = {}) => {
+          void where;
+          const row =
+            state.allowlistEntries.find(
+              (entry) =>
+                entry.workspaceId === state.selectedWorkspaceId ||
+                entry.id === state.selectedWorkspaceId,
+            ) ?? null;
+
+          state.selectedInviteId = row?.id ?? null;
+          return row;
+        }),
         findMany: vi.fn(async () =>
-          state.allowlistEntries.filter(
-            (entry) => entry.workspaceId === state.selectedWorkspaceId,
+          [...state.allowlistEntries].sort(
+            (a, b) =>
+              a.createdAt.getTime() - b.createdAt.getTime() ||
+              a.id.localeCompare(b.id),
           ),
         ),
       },
@@ -181,8 +203,75 @@ function createCaller(options?: {
     update: vi.fn(() => {
       throw new Error("Unexpected update");
     }),
-    insert: vi.fn(() => {
+    insert: vi.fn((table: unknown) => {
+      if (table === workspaceInviteAllowlist) {
+        return {
+          values: (values: Partial<TestAllowlistEntry>) => ({
+            returning: async () => {
+              const row: TestAllowlistEntry = {
+                id: values.id ?? randomUUID(),
+                workspaceId: values.workspaceId ?? state.selectedWorkspaceId!,
+                email: values.email ?? "invitee@example.com",
+                role: values.role ?? "member",
+                invitedByUserId: values.invitedByUserId ?? state.user.id,
+                createdAt:
+                  values.createdAt ?? new Date("2026-03-27T03:00:00.000Z"),
+                updatedAt: values.updatedAt ?? null,
+              };
+
+              state.allowlistEntries.push(row);
+              return [row];
+            },
+          }),
+        };
+      }
+
+      if (table === workspaceMembership) {
+        return {
+          values: (values: Partial<TestWorkspaceMembership>) => ({
+            returning: async () => {
+              const row: TestWorkspaceMembership = {
+                id: values.id ?? randomUUID(),
+                workspaceId: values.workspaceId ?? state.selectedWorkspaceId!,
+                userId: values.userId ?? state.user.id,
+                role: values.role ?? "member",
+                createdAt:
+                  values.createdAt ?? new Date("2026-03-27T03:00:00.000Z"),
+                updatedAt: values.updatedAt ?? null,
+              };
+
+              state.memberships.push(row);
+              return [row];
+            },
+          }),
+        };
+      }
+
       throw new Error("Unexpected insert");
+    }),
+    delete: vi.fn((table: unknown) => {
+      if (table === workspaceInviteAllowlist) {
+        return {
+          where: () => ({
+            returning: async () => {
+              const index = state.allowlistEntries.findIndex(
+                (entry) =>
+                  entry.id === state.selectedInviteId ||
+                  entry.email.toLowerCase() === state.user.email.toLowerCase(),
+              );
+              if (index === -1) {
+                return [];
+              }
+
+              const [deleted] = state.allowlistEntries.splice(index, 1);
+              state.selectedInviteId = null;
+              return deleted ? [{ id: deleted.id }] : [];
+            },
+          }),
+        };
+      }
+
+      throw new Error("Unexpected delete");
     }),
     transaction: vi.fn(async () => {
       throw new Error("Unexpected transaction");
@@ -269,11 +358,19 @@ describe("settings workspace context", () => {
           id: randomUUID(),
           workspaceId: "workspace_2",
           email: "beta@example.com",
+          role: "member",
+          invitedByUserId: "admin_1",
+          createdAt: new Date("2026-03-27T02:00:00.000Z"),
+          updatedAt: null,
         },
         {
           id: randomUUID(),
           workspaceId: "workspace_2",
           email: "gamma@example.com",
+          role: "admin",
+          invitedByUserId: "admin_1",
+          createdAt: new Date("2026-03-27T02:30:00.000Z"),
+          updatedAt: null,
         },
       ],
     });
@@ -364,6 +461,10 @@ describe("settings workspace context", () => {
           id: randomUUID(),
           workspaceId: "workspace_1",
           email: "alpha@example.com",
+          role: "member",
+          invitedByUserId: "user_2",
+          createdAt: new Date("2026-03-27T02:00:00.000Z"),
+          updatedAt: null,
         },
       ],
     });
@@ -391,5 +492,400 @@ describe("settings workspace context", () => {
       isPlatformAdmin: false,
       inviteAllowlistCount: 1,
     });
+  });
+});
+
+describe("settings collaboration invites", () => {
+  it("lists pending invites for a manageable current workspace", async () => {
+    const inviteAId = randomUUID();
+    const inviteBId = randomUUID();
+    const { caller } = createCaller({
+      sessionUser: {
+        id: "admin_1",
+        name: "Avery",
+        email: "avery@example.com",
+        emailVerified: true,
+        image: null,
+        role: "admin",
+        createdAt: new Date("2026-03-27T00:00:00.000Z"),
+        updatedAt: new Date("2026-03-27T00:00:00.000Z"),
+      },
+      applicationSettings: {
+        id: randomUUID(),
+        setupCompletedAt: new Date("2026-03-27T01:00:00.000Z"),
+        setupCompletedByUserId: "admin_1",
+        initialWorkspaceId: "workspace_1",
+        createdAt: new Date("2026-03-27T01:00:00.000Z"),
+        updatedAt: null,
+      },
+      workspaces: [
+        {
+          id: "workspace_1",
+          name: "Atlas",
+          slug: "atlas",
+          ownerUserId: "admin_1",
+          createdAt: new Date("2026-03-27T00:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+      memberships: [
+        {
+          id: "membership_1",
+          workspaceId: "workspace_1",
+          userId: "admin_1",
+          role: "owner",
+          createdAt: new Date("2026-03-27T00:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+      allowlistEntries: [
+        {
+          id: inviteAId,
+          workspaceId: "workspace_1",
+          email: "alpha@example.com",
+          role: "member",
+          invitedByUserId: "admin_1",
+          createdAt: new Date("2026-03-27T02:00:00.000Z"),
+          updatedAt: null,
+        },
+        {
+          id: inviteBId,
+          workspaceId: "workspace_1",
+          email: "beta@example.com",
+          role: "admin",
+          invitedByUserId: "admin_1",
+          createdAt: new Date("2026-03-27T03:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+    });
+
+    const settingsCaller = caller.settings as unknown as {
+      listInvites: () => Promise<
+        Array<{ id: string; email: string; role: "admin" | "member" }>
+      >;
+    };
+
+    await expect(settingsCaller.listInvites()).resolves.toEqual([
+      {
+        id: inviteAId,
+        email: "alpha@example.com",
+        role: "member",
+      },
+      {
+        id: inviteBId,
+        email: "beta@example.com",
+        role: "admin",
+      },
+    ]);
+  });
+
+  it("hides pending invites when the current user cannot manage the workspace", async () => {
+    const { caller } = createCaller({
+      sessionUser: {
+        id: "member_1",
+        name: "Casey",
+        email: "casey@example.com",
+        emailVerified: true,
+        image: null,
+        role: "user",
+        createdAt: new Date("2026-03-27T00:00:00.000Z"),
+        updatedAt: new Date("2026-03-27T00:00:00.000Z"),
+      },
+      applicationSettings: {
+        id: randomUUID(),
+        setupCompletedAt: new Date("2026-03-27T01:00:00.000Z"),
+        setupCompletedByUserId: "owner_1",
+        initialWorkspaceId: "workspace_1",
+        createdAt: new Date("2026-03-27T01:00:00.000Z"),
+        updatedAt: null,
+      },
+      workspaces: [
+        {
+          id: "workspace_1",
+          name: "Atlas",
+          slug: "atlas",
+          ownerUserId: "owner_1",
+          createdAt: new Date("2026-03-27T00:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+      memberships: [
+        {
+          id: "membership_member",
+          workspaceId: "workspace_1",
+          userId: "member_1",
+          role: "member",
+          createdAt: new Date("2026-03-27T00:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+      allowlistEntries: [
+        {
+          id: randomUUID(),
+          workspaceId: "workspace_1",
+          email: "pending@example.com",
+          role: "member",
+          invitedByUserId: "owner_1",
+          createdAt: new Date("2026-03-27T02:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+    });
+
+    const settingsCaller = caller.settings as unknown as {
+      listInvites: () => Promise<
+        Array<{ id: string; email: string; role: "admin" | "member" }>
+      >;
+    };
+
+    await expect(settingsCaller.listInvites()).resolves.toEqual([]);
+  });
+
+  it("creates and accepts invite-based collaboration entries", async () => {
+    const inviteId = randomUUID();
+    const { caller, state } = createCaller({
+      sessionUser: {
+        id: "user_1",
+        name: "Taylor",
+        email: "invitee@example.com",
+        emailVerified: true,
+        image: null,
+        role: "user",
+        createdAt: new Date("2026-03-27T00:00:00.000Z"),
+        updatedAt: new Date("2026-03-27T00:00:00.000Z"),
+      },
+      applicationSettings: {
+        id: randomUUID(),
+        setupCompletedAt: new Date("2026-03-27T01:00:00.000Z"),
+        setupCompletedByUserId: "owner_1",
+        initialWorkspaceId: "workspace_1",
+        createdAt: new Date("2026-03-27T01:00:00.000Z"),
+        updatedAt: null,
+      },
+      workspaces: [
+        {
+          id: "workspace_1",
+          name: "Atlas",
+          slug: "atlas",
+          ownerUserId: "owner_1",
+          createdAt: new Date("2026-03-27T00:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+      memberships: [
+        {
+          id: "membership_owner",
+          workspaceId: "workspace_1",
+          userId: "owner_1",
+          role: "owner",
+          createdAt: new Date("2026-03-27T00:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+    });
+
+    state.user.id = "owner_1";
+    state.user.email = "owner@example.com";
+    state.user.role = "admin";
+
+    const settingsCaller = caller.settings as unknown as {
+      createInvite: (input: {
+        email: string;
+        role: "admin" | "member";
+      }) => Promise<{
+        id: string;
+        email: string;
+        role: "admin" | "member";
+      }>;
+      acceptInvite: (input: { inviteId: string }) => Promise<{
+        workspaceId: string;
+        role: "owner" | "admin" | "member";
+      }>;
+    };
+
+    await expect(
+      settingsCaller.createInvite({
+        email: "invitee@example.com",
+        role: "member",
+      }),
+    ).resolves.toMatchObject({
+      email: "invitee@example.com",
+      role: "member",
+    });
+
+    const createdInvite = state.allowlistEntries.at(-1);
+    expect(createdInvite).toBeDefined();
+    if (!createdInvite) {
+      throw new Error("expected created invite");
+    }
+
+    createdInvite.id = inviteId;
+
+    state.user.id = "user_1";
+    state.user.email = "invitee@example.com";
+    state.user.role = "user";
+
+    await expect(
+      settingsCaller.acceptInvite({ inviteId }),
+    ).resolves.toMatchObject({
+      workspaceId: "workspace_1",
+      role: "member",
+    });
+
+    expect(
+      state.memberships.some(
+        (membership) =>
+          membership.workspaceId === "workspace_1" &&
+          membership.userId === "user_1" &&
+          membership.role === "member",
+      ),
+    ).toBe(true);
+    expect(state.allowlistEntries.some((entry) => entry.id === inviteId)).toBe(
+      false,
+    );
+  });
+
+  it("rejects owner invite roles in v1", async () => {
+    const { caller } = createCaller({
+      sessionUser: {
+        id: "owner_1",
+        name: "Avery",
+        email: "avery@example.com",
+        emailVerified: true,
+        image: null,
+        role: "admin",
+        createdAt: new Date("2026-03-27T00:00:00.000Z"),
+        updatedAt: new Date("2026-03-27T00:00:00.000Z"),
+      },
+      applicationSettings: {
+        id: randomUUID(),
+        setupCompletedAt: new Date("2026-03-27T01:00:00.000Z"),
+        setupCompletedByUserId: "owner_1",
+        initialWorkspaceId: "workspace_1",
+        createdAt: new Date("2026-03-27T01:00:00.000Z"),
+        updatedAt: null,
+      },
+      workspaces: [
+        {
+          id: "workspace_1",
+          name: "Atlas",
+          slug: "atlas",
+          ownerUserId: "owner_1",
+          createdAt: new Date("2026-03-27T00:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+      memberships: [
+        {
+          id: "membership_owner",
+          workspaceId: "workspace_1",
+          userId: "owner_1",
+          role: "owner",
+          createdAt: new Date("2026-03-27T00:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+    });
+
+    const settingsCaller = caller.settings as unknown as {
+      createInvite: (input: {
+        email: string;
+        role: "admin" | "member";
+      }) => Promise<unknown>;
+    };
+
+    await expect(
+      settingsCaller.createInvite({
+        email: "invitee@example.com",
+        role: "owner" as never,
+      }),
+    ).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
+  });
+
+  it("rejects accepting an invite when the account already belongs to another workspace", async () => {
+    const inviteId = randomUUID();
+    const { caller, state } = createCaller({
+      sessionUser: {
+        id: "user_1",
+        name: "Taylor",
+        email: "invitee@example.com",
+        emailVerified: true,
+        image: null,
+        role: "user",
+        createdAt: new Date("2026-03-27T00:00:00.000Z"),
+        updatedAt: new Date("2026-03-27T00:00:00.000Z"),
+      },
+      applicationSettings: {
+        id: randomUUID(),
+        setupCompletedAt: new Date("2026-03-27T01:00:00.000Z"),
+        setupCompletedByUserId: "owner_1",
+        initialWorkspaceId: "workspace_1",
+        createdAt: new Date("2026-03-27T01:00:00.000Z"),
+        updatedAt: null,
+      },
+      workspaces: [
+        {
+          id: "workspace_1",
+          name: "Atlas",
+          slug: "atlas",
+          ownerUserId: "owner_1",
+          createdAt: new Date("2026-03-27T00:00:00.000Z"),
+          updatedAt: null,
+        },
+        {
+          id: "workspace_2",
+          name: "Beacon",
+          slug: "beacon",
+          ownerUserId: "owner_1",
+          createdAt: new Date("2026-03-27T01:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+      memberships: [
+        {
+          id: "membership_other",
+          workspaceId: "workspace_2",
+          userId: "user_1",
+          role: "member",
+          createdAt: new Date("2026-03-27T01:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+      allowlistEntries: [
+        {
+          id: inviteId,
+          workspaceId: "workspace_1",
+          email: "invitee@example.com",
+          role: "member",
+          invitedByUserId: "owner_1",
+          createdAt: new Date("2026-03-27T02:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+    });
+
+    const settingsCaller = caller.settings as unknown as {
+      acceptInvite: (input: { inviteId: string }) => Promise<unknown>;
+    };
+
+    await expect(
+      settingsCaller.acceptInvite({ inviteId }),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+
+    expect(
+      state.memberships.some(
+        (membership) =>
+          membership.workspaceId === "workspace_1" &&
+          membership.userId === "user_1",
+      ),
+    ).toBe(false);
+    expect(state.allowlistEntries.some((entry) => entry.id === inviteId)).toBe(
+      true,
+    );
   });
 });
