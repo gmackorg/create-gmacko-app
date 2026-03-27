@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { applicationSettings, user, workspace } from "@gmacko/db/schema";
+import {
+  applicationSettings,
+  user,
+  workspace,
+  workspaceMembership,
+} from "@gmacko/db/schema";
 import { describe, expect, it, vi } from "vitest";
 
 process.env.DATABASE_URL ??=
@@ -36,12 +41,29 @@ type TestApplicationSettings = {
   updatedAt: Date | null;
 };
 
+type TestWorkspaceMembership = {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  role: "owner" | "admin" | "member";
+  createdAt: Date;
+  updatedAt: Date | null;
+};
+
 function createFakeDb(input?: {
   user?: TestUser;
   applicationSettings?: TestApplicationSettings | null;
   workspaces?: TestWorkspace[];
+  memberships?: TestWorkspaceMembership[];
   failApplicationSettingsInsert?: boolean;
 }) {
+  const sortWorkspaces = (rows: TestWorkspace[]) =>
+    [...rows].sort(
+      (a, b) =>
+        a.createdAt.getTime() - b.createdAt.getTime() ||
+        a.id.localeCompare(b.id),
+    );
+
   const state = {
     user: input?.user ?? {
       id: "user_1",
@@ -55,6 +77,22 @@ function createFakeDb(input?: {
     },
     applicationSettings: input?.applicationSettings ?? null,
     workspaces: [...(input?.workspaces ?? [])],
+    memberships: [...(input?.memberships ?? [])],
+  };
+
+  const makeRowsQuery = <T>(rows: T[]) => {
+    const query = {
+      where: () => query,
+      limit: () => query,
+      offset: () => query,
+      orderBy: () => query,
+      then: (
+        onFulfilled?: ((value: T[]) => unknown) | null,
+        onRejected?: ((reason: unknown) => unknown) | null,
+      ) => Promise.resolve(rows).then(onFulfilled, onRejected),
+    };
+
+    return query;
   };
 
   const db = {
@@ -65,13 +103,21 @@ function createFakeDb(input?: {
     },
     select: vi.fn(() => ({
       from: (table: unknown) => ({
-        limit: async () => {
+        ...(() => {
           if (table === workspace) {
-            return state.workspaces.slice(0, 1);
+            return makeRowsQuery(sortWorkspaces(state.workspaces));
+          }
+
+          if (table === user) {
+            return makeRowsQuery([state.user]);
+          }
+
+          if (table === workspaceMembership) {
+            return makeRowsQuery([...state.memberships]);
           }
 
           throw new Error("Unexpected select table");
-        },
+        })(),
       }),
     })),
     update: vi.fn((table: unknown) => {
@@ -162,6 +208,26 @@ function createFakeDb(input?: {
         };
       }
 
+      if (table === workspaceMembership) {
+        return {
+          values: (values: Partial<TestWorkspaceMembership>) => ({
+            returning: async () => {
+              const row: TestWorkspaceMembership = {
+                id: randomUUID(),
+                workspaceId: values.workspaceId ?? randomUUID(),
+                userId: values.userId ?? state.user.id,
+                role: values.role ?? "member",
+                createdAt: new Date("2026-03-27T01:00:00.000Z"),
+                updatedAt: null,
+              };
+
+              state.memberships.push(row);
+              return [row];
+            },
+          }),
+        };
+      }
+
       throw new Error("Unexpected insert table");
     }),
     transaction: vi.fn(async (fn: (tx: typeof db) => Promise<unknown>) => {
@@ -171,6 +237,7 @@ function createFakeDb(input?: {
           ? structuredClone(state.applicationSettings)
           : null,
         workspaces: structuredClone(state.workspaces),
+        memberships: structuredClone(state.memberships),
       };
 
       try {
@@ -179,6 +246,7 @@ function createFakeDb(input?: {
         state.user = snapshot.user;
         state.applicationSettings = snapshot.applicationSettings;
         state.workspaces = snapshot.workspaces;
+        state.memberships = snapshot.memberships;
         throw error;
       }
     }),
@@ -191,12 +259,14 @@ function createCaller(options?: {
   sessionUser?: TestUser | null;
   applicationSettings?: TestApplicationSettings | null;
   workspaces?: TestWorkspace[];
+  memberships?: TestWorkspaceMembership[];
   failApplicationSettingsInsert?: boolean;
 }) {
   const { db, state } = createFakeDb({
     user: options?.sessionUser ?? undefined,
     applicationSettings: options?.applicationSettings ?? undefined,
     workspaces: options?.workspaces,
+    memberships: options?.memberships,
     failApplicationSettingsInsert: options?.failApplicationSettingsInsert,
   });
 
@@ -320,5 +390,96 @@ describe("admin bootstrap", () => {
       isInitialized: false,
       requiresSetup: true,
     });
+  });
+
+  it("lists workspaces with membership counts in creation order", async () => {
+    const { caller } = createCaller({
+      sessionUser: {
+        id: "admin_1",
+        name: "Avery",
+        email: "avery@example.com",
+        emailVerified: true,
+        image: null,
+        role: "admin",
+        createdAt: new Date("2026-03-27T00:00:00.000Z"),
+        updatedAt: new Date("2026-03-27T00:00:00.000Z"),
+      },
+      workspaces: [
+        {
+          id: "workspace_1",
+          name: "Atlas",
+          slug: "atlas",
+          ownerUserId: "admin_1",
+          createdAt: new Date("2026-03-27T00:00:00.000Z"),
+          updatedAt: null,
+        },
+        {
+          id: "workspace_2",
+          name: "Beacon",
+          slug: "beacon",
+          ownerUserId: "admin_1",
+          createdAt: new Date("2026-03-27T01:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+      memberships: [
+        {
+          id: "membership_1",
+          workspaceId: "workspace_1",
+          userId: "admin_1",
+          role: "owner",
+          createdAt: new Date("2026-03-27T00:00:00.000Z"),
+          updatedAt: null,
+        },
+        {
+          id: "membership_2",
+          workspaceId: "workspace_1",
+          userId: "user_2",
+          role: "member",
+          createdAt: new Date("2026-03-27T00:10:00.000Z"),
+          updatedAt: null,
+        },
+        {
+          id: "membership_3",
+          workspaceId: "workspace_2",
+          userId: "admin_1",
+          role: "owner",
+          createdAt: new Date("2026-03-27T01:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+    });
+
+    const adminCaller = caller.admin as unknown as {
+      listWorkspaces: () => Promise<
+        Array<{
+          id: string;
+          name: string;
+          slug: string;
+          ownerUserId: string;
+          membershipCount: number;
+          createdAt: Date;
+        }>
+      >;
+    };
+
+    await expect(adminCaller.listWorkspaces()).resolves.toEqual([
+      {
+        id: "workspace_1",
+        name: "Atlas",
+        slug: "atlas",
+        ownerUserId: "admin_1",
+        membershipCount: 2,
+        createdAt: new Date("2026-03-27T00:00:00.000Z"),
+      },
+      {
+        id: "workspace_2",
+        name: "Beacon",
+        slug: "beacon",
+        ownerUserId: "admin_1",
+        membershipCount: 1,
+        createdAt: new Date("2026-03-27T01:00:00.000Z"),
+      },
+    ]);
   });
 });

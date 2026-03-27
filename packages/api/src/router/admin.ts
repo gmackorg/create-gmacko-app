@@ -1,9 +1,11 @@
+import { isPlatformAdminRole } from "@gmacko/auth";
 import { eq } from "@gmacko/db";
 import {
   applicationSettings,
   user,
   userRoleEnum,
   workspace,
+  workspaceMembership,
 } from "@gmacko/db/schema";
 import type { TRPCRouterRecord } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
@@ -34,7 +36,7 @@ const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
     .where(eq(user.id, ctx.session.user.id))
     .limit(1);
 
-  if (dbUser?.role !== "admin") {
+  if (!isPlatformAdminRole(dbUser?.role)) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "Admin access required",
@@ -109,6 +111,12 @@ export const adminRouter = {
           });
         }
 
+        await tx.insert(workspaceMembership).values({
+          workspaceId: createdWorkspace.id,
+          userId: ctx.session.user.id,
+          role: "owner",
+        });
+
         const [updatedUser] = await tx
           .update(user)
           .set({ role: "admin" })
@@ -169,14 +177,35 @@ export const adminRouter = {
    */
   stats: adminProcedure.query(async ({ ctx }) => {
     const users = await ctx.db.select().from(user);
+    const workspaces = await ctx.db.select().from(workspace);
     const totalUsers = users.length;
     const adminUsers = users.filter((u) => u.role === "admin").length;
 
     return {
       totalUsers,
+      totalWorkspaces: workspaces.length,
       adminUsers,
       regularUsers: totalUsers - adminUsers,
     };
+  }),
+
+  listWorkspaces: adminProcedure.query(async ({ ctx }) => {
+    const workspaces = await ctx.db
+      .select()
+      .from(workspace)
+      .orderBy(workspace.createdAt);
+    const memberships = await ctx.db.select().from(workspaceMembership);
+
+    return workspaces.map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      slug: entry.slug,
+      ownerUserId: entry.ownerUserId,
+      membershipCount: memberships.filter(
+        (membership) => membership.workspaceId === entry.id,
+      ).length,
+      createdAt: entry.createdAt,
+    }));
   }),
 
   /**

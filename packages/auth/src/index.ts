@@ -1,9 +1,22 @@
 import { expo } from "@better-auth/expo";
 import { db } from "@gmacko/db/client";
+import type { WorkspaceRole } from "@gmacko/db/schema";
 import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { oAuthProxy } from "better-auth/plugins";
+
+export function isPlatformAdminRole(
+  role: "user" | "admin" | null | undefined,
+): role is "admin" {
+  return role === "admin";
+}
+
+export function canManageWorkspace(
+  role: WorkspaceRole | null | undefined,
+): boolean {
+  return role === "owner" || role === "admin";
+}
 
 export function initAuth<
   TExtraPlugins extends BetterAuthPlugin[] = [],

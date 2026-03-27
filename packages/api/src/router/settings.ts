@@ -1,9 +1,13 @@
+import { canManageWorkspace, isPlatformAdminRole } from "@gmacko/auth";
 import { and, eq, isNull } from "@gmacko/db";
 import {
   apiKeys,
   UpdateUserPreferencesSchema,
   user,
   userPreferences,
+  workspace,
+  workspaceInviteAllowlist,
+  workspaceMembership,
 } from "@gmacko/db/schema";
 import type { TRPCRouterRecord } from "@trpc/server";
 import { createHash, randomBytes } from "crypto";
@@ -24,6 +28,74 @@ function getKeyPrefix(key: string): string {
 }
 
 export const settingsRouter = {
+  getWorkspaceContext: protectedProcedure.query(async ({ ctx }) => {
+    const [dbUser] = await ctx.db
+      .select({
+        id: user.id,
+        role: user.role,
+      })
+      .from(user)
+      .where(eq(user.id, ctx.session.user.id))
+      .limit(1);
+
+    const settings = await ctx.db.query.applicationSettings.findFirst();
+
+    const membership = settings?.initialWorkspaceId
+      ? await ctx.db.query.workspaceMembership.findFirst({
+          where: and(
+            eq(workspaceMembership.userId, ctx.session.user.id),
+            eq(workspaceMembership.workspaceId, settings.initialWorkspaceId),
+          ),
+        })
+      : await ctx.db.query.workspaceMembership.findFirst({
+          where: eq(workspaceMembership.userId, ctx.session.user.id),
+          orderBy: (membership, { asc }) => [
+            asc(membership.createdAt),
+            asc(membership.id),
+          ],
+        });
+
+    const fallbackWorkspace =
+      !membership && settings?.initialWorkspaceId
+        ? await ctx.db.query.workspace.findFirst({
+            where: eq(workspace.id, settings.initialWorkspaceId),
+          })
+        : null;
+
+    const currentWorkspace = membership
+      ? await ctx.db.query.workspace.findFirst({
+          where: eq(workspace.id, membership.workspaceId),
+        })
+      : fallbackWorkspace;
+
+    const currentWorkspaceId =
+      currentWorkspace?.id ?? settings?.initialWorkspaceId ?? null;
+
+    const inviteAllowlistEntries = currentWorkspaceId
+      ? await ctx.db.query.workspaceInviteAllowlist.findMany({
+          where: eq(workspaceInviteAllowlist.workspaceId, currentWorkspaceId),
+          columns: { id: true },
+        })
+      : [];
+
+    const currentWorkspaceRole = membership?.role ?? null;
+
+    return {
+      workspace: currentWorkspace
+        ? {
+            id: currentWorkspace.id,
+            name: currentWorkspace.name,
+            slug: currentWorkspace.slug,
+          }
+        : null,
+      workspaceRole: currentWorkspaceRole,
+      platformRole: dbUser?.role ?? "user",
+      canManageWorkspace: canManageWorkspace(currentWorkspaceRole),
+      isPlatformAdmin: isPlatformAdminRole(dbUser?.role),
+      inviteAllowlistCount: inviteAllowlistEntries.length,
+    };
+  }),
+
   getPreferences: protectedProcedure.query(async ({ ctx }) => {
     const prefs = await ctx.db.query.userPreferences.findFirst({
       where: eq(userPreferences.userId, ctx.session.user.id),

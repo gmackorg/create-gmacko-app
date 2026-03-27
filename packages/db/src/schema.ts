@@ -1,9 +1,12 @@
 import { sql } from "drizzle-orm";
-import { pgTable } from "drizzle-orm/pg-core";
+import { pgTable, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
 import { user } from "./auth-schema";
+
+export const workspaceRoleEnum = ["owner", "admin", "member"] as const;
+export type WorkspaceRole = (typeof workspaceRoleEnum)[number];
 
 export const Post = pgTable("post", (t) => ({
   id: t.uuid().notNull().primaryKey().defaultRandom(),
@@ -71,6 +74,59 @@ export const workspace = pgTable("workspace", (t) => ({
     .timestamp({ mode: "date", withTimezone: true })
     .$onUpdateFn(() => sql`now()`),
 }));
+
+export const workspaceMembership = pgTable(
+  "workspace_membership",
+  (t) => ({
+    id: t.uuid().notNull().primaryKey().defaultRandom(),
+    workspaceId: t
+      .uuid()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    userId: t
+      .text()
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    role: t.text().$type<WorkspaceRole>().notNull().default("member"),
+    createdAt: t.timestamp().defaultNow().notNull(),
+    updatedAt: t
+      .timestamp({ mode: "date", withTimezone: true })
+      .$onUpdateFn(() => sql`now()`),
+  }),
+  (table) => [
+    unique("workspace_membership_workspace_user_unique").on(
+      table.workspaceId,
+      table.userId,
+    ),
+  ],
+);
+
+export const workspaceInviteAllowlist = pgTable(
+  "workspace_invite_allowlist",
+  (t) => ({
+    id: t.uuid().notNull().primaryKey().defaultRandom(),
+    workspaceId: t
+      .uuid()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    email: t.varchar({ length: 320 }).notNull(),
+    role: t.text().$type<WorkspaceRole>().notNull().default("member"),
+    invitedByUserId: t
+      .text()
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: t.timestamp().defaultNow().notNull(),
+    updatedAt: t
+      .timestamp({ mode: "date", withTimezone: true })
+      .$onUpdateFn(() => sql`now()`),
+  }),
+  (table) => [
+    unique("workspace_invite_allowlist_workspace_email_unique").on(
+      table.workspaceId,
+      table.email,
+    ),
+  ],
+);
 
 export const applicationSettings = pgTable("application_settings", (t) => ({
   id: t.uuid().notNull().primaryKey().defaultRandom(),
