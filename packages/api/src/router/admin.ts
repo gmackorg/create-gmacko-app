@@ -1,10 +1,25 @@
 import { eq } from "@gmacko/db";
-import { user, userRoleEnum } from "@gmacko/db/schema";
+import {
+  applicationSettings,
+  user,
+  userRoleEnum,
+  workspace,
+} from "@gmacko/db/schema";
 import type { TRPCRouterRecord } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod/v4";
 
-import { protectedProcedure } from "../trpc";
+import { protectedProcedure, publicProcedure } from "../trpc";
+
+function slugifyWorkspaceName(name: string): string {
+  const base = name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return base || "workspace";
+}
 
 /**
  * Middleware that ensures the user has admin role.
@@ -35,6 +50,120 @@ const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
 });
 
 export const adminRouter = {
+  bootstrapStatus: publicProcedure.query(async ({ ctx }) => {
+    const settings = await ctx.db.query.applicationSettings.findFirst();
+    const existingWorkspace = await ctx.db.select().from(workspace).limit(1);
+
+    return {
+      isInitialized: !!settings?.setupCompletedAt,
+      requiresSetup: !settings?.setupCompletedAt,
+      hasExistingWorkspace: existingWorkspace.length > 0,
+      setupCompletedAt: settings?.setupCompletedAt ?? null,
+      initialWorkspaceId: settings?.initialWorkspaceId ?? null,
+    };
+  }),
+
+  completeBootstrap: protectedProcedure
+    .input(
+      z.object({
+        workspaceName: z.string().min(2).max(120),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return ctx.db.transaction(async (tx) => {
+        const existingSettings = await tx.query.applicationSettings.findFirst();
+        const existingWorkspace = await tx.select().from(workspace).limit(1);
+
+        if (existingSettings?.setupCompletedAt) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Bootstrap has already been completed",
+          });
+        }
+
+        if (existingWorkspace.length > 0) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Bootstrap has already started",
+          });
+        }
+
+        const [createdWorkspace] = await tx
+          .insert(workspace)
+          .values({
+            name: input.workspaceName,
+            slug: slugifyWorkspaceName(input.workspaceName),
+            ownerUserId: ctx.session.user.id,
+          })
+          .returning({
+            id: workspace.id,
+            name: workspace.name,
+            slug: workspace.slug,
+            ownerUserId: workspace.ownerUserId,
+          });
+
+        if (!createdWorkspace) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to create the initial workspace",
+          });
+        }
+
+        const [updatedUser] = await tx
+          .update(user)
+          .set({ role: "admin" })
+          .where(eq(user.id, ctx.session.user.id))
+          .returning({
+            id: user.id,
+            role: user.role,
+          });
+
+        if (!updatedUser) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Bootstrap user not found",
+          });
+        }
+
+        const [settings] = existingSettings
+          ? await tx
+              .update(applicationSettings)
+              .set({
+                setupCompletedAt: new Date(),
+                setupCompletedByUserId: ctx.session.user.id,
+                initialWorkspaceId: createdWorkspace.id,
+              })
+              .where(eq(applicationSettings.id, existingSettings.id))
+              .returning({
+                id: applicationSettings.id,
+                setupCompletedAt: applicationSettings.setupCompletedAt,
+                setupCompletedByUserId:
+                  applicationSettings.setupCompletedByUserId,
+                initialWorkspaceId: applicationSettings.initialWorkspaceId,
+              })
+          : await tx
+              .insert(applicationSettings)
+              .values({
+                setupCompletedAt: new Date(),
+                setupCompletedByUserId: ctx.session.user.id,
+                initialWorkspaceId: createdWorkspace.id,
+              })
+              .returning({
+                id: applicationSettings.id,
+                setupCompletedAt: applicationSettings.setupCompletedAt,
+                setupCompletedByUserId:
+                  applicationSettings.setupCompletedByUserId,
+                initialWorkspaceId: applicationSettings.initialWorkspaceId,
+              });
+
+        return {
+          setupCompleted: true,
+          settings,
+          workspace: createdWorkspace,
+        };
+      });
+    }),
+
   /**
    * Get dashboard statistics
    */

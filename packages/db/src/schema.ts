@@ -58,6 +58,35 @@ export const apiKeys = pgTable("api_keys", (t) => ({
   revokedAt: t.timestamp({ mode: "date", withTimezone: true }),
 }));
 
+export const workspace = pgTable("workspace", (t) => ({
+  id: t.uuid().notNull().primaryKey().defaultRandom(),
+  name: t.varchar({ length: 120 }).notNull(),
+  slug: t.varchar({ length: 160 }).notNull().unique(),
+  ownerUserId: t
+    .text()
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  createdAt: t.timestamp().defaultNow().notNull(),
+  updatedAt: t
+    .timestamp({ mode: "date", withTimezone: true })
+    .$onUpdateFn(() => sql`now()`),
+}));
+
+export const applicationSettings = pgTable("application_settings", (t) => ({
+  id: t.uuid().notNull().primaryKey().defaultRandom(),
+  setupCompletedAt: t.timestamp({ mode: "date", withTimezone: true }),
+  setupCompletedByUserId: t
+    .text()
+    .references(() => user.id, { onDelete: "set null" }),
+  initialWorkspaceId: t
+    .uuid()
+    .references(() => workspace.id, { onDelete: "set null" }),
+  createdAt: t.timestamp().defaultNow().notNull(),
+  updatedAt: t
+    .timestamp({ mode: "date", withTimezone: true })
+    .$onUpdateFn(() => sql`now()`),
+}));
+
 export const CreateUserPreferencesSchema = createInsertSchema(userPreferences, {
   theme: z.enum(["light", "dark", "system"]).default("system"),
   language: z.string().max(10).default("en"),
