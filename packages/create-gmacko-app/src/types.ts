@@ -20,7 +20,16 @@ export interface CliOptions {
   displayName: string;
   packageScope: string;
   platforms: PlatformConfig;
+  saasCollaboration: boolean;
+  saasBilling: boolean;
+  saasMetering: boolean;
+  saasSupport: boolean;
+  saasLaunch: boolean;
+  saasReferrals: boolean;
+  saasOperatorApis: boolean;
   vinext: boolean;
+  saasBootstrap: boolean;
+  trpcOperators: boolean;
   forgegraphServer: string;
   forgegraphStagingNode: string;
   forgegraphProductionNode: string;

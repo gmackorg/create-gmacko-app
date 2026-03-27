@@ -53,6 +53,9 @@ export async function scaffold(options: CliOptions): Promise<void> {
   createManifest(targetDir, options);
   createForgeGraphConfig(targetDir, options);
   addForgeGraphScripts(targetDir);
+  addOptionalOperatorScripts(targetDir, options);
+  customizeMcpConfig(targetDir, options);
+  customizeClaudeInstructions(targetDir, options);
 
   if (!options.platforms.web) {
     fs.removeSync(path.join(targetDir, "apps/nextjs"));
@@ -73,6 +76,7 @@ export async function scaffold(options: CliOptions): Promise<void> {
   }
 
   customizeGeneratedReadme(targetDir, options);
+  pruneOptionalLanes(targetDir, options);
 
   if (!options.includeAi) {
     fs.removeSync(path.join(targetDir, ".claude"));
@@ -279,6 +283,13 @@ function customizeGeneratedReadme(
   const agentQuickstartBlock = options.includeAi
     ? `\n\n${buildAgentQuickstartBlock()}`
     : "";
+  const saasBootstrapBlock =
+    options.includeAi && options.saasBootstrap
+      ? `\n\n${buildSaasBootstrapBlock()}`
+      : "";
+  const trpcOperatorsBlock = options.trpcOperators
+    ? `\n\n${buildTrpcOperatorsBlock()}`
+    : "";
   const startIndex = readme.indexOf(startMarker);
   const endIndex = readme.indexOf(endMarker);
 
@@ -290,6 +301,8 @@ function customizeGeneratedReadme(
     readme.slice(0, startIndex) +
     profileBlock +
     agentQuickstartBlock +
+    saasBootstrapBlock +
+    trpcOperatorsBlock +
     readme.slice(endIndex + endMarker.length);
 
   fs.writeFileSync(readmePath, updatedReadme);
@@ -302,6 +315,25 @@ function buildAgentQuickstartBlock(): string {
 - Use \`.mcp.json\` for the repo MCP server setup.
 - Claude Code users should check \`.claude/settings.json\`.
 - OpenCode users should check \`opencode.json\`.
+`;
+}
+
+function buildSaasBootstrapBlock(): string {
+  return `## Claude SaaS bootstrap pack
+
+- After \`pnpm bootstrap:local\`, use Claude Code and run \`/office-hours\`.
+- If your user-level gstack install includes \`/autoplan\`, run it next to turn the product direction into an execution plan.
+- Run \`/design-consultation\` once the problem and audience are clear so \`DESIGN.md\` becomes the visual source of truth.
+- Then work through [docs/ai/BOOTSTRAP_PLAYBOOK.md](docs/ai/BOOTSTRAP_PLAYBOOK.md) with \`/launch-landing-page\`, \`/setup-stripe-billing\`, \`/bootstrap-expo-app\`, and \`/test-mobile-with-maestro\`.
+`;
+}
+
+function buildTrpcOperatorsBlock(): string {
+  return `## Operator lane
+
+- This scaffold includes CLI + MCP wrappers over the same tRPC API.
+- Use \`pnpm trpc:ops -- --help\` for the terminal operator surface.
+- Use \`pnpm mcp:app\` to run the local MCP server once \`GMACKO_API_URL\` and \`GMACKO_API_KEY\` are set.
 `;
 }
 
@@ -329,6 +361,16 @@ function buildScaffoldProfileBlock(options: CliOptions): string {
       : null,
   ].filter(Boolean);
 
+  const saasLayers = [
+    options.saasCollaboration ? "collaboration" : null,
+    options.saasBilling ? "billing" : null,
+    options.saasMetering ? "metering" : null,
+    options.saasSupport ? "support" : null,
+    options.saasLaunch ? "launch" : null,
+    options.saasReferrals ? "referrals" : null,
+    options.saasOperatorApis ? "operator APIs" : null,
+  ].filter(Boolean);
+
   const preferredDevCommands = [
     "- `pnpm bootstrap:local`",
     options.platforms.web ? "- `pnpm dev:next`" : null,
@@ -338,6 +380,7 @@ function buildScaffoldProfileBlock(options: CliOptions): string {
     options.platforms.tanstackStart
       ? "- `pnpm --filter @gmacko/tanstack-start dev`"
       : null,
+    options.trpcOperators ? "- `pnpm trpc:ops -- --help`" : null,
   ]
     .filter(Boolean)
     .join("\n");
@@ -346,8 +389,11 @@ function buildScaffoldProfileBlock(options: CliOptions): string {
 > **Scaffold profile**
 > - Platforms: ${platforms.join(", ") || "none selected"}
 > - Integrations: ${integrations.join(", ") || "core only"}
+> - SaaS layers: ${saasLayers.join(", ") || "none selected"}
 > - Default deploy path: ForgeGraph + Nix + colocated Postgres
 > - Workers lane: ${options.vinext ? "vinext enabled (experimental)" : "not scaffolded"}
+> - Claude SaaS bootstrap pack: ${options.saasBootstrap ? "enabled" : "not scaffolded"}
+> - Operator lane: ${options.trpcOperators ? "CLI + MCP wrappers over the same tRPC API" : "not scaffolded"}
 >
 > **Recommended first commands**
 ${preferredDevCommands}
@@ -412,6 +458,96 @@ function addForgeGraphScripts(targetDir: string): void {
   rootPackage.scripts["forge:stages"] = "forge stage list";
 
   fs.writeJsonSync(rootPackagePath, rootPackage, { spaces: 2 });
+}
+
+function addOptionalOperatorScripts(
+  targetDir: string,
+  options: CliOptions,
+): void {
+  if (!options.trpcOperators) {
+    return;
+  }
+
+  const rootPackagePath = path.join(targetDir, "package.json");
+  const rootPackage = fs.readJsonSync(rootPackagePath) as {
+    scripts?: Record<string, string>;
+  };
+
+  rootPackage.scripts ??= {};
+  rootPackage.scripts["trpc:ops"] =
+    "pnpm --filter @gmacko/trpc-cli exec gmacko-ops";
+  rootPackage.scripts["mcp:app"] =
+    "pnpm --filter @gmacko/mcp-server exec gmacko-mcp";
+
+  fs.writeJsonSync(rootPackagePath, rootPackage, { spaces: 2 });
+}
+
+function customizeMcpConfig(targetDir: string, options: CliOptions): void {
+  if (!options.includeAi || !options.trpcOperators) {
+    return;
+  }
+
+  const mcpConfigPath = path.join(targetDir, ".mcp.json");
+  if (!fs.existsSync(mcpConfigPath)) {
+    return;
+  }
+
+  const mcpConfig = fs.readJsonSync(mcpConfigPath) as {
+    mcpServers?: Record<
+      string,
+      {
+        command?: string;
+        args?: string[];
+        env?: Record<string, string>;
+      }
+    >;
+  };
+
+  mcpConfig.mcpServers ??= {};
+  mcpConfig.mcpServers["gmacko-app"] = {
+    command: "pnpm",
+    args: ["--filter", "@gmacko/mcp-server", "exec", "gmacko-mcp"],
+    env: {
+      GMACKO_API_URL: "http://localhost:3000",
+      GMACKO_API_KEY: "change-me",
+    },
+  };
+
+  fs.writeJsonSync(mcpConfigPath, mcpConfig, { spaces: 2 });
+}
+
+function customizeClaudeInstructions(
+  targetDir: string,
+  options: CliOptions,
+): void {
+  if (!options.includeAi || !options.saasBootstrap) {
+    return;
+  }
+
+  const claudePath = path.join(targetDir, "CLAUDE.md");
+  if (!fs.existsSync(claudePath)) {
+    return;
+  }
+
+  const content = fs.readFileSync(claudePath, "utf8");
+  if (content.includes("## Post-Setup SaaS Bootstrap")) {
+    return;
+  }
+
+  fs.writeFileSync(
+    claudePath,
+    `${content.trimEnd()}
+
+## Post-Setup SaaS Bootstrap
+
+After \`pnpm bootstrap:local\`:
+
+1. Run \`/office-hours\` to pressure-test the problem, customer, and wedge.
+2. If your user-level gstack install includes \`/autoplan\`, run it next to turn the product direction into an execution track.
+3. Run \`/design-consultation\` once the problem and audience are clear so \`DESIGN.md\` becomes the visual source of truth.
+4. Then use the local skills in \`.claude/skills/bootstrap-saas\`, \`.claude/skills/launch-landing-page\`, \`.claude/skills/setup-stripe-billing\`, \`.claude/skills/bootstrap-expo-app\`, and \`.claude/skills/test-mobile-with-maestro\`.
+`,
+  );
 }
 
 function configureVinext(targetDir: string): void {
@@ -710,6 +846,25 @@ function pruneIntegrations(
       }
       fs.writeJsonSync(appPkgPath, pkg, { spaces: 2 });
     }
+  }
+}
+
+function pruneOptionalLanes(targetDir: string, options: CliOptions): void {
+  if (!options.saasBootstrap) {
+    fs.removeSync(path.join(targetDir, "docs/ai/BOOTSTRAP_PLAYBOOK.md"));
+    fs.removeSync(path.join(targetDir, ".claude/skills/bootstrap-saas"));
+    fs.removeSync(path.join(targetDir, ".claude/skills/launch-landing-page"));
+    fs.removeSync(path.join(targetDir, ".claude/skills/setup-stripe-billing"));
+    fs.removeSync(path.join(targetDir, ".claude/skills/bootstrap-expo-app"));
+    fs.removeSync(
+      path.join(targetDir, ".claude/skills/test-mobile-with-maestro"),
+    );
+  }
+
+  if (!options.trpcOperators) {
+    fs.removeSync(path.join(targetDir, "packages/operator-core"));
+    fs.removeSync(path.join(targetDir, "packages/trpc-cli"));
+    fs.removeSync(path.join(targetDir, "packages/mcp-server"));
   }
 }
 

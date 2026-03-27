@@ -24,7 +24,25 @@ program
   .option("--no-mobile", "Exclude Expo mobile app")
   .option("--tanstack-start", "Include TanStack Start app")
   .option("--no-tanstack-start", "Exclude TanStack Start app (default)")
+  .option("--saas-collaboration", "Add collaboration layers to the SaaS app")
+  .option("--saas-billing", "Add billing and plans to the SaaS app")
+  .option("--saas-metering", "Add metering and usage rollups to the SaaS app")
+  .option("--saas-support", "Add support surfaces to the SaaS app")
+  .option("--saas-launch", "Add launch controls to the SaaS app")
+  .option("--saas-referrals", "Add referral growth tools to the SaaS app")
+  .option(
+    "--saas-operator-apis",
+    "Add operator APIs (CLI + MCP wrappers) to the SaaS app",
+  )
   .option("--vinext", "Add experimental vinext support to the Next.js app")
+  .option(
+    "--saas-bootstrap",
+    "Add optional Claude SaaS bootstrap skills and post-setup playbook",
+  )
+  .option(
+    "--trpc-operators",
+    "Add optional CLI + MCP wrappers around the app's tRPC API",
+  )
   .option(
     "--integrations <list>",
     "Comma-separated list of integrations (sentry,posthog,stripe,revenuecat,notifications,email,realtime,storage)",
@@ -79,6 +97,9 @@ program
       if (opts.tanstackStart !== undefined)
         options.platforms.tanstackStart = opts.tanstackStart === true;
       options.vinext = opts.vinext === true;
+      applySaasCapabilityFlags(options, opts);
+      applyOperatorLaneFlags(options, opts);
+      options.saasBootstrap = opts.saasBootstrap === true;
       if (opts.forgegraphServer) {
         options.forgegraphServer = opts.forgegraphServer as string;
       }
@@ -113,6 +134,11 @@ program
       if (opts.install !== undefined) options.install = opts.install !== false;
       if (opts.git !== undefined) options.git = opts.git !== false;
       options.vinext = opts.vinext === true;
+      applySaasCapabilityFlags(options, opts);
+      applyOperatorLaneFlags(options, opts);
+      if (opts.saasBootstrap !== undefined) {
+        options.saasBootstrap = opts.saasBootstrap === true;
+      }
       if (opts.forgegraphServer) {
         options.forgegraphServer = opts.forgegraphServer as string;
       }
@@ -167,6 +193,46 @@ function parseIntegrations(
       provider: set.has("storage") ? "uploadthing" : "none",
     },
   };
+}
+
+function applySaasCapabilityFlags(
+  options: CliOptions,
+  opts: Record<string, unknown>,
+): void {
+  if (opts.saasCollaboration !== undefined) {
+    options.saasCollaboration = opts.saasCollaboration === true;
+  }
+  if (opts.saasBilling !== undefined) {
+    options.saasBilling = opts.saasBilling === true;
+  }
+  if (opts.saasMetering !== undefined) {
+    options.saasMetering = opts.saasMetering === true;
+  }
+  if (opts.saasSupport !== undefined) {
+    options.saasSupport = opts.saasSupport === true;
+  }
+  if (opts.saasLaunch !== undefined) {
+    options.saasLaunch = opts.saasLaunch === true;
+  }
+  if (opts.saasReferrals !== undefined) {
+    options.saasReferrals = opts.saasReferrals === true;
+  }
+  if (opts.saasOperatorApis !== undefined) {
+    options.saasOperatorApis = opts.saasOperatorApis === true;
+  }
+}
+
+function applyOperatorLaneFlags(
+  options: CliOptions,
+  opts: Record<string, unknown>,
+): void {
+  const requested =
+    opts.saasOperatorApis === true || opts.trpcOperators === true;
+
+  if (opts.saasOperatorApis !== undefined || opts.trpcOperators !== undefined) {
+    options.saasOperatorApis = requested;
+    options.trpcOperators = requested;
+  }
 }
 
 program.parse();

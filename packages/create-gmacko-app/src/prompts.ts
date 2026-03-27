@@ -118,12 +118,28 @@ export async function runPrompts(
     integrations = await promptCustomIntegrations();
   }
 
+  const saasLayers = await promptSaasLayers();
+
   const includeAi = await p.confirm({
     message: "Include Gmacko AI workflow system?",
     initialValue: true,
   });
 
   if (p.isCancel(includeAi)) {
+    p.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  const saasBootstrap =
+    includeAi === true
+      ? await p.confirm({
+          message:
+            "Add the optional Claude SaaS bootstrap pack (office-hours -> autoplan -> design-consultation + local follow-up skills)?",
+          initialValue: false,
+        })
+      : false;
+
+  if (p.isCancel(saasBootstrap)) {
     p.cancel("Operation cancelled.");
     process.exit(0);
   }
@@ -177,7 +193,16 @@ export async function runPrompts(
       mobile: (platforms as string[]).includes("mobile"),
       tanstackStart: (platforms as string[]).includes("tanstackStart"),
     },
+    saasCollaboration: saasLayers.collaboration,
+    saasBilling: saasLayers.billing,
+    saasMetering: saasLayers.metering,
+    saasSupport: saasLayers.support,
+    saasLaunch: saasLayers.launch,
+    saasReferrals: saasLayers.referrals,
+    saasOperatorApis: saasLayers.operatorApis,
     vinext: false,
+    saasBootstrap: saasBootstrap as boolean,
+    trpcOperators: saasLayers.operatorApis,
     forgegraphServer: "https://forge.example.com",
     forgegraphStagingNode: "change-me-staging-node",
     forgegraphProductionNode: "change-me-production-node",
@@ -189,6 +214,89 @@ export async function runPrompts(
     prune: prune as boolean,
     install: install as boolean,
     git: git as boolean,
+  };
+}
+
+async function promptSaasLayers(): Promise<{
+  collaboration: boolean;
+  billing: boolean;
+  metering: boolean;
+  support: boolean;
+  launch: boolean;
+  referrals: boolean;
+  operatorApis: boolean;
+}> {
+  const collaboration = await p.confirm({
+    message: "Add collaboration layers (members and invites)?",
+    initialValue: false,
+  });
+  if (p.isCancel(collaboration)) {
+    p.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  const billing = await p.confirm({
+    message: "Add billing and plans?",
+    initialValue: false,
+  });
+  if (p.isCancel(billing)) {
+    p.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  const metering = await p.confirm({
+    message: "Add metering and usage rollups?",
+    initialValue: false,
+  });
+  if (p.isCancel(metering)) {
+    p.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  const support = await p.confirm({
+    message: "Add support surfaces (contact, tickets, FAQ, changelog)?",
+    initialValue: false,
+  });
+  if (p.isCancel(support)) {
+    p.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  const launch = await p.confirm({
+    message: "Add launch controls (maintenance, signup, allowlists, waitlist)?",
+    initialValue: false,
+  });
+  if (p.isCancel(launch)) {
+    p.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  const referrals = await p.confirm({
+    message: "Add referral and invite growth tools?",
+    initialValue: false,
+  });
+  if (p.isCancel(referrals)) {
+    p.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  const operatorApis = await p.confirm({
+    message: "Add operator APIs (shared CLI + MCP wrappers over the API)?",
+    initialValue: false,
+  });
+  if (p.isCancel(operatorApis)) {
+    p.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  return {
+    collaboration: collaboration as boolean,
+    billing: billing as boolean,
+    metering: metering as boolean,
+    support: support as boolean,
+    launch: launch as boolean,
+    referrals: referrals as boolean,
+    operatorApis: operatorApis as boolean,
   };
 }
 
@@ -280,7 +388,16 @@ export function getDefaultOptions(appName: string): CliOptions {
       mobile: true,
       tanstackStart: false,
     },
+    saasCollaboration: false,
+    saasBilling: false,
+    saasMetering: false,
+    saasSupport: false,
+    saasLaunch: false,
+    saasReferrals: false,
+    saasOperatorApis: false,
     vinext: false,
+    saasBootstrap: false,
+    trpcOperators: false,
     forgegraphServer: "https://forge.example.com",
     forgegraphStagingNode: "change-me-staging-node",
     forgegraphProductionNode: "change-me-production-node",

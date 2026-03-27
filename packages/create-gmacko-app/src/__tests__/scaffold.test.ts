@@ -50,6 +50,15 @@ describe("create-gmacko-app scaffold", () => {
       for (const file of EXPECTED_FILES.core) {
         expect(fileExists(result.appPath, file)).toBe(true);
       }
+      expect(
+        fileExists(result.appPath, "packages/operator-core/package.json"),
+      ).toBe(false);
+      expect(fileExists(result.appPath, "packages/trpc-cli/package.json")).toBe(
+        false,
+      );
+      expect(
+        fileExists(result.appPath, "packages/mcp-server/package.json"),
+      ).toBe(false);
     }, 120000);
 
     it("should include web app by default", async () => {
@@ -689,6 +698,203 @@ describe("create-gmacko-app scaffold", () => {
       expect(rootReadme).toContain("opencode.json");
     }, 120000);
 
+    it("should scaffold a Claude SaaS bootstrap pack when requested", async () => {
+      const appName = generateAppName("saas-bootstrap");
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-install", "--no-git", "--saas-bootstrap"],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+      expect(
+        fileExists(result.appPath, ".claude/skills/bootstrap-saas/SKILL.md"),
+      ).toBe(true);
+      expect(
+        fileExists(
+          result.appPath,
+          ".claude/skills/launch-landing-page/SKILL.md",
+        ),
+      ).toBe(true);
+      expect(
+        fileExists(
+          result.appPath,
+          ".claude/skills/setup-stripe-billing/SKILL.md",
+        ),
+      ).toBe(true);
+      expect(
+        fileExists(
+          result.appPath,
+          ".claude/skills/bootstrap-expo-app/SKILL.md",
+        ),
+      ).toBe(true);
+      expect(
+        fileExists(
+          result.appPath,
+          ".claude/skills/test-mobile-with-maestro/SKILL.md",
+        ),
+      ).toBe(true);
+      expect(fileExists(result.appPath, "docs/ai/BOOTSTRAP_PLAYBOOK.md")).toBe(
+        true,
+      );
+
+      const claudeInstructions = readFile(result.appPath, "CLAUDE.md");
+      const bootstrapPlaybook = readFile(
+        result.appPath,
+        "docs/ai/BOOTSTRAP_PLAYBOOK.md",
+      );
+      const rootReadme = readFile(result.appPath, "README.md");
+      const bootstrapSkill = readFile(
+        result.appPath,
+        ".claude/skills/bootstrap-saas/SKILL.md",
+      );
+
+      expect(claudeInstructions).toContain("After `pnpm bootstrap:local`");
+      expect(claudeInstructions).toContain("/office-hours");
+      expect(claudeInstructions).toContain("/autoplan");
+      expect(claudeInstructions).toContain("/design-consultation");
+      expect(claudeInstructions).toContain("bootstrap-saas");
+      expect(bootstrapPlaybook).toContain("Post-setup SaaS bootstrap");
+      expect(bootstrapPlaybook).toContain("/office-hours");
+      expect(bootstrapPlaybook).toContain("/autoplan");
+      expect(bootstrapPlaybook).toContain("/design-consultation");
+      expect(bootstrapPlaybook).toContain("/launch-landing-page");
+      expect(bootstrapPlaybook).toContain("/setup-stripe-billing");
+      expect(bootstrapPlaybook).toContain("/bootstrap-expo-app");
+      expect(bootstrapPlaybook).toContain("/test-mobile-with-maestro");
+      expect(rootReadme).toContain("Claude SaaS bootstrap pack");
+      expect(rootReadme).toContain("docs/ai/BOOTSTRAP_PLAYBOOK.md");
+      expect(rootReadme).not.toContain(
+        "/Volumes/dev/create-gmacko-app/docs/ai/BOOTSTRAP_PLAYBOOK.md",
+      );
+      expect(bootstrapSkill).toContain("/office-hours");
+      expect(bootstrapSkill).toContain("/autoplan");
+      expect(bootstrapSkill).toContain("/design-consultation");
+    }, 120000);
+
+    it("should scaffold modular SaaS wizard options when requested", async () => {
+      const appName = generateAppName("saas-wizard");
+      const result = await runCli({
+        appName,
+        flags: [
+          "--yes",
+          "--no-install",
+          "--no-git",
+          "--saas-collaboration",
+          "--saas-billing",
+          "--saas-metering",
+          "--saas-support",
+          "--saas-launch",
+          "--saas-referrals",
+          "--saas-operator-apis",
+        ],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+      expect(
+        fileExists(result.appPath, "packages/operator-core/package.json"),
+      ).toBe(true);
+      expect(fileExists(result.appPath, "packages/trpc-cli/package.json")).toBe(
+        true,
+      );
+      expect(
+        fileExists(result.appPath, "packages/mcp-server/package.json"),
+      ).toBe(true);
+
+      const rootReadme = readFile(result.appPath, "README.md");
+      expect(rootReadme).toContain("Scaffold profile");
+      expect(rootReadme).toContain("SaaS layers");
+      expect(rootReadme).toContain("collaboration");
+      expect(rootReadme).toContain("billing");
+      expect(rootReadme).toContain("metering");
+      expect(rootReadme).toContain("support");
+      expect(rootReadme).toContain("launch");
+      expect(rootReadme).toContain("referrals");
+      expect(rootReadme).toContain("operator APIs");
+    }, 120000);
+
+    it("should scaffold a tRPC-backed operator CLI and MCP lane when requested", async () => {
+      const appName = generateAppName("trpc-operators");
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-install", "--no-git", "--trpc-operators"],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+      expect(
+        fileExists(result.appPath, "packages/operator-core/package.json"),
+      ).toBe(true);
+      expect(fileExists(result.appPath, "packages/trpc-cli/package.json")).toBe(
+        true,
+      );
+      expect(fileExists(result.appPath, "packages/trpc-cli/src/index.ts")).toBe(
+        true,
+      );
+      expect(
+        fileExists(result.appPath, "packages/mcp-server/package.json"),
+      ).toBe(true);
+
+      const rootPackage = readJson<{
+        scripts?: Record<string, string>;
+      }>(result.appPath, "package.json");
+      const mcpConfig = readJson<{
+        mcpServers?: Record<
+          string,
+          { command?: string; args?: string[]; env?: Record<string, string> }
+        >;
+      }>(result.appPath, ".mcp.json");
+      const operatorCorePackage = readJson<{
+        name?: string;
+      }>(result.appPath, "packages/operator-core/package.json");
+      const trpcCliPackage = readJson<{
+        name?: string;
+        bin?: Record<string, string>;
+      }>(result.appPath, "packages/trpc-cli/package.json");
+      const trpcCliSource = readFile(
+        result.appPath,
+        "packages/trpc-cli/src/index.ts",
+      );
+      const mcpServerSource = readFile(
+        result.appPath,
+        "packages/mcp-server/src/index.ts",
+      );
+      const rootReadme = readFile(result.appPath, "README.md");
+
+      expect(rootPackage.scripts?.["trpc:ops"]).toContain("@gmacko/trpc-cli");
+      expect(rootPackage.scripts?.["mcp:app"]).toContain("@gmacko/mcp-server");
+      expect(operatorCorePackage.name).toBe("@gmacko/operator-core");
+      expect(trpcCliPackage.name).toBe("@gmacko/trpc-cli");
+      expect(Object.keys(trpcCliPackage.bin ?? {})).toContain("gmacko-ops");
+      expect(trpcCliSource).toContain("@gmacko/operator-core");
+      expect(mcpServerSource).toContain("@gmacko/operator-core");
+      expect(mcpServerSource).toContain('name: "gmacko-app"');
+      expect(mcpConfig.mcpServers?.["gmacko-app"]?.command).toBe("pnpm");
+      expect(mcpConfig.mcpServers?.["gmacko-app"]?.args).toContain(
+        "@gmacko/mcp-server",
+      );
+      expect(mcpConfig.mcpServers?.["gmacko-app"]?.env).toMatchObject({
+        GMACKO_API_URL: "http://localhost:3000",
+        GMACKO_API_KEY: "change-me",
+      });
+      expect(rootReadme).toContain("CLI + MCP wrappers over the same tRPC API");
+      expect(rootReadme).toContain("pnpm trpc:ops -- --help");
+      expect(rootReadme).toContain("pnpm mcp:app");
+
+      const doctorScript = readFile(result.appPath, "scripts/doctor.sh");
+      expect(doctorScript).toContain("Operator API lane detected");
+      expect(doctorScript).toContain("Operator API env values");
+      expect(doctorScript).toContain("GMACKO_API_URL");
+      expect(doctorScript).toContain("GMACKO_API_KEY");
+    }, 120000);
+
     it("should omit the generated agent quickstart when AI workflow files are excluded", async () => {
       const appName = generateAppName("no-ai-quickstart");
       const result = await runCli({
@@ -1086,6 +1292,11 @@ describe("create-gmacko-app scaffold", () => {
     expect(e2eWorkflow).toContain(
       "pnpm --filter @gmacko/nextjs deploy:cloudflare:staging",
     );
+    expect(e2eWorkflow).toContain("--trpc-operators");
+    expect(e2eWorkflow).toContain("pnpm trpc:ops -- --help");
+    expect(e2eWorkflow).toContain("Operator API env values");
+    expect(e2eWorkflow).toContain('GMACKO_API_URL="http://localhost:3000"');
+    expect(e2eWorkflow).toContain('GMACKO_API_KEY="test-gmacko-api-key"');
     expect(e2eWorkflow).toContain("pnpm exec forge --version");
     expect(e2eWorkflow).toContain("pnpm forge:stages");
     expect(e2eWorkflow).toContain("pnpm forge:deploy:staging");
