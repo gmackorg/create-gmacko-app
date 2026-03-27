@@ -17,6 +17,14 @@ Read [`AGENTS.md`](./AGENTS.md) first for the shared repo conventions used by Co
 3. Run `/plan-eng-review` to turn the approved proposal into the implementation plan in `docs/ai/IMPLEMENTATION_PLAN.md`.
 4. Run `/design-consultation` to establish the design philosophy for the app and write `DESIGN.md`.
 
+If the repo was scaffolded with the optional SaaS bootstrap pack, run that flow after `pnpm bootstrap:local`:
+
+1. `/office-hours`
+2. `/autoplan` if available from your user-level gstack install
+3. `/design-consultation`
+4. the generated [`docs/ai/BOOTSTRAP_PLAYBOOK.md`](./docs/ai/BOOTSTRAP_PLAYBOOK.md), which splits guidance into `Claude-only`, `Codex`, and `OpenCode` sections and adds feature-aware follow-ups for the selected SaaS layers
+5. the local follow-up skills in `.claude/skills/bootstrap-saas`, `.claude/skills/launch-landing-page`, `.claude/skills/setup-stripe-billing`, `.claude/skills/bootstrap-expo-app`, and `.claude/skills/test-mobile-with-maestro`
+
 ## UI Workflow
 
 - Use Storybook for isolated UI work with `pnpm --filter @gmacko/nextjs storybook`.

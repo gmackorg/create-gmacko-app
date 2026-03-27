@@ -56,6 +56,7 @@ export async function scaffold(options: CliOptions): Promise<void> {
   addOptionalOperatorScripts(targetDir, options);
   customizeMcpConfig(targetDir, options);
   customizeClaudeInstructions(targetDir, options);
+  customizeBootstrapPlaybook(targetDir, options);
 
   if (!options.platforms.web) {
     fs.removeSync(path.join(targetDir, "apps/nextjs"));
@@ -285,7 +286,7 @@ function customizeGeneratedReadme(
     : "";
   const saasBootstrapBlock =
     options.includeAi && options.saasBootstrap
-      ? `\n\n${buildSaasBootstrapBlock()}`
+      ? `\n\n${buildSaasBootstrapBlock(options)}`
       : "";
   const trpcOperatorsBlock = options.trpcOperators
     ? `\n\n${buildTrpcOperatorsBlock()}`
@@ -318,14 +319,165 @@ function buildAgentQuickstartBlock(): string {
 `;
 }
 
-function buildSaasBootstrapBlock(): string {
-  return `## Claude SaaS bootstrap pack
+function buildSaasBootstrapBlock(options: CliOptions): string {
+  return buildSaasBootstrapContent(options, true);
+}
 
-- After \`pnpm bootstrap:local\`, use Claude Code and run \`/office-hours\`.
-- If your user-level gstack install includes \`/autoplan\`, run it next to turn the product direction into an execution plan.
-- Run \`/design-consultation\` once the problem and audience are clear so \`DESIGN.md\` becomes the visual source of truth.
-- Then work through [docs/ai/BOOTSTRAP_PLAYBOOK.md](docs/ai/BOOTSTRAP_PLAYBOOK.md) with \`/launch-landing-page\`, \`/setup-stripe-billing\`, \`/bootstrap-expo-app\`, and \`/test-mobile-with-maestro\`.
+function buildSaasBootstrapContent(
+  options: CliOptions,
+  includeSummaryLink: boolean,
+): string {
+  const { claudeLines, codexLines, opencodeLines, selectedLayerLines } =
+    getBootstrapRecommendations(options);
+
+  const summaryLink = includeSummaryLink
+    ? `
+- Use [docs/ai/BOOTSTRAP_PLAYBOOK.md](docs/ai/BOOTSTRAP_PLAYBOOK.md) for the full handoff.`
+    : "";
+
+  const selectedLayerSection =
+    selectedLayerLines.length > 0
+      ? `
+## Selected SaaS layers
+
+${selectedLayerLines.join("\n")}
+`
+      : "";
+
+  return `# Post-setup SaaS bootstrap
+
+Run this after \`pnpm bootstrap:local\`.
+
+## Claude-only
+
+${claudeLines.join("\n")}
+
+## Codex
+
+${codexLines.join("\n")}
+
+## OpenCode
+
+${opencodeLines.join("\n")}${selectedLayerSection}${summaryLink}
 `;
+}
+
+function getBootstrapRecommendations(options: CliOptions): {
+  claudeLines: string[];
+  codexLines: string[];
+  opencodeLines: string[];
+  selectedLayerLines: string[];
+} {
+  const claudeLines = [
+    "- Claude-only: run `/office-hours` to force clarity on customer, problem, and wedge.",
+    "- Claude-only: if your user-level gstack install includes `/autoplan`, run it next.",
+    "- Claude-only: run `/design-consultation` once the product direction is clear so `DESIGN.md` becomes the visual source of truth.",
+  ];
+  const codexLines = [
+    "- Start from `AGENTS.md` and `docs/ai/IMPLEMENTATION_PLAN.md`.",
+    "- Run `pnpm bootstrap:local`, then `pnpm doctor` and `pnpm check:fast`.",
+  ];
+  const opencodeLines = [
+    "- Start from `AGENTS.md`, `opencode.json`, and `docs/ai/IMPLEMENTATION_PLAN.md`.",
+    "- Run `pnpm bootstrap:local`, then `pnpm doctor` and `pnpm check:fast`.",
+  ];
+  const selectedLayerLines: string[] = [];
+
+  if (options.saasCollaboration) {
+    selectedLayerLines.push(
+      "- Collaboration: use `packages/db/src/schema.ts` and `packages/api/src/router/settings.ts` for workspace membership and invites.",
+    );
+    codexLines.push(
+      "- Collaboration: inspect `packages/db/src/schema.ts` and `packages/api/src/router/settings.ts` for workspace membership and invites.",
+    );
+    opencodeLines.push(
+      "- Collaboration: inspect `packages/db/src/schema.ts` and `packages/api/src/router/settings.ts` for workspace membership and invites.",
+    );
+  }
+
+  if (options.saasBilling || options.saasMetering) {
+    selectedLayerLines.push(
+      "- Billing and metering: use `packages/billing` and `packages/api/src/router/settings.ts` for plan shape, limits, and usage rollups.",
+    );
+    codexLines.push(
+      "- Billing and metering: use `packages/billing` and `packages/api/src/router/settings.ts` for plans, limits, and usage rollups.",
+    );
+    opencodeLines.push(
+      "- Billing and metering: use `packages/billing` and `packages/api/src/router/settings.ts` for plans, limits, and usage rollups.",
+    );
+    claudeLines.push(
+      "- Claude-only: run `/setup-stripe-billing` once the workspace, plan, and usage model are clear.",
+    );
+  }
+
+  if (options.saasSupport || options.saasLaunch) {
+    selectedLayerLines.push(
+      "- Support and launch: use `apps/nextjs/src/app`, `packages/api/src/router/admin.ts`, and `packages/api/src/router/settings.ts` for landing, contact, FAQ, changelog, maintenance mode, signup toggles, and waitlist review.",
+    );
+    codexLines.push(
+      "- Support and launch: use `apps/nextjs/src/app`, `packages/api/src/router/admin.ts`, and `packages/api/src/router/settings.ts` for landing, contact, FAQ, changelog, maintenance mode, signup toggles, and waitlist review.",
+    );
+    opencodeLines.push(
+      "- Support and launch: use `apps/nextjs/src/app`, `packages/api/src/router/admin.ts`, and `packages/api/src/router/settings.ts` for landing, contact, FAQ, changelog, maintenance mode, signup toggles, and waitlist review.",
+    );
+    claudeLines.push(
+      "- Claude-only: run `/launch-landing-page` once the public shell and support flow are ready to shape.",
+    );
+  }
+
+  if (options.saasReferrals) {
+    selectedLayerLines.push(
+      "- Referrals: keep referral capture and invite growth tied to the landing page and admin review tools.",
+    );
+    codexLines.push(
+      "- Referrals: keep referral capture and invite growth tied to the landing page and admin review tools in `packages/api/src/router/admin.ts`.",
+    );
+    opencodeLines.push(
+      "- Referrals: keep referral capture and invite growth tied to the landing page and admin review tools in `packages/api/src/router/admin.ts`.",
+    );
+  }
+
+  if (options.saasOperatorApis || options.trpcOperators) {
+    selectedLayerLines.push(
+      "- Operator APIs: use `pnpm trpc:ops -- --help` and `pnpm mcp:app` for the shared CLI and MCP wrapper lane.",
+    );
+    codexLines.push(
+      "- Operator APIs: use `packages/operator-core`, `packages/trpc-cli`, and `packages/mcp-server` for the shared CLI and MCP wrapper lane.",
+    );
+    opencodeLines.push(
+      "- Operator APIs: use `packages/operator-core`, `packages/trpc-cli`, and `packages/mcp-server` for the shared CLI and MCP wrapper lane.",
+    );
+  }
+
+  if (options.platforms.mobile) {
+    claudeLines.push(
+      "- Claude-only: use `/bootstrap-expo-app` and `/test-mobile-with-maestro` for the Expo lane.",
+    );
+    codexLines.push(
+      "- Mobile: use `apps/expo` and the mobile QA checklist to complete the Expo baseline.",
+    );
+    opencodeLines.push(
+      "- Mobile: use `apps/expo` and the mobile QA checklist to complete the Expo baseline.",
+    );
+  }
+
+  return { claudeLines, codexLines, opencodeLines, selectedLayerLines };
+}
+
+function customizeBootstrapPlaybook(
+  targetDir: string,
+  options: CliOptions,
+): void {
+  if (!options.includeAi || !options.saasBootstrap) {
+    return;
+  }
+
+  const playbookPath = path.join(targetDir, "docs/ai/BOOTSTRAP_PLAYBOOK.md");
+  if (!fs.existsSync(playbookPath)) {
+    return;
+  }
+
+  fs.writeFileSync(playbookPath, buildSaasBootstrapContent(options, false));
 }
 
 function buildTrpcOperatorsBlock(): string {

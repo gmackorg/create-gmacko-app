@@ -760,11 +760,16 @@ describe("create-gmacko-app scaffold", () => {
       expect(bootstrapPlaybook).toContain("/office-hours");
       expect(bootstrapPlaybook).toContain("/autoplan");
       expect(bootstrapPlaybook).toContain("/design-consultation");
-      expect(bootstrapPlaybook).toContain("/launch-landing-page");
-      expect(bootstrapPlaybook).toContain("/setup-stripe-billing");
       expect(bootstrapPlaybook).toContain("/bootstrap-expo-app");
       expect(bootstrapPlaybook).toContain("/test-mobile-with-maestro");
-      expect(rootReadme).toContain("Claude SaaS bootstrap pack");
+      expect(bootstrapPlaybook).toContain("## Claude-only");
+      expect(bootstrapPlaybook).toContain("## Codex");
+      expect(bootstrapPlaybook).toContain("## OpenCode");
+      expect(bootstrapPlaybook).toContain("Claude-only");
+      expect(bootstrapPlaybook).not.toContain("## Selected SaaS layers");
+      expect(bootstrapPlaybook).not.toContain("/launch-landing-page");
+      expect(bootstrapPlaybook).not.toContain("/setup-stripe-billing");
+      expect(rootReadme).toContain("Post-setup SaaS bootstrap");
       expect(rootReadme).toContain("docs/ai/BOOTSTRAP_PLAYBOOK.md");
       expect(rootReadme).not.toContain(
         "/Volumes/dev/create-gmacko-app/docs/ai/BOOTSTRAP_PLAYBOOK.md",
@@ -772,6 +777,63 @@ describe("create-gmacko-app scaffold", () => {
       expect(bootstrapSkill).toContain("/office-hours");
       expect(bootstrapSkill).toContain("/autoplan");
       expect(bootstrapSkill).toContain("/design-consultation");
+    }, 120000);
+
+    it("should scaffold feature-aware SaaS bootstrap recommendations when SaaS layers are selected", async () => {
+      const appName = generateAppName("saas-bootstrap-aware");
+      const result = await runCli({
+        appName,
+        flags: [
+          "--yes",
+          "--no-install",
+          "--no-git",
+          "--saas-bootstrap",
+          "--saas-billing",
+          "--saas-support",
+          "--saas-operator-apis",
+        ],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+
+      const bootstrapPlaybook = readFile(
+        result.appPath,
+        "docs/ai/BOOTSTRAP_PLAYBOOK.md",
+      );
+      const rootReadme = readFile(result.appPath, "README.md");
+
+      expect(bootstrapPlaybook).toContain("## Claude-only");
+      expect(bootstrapPlaybook).toContain("## Codex");
+      expect(bootstrapPlaybook).toContain("## OpenCode");
+      expect(bootstrapPlaybook).toContain("## Selected SaaS layers");
+      expect(bootstrapPlaybook).toContain("Billing");
+      expect(bootstrapPlaybook).toContain("Support");
+      expect(bootstrapPlaybook).toContain("Operator APIs");
+      expect(bootstrapPlaybook).toContain("/setup-stripe-billing");
+      expect(bootstrapPlaybook).toContain("/launch-landing-page");
+      expect(bootstrapPlaybook).toContain("pnpm trpc:ops -- --help");
+      expect(bootstrapPlaybook).toContain("pnpm mcp:app");
+      expect(bootstrapPlaybook).toContain("Claude-only");
+      const selectedLayersStart = bootstrapPlaybook.indexOf(
+        "## Selected SaaS layers",
+      );
+      const selectedLayersEnd = bootstrapPlaybook.indexOf(
+        "- Use [docs/ai/BOOTSTRAP_PLAYBOOK.md](docs/ai/BOOTSTRAP_PLAYBOOK.md) for the full handoff.",
+      );
+      const selectedLayersSection =
+        selectedLayersStart !== -1 && selectedLayersEnd !== -1
+          ? bootstrapPlaybook.slice(selectedLayersStart, selectedLayersEnd)
+          : "";
+      expect(selectedLayersSection).not.toContain("/setup-stripe-billing");
+      expect(selectedLayersSection).not.toContain("/launch-landing-page");
+      expect(selectedLayersSection).not.toContain("Claude-only:");
+      expect(rootReadme).toContain("Selected SaaS layers");
+      expect(rootReadme).toContain("billing");
+      expect(rootReadme).toContain("support");
+      expect(rootReadme).toContain("operator APIs");
     }, 120000);
 
     it("should scaffold modular SaaS wizard options when requested", async () => {

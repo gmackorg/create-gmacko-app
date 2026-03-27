@@ -10,6 +10,7 @@ This repository is set up to work well with `Codex`, `Claude Code`, and `OpenCod
 - Use `pnpm`, `oxlint`, `biome`, and `turbo` as the default tooling surface.
 - Use ForgeGraph for deployment workflows and `forge` from [`../ForgeGraph`](../ForgeGraph) when working against the real deployment control plane.
 - Treat [docs/ai/DEVELOPER_EXPERIENCE.md](./docs/ai/DEVELOPER_EXPERIENCE.md) as the current support matrix for agent tooling, Cloudflare Workers, ForgeGraph, Nix, and mobile DX choices.
+- When the optional SaaS bootstrap pack is scaffolded, keep the generated bootstrap playbook feature-aware across `Claude-only`, `Codex`, and `OpenCode` sections, and keep Claude-only slash commands labeled as such.
 
 ## Planning Flow
 
@@ -33,6 +34,7 @@ This repository is set up to work well with `Codex`, `Claude Code`, and `OpenCod
 - Project hooks belong in `.claude/settings.json`, not in this file.
 - Project subagents belong in `.claude/agents/` when they are narrow and reusable.
 - This repo ships `.claude/settings.json` with `../ForgeGraph` available as an additional working directory.
+- The generated SaaS bootstrap handoff should keep Claude-only slash commands separate from the repo-level guidance used by Codex and OpenCode.
 
 ### OpenCode
 
@@ -40,3 +42,4 @@ This repository is set up to work well with `Codex`, `Claude Code`, and `OpenCod
 - `opencode.json` should reference this file plus any high-signal planning docs that should always be loaded.
 - Use OpenCode agents and rules for bounded task specialization, but keep repo conventions centralized here.
 - Keep shared supplemental instructions in `opencode.json` instead of bloating `AGENTS.md`.
+- The generated SaaS bootstrap handoff should point OpenCode at the same repo-level follow-ups as Codex, not at Claude-only slash commands.
