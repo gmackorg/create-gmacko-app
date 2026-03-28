@@ -51,6 +51,40 @@ export const saasFeatures = {
 
 export type SaasFeatures = typeof saasFeatures;
 
+export const platformPrimitives = {
+  featureFlags: {
+    enabled: true,
+    provider: "local" as const,
+  },
+  jobs: {
+    enabled: true,
+    provider: "local" as const,
+  },
+  rateLimits: {
+    enabled: true,
+    scopes: ["auth", "contact", "signup", "api-keys", "operator-api"] as const,
+  },
+  botProtection: {
+    enabled: true,
+    provider: "local-rate-limit" as const,
+  },
+  compliance: {
+    enabled: true,
+    dataExport: true,
+    dataDeletion: true,
+  },
+  emailDelivery: {
+    enabled: integrations.email.enabled,
+    provider: integrations.email.provider,
+    requiredEnv:
+      integrations.email.enabled && integrations.email.provider === "resend"
+        ? (["RESEND_API_KEY"] as const)
+        : ([] as const),
+  },
+} as const;
+
+export type PlatformPrimitives = typeof platformPrimitives;
+
 export const isSentryEnabled = () => integrations.sentry;
 export const isPostHogEnabled = () => integrations.posthog;
 export const isStripeEnabled = () => integrations.stripe;
@@ -68,3 +102,5 @@ export const isSaasSupportEnabled = () => saasFeatures.support;
 export const isSaasLaunchEnabled = () => saasFeatures.launch;
 export const isSaasReferralsEnabled = () => saasFeatures.referrals;
 export const isSaasOperatorApisEnabled = () => saasFeatures.operatorApis;
+export const isEmailDeliveryEnabled = () =>
+  platformPrimitives.emailDelivery.enabled;

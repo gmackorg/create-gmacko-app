@@ -4,8 +4,8 @@ import {
   user,
   waitlistEntry,
   workspace,
-  workspaceMembership,
   workspaceInviteAllowlist,
+  workspaceMembership,
 } from "@gmacko/db/schema";
 import { describe, expect, it, vi } from "vitest";
 
@@ -217,8 +217,7 @@ function createFakeDb(input?: {
                   id: state.waitlistEntries[index]!.id,
                   email: state.waitlistEntries[index]!.email,
                   source: state.waitlistEntries[index]!.source,
-                  status:
-                    values.status ?? state.waitlistEntries[index]!.status,
+                  status: values.status ?? state.waitlistEntries[index]!.status,
                   referralCode:
                     values.referralCode ??
                     state.waitlistEntries[index]!.referralCode,
@@ -664,6 +663,13 @@ describe("admin launch controls", () => {
         maintenanceMode: boolean;
         signupEnabled: boolean;
         allowedEmailDomains: string[];
+        platformPrimitives: {
+          botProtection: { enabled: boolean; provider: string };
+          compliance: { dataExport: boolean; enabled: boolean };
+          featureFlags: { enabled: boolean; provider: string };
+          jobs: { enabled: boolean; provider: string };
+          rateLimits: { enabled: boolean; scopes: string[] };
+        };
         waitlistCount: number;
       }>;
       reviewWaitlistEntry: (input: {
@@ -678,6 +684,22 @@ describe("admin launch controls", () => {
       announcementMessage: null,
       announcementTone: "info",
       allowedEmailDomains: [],
+      platformPrimitives: expect.objectContaining({
+        featureFlags: { enabled: true, provider: "local" },
+        jobs: { enabled: true, provider: "local" },
+        rateLimits: expect.objectContaining({
+          enabled: true,
+          scopes: expect.arrayContaining(["auth", "contact", "operator-api"]),
+        }),
+        botProtection: {
+          enabled: true,
+          provider: "local-rate-limit",
+        },
+        compliance: expect.objectContaining({
+          dataExport: true,
+          enabled: true,
+        }),
+      }),
       waitlistCount: 1,
     });
 

@@ -127,6 +127,17 @@ if [ -f "$ROOT_DIR/.forgegraph.yaml" ]; then
   check_env_group "ForgeGraph deploy values" "DATABASE_URL" "AUTH_SECRET"
 fi
 
+echo ""
+echo "Checking shared platform primitives..."
+ok "Feature flags: local scaffolding with room for PostHog migration later"
+ok "Background jobs: local queue hooks scaffolded for email, billing, and metering work"
+ok "Rate limits: auth, contact, signup, API keys, and operator API guards are scaffolded"
+ok "Compliance export hooks: data export and deletion hooks are scaffolded"
+
+if [ -f "$ROOT_DIR/packages/config/src/integrations.ts" ] && grep -q 'provider: "resend"' "$ROOT_DIR/packages/config/src/integrations.ts"; then
+  check_env_group "Resend email env values" "RESEND_API_KEY"
+fi
+
 if [ -f "$ROOT_DIR/apps/nextjs/wrangler.jsonc" ]; then
   ok "Cloudflare Workers lane detected"
 

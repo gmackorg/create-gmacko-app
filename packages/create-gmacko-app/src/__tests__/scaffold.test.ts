@@ -1288,6 +1288,10 @@ describe("create-gmacko-app scaffold", () => {
       expect(doctorScript).toContain("@forgegraph/cli");
       expect(doctorScript).toContain("Core app env values");
       expect(doctorScript).toContain("ForgeGraph deploy values");
+      expect(doctorScript).toContain("Feature flags");
+      expect(doctorScript).toContain("Background jobs");
+      expect(doctorScript).toContain("Rate limits");
+      expect(doctorScript).toContain("Compliance export hooks");
       expect(doctorScript).toContain("Cloudflare Workers env values");
       expect(doctorScript).toContain(
         ".forgegraph.yaml still has placeholder ForgeGraph values; update server, domains, and stage node IDs before deploying",
@@ -1316,6 +1320,37 @@ describe("create-gmacko-app scaffold", () => {
         fs.statSync(path.join(result.appPath, "scripts/bootstrap-local.sh"))
           .mode & 0o111,
       ).toBeTruthy();
+    }, 120000);
+
+    it("should scaffold Resend-aware doctor checks when email integration is enabled", async () => {
+      const appName = generateAppName("resend-doctor");
+      const result = await runCli({
+        appName,
+        flags: [
+          "--yes",
+          "--no-install",
+          "--no-git",
+          "--integrations",
+          "email",
+          "--email-provider",
+          "resend",
+        ],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+
+      const doctorScript = readFile(result.appPath, "scripts/doctor.sh");
+      const integrationsConfig = readFile(
+        result.appPath,
+        "packages/config/src/integrations.ts",
+      );
+
+      expect(integrationsConfig).toContain('provider: "resend"');
+      expect(doctorScript).toContain("Resend email env values");
+      expect(doctorScript).toContain("RESEND_API_KEY");
     }, 120000);
 
     it("should initialize a jj repo by default", async () => {

@@ -1,13 +1,14 @@
 import { isPlatformAdminRole } from "@gmacko/auth";
+import { platformPrimitives } from "@gmacko/config";
 import { eq } from "@gmacko/db";
 import {
   applicationSettings,
   user,
   userRoleEnum,
+  waitlistEntry,
   workspace,
   workspaceInviteAllowlist,
   workspaceMembership,
-  waitlistEntry,
 } from "@gmacko/db/schema";
 import type { TRPCRouterRecord } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
@@ -64,6 +65,34 @@ export const adminRouter = {
       announcementMessage: settings?.announcementMessage ?? null,
       announcementTone: settings?.announcementTone ?? "info",
       allowedEmailDomains: settings?.allowedEmailDomains ?? [],
+      platformPrimitives: {
+        featureFlags: {
+          enabled: platformPrimitives.featureFlags.enabled,
+          provider: platformPrimitives.featureFlags.provider,
+        },
+        jobs: {
+          enabled: platformPrimitives.jobs.enabled,
+          provider: platformPrimitives.jobs.provider,
+        },
+        rateLimits: {
+          enabled: platformPrimitives.rateLimits.enabled,
+          scopes: [...platformPrimitives.rateLimits.scopes],
+        },
+        botProtection: {
+          enabled: platformPrimitives.botProtection.enabled,
+          provider: platformPrimitives.botProtection.provider,
+        },
+        compliance: {
+          enabled: platformPrimitives.compliance.enabled,
+          dataExport: platformPrimitives.compliance.dataExport,
+          dataDeletion: platformPrimitives.compliance.dataDeletion,
+        },
+        emailDelivery: {
+          enabled: platformPrimitives.emailDelivery.enabled,
+          provider: platformPrimitives.emailDelivery.provider,
+          requiredEnv: [...platformPrimitives.emailDelivery.requiredEnv],
+        },
+      },
       waitlistCount: waitlist.length,
     };
   }),

@@ -1,5 +1,5 @@
 import { canManageWorkspace, isPlatformAdminRole } from "@gmacko/auth";
-import { integrations, saasFeatures } from "@gmacko/config";
+import { integrations, platformPrimitives, saasFeatures } from "@gmacko/config";
 import { and, eq, isNull } from "@gmacko/db";
 import {
   apiKeys,
@@ -7,12 +7,12 @@ import {
   UpdateUserPreferencesSchema,
   user,
   userPreferences,
+  waitlistEntry,
   workspace,
   workspaceInviteAllowlist,
   workspaceMembership,
   workspaceSubscription,
   workspaceUsageRollup,
-  waitlistEntry,
 } from "@gmacko/db/schema";
 import type { TRPCRouterRecord } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
@@ -132,8 +132,7 @@ export const settingsRouter = {
     return {
       announcementMessage:
         settings?.announcementMessage ?? defaults.announcementMessage,
-      announcementTone:
-        settings?.announcementTone ?? defaults.announcementTone,
+      announcementTone: settings?.announcementTone ?? defaults.announcementTone,
       allowedEmailDomains: settings?.allowedEmailDomains ?? [],
       canAutoCreateAccounts: defaults.canAutoCreateAccounts,
       inviteOnly: !(settings?.signupEnabled ?? defaults.signupEnabled),
@@ -163,7 +162,12 @@ export const settingsRouter = {
       const [existing] = await ctx.db
         .select({ id: waitlistEntry.id })
         .from(waitlistEntry)
-        .where(and(eq(waitlistEntry.email, email), eq(waitlistEntry.source, input.source)))
+        .where(
+          and(
+            eq(waitlistEntry.email, email),
+            eq(waitlistEntry.source, input.source),
+          ),
+        )
         .limit(1);
 
       if (existing) {
@@ -227,6 +231,37 @@ export const settingsRouter = {
       canManageWorkspace: workspaceScope.canManageCurrentWorkspace,
       isPlatformAdmin: workspaceScope.isPlatformAdmin,
       inviteAllowlistCount: inviteAllowlistEntries.length,
+    };
+  }),
+
+  getPlatformPrimitives: protectedProcedure.query(() => {
+    return {
+      featureFlags: {
+        enabled: platformPrimitives.featureFlags.enabled,
+        provider: platformPrimitives.featureFlags.provider,
+      },
+      jobs: {
+        enabled: platformPrimitives.jobs.enabled,
+        provider: platformPrimitives.jobs.provider,
+      },
+      rateLimits: {
+        enabled: platformPrimitives.rateLimits.enabled,
+        scopes: [...platformPrimitives.rateLimits.scopes],
+      },
+      botProtection: {
+        enabled: platformPrimitives.botProtection.enabled,
+        provider: platformPrimitives.botProtection.provider,
+      },
+      compliance: {
+        enabled: platformPrimitives.compliance.enabled,
+        dataExport: platformPrimitives.compliance.dataExport,
+        dataDeletion: platformPrimitives.compliance.dataDeletion,
+      },
+      emailDelivery: {
+        enabled: platformPrimitives.emailDelivery.enabled,
+        provider: platformPrimitives.emailDelivery.provider,
+        requiredEnv: [...platformPrimitives.emailDelivery.requiredEnv],
+      },
     };
   }),
 
