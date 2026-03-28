@@ -2,8 +2,10 @@ import { randomUUID } from "node:crypto";
 import {
   applicationSettings,
   user,
+  waitlistEntry,
   workspace,
   workspaceMembership,
+  workspaceInviteAllowlist,
 } from "@gmacko/db/schema";
 import { describe, expect, it, vi } from "vitest";
 
@@ -37,6 +39,11 @@ type TestApplicationSettings = {
   setupCompletedAt: Date | null;
   setupCompletedByUserId: string | null;
   initialWorkspaceId: string | null;
+  maintenanceMode: boolean;
+  signupEnabled: boolean;
+  announcementMessage: string | null;
+  announcementTone: string;
+  allowedEmailDomains: string[];
   createdAt: Date;
   updatedAt: Date | null;
 };
@@ -50,12 +57,25 @@ type TestWorkspaceMembership = {
   updatedAt: Date | null;
 };
 
+type TestWaitlistEntry = {
+  id: string;
+  email: string;
+  source: "landing" | "contact" | "referral" | "blocked-signup";
+  status: "pending" | "contacted" | "approved" | "dismissed";
+  referralCode: string | null;
+  reviewedByUserId: string | null;
+  reviewedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date | null;
+};
+
 function createFakeDb(input?: {
   user?: TestUser;
   applicationSettings?: TestApplicationSettings | null;
   workspaces?: TestWorkspace[];
   memberships?: TestWorkspaceMembership[];
   failApplicationSettingsInsert?: boolean;
+  waitlistEntries?: TestWaitlistEntry[];
 }) {
   const sortWorkspaces = (rows: TestWorkspace[]) =>
     [...rows].sort(
@@ -78,6 +98,8 @@ function createFakeDb(input?: {
     applicationSettings: input?.applicationSettings ?? null,
     workspaces: [...(input?.workspaces ?? [])],
     memberships: [...(input?.memberships ?? [])],
+    waitlistEntries: [...(input?.waitlistEntries ?? [])],
+    selectedWaitlistEntryId: null as string | null,
   };
 
   const makeRowsQuery = <T>(rows: T[]) => {
@@ -99,6 +121,9 @@ function createFakeDb(input?: {
     query: {
       applicationSettings: {
         findFirst: vi.fn(async () => state.applicationSettings),
+      },
+      waitlistEntry: {
+        findMany: vi.fn(async () => [...state.waitlistEntries]),
       },
     },
     select: vi.fn(() => ({
@@ -161,6 +186,47 @@ function createFakeDb(input?: {
         };
       }
 
+      if (table === waitlistEntry) {
+        return {
+          set: (values: Partial<TestWaitlistEntry>) => ({
+            where: () => ({
+              returning: async () => {
+                const selectedWaitlistEntryId =
+                  state.selectedWaitlistEntryId ?? state.waitlistEntries[0]?.id;
+                const index = state.waitlistEntries.findIndex(
+                  (entry) => entry.id === selectedWaitlistEntryId,
+                );
+
+                if (index === -1) {
+                  return [];
+                }
+
+                state.waitlistEntries[index] = {
+                  id: state.waitlistEntries[index]!.id,
+                  email: state.waitlistEntries[index]!.email,
+                  source: state.waitlistEntries[index]!.source,
+                  status:
+                    values.status ?? state.waitlistEntries[index]!.status,
+                  referralCode:
+                    values.referralCode ??
+                    state.waitlistEntries[index]!.referralCode,
+                  reviewedByUserId:
+                    values.reviewedByUserId ??
+                    state.waitlistEntries[index]!.reviewedByUserId,
+                  reviewedAt:
+                    values.reviewedAt ??
+                    state.waitlistEntries[index]!.reviewedAt,
+                  createdAt: state.waitlistEntries[index]!.createdAt,
+                  updatedAt: new Date("2026-03-27T01:00:00.000Z"),
+                };
+
+                return [state.waitlistEntries[index]];
+              },
+            }),
+          }),
+        };
+      }
+
       throw new Error("Unexpected update table");
     }),
     insert: vi.fn((table: unknown) => {
@@ -197,6 +263,11 @@ function createFakeDb(input?: {
                 setupCompletedAt: values.setupCompletedAt ?? null,
                 setupCompletedByUserId: values.setupCompletedByUserId ?? null,
                 initialWorkspaceId: values.initialWorkspaceId ?? null,
+                maintenanceMode: values.maintenanceMode ?? false,
+                signupEnabled: values.signupEnabled ?? true,
+                announcementMessage: values.announcementMessage ?? null,
+                announcementTone: values.announcementTone ?? "info",
+                allowedEmailDomains: values.allowedEmailDomains ?? [],
                 createdAt: new Date("2026-03-27T01:00:00.000Z"),
                 updatedAt: null,
               };
@@ -228,6 +299,14 @@ function createFakeDb(input?: {
         };
       }
 
+      if (table === workspaceInviteAllowlist) {
+        return {
+          values: () => ({
+            returning: async () => [],
+          }),
+        };
+      }
+
       throw new Error("Unexpected insert table");
     }),
     transaction: vi.fn(async (fn: (tx: typeof db) => Promise<unknown>) => {
@@ -238,6 +317,7 @@ function createFakeDb(input?: {
           : null,
         workspaces: structuredClone(state.workspaces),
         memberships: structuredClone(state.memberships),
+        waitlistEntries: structuredClone(state.waitlistEntries),
       };
 
       try {
@@ -247,6 +327,7 @@ function createFakeDb(input?: {
         state.applicationSettings = snapshot.applicationSettings;
         state.workspaces = snapshot.workspaces;
         state.memberships = snapshot.memberships;
+        state.waitlistEntries = snapshot.waitlistEntries;
         throw error;
       }
     }),
@@ -261,6 +342,7 @@ function createCaller(options?: {
   workspaces?: TestWorkspace[];
   memberships?: TestWorkspaceMembership[];
   failApplicationSettingsInsert?: boolean;
+  waitlistEntries?: TestWaitlistEntry[];
 }) {
   const { db, state } = createFakeDb({
     user: options?.sessionUser ?? undefined,
@@ -268,6 +350,7 @@ function createCaller(options?: {
     workspaces: options?.workspaces,
     memberships: options?.memberships,
     failApplicationSettingsInsert: options?.failApplicationSettingsInsert,
+    waitlistEntries: options?.waitlistEntries,
   });
 
   const sessionUser = options?.sessionUser ?? state.user;
@@ -481,5 +564,105 @@ describe("admin bootstrap", () => {
         createdAt: new Date("2026-03-27T01:00:00.000Z"),
       },
     ]);
+  });
+});
+
+describe("admin launch controls", () => {
+  it("exposes launch settings and reviewable waitlist entries", async () => {
+    const { caller, state } = createCaller({
+      sessionUser: {
+        id: "admin_1",
+        name: "Avery",
+        email: "avery@example.com",
+        emailVerified: true,
+        image: null,
+        role: "admin",
+        createdAt: new Date("2026-03-27T00:00:00.000Z"),
+        updatedAt: new Date("2026-03-27T00:00:00.000Z"),
+      },
+      applicationSettings: {
+        id: randomUUID(),
+        setupCompletedAt: new Date("2026-03-27T01:00:00.000Z"),
+        setupCompletedByUserId: "admin_1",
+        initialWorkspaceId: "workspace_1",
+        maintenanceMode: false,
+        signupEnabled: true,
+        announcementMessage: null,
+        announcementTone: "info",
+        allowedEmailDomains: [],
+        createdAt: new Date("2026-03-27T01:00:00.000Z"),
+        updatedAt: null,
+      },
+      workspaces: [
+        {
+          id: "workspace_1",
+          name: "Acme",
+          slug: "acme",
+          ownerUserId: "admin_1",
+          createdAt: new Date("2026-03-27T01:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+      memberships: [
+        {
+          id: randomUUID(),
+          workspaceId: "workspace_1",
+          userId: "admin_1",
+          role: "owner",
+          createdAt: new Date("2026-03-27T01:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+      waitlistEntries: [
+        {
+          id: "waitlist_1",
+          email: "alpha@example.com",
+          source: "landing",
+          status: "pending",
+          referralCode: null,
+          reviewedByUserId: null,
+          reviewedAt: null,
+          createdAt: new Date("2026-03-27T02:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+    });
+
+    state.selectedWaitlistEntryId = "waitlist_1";
+
+    const adminCaller = caller.admin as unknown as {
+      getLaunchControls: () => Promise<{
+        maintenanceMode: boolean;
+        signupEnabled: boolean;
+        allowedEmailDomains: string[];
+        waitlistCount: number;
+      }>;
+      reviewWaitlistEntry: (input: {
+        waitlistEntryId: string;
+        status: "pending" | "contacted" | "approved" | "dismissed";
+      }) => Promise<unknown>;
+    };
+
+    await expect(adminCaller.getLaunchControls()).resolves.toEqual({
+      maintenanceMode: false,
+      signupEnabled: true,
+      announcementMessage: null,
+      announcementTone: "info",
+      allowedEmailDomains: [],
+      waitlistCount: 1,
+    });
+
+    await expect(
+      adminCaller.reviewWaitlistEntry({
+        waitlistEntryId: "waitlist_1",
+        status: "approved",
+      }),
+    ).resolves.toMatchObject({
+      id: "waitlist_1",
+      status: "approved",
+    });
+
+    expect(state.waitlistEntries[0]?.status).toBe("approved");
+    expect(state.waitlistEntries[0]?.reviewedByUserId).toBe("admin_1");
   });
 });

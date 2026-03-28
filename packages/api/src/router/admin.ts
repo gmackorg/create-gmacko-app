@@ -6,6 +6,7 @@ import {
   userRoleEnum,
   workspace,
   workspaceMembership,
+  waitlistEntry,
 } from "@gmacko/db/schema";
 import type { TRPCRouterRecord } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
@@ -52,6 +53,122 @@ const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
 });
 
 export const adminRouter = {
+  getLaunchControls: adminProcedure.query(async ({ ctx }) => {
+    const settings = await ctx.db.query.applicationSettings.findFirst();
+    const waitlist = await ctx.db.query.waitlistEntry.findMany();
+
+    return {
+      maintenanceMode: settings?.maintenanceMode ?? false,
+      signupEnabled: settings?.signupEnabled ?? true,
+      announcementMessage: settings?.announcementMessage ?? null,
+      announcementTone: settings?.announcementTone ?? "info",
+      allowedEmailDomains: settings?.allowedEmailDomains ?? [],
+      waitlistCount: waitlist.length,
+    };
+  }),
+
+  updateLaunchControls: adminProcedure
+    .input(
+      z.object({
+        maintenanceMode: z.boolean().optional(),
+        signupEnabled: z.boolean().optional(),
+        announcementMessage: z.string().max(2000).nullable().optional(),
+        announcementTone: z.enum(["info", "warning", "critical"]).optional(),
+        allowedEmailDomains: z.array(z.string().min(1)).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const settings = await ctx.db.query.applicationSettings.findFirst();
+
+      const values = {
+        maintenanceMode: input.maintenanceMode,
+        signupEnabled: input.signupEnabled,
+        announcementMessage: input.announcementMessage,
+        announcementTone: input.announcementTone,
+        allowedEmailDomains: input.allowedEmailDomains,
+      };
+
+      if (settings) {
+        const [updated] = await ctx.db
+          .update(applicationSettings)
+          .set(values)
+          .where(eq(applicationSettings.id, settings.id))
+          .returning({
+            id: applicationSettings.id,
+            maintenanceMode: applicationSettings.maintenanceMode,
+            signupEnabled: applicationSettings.signupEnabled,
+            announcementMessage: applicationSettings.announcementMessage,
+            announcementTone: applicationSettings.announcementTone,
+            allowedEmailDomains: applicationSettings.allowedEmailDomains,
+          });
+
+        return updated;
+      }
+
+      const [created] = await ctx.db
+        .insert(applicationSettings)
+        .values(values)
+        .returning({
+          id: applicationSettings.id,
+          maintenanceMode: applicationSettings.maintenanceMode,
+          signupEnabled: applicationSettings.signupEnabled,
+          announcementMessage: applicationSettings.announcementMessage,
+          announcementTone: applicationSettings.announcementTone,
+          allowedEmailDomains: applicationSettings.allowedEmailDomains,
+        });
+
+      return created;
+    }),
+
+  listWaitlistEntries: adminProcedure.query(async ({ ctx }) => {
+    const entries = await ctx.db.query.waitlistEntry.findMany();
+
+    return entries.map((entry) => ({
+      id: entry.id,
+      email: entry.email,
+      source: entry.source,
+      status: entry.status,
+      message: entry.message,
+      referralCode: entry.referralCode,
+      reviewedByUserId: entry.reviewedByUserId,
+      reviewedAt: entry.reviewedAt,
+      createdAt: entry.createdAt,
+    }));
+  }),
+
+  reviewWaitlistEntry: adminProcedure
+    .input(
+      z.object({
+        waitlistEntryId: z.string(),
+        status: z.enum(["pending", "contacted", "approved", "dismissed"]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [updated] = await ctx.db
+        .update(waitlistEntry)
+        .set({
+          status: input.status,
+          reviewedByUserId: ctx.session.user.id,
+          reviewedAt: new Date(),
+        })
+        .where(eq(waitlistEntry.id, input.waitlistEntryId))
+        .returning({
+          id: waitlistEntry.id,
+          status: waitlistEntry.status,
+          reviewedByUserId: waitlistEntry.reviewedByUserId,
+          reviewedAt: waitlistEntry.reviewedAt,
+        });
+
+      if (!updated) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Waitlist entry not found",
+        });
+      }
+
+      return updated;
+    }),
+
   bootstrapStatus: publicProcedure.query(async ({ ctx }) => {
     const settings = await ctx.db.query.applicationSettings.findFirst();
     const existingWorkspace = await ctx.db.select().from(workspace).limit(1);

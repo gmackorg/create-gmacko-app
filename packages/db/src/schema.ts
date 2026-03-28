@@ -155,11 +155,55 @@ export const applicationSettings = pgTable("application_settings", (t) => ({
   initialWorkspaceId: t
     .uuid()
     .references(() => workspace.id, { onDelete: "set null" }),
+  maintenanceMode: t.boolean().notNull().default(false),
+  signupEnabled: t.boolean().notNull().default(true),
+  announcementMessage: t.text(),
+  announcementTone: t.varchar({ length: 24 }).notNull().default("info"),
+  allowedEmailDomains: t.json().$type<string[]>().notNull().default([]),
   createdAt: t.timestamp().defaultNow().notNull(),
   updatedAt: t
     .timestamp({ mode: "date", withTimezone: true })
     .$onUpdateFn(() => sql`now()`),
 }));
+
+export const waitlistSourceEnum = [
+  "landing",
+  "contact",
+  "referral",
+  "blocked-signup",
+] as const;
+export type WaitlistSource = (typeof waitlistSourceEnum)[number];
+
+export const waitlistStatusEnum = [
+  "pending",
+  "contacted",
+  "approved",
+  "dismissed",
+] as const;
+export type WaitlistStatus = (typeof waitlistStatusEnum)[number];
+
+export const waitlistEntry = pgTable(
+  "waitlist_entry",
+  (t) => ({
+    id: t.uuid().notNull().primaryKey().defaultRandom(),
+    email: t.varchar({ length: 320 }).notNull(),
+    source: t.text().$type<WaitlistSource>().notNull().default("landing"),
+    status: t.text().$type<WaitlistStatus>().notNull().default("pending"),
+    message: t.text(),
+    referralCode: t.varchar({ length: 120 }),
+    reviewedByUserId: t
+      .text()
+      .references(() => user.id, { onDelete: "set null" }),
+    reviewedAt: t.timestamp({ mode: "date", withTimezone: true }),
+    createdAt: t.timestamp().defaultNow().notNull(),
+    updatedAt: t
+      .timestamp({ mode: "date", withTimezone: true })
+      .$onUpdateFn(() => sql`now()`),
+  }),
+  (table) => [
+    unique("waitlist_entry_email_source_unique").on(table.email, table.source),
+  ],
+);
 
 export const billingPlan = pgTable("billing_plan", (t) => ({
   id: t.uuid().notNull().primaryKey().defaultRandom(),

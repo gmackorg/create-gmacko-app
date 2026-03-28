@@ -12,6 +12,7 @@ import {
   workspaceMembership,
   workspaceSubscription,
   workspaceUsageRollup,
+  waitlistEntry,
 } from "@gmacko/db/schema";
 import type { TRPCRouterRecord } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
@@ -19,7 +20,7 @@ import { createHash, randomBytes } from "crypto";
 import { z } from "zod/v4";
 
 import type { createTRPCContext } from "../trpc";
-import { protectedProcedure } from "../trpc";
+import { protectedProcedure, publicProcedure } from "../trpc";
 
 type SettingsContext = Awaited<ReturnType<typeof createTRPCContext>> & {
   session: NonNullable<
@@ -49,6 +50,23 @@ function getDefaultUsagePeriod() {
   );
 
   return { periodStart, periodEnd };
+}
+
+function getLaunchDefaults() {
+  const signupEnabled = true;
+  const maintenanceMode = false;
+  const isProduction = process.env.NODE_ENV === "production";
+
+  return {
+    allowedEmailDomains: [] as string[],
+    announcementMessage: null as string | null,
+    announcementTone: "info" as const,
+    canAutoCreateAccounts: !isProduction,
+    maintenanceMode,
+    signupEnabled,
+    inviteOnly: !signupEnabled,
+    isProduction,
+  };
 }
 
 async function getWorkspaceScope(ctx: SettingsContext) {
@@ -107,6 +125,85 @@ async function getWorkspaceScope(ctx: SettingsContext) {
 }
 
 export const settingsRouter = {
+  getLaunchState: publicProcedure.query(async ({ ctx }) => {
+    const settings = await ctx.db.query.applicationSettings.findFirst();
+    const defaults = getLaunchDefaults();
+
+    return {
+      announcementMessage:
+        settings?.announcementMessage ?? defaults.announcementMessage,
+      announcementTone:
+        settings?.announcementTone ?? defaults.announcementTone,
+      allowedEmailDomains: settings?.allowedEmailDomains ?? [],
+      canAutoCreateAccounts: defaults.canAutoCreateAccounts,
+      inviteOnly: !(settings?.signupEnabled ?? defaults.signupEnabled),
+      maintenanceMode: settings?.maintenanceMode ?? defaults.maintenanceMode,
+      signupEnabled: settings?.signupEnabled ?? defaults.signupEnabled,
+      stripeConfigured: integrations.stripe,
+      publicAnnouncementVisible: Boolean(
+        settings?.announcementMessage ?? defaults.announcementMessage,
+      ),
+      canUseWaitlist: true,
+    };
+  }),
+
+  submitWaitlistEntry: publicProcedure
+    .input(
+      z.object({
+        email: z.string().email(),
+        message: z.string().max(1000).optional(),
+        referralCode: z.string().max(120).optional(),
+        source: z
+          .enum(["landing", "contact", "referral", "blocked-signup"])
+          .default("landing"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const email = input.email.trim().toLowerCase();
+      const [existing] = await ctx.db
+        .select({ id: waitlistEntry.id })
+        .from(waitlistEntry)
+        .where(and(eq(waitlistEntry.email, email), eq(waitlistEntry.source, input.source)))
+        .limit(1);
+
+      if (existing) {
+        const [updated] = await ctx.db
+          .update(waitlistEntry)
+          .set({
+            message: input.message ?? null,
+            referralCode: input.referralCode ?? null,
+            status: "pending",
+          })
+          .where(eq(waitlistEntry.id, existing.id))
+          .returning({
+            id: waitlistEntry.id,
+            email: waitlistEntry.email,
+            source: waitlistEntry.source,
+            status: waitlistEntry.status,
+          });
+
+        return updated ?? existing;
+      }
+
+      const [created] = await ctx.db
+        .insert(waitlistEntry)
+        .values({
+          email,
+          message: input.message ?? null,
+          referralCode: input.referralCode ?? null,
+          source: input.source,
+          status: "pending",
+        })
+        .returning({
+          id: waitlistEntry.id,
+          email: waitlistEntry.email,
+          source: waitlistEntry.source,
+          status: waitlistEntry.status,
+        });
+
+      return created;
+    }),
+
   getWorkspaceContext: protectedProcedure.query(async ({ ctx }) => {
     const workspaceScope = await getWorkspaceScope(ctx);
     const { currentWorkspace, currentWorkspaceId } = workspaceScope;

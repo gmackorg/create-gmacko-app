@@ -14,13 +14,15 @@ export const metadata: Metadata = {
   metadataBase: new URL(
     env.APP_URL ?? env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   ),
-  title: "Create T3 Turbo",
-  description: "Simple monorepo with shared backend for web & mobile apps",
+  title: "Gmacko App",
+  description:
+    "A SaaS-first template with public launch controls, workspace onboarding, and optional product layers.",
   openGraph: {
-    title: "Create T3 Turbo",
-    description: "Simple monorepo with shared backend for web & mobile apps",
+    title: "Gmacko App",
+    description:
+      "A SaaS-first template with public launch controls, workspace onboarding, and optional product layers.",
     url: env.APP_URL ?? env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
-    siteName: "Create T3 Turbo",
+    siteName: "Gmacko App",
   },
   twitter: {
     card: "summary_large_image",

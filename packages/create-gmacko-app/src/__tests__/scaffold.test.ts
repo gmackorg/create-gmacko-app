@@ -892,6 +892,50 @@ describe("create-gmacko-app scaffold", () => {
       expect(integrationsConfig).toContain("operatorApis: true");
     }, 120000);
 
+    it("should scaffold launch-control pages and public-shell copy", async () => {
+      const appName = generateAppName("launch-shell");
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-install", "--no-git", "--saas-launch"],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+      expect(fileExists(result.appPath, "apps/nextjs/src/app/pricing/page.tsx")).toBe(
+        true,
+      );
+      expect(fileExists(result.appPath, "apps/nextjs/src/app/faq/page.tsx")).toBe(
+        true,
+      );
+      expect(fileExists(result.appPath, "apps/nextjs/src/app/changelog/page.tsx")).toBe(
+        true,
+      );
+      expect(fileExists(result.appPath, "apps/nextjs/src/app/contact/page.tsx")).toBe(
+        true,
+      );
+      expect(fileExists(result.appPath, "apps/nextjs/src/app/privacy/page.tsx")).toBe(
+        true,
+      );
+      expect(fileExists(result.appPath, "apps/nextjs/src/app/terms/page.tsx")).toBe(
+        true,
+      );
+
+      const publicHome = readFile(result.appPath, "apps/nextjs/src/app/page.tsx");
+      const adminRouter = readFile(result.appPath, "packages/api/src/router/admin.ts");
+
+      expect(publicHome).toContain("Maintenance mode");
+      expect(publicHome).toContain("Request access");
+      expect(publicHome).toContain("waitlist");
+      expect(publicHome).toContain("See pricing");
+      expect(publicHome).toContain("/contact");
+      expect(adminRouter).toContain("maintenanceMode");
+      expect(adminRouter).toContain("signupEnabled");
+      expect(adminRouter).toContain("allowedEmailDomains");
+      expect(adminRouter).toContain("waitlist");
+    }, 120000);
+
     it("should scaffold a tRPC-backed operator CLI and MCP lane when requested", async () => {
       const appName = generateAppName("trpc-operators");
       const result = await runCli({
