@@ -247,6 +247,8 @@ EXPO_PUBLIC_SENTRY_DSN_STAGING="https://test@example.ingest.sentry.io/456"
 EXPO_PUBLIC_SENTRY_DSN_PROD="https://test@example.ingest.sentry.io/789"
 CLOUDFLARE_ACCOUNT_ID="test-cloudflare-account"
 CLOUDFLARE_API_TOKEN="test-cloudflare-token"
+GMACKO_API_URL="http://localhost:3000"
+GMACKO_API_KEY="test-gmacko-api-key"
 `;
 
   fs.writeFileSync(path.join(appPath, ".env"), envContent.trim());

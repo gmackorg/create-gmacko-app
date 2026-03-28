@@ -678,4 +678,74 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
       expect(result.stdout).toContain("fake-wrangler deploy --env staging");
     }, 900000);
   });
+
+  describe("operator lane configuration", () => {
+    let appPath: string;
+    let appName: string;
+
+    beforeAll(async () => {
+      appName = generateAppName("e2e-operators");
+      console.log(`\n[E2E] Scaffolding operator lane ${appName}...`);
+
+      const result = await runCli({
+        appName,
+        flags: [
+          "--yes",
+          "--no-git",
+          "--no-mobile",
+          "--saas-bootstrap",
+          "--trpc-operators",
+        ],
+        cwd: tempDir,
+        timeout: 600000,
+      });
+
+      appPath = result.appPath;
+      appsToClean.push(appPath);
+
+      expect(result.exitCode).toBe(0);
+      console.log(`[E2E] Scaffolded to ${appPath}`);
+    }, 900000);
+
+    it("should expose the operator CLI help", () => {
+      console.log("[E2E] Running operator CLI help smoke check...");
+      createMockEnv(appPath);
+
+      const result = runInApp(appPath, "pnpm trpc:ops -- --help", {
+        timeout: 180000,
+      });
+
+      if (!result.success) {
+        console.error("[E2E] Operator CLI help failed:");
+        console.error(result.stderr || result.stdout);
+      }
+
+      expect(result.success).toBe(true);
+      expect(result.stdout).toContain("gmacko-ops");
+      expect(result.stdout).toContain(
+        "CLI + MCP wrappers over the same tRPC API",
+      );
+    }, 300000);
+
+    it("should report operator env values in doctor output", () => {
+      console.log("[E2E] Running doctor (operator lane)...");
+      createMockEnv(appPath);
+
+      const doctorResult = runInApp(appPath, "pnpm doctor", {
+        timeout: 180000,
+      });
+
+      if (!doctorResult.success) {
+        console.error("[E2E] Operator lane doctor failed:");
+        console.error(doctorResult.stderr || doctorResult.stdout);
+      }
+
+      expect(doctorResult.success).toBe(true);
+      expect(doctorResult.stdout).toContain("Operator API lane detected");
+      expect(doctorResult.stdout).toContain("Operator API env values");
+      expect(doctorResult.stdout).not.toContain(
+        "Operator API env values missing",
+      );
+    }, 300000);
+  });
 });

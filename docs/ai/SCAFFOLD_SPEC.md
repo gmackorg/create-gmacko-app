@@ -32,6 +32,8 @@
 - `--web / --no-web` (default: `--web`)
 - `--mobile / --no-mobile` (default: `--mobile`)
 - `--tanstack-start / --no-tanstack-start` (default: `--no-tanstack-start`)
+- `--saas-bootstrap` (add the optional Claude SaaS bootstrap pack)
+- `--trpc-operators` (add the optional CLI + MCP operator lane over tRPC)
 - `--integrations <comma-list>` overrides integration toggles entirely
   - accepted keys: `sentry,posthog,stripe,email,realtime,storage`
 - `--email-provider <resend|sendgrid|none>` (default: `none`)
@@ -107,21 +109,31 @@
 - **Default:** Yes
 - **Validation:** boolean
 
-#### Prompt 10 — Include provisioning script?
+#### Prompt 10 — Add Claude SaaS bootstrap pack? (only if AI enabled)
+- **Question:** "Add the optional Claude SaaS bootstrap pack (office-hours -> autoplan -> design-consultation + local follow-up skills)?"
+- **Default:** No
+- **Validation:** boolean
+
+#### Prompt 11 — Add tRPC operator lane?
+- **Question:** "Add the optional tRPC operator lane (shared CLI + MCP wrappers over the API)?"
+- **Default:** No
+- **Validation:** boolean
+
+#### Prompt 12 — Include provisioning script?
 - **Question:** "Include interactive provisioning script (scripts/provision.sh)?"
 - **Default:** Yes
 - **Validation:** boolean
 
-#### Prompt 11 — Prune unused integrations?
+#### Prompt 13 — Prune unused integrations?
 - **Question:** "Prune unused integrations from the repo? (recommended for public apps)"
 - **Default:** No
 - **Validation:** boolean
 
-#### Prompt 12 — Install dependencies?
+#### Prompt 14 — Install dependencies?
 - **Question:** "Run pnpm install?"
 - **Default:** Yes
 
-#### Prompt 13 — Initialize git?
+#### Prompt 15 — Initialize git?
 - **Question:** "Initialize a git repository?"
 - **Default:** Yes
 
@@ -242,6 +254,22 @@ export type Integrations = typeof integrations;
   1. `superpowers:brainstorming` writes the initial proposal to `docs/ai/INITIAL_PROPOSAL.md`
   2. `/plan-ceo-review` and `/plan-eng-review` refine the proposal and implementation plan
   3. `/design-consultation` writes `DESIGN.md`
+
+**If SaaS bootstrap pack enabled**
+- Create: `docs/ai/BOOTSTRAP_PLAYBOOK.md`
+- Copy/Create:
+  - `.claude/skills/bootstrap-saas/**`
+  - `.claude/skills/launch-landing-page/**`
+  - `.claude/skills/setup-stripe-billing/**`
+  - `.claude/skills/bootstrap-expo-app/**`
+  - `.claude/skills/test-mobile-with-maestro/**`
+- Append Claude guidance that the post-setup order is `/office-hours`, optional user-level `/autoplan`, then `/design-consultation`
+
+**If tRPC operator lane enabled**
+- Create/keep: `packages/operator-core/**`
+- Create/keep: `packages/trpc-cli/**`
+- Modify: root `package.json` with `trpc:ops` and `mcp:app`
+- Modify: `.mcp.json` to include a local `gmacko-app` server entry when AI files are present
 
 ---
 

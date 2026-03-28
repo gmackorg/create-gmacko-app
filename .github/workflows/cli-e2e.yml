@@ -100,6 +100,8 @@ jobs:
           AUTH_URL="http://localhost:3000"
           NEXT_PUBLIC_APP_URL="http://localhost:3000"
           NEXT_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
+          GMACKO_API_URL="http://localhost:3000"
+          GMACKO_API_KEY="test-gmacko-api-key"
           EOF
         working-directory: /tmp/e2e-test/test-app-default
 
@@ -157,6 +159,79 @@ jobs:
       - name: Run Next.js build
         run: pnpm --filter @gmacko/nextjs build
         working-directory: /tmp/e2e-test/test-app-default
+
+  e2e-operators:
+    name: E2E - Operator Lane
+    needs: build-cli
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download CLI dist
+        uses: actions/download-artifact@v4
+        with:
+          name: cli-dist
+          path: packages/create-gmacko-app/dist
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install CLI dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Scaffold operator app
+        run: |
+          mkdir -p /tmp/e2e-test
+          node ${{ github.workspace }}/packages/create-gmacko-app/dist/index.js test-app-operators \
+            --yes --no-git --no-mobile --saas-bootstrap --trpc-operators
+        working-directory: /tmp/e2e-test
+        env:
+          CI: "true"
+
+      - name: Create mock .env
+        run: |
+          cat > .env << 'EOF'
+          DATABASE_URL="postgresql://test:test@localhost:5432/test"
+          AUTH_SECRET="test-secret-key-for-testing-only"
+          AUTH_DISCORD_ID="test-discord-client-id"
+          AUTH_DISCORD_SECRET="test-discord-client-secret"
+          AUTH_URL="http://localhost:3000"
+          NEXT_PUBLIC_APP_URL="http://localhost:3000"
+          NEXT_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
+          GMACKO_API_URL="http://localhost:3000"
+          GMACKO_API_KEY="test-gmacko-api-key"
+          EOF
+        working-directory: /tmp/e2e-test/test-app-operators
+
+      - name: Run doctor
+        run: |
+          pnpm doctor | tee /tmp/e2e-test/operator-doctor.log
+          grep 'Operator API lane detected' /tmp/e2e-test/operator-doctor.log || (echo "Doctor did not detect operator lane" && exit 1)
+          grep 'Operator API env values' /tmp/e2e-test/operator-doctor.log || (echo "Doctor did not check operator env values" && exit 1)
+        working-directory: /tmp/e2e-test/test-app-operators
+
+      - name: Smoke operator CLI help
+        run: |
+          pnpm trpc:ops -- --help | tee /tmp/e2e-test/operator-help.log
+          grep 'gmacko-ops' /tmp/e2e-test/operator-help.log || (echo "Operator CLI help did not render" && exit 1)
+        working-directory: /tmp/e2e-test/test-app-operators
+
+      - name: Verify bootstrap artifacts
+        run: |
+          test -f docs/ai/BOOTSTRAP_PLAYBOOK.md || (echo "Missing BOOTSTRAP_PLAYBOOK.md" && exit 1)
+          test -f .claude/skills/bootstrap-saas/SKILL.md || (echo "Missing bootstrap-saas skill" && exit 1)
+          grep '/office-hours' docs/ai/BOOTSTRAP_PLAYBOOK.md || (echo "Missing office-hours guidance" && exit 1)
+          grep '/autoplan' docs/ai/BOOTSTRAP_PLAYBOOK.md || (echo "Missing autoplan guidance" && exit 1)
+          grep '/design-consultation' docs/ai/BOOTSTRAP_PLAYBOOK.md || (echo "Missing design-consultation guidance" && exit 1)
+        working-directory: /tmp/e2e-test/test-app-operators
 
   e2e-minimal:
     name: E2E - Minimal (Web Only)
@@ -486,7 +561,7 @@ jobs:
 
   report:
     name: Report Results
-    needs: [e2e-default, e2e-minimal, e2e-custom-scope, e2e-full, e2e-vinext]
+    needs: [e2e-default, e2e-operators, e2e-minimal, e2e-custom-scope, e2e-full, e2e-vinext]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -499,6 +574,12 @@ jobs:
             echo "- :white_check_mark: Default configuration" >> $GITHUB_STEP_SUMMARY
           else
             echo "- :x: Default configuration" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.e2e-operators.result }}" == "success" ]; then
+            echo "- :white_check_mark: Operator lane" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- :x: Operator lane" >> $GITHUB_STEP_SUMMARY
           fi
 
           if [ "${{ needs.e2e-minimal.result }}" == "success" ]; then
@@ -527,6 +608,7 @@ jobs:
 
           # Fail if any test failed
           if [ "${{ needs.e2e-default.result }}" != "success" ] || \
+             [ "${{ needs.e2e-operators.result }}" != "success" ] || \
              [ "${{ needs.e2e-minimal.result }}" != "success" ] || \
              [ "${{ needs.e2e-custom-scope.result }}" != "success" ] || \
              [ "${{ needs.e2e-full.result }}" != "success" ] || \

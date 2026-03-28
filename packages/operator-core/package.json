@@ -1,35 +1,40 @@
 {
-  "name": "@gmacko/mcp-server",
+  "name": "@gmacko/operator-core",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "bin": {
-    "gmacko-mcp": "./dist/index.js"
-  },
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "license": "MIT",
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "dev": "tsup src/index.ts --format esm --watch",
+    "dev": "tsup src/index.ts --format esm --watch --dts",
     "format": "biome check .",
     "lint": "oxlint .",
+    "test": "vitest run src/__tests__/operator-core.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@gmacko/operator-core": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.27.1",
-    "superjson": "catalog:",
-    "zod": "catalog:"
+    "@gmacko/trpc-client": "workspace:*"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
+    "@gmacko/api": "workspace:*",
     "@gmacko/tsconfig": "workspace:*",
     "@types/node": "catalog:",
     "oxlint": "catalog:",
     "tsup": "^8.5.1",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^4.1.0"
   }
 }

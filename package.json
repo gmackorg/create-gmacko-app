@@ -30,6 +30,8 @@
     "forge:stages": "forge stage list",
     "forge:deploy:staging": "forge deploy create staging --wait",
     "forge:deploy:production": "forge deploy create production --wait",
+    "trpc:ops": "pnpm --filter @gmacko/trpc-cli exec gmacko-ops",
+    "mcp:app": "pnpm --filter @gmacko/mcp-server exec gmacko-mcp",
     "dev": "turbo watch dev --continue",
     "dev:next": "turbo watch dev -F @gmacko/nextjs...",
     "dev:mobile": "./scripts/dev-mobile.sh",

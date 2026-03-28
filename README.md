@@ -9,6 +9,8 @@ A fork of [create-t3-turbo](https://github.com/t3-oss/create-t3-turbo) with:
 - a baseline standards stack of `oxlint`, `biome`, `lefthook`, `commitlint`, and `knip`
 - Conditional integration system (Sentry, PostHog, Stripe, Email, Realtime, Storage)
 - shared agent workflow support for Codex, Claude Code, and OpenCode via `AGENTS.md`, `CLAUDE.md`, `opencode.json`, and `.mcp.json`
+- optional Claude-first SaaS bootstrap guidance after local setup, including `/office-hours`, optional user-level `/autoplan`, `/design-consultation`, and local follow-up skills
+- optional operator surfaces where both the CLI and MCP server are wrappers over the same tRPC API
 - Storybook wired into the Next.js app for isolated UI development
 
 ## Installation
@@ -146,6 +148,22 @@ pnpm bootstrap:local
 # Verify linting and types before you start iterating
 pnpm check:fast
 ```
+
+If you enable the optional SaaS bootstrap pack during scaffolding, the next Claude Code pass should be:
+
+1. `/office-hours`
+2. `/autoplan` if your user-level gstack install provides it
+3. `/design-consultation`
+4. the local follow-up skills documented in `docs/ai/BOOTSTRAP_PLAYBOOK.md`
+
+If you enable the optional operator lane, generated repos also expose:
+
+```bash
+pnpm trpc:ops -- --help
+pnpm mcp:app
+```
+
+Both are wrappers over the same tRPC API surface.
 
 ### 2. Generate Better Auth Schema
 

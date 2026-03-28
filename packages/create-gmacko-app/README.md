@@ -33,6 +33,8 @@ create-gmacko-app is a CLI tool designed to bootstrap production-ready, full-sta
 | `--tanstack-start`               | Include TanStack Start app                                                                                          |
 | `--no-tanstack-start`            | Exclude TanStack Start app (default)                                                                                |
 | `--vinext`                       | Add experimental `vinext` support to the Next.js app for a Cloudflare Workers lane                                 |
+| `--saas-bootstrap`               | Add the optional Claude SaaS bootstrap pack (`/office-hours` -> optional `/autoplan` -> `/design-consultation` + local follow-up skills) |
+| `--trpc-operators`               | Add the optional operator lane with CLI + MCP wrappers over the same tRPC API                                      |
 | `--forgegraph-server <url>`      | Write a ForgeGraph server URL into `.forgegraph.yaml`                                                               |
 | `--forgegraph-staging-node <id>` | Write the staging node placeholder into `.forgegraph.yaml`                                                          |
 | `--forgegraph-production-node <id>` | Write the production node placeholder into `.forgegraph.yaml`                                                   |
@@ -86,6 +88,22 @@ Add the `vinext` Workers lane to the generated Next app.
 pnpm dlx create-gmacko-app@latest my-app --no-mobile --no-ai --vinext
 ```
 
+### Claude Bootstrap Setup
+
+Add the post-setup SaaS bootstrap pack for Claude Code.
+
+```bash
+pnpm dlx create-gmacko-app@latest my-app --saas-bootstrap
+```
+
+### Operator Setup
+
+Add the optional tRPC-backed operator lane.
+
+```bash
+pnpm dlx create-gmacko-app@latest my-app --trpc-operators
+```
+
 ## Tech Stack
 
 - **Monorepo Management**: Turborepo + pnpm workspaces
@@ -109,6 +127,26 @@ Generated apps include `AGENTS.md`, `CLAUDE.md`, `.claude/settings.json`, `openc
 2. Run `/plan-ceo-review` and `/plan-eng-review` to refine the proposal and implementation plan.
 3. Run `/design-consultation` to define the design philosophy and write `DESIGN.md`.
 4. If the gstack commands are unavailable, run `cd .claude/skills/gstack && ./setup`.
+
+If you scaffold with `--saas-bootstrap`, generated apps also include:
+
+- `docs/ai/BOOTSTRAP_PLAYBOOK.md`
+- `.claude/skills/bootstrap-saas`
+- `.claude/skills/launch-landing-page`
+- `.claude/skills/setup-stripe-billing`
+- `.claude/skills/bootstrap-expo-app`
+- `.claude/skills/test-mobile-with-maestro`
+
+That pack is designed to run after `pnpm bootstrap:local`, with `/office-hours` first, optional user-level `/autoplan` second, and `/design-consultation` before deeper implementation work.
+
+If you scaffold with `--trpc-operators`, generated apps also expose:
+
+```bash
+pnpm trpc:ops -- --help
+pnpm mcp:app
+```
+
+Both surfaces call into the same underlying tRPC API contract.
 
 See [../../docs/ai/DEVELOPER_EXPERIENCE.md](/Volumes/dev/create-gmacko-app/docs/ai/DEVELOPER_EXPERIENCE.md) for the current recommendations around Codex, Claude Code, OpenCode, Expo Orbit, Cloudflare Workers, ForgeGraph, and Nix.
 

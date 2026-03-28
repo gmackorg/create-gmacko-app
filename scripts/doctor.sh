@@ -142,6 +142,14 @@ if [ -f "$ROOT_DIR/apps/nextjs/wrangler.jsonc" ]; then
     "CLOUDFLARE_API_TOKEN"
 fi
 
+if [ -d "$ROOT_DIR/packages/operator-core" ] || [ -d "$ROOT_DIR/packages/trpc-cli" ] || grep -q '"gmacko-app"' "$ROOT_DIR/.mcp.json" 2>/dev/null; then
+  ok "Operator API lane detected"
+  check_env_group \
+    "Operator API env values" \
+    "GMACKO_API_URL" \
+    "GMACKO_API_KEY"
+fi
+
 echo ""
 if [ "$FAILURES" -gt 0 ]; then
   echo "Doctor found $FAILURES blocking issue(s) and $WARNINGS warning(s)."
