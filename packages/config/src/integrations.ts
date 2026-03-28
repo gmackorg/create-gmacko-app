@@ -39,6 +39,18 @@ export const integrations = {
 
 export type Integrations = typeof integrations;
 
+export const saasFeatures = {
+  collaboration: false,
+  billing: false,
+  metering: false,
+  support: false,
+  launch: false,
+  referrals: false,
+  operatorApis: false,
+} as const;
+
+export type SaasFeatures = typeof saasFeatures;
+
 export const isSentryEnabled = () => integrations.sentry;
 export const isPostHogEnabled = () => integrations.posthog;
 export const isStripeEnabled = () => integrations.stripe;
@@ -49,3 +61,10 @@ export const isRealtimeEnabled = () => integrations.realtime.enabled;
 export const isStorageEnabled = () => integrations.storage.enabled;
 export const isI18nEnabled = () => integrations.i18n;
 export const isOpenApiEnabled = () => integrations.openapi;
+export const isSaasCollaborationEnabled = () => saasFeatures.collaboration;
+export const isSaasBillingEnabled = () => saasFeatures.billing;
+export const isSaasMeteringEnabled = () => saasFeatures.metering;
+export const isSaasSupportEnabled = () => saasFeatures.support;
+export const isSaasLaunchEnabled = () => saasFeatures.launch;
+export const isSaasReferralsEnabled = () => saasFeatures.referrals;
+export const isSaasOperatorApisEnabled = () => saasFeatures.operatorApis;

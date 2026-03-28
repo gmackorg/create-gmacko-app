@@ -1,13 +1,17 @@
 import { canManageWorkspace, isPlatformAdminRole } from "@gmacko/auth";
+import { integrations, saasFeatures } from "@gmacko/config";
 import { and, eq, isNull } from "@gmacko/db";
 import {
   apiKeys,
+  billingPlanLimit,
   UpdateUserPreferencesSchema,
   user,
   userPreferences,
   workspace,
   workspaceInviteAllowlist,
   workspaceMembership,
+  workspaceSubscription,
+  workspaceUsageRollup,
 } from "@gmacko/db/schema";
 import type { TRPCRouterRecord } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
@@ -33,6 +37,18 @@ function hashApiKey(key: string): string {
 
 function getKeyPrefix(key: string): string {
   return key.substring(0, 12);
+}
+
+function getDefaultUsagePeriod() {
+  const now = new Date();
+  const periodStart = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0),
+  );
+  const periodEnd = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0),
+  );
+
+  return { periodStart, periodEnd };
 }
 
 async function getWorkspaceScope(ctx: SettingsContext) {
@@ -114,6 +130,158 @@ export const settingsRouter = {
       canManageWorkspace: workspaceScope.canManageCurrentWorkspace,
       isPlatformAdmin: workspaceScope.isPlatformAdmin,
       inviteAllowlistCount: inviteAllowlistEntries.length,
+    };
+  }),
+
+  getBillingOverview: protectedProcedure.query(async ({ ctx }) => {
+    const workspaceScope = await getWorkspaceScope(ctx);
+
+    if (
+      !workspaceScope.currentWorkspaceId ||
+      !workspaceScope.currentWorkspace
+    ) {
+      return {
+        billing: {
+          customerPortalAvailable: false,
+          plan: null,
+          plans: [],
+          providerConfigured: integrations.stripe,
+          subscription: null,
+          visible: false,
+        },
+        usage: {
+          currentPeriodEnd: null,
+          currentPeriodStart: null,
+          limits: [],
+          meters: [],
+          visible: false,
+        },
+      };
+    }
+
+    const billingVisible = saasFeatures.billing;
+    const usageVisible = saasFeatures.billing || saasFeatures.metering;
+
+    const [plans, subscription, meters, rollups] = await Promise.all([
+      ctx.db.query.billingPlan.findMany({
+        orderBy: (plan, { asc }) => [asc(plan.amountInCents), asc(plan.name)],
+      }),
+      ctx.db.query.workspaceSubscription.findFirst({
+        where: eq(
+          workspaceSubscription.workspaceId,
+          workspaceScope.currentWorkspaceId,
+        ),
+      }),
+      ctx.db.query.usageMeter.findMany({
+        orderBy: (meter, { asc }) => [asc(meter.name), asc(meter.key)],
+      }),
+      ctx.db.query.workspaceUsageRollup.findMany({
+        where: eq(
+          workspaceUsageRollup.workspaceId,
+          workspaceScope.currentWorkspaceId,
+        ),
+        orderBy: (rollup, { desc }) => [
+          desc(rollup.periodEnd),
+          desc(rollup.createdAt),
+        ],
+      }),
+    ]);
+
+    const currentPlan =
+      (subscription?.planId
+        ? plans.find((plan) => plan.id === subscription.planId)
+        : null) ??
+      plans.find((plan) => plan.isDefault) ??
+      plans[0] ??
+      null;
+
+    const planLimits = currentPlan
+      ? await ctx.db.query.billingPlanLimit.findMany({
+          where: eq(billingPlanLimit.planId, currentPlan.id),
+          orderBy: (limit, { asc }) => [asc(limit.key)],
+        })
+      : [];
+
+    const latestRollupByMeterId = new Map<string, (typeof rollups)[number]>();
+    for (const rollup of rollups) {
+      if (!latestRollupByMeterId.has(rollup.meterId)) {
+        latestRollupByMeterId.set(rollup.meterId, rollup);
+      }
+    }
+
+    const fallbackPeriod = getDefaultUsagePeriod();
+    const activePeriodStart =
+      subscription?.currentPeriodStart ?? fallbackPeriod.periodStart;
+    const activePeriodEnd =
+      subscription?.currentPeriodEnd ?? fallbackPeriod.periodEnd;
+
+    return {
+      billing: {
+        customerPortalAvailable:
+          integrations.stripe && Boolean(subscription?.stripeCustomerId),
+        plan: currentPlan
+          ? {
+              amountInCents: currentPlan.amountInCents,
+              currency: currentPlan.currency,
+              description: currentPlan.description,
+              id: currentPlan.id,
+              interval: currentPlan.interval,
+              key: currentPlan.key,
+              name: currentPlan.name,
+            }
+          : null,
+        plans: plans.map((plan) => ({
+          amountInCents: plan.amountInCents,
+          currency: plan.currency,
+          id: plan.id,
+          interval: plan.interval,
+          isDefault: plan.isDefault,
+          key: plan.key,
+          name: plan.name,
+        })),
+        providerConfigured: integrations.stripe,
+        subscription: subscription
+          ? {
+              cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+              currentPeriodEnd: subscription.currentPeriodEnd,
+              currentPeriodStart: subscription.currentPeriodStart,
+              provider: subscription.provider,
+              status: subscription.status,
+            }
+          : null,
+        visible: billingVisible,
+      },
+      usage: {
+        currentPeriodEnd: activePeriodEnd,
+        currentPeriodStart: activePeriodStart,
+        limits: planLimits.map((limit) => {
+          const matchingMeter = meters.find((meter) => meter.key === limit.key);
+          const currentUsage = matchingMeter
+            ? (latestRollupByMeterId.get(matchingMeter.id)?.quantity ?? 0)
+            : 0;
+
+          return {
+            currentUsage,
+            key: limit.key,
+            period: limit.period,
+            value: limit.value,
+          };
+        }),
+        meters: meters.map((meter) => {
+          const latestRollup = latestRollupByMeterId.get(meter.id);
+
+          return {
+            aggregation: meter.aggregation,
+            currentUsage: latestRollup?.quantity ?? 0,
+            key: meter.key,
+            latestPeriodEnd: latestRollup?.periodEnd ?? activePeriodEnd,
+            latestPeriodStart: latestRollup?.periodStart ?? activePeriodStart,
+            name: meter.name,
+            unit: meter.unit,
+          };
+        }),
+        visible: usageVisible,
+      },
     };
   }),
 

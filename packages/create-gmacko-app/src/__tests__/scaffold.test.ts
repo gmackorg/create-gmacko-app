@@ -869,6 +869,10 @@ describe("create-gmacko-app scaffold", () => {
       ).toBe(true);
 
       const rootReadme = readFile(result.appPath, "README.md");
+      const integrationsConfig = readFile(
+        result.appPath,
+        "packages/config/src/integrations.ts",
+      );
       expect(rootReadme).toContain("Scaffold profile");
       expect(rootReadme).toContain("SaaS layers");
       expect(rootReadme).toContain("collaboration");
@@ -878,6 +882,14 @@ describe("create-gmacko-app scaffold", () => {
       expect(rootReadme).toContain("launch");
       expect(rootReadme).toContain("referrals");
       expect(rootReadme).toContain("operator APIs");
+      expect(integrationsConfig).toContain("export const saasFeatures = {");
+      expect(integrationsConfig).toContain("collaboration: true");
+      expect(integrationsConfig).toContain("billing: true");
+      expect(integrationsConfig).toContain("metering: true");
+      expect(integrationsConfig).toContain("support: true");
+      expect(integrationsConfig).toContain("launch: true");
+      expect(integrationsConfig).toContain("referrals: true");
+      expect(integrationsConfig).toContain("operatorApis: true");
     }, 120000);
 
     it("should scaffold a tRPC-backed operator CLI and MCP lane when requested", async () => {

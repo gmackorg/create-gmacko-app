@@ -7,6 +7,24 @@ import { user } from "./auth-schema";
 
 export const workspaceRoleEnum = ["owner", "admin", "member"] as const;
 export type WorkspaceRole = (typeof workspaceRoleEnum)[number];
+export const billingIntervalEnum = ["month", "year"] as const;
+export type BillingInterval = (typeof billingIntervalEnum)[number];
+export const workspaceSubscriptionStatusEnum = [
+  "free",
+  "trialing",
+  "active",
+  "past_due",
+  "canceled",
+  "incomplete",
+] as const;
+export type WorkspaceSubscriptionStatus =
+  (typeof workspaceSubscriptionStatusEnum)[number];
+export const billingProviderEnum = ["manual", "stripe"] as const;
+export type BillingProvider = (typeof billingProviderEnum)[number];
+export const billingLimitPeriodEnum = ["day", "month", "all_time"] as const;
+export type BillingLimitPeriod = (typeof billingLimitPeriodEnum)[number];
+export const usageAggregationEnum = ["sum", "max"] as const;
+export type UsageAggregation = (typeof usageAggregationEnum)[number];
 
 export const Post = pgTable("post", (t) => ({
   id: t.uuid().notNull().primaryKey().defaultRandom(),
@@ -142,6 +160,116 @@ export const applicationSettings = pgTable("application_settings", (t) => ({
     .timestamp({ mode: "date", withTimezone: true })
     .$onUpdateFn(() => sql`now()`),
 }));
+
+export const billingPlan = pgTable("billing_plan", (t) => ({
+  id: t.uuid().notNull().primaryKey().defaultRandom(),
+  key: t.varchar({ length: 64 }).notNull().unique(),
+  name: t.varchar({ length: 120 }).notNull(),
+  description: t.text(),
+  interval: t.text().$type<BillingInterval>().notNull().default("month"),
+  amountInCents: t.integer().notNull().default(0),
+  currency: t.varchar({ length: 3 }).notNull().default("usd"),
+  isDefault: t.boolean().notNull().default(false),
+  active: t.boolean().notNull().default(true),
+  createdAt: t.timestamp().defaultNow().notNull(),
+  updatedAt: t
+    .timestamp({ mode: "date", withTimezone: true })
+    .$onUpdateFn(() => sql`now()`),
+}));
+
+export const billingPlanLimit = pgTable(
+  "billing_plan_limit",
+  (t) => ({
+    id: t.uuid().notNull().primaryKey().defaultRandom(),
+    planId: t
+      .uuid()
+      .notNull()
+      .references(() => billingPlan.id, { onDelete: "cascade" }),
+    key: t.varchar({ length: 80 }).notNull(),
+    value: t.integer(),
+    period: t.text().$type<BillingLimitPeriod>().notNull().default("month"),
+    createdAt: t.timestamp().defaultNow().notNull(),
+    updatedAt: t
+      .timestamp({ mode: "date", withTimezone: true })
+      .$onUpdateFn(() => sql`now()`),
+  }),
+  (table) => [
+    unique("billing_plan_limit_plan_key_unique").on(table.planId, table.key),
+  ],
+);
+
+export const workspaceSubscription = pgTable(
+  "workspace_subscription",
+  (t) => ({
+    id: t.uuid().notNull().primaryKey().defaultRandom(),
+    workspaceId: t
+      .uuid()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    planId: t.uuid().references(() => billingPlan.id, { onDelete: "set null" }),
+    status: t
+      .text()
+      .$type<WorkspaceSubscriptionStatus>()
+      .notNull()
+      .default("free"),
+    provider: t.text().$type<BillingProvider>().notNull().default("manual"),
+    stripeCustomerId: t.varchar({ length: 255 }),
+    stripeSubscriptionId: t.varchar({ length: 255 }),
+    currentPeriodStart: t.timestamp({ mode: "date", withTimezone: true }),
+    currentPeriodEnd: t.timestamp({ mode: "date", withTimezone: true }),
+    cancelAtPeriodEnd: t.boolean().notNull().default(false),
+    createdAt: t.timestamp().defaultNow().notNull(),
+    updatedAt: t
+      .timestamp({ mode: "date", withTimezone: true })
+      .$onUpdateFn(() => sql`now()`),
+  }),
+  (table) => [
+    unique("workspace_subscription_workspace_unique").on(table.workspaceId),
+  ],
+);
+
+export const usageMeter = pgTable("usage_meter", (t) => ({
+  id: t.uuid().notNull().primaryKey().defaultRandom(),
+  key: t.varchar({ length: 80 }).notNull().unique(),
+  name: t.varchar({ length: 120 }).notNull(),
+  description: t.text(),
+  aggregation: t.text().$type<UsageAggregation>().notNull().default("sum"),
+  unit: t.varchar({ length: 40 }).notNull().default("count"),
+  createdAt: t.timestamp().defaultNow().notNull(),
+  updatedAt: t
+    .timestamp({ mode: "date", withTimezone: true })
+    .$onUpdateFn(() => sql`now()`),
+}));
+
+export const workspaceUsageRollup = pgTable(
+  "workspace_usage_rollup",
+  (t) => ({
+    id: t.uuid().notNull().primaryKey().defaultRandom(),
+    workspaceId: t
+      .uuid()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    meterId: t
+      .uuid()
+      .notNull()
+      .references(() => usageMeter.id, { onDelete: "cascade" }),
+    periodStart: t.timestamp({ mode: "date", withTimezone: true }).notNull(),
+    periodEnd: t.timestamp({ mode: "date", withTimezone: true }).notNull(),
+    quantity: t.integer().notNull().default(0),
+    createdAt: t.timestamp().defaultNow().notNull(),
+    updatedAt: t
+      .timestamp({ mode: "date", withTimezone: true })
+      .$onUpdateFn(() => sql`now()`),
+  }),
+  (table) => [
+    unique("workspace_usage_rollup_workspace_meter_period_unique").on(
+      table.workspaceId,
+      table.meterId,
+      table.periodStart,
+      table.periodEnd,
+    ),
+  ],
+);
 
 export const CreateUserPreferencesSchema = createInsertSchema(userPreferences, {
   theme: z.enum(["light", "dark", "system"]).default("system"),

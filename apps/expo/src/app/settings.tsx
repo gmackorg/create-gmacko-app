@@ -24,6 +24,23 @@ import { setLocale } from "~/utils/i18n";
 const PERMISSIONS = ["read", "write", "delete", "admin"] as const;
 const COLLABORATION_ROLES = ["member", "admin"] as const;
 
+function formatMoney(amountInCents: number, currency: string) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  }).format(amountInCents / 100);
+}
+
+function formatDate(value: Date | string | null) {
+  if (!value) {
+    return "Not set";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+  }).format(new Date(value));
+}
+
 function PreferencesSection() {
   const queryClient = useQueryClient();
   const _t = useTranslationsNative();
@@ -516,6 +533,147 @@ function CollaborationSection() {
   );
 }
 
+function BillingUsageSection() {
+  const { data, isLoading } = useQuery(
+    trpc.settings.getBillingOverview.queryOptions(),
+  );
+
+  if (isLoading) {
+    return (
+      <View className="border-border bg-card mt-4 rounded-lg border p-4">
+        <Text className="text-foreground text-lg font-semibold">
+          Billing & Usage
+        </Text>
+        <Text className="text-muted-foreground mt-2">Loading...</Text>
+      </View>
+    );
+  }
+
+  if (!data?.billing.visible && !data?.usage.visible) {
+    return null;
+  }
+
+  return (
+    <View className="border-border bg-card mt-4 rounded-lg border p-4">
+      <Text className="text-foreground mb-2 text-lg font-semibold">
+        Billing
+      </Text>
+      <Text className="text-muted-foreground mb-4">
+        Billing stays per-workspace in v1, and seat billing is intentionally
+        deferred.
+      </Text>
+
+      <View className="border-border mb-4 rounded-lg border p-3">
+        <Text className="text-foreground font-medium">Current plan</Text>
+        {data?.billing.plan ? (
+          <>
+            <Text className="text-foreground mt-2">
+              {data.billing.plan.name}
+            </Text>
+            <Text className="text-muted-foreground">
+              {formatMoney(
+                data.billing.plan.amountInCents,
+                data.billing.plan.currency,
+              )}{" "}
+              / {data.billing.plan.interval}
+            </Text>
+          </>
+        ) : (
+          <Text className="text-muted-foreground mt-2">
+            No workspace plan is configured yet.
+          </Text>
+        )}
+      </View>
+
+      <View className="border-border mb-4 rounded-lg border p-3">
+        <Text className="text-foreground font-medium">Subscription</Text>
+        {data?.billing.subscription ? (
+          <>
+            <Text className="text-foreground mt-2 capitalize">
+              {data.billing.subscription.status.replaceAll("_", " ")}
+            </Text>
+            <Text className="text-muted-foreground capitalize">
+              Provider: {data.billing.subscription.provider}
+            </Text>
+            <Text className="text-muted-foreground">
+              Current period ends{" "}
+              {formatDate(data.billing.subscription.currentPeriodEnd)}
+            </Text>
+          </>
+        ) : (
+          <Text className="text-muted-foreground mt-2">
+            No paid subscription is attached yet.
+          </Text>
+        )}
+      </View>
+
+      <View className="border-border rounded-lg border p-3">
+        <Text className="text-foreground font-medium">Usage & Limits</Text>
+        {data?.usage.limits.length ? (
+          <View className="mt-3 gap-2">
+            {data.usage.limits.map(
+              (limit: (typeof data.usage.limits)[number]) => (
+                <View
+                  key={limit.key}
+                  className="border-border rounded-md border p-3"
+                >
+                  <Text className="text-foreground font-medium">
+                    {limit.key}
+                  </Text>
+                  <Text className="text-muted-foreground capitalize">
+                    {limit.period.replaceAll("_", " ")}
+                  </Text>
+                  <Text className="text-foreground mt-1">
+                    {limit.currentUsage} /{" "}
+                    {limit.value === null ? "Unlimited" : limit.value}
+                  </Text>
+                </View>
+              ),
+            )}
+          </View>
+        ) : (
+          <Text className="text-muted-foreground mt-2">
+            No limits are configured yet.
+          </Text>
+        )}
+
+        {data?.usage.meters.length ? (
+          <View className="mt-4 gap-2">
+            {data.usage.meters.map(
+              (meter: (typeof data.usage.meters)[number]) => (
+                <View
+                  key={meter.key}
+                  className="border-border rounded-md border p-3"
+                >
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-foreground font-medium">
+                      {meter.name}
+                    </Text>
+                    <Text className="text-foreground">
+                      {meter.currentUsage} {meter.unit}
+                    </Text>
+                  </View>
+                  <Text className="text-muted-foreground mt-1">
+                    {meter.key} • {meter.aggregation}
+                  </Text>
+                  <Text className="text-muted-foreground mt-1">
+                    {formatDate(meter.latestPeriodStart)} -{" "}
+                    {formatDate(meter.latestPeriodEnd)}
+                  </Text>
+                </View>
+              ),
+            )}
+          </View>
+        ) : (
+          <Text className="text-muted-foreground mt-4">
+            No usage meters are configured yet.
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
 function AccountSection() {
   const { mutate: deleteAccount, isPending } = useMutation(
     trpc.settings.deleteAccount.mutationOptions({
@@ -573,6 +731,7 @@ export default function SettingsScreen() {
         </Text>
         <PreferencesSection />
         <ApiKeysSection />
+        <BillingUsageSection />
         <CollaborationSection />
         <AccountSection />
       </ScrollView>

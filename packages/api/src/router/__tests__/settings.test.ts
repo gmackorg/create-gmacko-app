@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { saasFeatures } from "@gmacko/config";
 import {
   applicationSettings,
   user,
@@ -61,12 +62,84 @@ type TestAllowlistEntry = {
   updatedAt: Date | null;
 };
 
+type TestBillingPlan = {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  interval: "month" | "year";
+  amountInCents: number;
+  currency: string;
+  isDefault: boolean;
+  active: boolean;
+  createdAt: Date;
+  updatedAt: Date | null;
+};
+
+type TestBillingPlanLimit = {
+  id: string;
+  planId: string;
+  key: string;
+  value: number | null;
+  period: "day" | "month" | "all_time";
+  createdAt: Date;
+  updatedAt: Date | null;
+};
+
+type TestWorkspaceSubscription = {
+  id: string;
+  workspaceId: string;
+  planId: string | null;
+  status:
+    | "free"
+    | "trialing"
+    | "active"
+    | "past_due"
+    | "canceled"
+    | "incomplete";
+  provider: "manual" | "stripe";
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  currentPeriodStart: Date | null;
+  currentPeriodEnd: Date | null;
+  cancelAtPeriodEnd: boolean;
+  createdAt: Date;
+  updatedAt: Date | null;
+};
+
+type TestUsageMeter = {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  aggregation: "sum" | "max";
+  unit: string;
+  createdAt: Date;
+  updatedAt: Date | null;
+};
+
+type TestWorkspaceUsageRollup = {
+  id: string;
+  workspaceId: string;
+  meterId: string;
+  periodStart: Date;
+  periodEnd: Date;
+  quantity: number;
+  createdAt: Date;
+  updatedAt: Date | null;
+};
+
 function createCaller(options?: {
   sessionUser?: TestUser;
   applicationSettings?: TestApplicationSettings | null;
   workspaces?: TestWorkspace[];
   memberships?: TestWorkspaceMembership[];
   allowlistEntries?: TestAllowlistEntry[];
+  billingPlans?: TestBillingPlan[];
+  billingPlanLimits?: TestBillingPlanLimit[];
+  subscriptions?: TestWorkspaceSubscription[];
+  usageMeters?: TestUsageMeter[];
+  usageRollups?: TestWorkspaceUsageRollup[];
 }) {
   const state = {
     user: options?.sessionUser ?? {
@@ -83,6 +156,11 @@ function createCaller(options?: {
     workspaces: [...(options?.workspaces ?? [])],
     memberships: [...(options?.memberships ?? [])],
     allowlistEntries: [...(options?.allowlistEntries ?? [])],
+    billingPlans: [...(options?.billingPlans ?? [])],
+    billingPlanLimits: [...(options?.billingPlanLimits ?? [])],
+    subscriptions: [...(options?.subscriptions ?? [])],
+    usageMeters: [...(options?.usageMeters ?? [])],
+    usageRollups: [...(options?.usageRollups ?? [])],
     selectedWorkspaceId: null as string | null,
     selectedInviteId: null as string | null,
   };
@@ -185,6 +263,29 @@ function createCaller(options?: {
             (a, b) =>
               a.createdAt.getTime() - b.createdAt.getTime() ||
               a.id.localeCompare(b.id),
+          ),
+        ),
+      },
+      billingPlan: {
+        findMany: vi.fn(async () => [...state.billingPlans]),
+      },
+      billingPlanLimit: {
+        findMany: vi.fn(async () => [...state.billingPlanLimits]),
+      },
+      workspaceSubscription: {
+        findFirst: vi.fn(async () =>
+          state.subscriptions.find(
+            (entry) => entry.workspaceId === state.selectedWorkspaceId,
+          ) ?? null,
+        ),
+      },
+      usageMeter: {
+        findMany: vi.fn(async () => [...state.usageMeters]),
+      },
+      workspaceUsageRollup: {
+        findMany: vi.fn(async () =>
+          [...state.usageRollups].filter(
+            (entry) => entry.workspaceId === state.selectedWorkspaceId,
           ),
         ),
       },
@@ -887,5 +988,206 @@ describe("settings collaboration invites", () => {
     expect(state.allowlistEntries.some((entry) => entry.id === inviteId)).toBe(
       true,
     );
+  });
+});
+
+describe("settings billing overview", () => {
+  it("keeps billing and usage hidden when the SaaS billing layers are disabled", async () => {
+    const originalFeatures = { ...saasFeatures };
+    Object.assign(saasFeatures, {
+      collaboration: false,
+      billing: false,
+      metering: false,
+      support: false,
+      launch: false,
+      referrals: false,
+      operatorApis: false,
+    });
+
+    const { caller } = createCaller({
+      applicationSettings: {
+        id: randomUUID(),
+        setupCompletedAt: new Date("2026-03-27T01:00:00.000Z"),
+        setupCompletedByUserId: "user_1",
+        initialWorkspaceId: "workspace_1",
+        createdAt: new Date("2026-03-27T01:00:00.000Z"),
+        updatedAt: null,
+      },
+      workspaces: [
+        {
+          id: "workspace_1",
+          name: "Acme",
+          slug: "acme",
+          ownerUserId: "user_1",
+          createdAt: new Date("2026-03-27T01:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+      memberships: [
+        {
+          id: randomUUID(),
+          workspaceId: "workspace_1",
+          userId: "user_1",
+          role: "owner",
+          createdAt: new Date("2026-03-27T01:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+      billingPlans: [
+        {
+          id: "plan_free",
+          key: "free",
+          name: "Free",
+          description: null,
+          interval: "month",
+          amountInCents: 0,
+          currency: "usd",
+          isDefault: true,
+          active: true,
+          createdAt: new Date("2026-03-27T01:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+    });
+
+    try {
+      const result = await caller.settings.getBillingOverview();
+
+      expect(result.billing.visible).toBe(false);
+      expect(result.usage.visible).toBe(false);
+    } finally {
+      Object.assign(saasFeatures, originalFeatures);
+    }
+  });
+
+  it("shows billing and usage when the corresponding SaaS features are enabled", async () => {
+    const originalFeatures = { ...saasFeatures };
+    Object.assign(saasFeatures, {
+      collaboration: false,
+      billing: true,
+      metering: true,
+      support: false,
+      launch: false,
+      referrals: false,
+      operatorApis: false,
+    });
+
+    const periodStart = new Date("2026-03-01T00:00:00.000Z");
+    const periodEnd = new Date("2026-04-01T00:00:00.000Z");
+
+    const { caller } = createCaller({
+      applicationSettings: {
+        id: randomUUID(),
+        setupCompletedAt: new Date("2026-03-27T01:00:00.000Z"),
+        setupCompletedByUserId: "user_1",
+        initialWorkspaceId: "workspace_1",
+        createdAt: new Date("2026-03-27T01:00:00.000Z"),
+        updatedAt: null,
+      },
+      workspaces: [
+        {
+          id: "workspace_1",
+          name: "Acme",
+          slug: "acme",
+          ownerUserId: "user_1",
+          createdAt: new Date("2026-03-27T01:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+      memberships: [
+        {
+          id: randomUUID(),
+          workspaceId: "workspace_1",
+          userId: "user_1",
+          role: "owner",
+          createdAt: new Date("2026-03-27T01:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+      billingPlans: [
+        {
+          id: "plan_pro",
+          key: "pro",
+          name: "Pro",
+          description: "Expanded limits",
+          interval: "month",
+          amountInCents: 4900,
+          currency: "usd",
+          isDefault: false,
+          active: true,
+          createdAt: new Date("2026-03-27T01:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+      billingPlanLimits: [
+        {
+          id: randomUUID(),
+          planId: "plan_pro",
+          key: "api_calls",
+          value: 1000,
+          period: "month",
+          createdAt: new Date("2026-03-27T01:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+      subscriptions: [
+        {
+          id: randomUUID(),
+          workspaceId: "workspace_1",
+          planId: "plan_pro",
+          status: "active",
+          provider: "manual",
+          stripeCustomerId: null,
+          stripeSubscriptionId: null,
+          currentPeriodStart: periodStart,
+          currentPeriodEnd: periodEnd,
+          cancelAtPeriodEnd: false,
+          createdAt: new Date("2026-03-27T01:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+      usageMeters: [
+        {
+          id: "meter_api_calls",
+          key: "api_calls",
+          name: "API Calls",
+          description: null,
+          aggregation: "sum",
+          unit: "calls",
+          createdAt: new Date("2026-03-27T01:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+      usageRollups: [
+        {
+          id: randomUUID(),
+          workspaceId: "workspace_1",
+          meterId: "meter_api_calls",
+          periodStart,
+          periodEnd,
+          quantity: 250,
+          createdAt: new Date("2026-03-27T01:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+    });
+
+    try {
+      const result = await caller.settings.getBillingOverview();
+
+      expect(result.billing.visible).toBe(true);
+      expect(result.billing.plan?.key).toBe("pro");
+      expect(result.usage.visible).toBe(true);
+      expect(result.usage.limits).toEqual([
+        {
+          currentUsage: 250,
+          key: "api_calls",
+          period: "month",
+          value: 1000,
+        },
+      ]);
+    } finally {
+      Object.assign(saasFeatures, originalFeatures);
+    }
   });
 });

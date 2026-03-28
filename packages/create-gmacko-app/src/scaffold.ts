@@ -48,7 +48,7 @@ export async function scaffold(options: CliOptions): Promise<void> {
   spinner.start("Configuring project...");
 
   updatePackageJson(targetDir, options);
-  updateIntegrationsConfig(targetDir, options.integrations);
+  updateIntegrationsConfig(targetDir, options, options.integrations);
   updatePackageScope(targetDir, options.packageScope);
   createManifest(targetDir, options);
   createForgeGraphConfig(targetDir, options);
@@ -178,6 +178,7 @@ function updatePackageJson(targetDir: string, options: CliOptions): void {
 
 function updateIntegrationsConfig(
   targetDir: string,
+  options: CliOptions,
   integrations: IntegrationConfig,
 ): void {
   const configPath = path.join(
@@ -209,6 +210,18 @@ function updateIntegrationsConfig(
 
 export type Integrations = typeof integrations;
 
+export const saasFeatures = {
+  collaboration: ${options.saasCollaboration},
+  billing: ${options.saasBilling},
+  metering: ${options.saasMetering},
+  support: ${options.saasSupport},
+  launch: ${options.saasLaunch},
+  referrals: ${options.saasReferrals},
+  operatorApis: ${options.saasOperatorApis || options.trpcOperators},
+} as const;
+
+export type SaasFeatures = typeof saasFeatures;
+
 export const isSentryEnabled = () => integrations.sentry;
 export const isPostHogEnabled = () => integrations.posthog;
 export const isStripeEnabled = () => integrations.stripe;
@@ -219,6 +232,13 @@ export const isRealtimeEnabled = () => integrations.realtime.enabled;
 export const isStorageEnabled = () => integrations.storage.enabled;
 export const isI18nEnabled = () => integrations.i18n;
 export const isOpenApiEnabled = () => integrations.openapi;
+export const isSaasCollaborationEnabled = () => saasFeatures.collaboration;
+export const isSaasBillingEnabled = () => saasFeatures.billing;
+export const isSaasMeteringEnabled = () => saasFeatures.metering;
+export const isSaasSupportEnabled = () => saasFeatures.support;
+export const isSaasLaunchEnabled = () => saasFeatures.launch;
+export const isSaasReferralsEnabled = () => saasFeatures.referrals;
+export const isSaasOperatorApisEnabled = () => saasFeatures.operatorApis;
 `;
 
   fs.writeFileSync(configPath, content);
