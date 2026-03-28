@@ -86,6 +86,17 @@ If a lane is not clearly `stable`, call out the risk in docs and generated guida
 
 Treat ForgeGraph/Nix and Cloudflare Workers as separate deployment lanes. Do not force one runtime model to satisfy both.
 
+## SaaS Scaffold Maturity
+
+Current SaaS direction:
+
+- `stable`: guided first-run bootstrap, workspace-centric onboarding, collaboration, billing/limits/metering primitives, support/public shell, launch controls, referrals, operator wrapper lane
+- `stable`: shared platform primitives for feature flags, jobs, rate limits, bot protection, and compliance hooks
+- `guided`: Resend-backed email delivery and related product flows when email integration is enabled
+- `later`: audit logs, multi-workspace UX, ownership transfer, webhooks, advanced support tooling, deeper billing automation
+
+Keep generated guidance honest. If a capability is only scaffolded as a hook or placeholder, say that explicitly instead of presenting it as a complete subsystem.
+
 ## Mobile Stack
 
 Current mobile DX recommendations:

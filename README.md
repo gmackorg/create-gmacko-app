@@ -8,6 +8,7 @@ A fork of [create-t3-turbo](https://github.com/t3-oss/create-t3-turbo) with:
 - `jj`-first repository setup with colocated Git compatibility
 - a baseline standards stack of `oxlint`, `biome`, `lefthook`, `commitlint`, and `knip`
 - Conditional integration system (Sentry, PostHog, Stripe, Email, Realtime, Storage)
+- modular SaaS scaffold layers for collaboration, billing, metering, support, launch controls, referrals, operator APIs, and shared platform primitives
 - shared agent workflow support for Codex, Claude Code, and OpenCode via `AGENTS.md`, `CLAUDE.md`, `opencode.json`, and `.mcp.json`
 - optional Claude-first SaaS bootstrap guidance after local setup, including `/office-hours`, optional user-level `/autoplan`, `/design-consultation`, and local follow-up skills
 - optional operator surfaces where both the CLI and MCP server are wrappers over the same tRPC API
@@ -107,6 +108,22 @@ export const integrations = {
 ```
 
 Disabled integrations require no env vars and have no runtime code paths.
+
+## SaaS Scaffold
+
+The template can now scaffold a real SaaS baseline instead of only a framework shell. The default runtime stays simple, but the wizard and CLI flags can add:
+
+- first-run app bootstrap with the initial platform admin, first user, and first workspace
+- workspace-centric SaaS primitives with future-friendly memberships
+- optional collaboration, billing, metering, support, launch, referrals, and operator API layers
+- shared platform primitives for feature flags, jobs, rate limits, bot protection, and compliance hooks
+
+Current maturity:
+
+- stable: workspace bootstrap, collaboration, billing/limits/metering primitives, support and launch controls, shared platform primitives
+- stable: operator CLI + MCP wrapper lane over the same tRPC API
+- guided but intentionally thin: email delivery, compliance hooks, and background jobs
+- later-phase work: multi-workspace UX, audit logs, webhooks, richer support tooling, and deeper billing automation
 
 ## Maintaining The CLI
 

@@ -33,6 +33,13 @@ create-gmacko-app is a CLI tool designed to bootstrap production-ready, full-sta
 | `--tanstack-start`               | Include TanStack Start app                                                                                          |
 | `--no-tanstack-start`            | Exclude TanStack Start app (default)                                                                                |
 | `--vinext`                       | Add experimental `vinext` support to the Next.js app for a Cloudflare Workers lane                                 |
+| `--saas-collaboration`          | Add workspace invites and team-management scaffolding                                                                |
+| `--saas-billing`                | Add plans, billing-state, and limits scaffolding                                                                     |
+| `--saas-metering`               | Add usage meters and rollup scaffolding                                                                              |
+| `--saas-support`                | Add contact/support/public help surfaces                                                                             |
+| `--saas-launch`                 | Add maintenance mode, signup controls, waitlist, and allowlist scaffolding                                           |
+| `--saas-referrals`              | Add referral and launch-growth scaffolding                                                                           |
+| `--saas-operator-apis`          | Mark the app runtime as exposing operator API capability layers                                                      |
 | `--saas-bootstrap`               | Add the optional Claude SaaS bootstrap pack (`/office-hours` -> optional `/autoplan` -> `/design-consultation` + local follow-up skills) |
 | `--trpc-operators`               | Add the optional operator lane with CLI + MCP wrappers over the same tRPC API                                      |
 | `--forgegraph-server <url>`      | Write a ForgeGraph server URL into `.forgegraph.yaml`                                                               |
@@ -104,6 +111,20 @@ Add the optional tRPC-backed operator lane.
 pnpm dlx create-gmacko-app@latest my-app --trpc-operators
 ```
 
+### SaaS Layer Setup
+
+Add only the SaaS business layers you actually need.
+
+```bash
+pnpm dlx create-gmacko-app@latest my-app \
+  --saas-collaboration \
+  --saas-billing \
+  --saas-metering \
+  --saas-support \
+  --saas-launch \
+  --saas-referrals
+```
+
 ## Tech Stack
 
 - **Monorepo Management**: Turborepo + pnpm workspaces
@@ -143,10 +164,21 @@ If you scaffold with `--trpc-operators`, generated apps also expose:
 
 ```bash
 pnpm trpc:ops -- --help
+pnpm trpc:ops -- auth_help
+pnpm trpc:ops -- get_workspace_context
+pnpm trpc:ops -- list_api_keys
+pnpm trpc:ops -- get_billing_overview
 pnpm mcp:app
 ```
 
 Both surfaces call into the same underlying tRPC API contract.
+
+## SaaS Scaffold Maturity
+
+- Stable: first-run bootstrap, workspace-centric onboarding, collaboration, billing/limits/metering primitives, support, launch controls, referrals, and the operator wrapper lane.
+- Stable: shared platform primitives for feature flags, jobs, rate limits, bot protection, and compliance hooks.
+- Thin-by-design: email delivery, compliance workflows, and background jobs are scaffolded as extension points rather than full products.
+- Later-phase: multi-workspace UX, audit logs, ownership transfer, deeper billing automation, webhooks, and richer support tooling.
 
 See [../../docs/ai/DEVELOPER_EXPERIENCE.md](/Volumes/dev/create-gmacko-app/docs/ai/DEVELOPER_EXPERIENCE.md) for the current recommendations around Codex, Claude Code, OpenCode, Expo Orbit, Cloudflare Workers, ForgeGraph, and Nix.
 

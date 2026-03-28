@@ -14,6 +14,7 @@
 2. Keep ForgeGraph as the only active deployment guidance path in current docs and scaffolding.
 3. Prefer Nix-based developer and deployment setup where it improves reproducibility without adding fragile app-specific runtime coupling.
 4. Remove or archive stale assumptions instead of carrying parallel deployment systems forward.
+5. Expand the template into a real SaaS starter through modular opt-in business capabilities instead of a generic framework shell.
 
 ## Workstreams
 
@@ -36,6 +37,12 @@
 - Provisioning should offer colocated Postgres and ForgeGraph deployment guidance.
 - Tests should assert the absence of stale deployment/runtime hooks and the presence of current ForgeGraph/Postgres/Nix expectations.
 
+### 4. SaaS Scaffold Expansion
+
+- The generated app should support a guided first-run bootstrap flow, workspace-centric onboarding, and a future-friendly SaaS schema.
+- SaaS layers such as collaboration, billing, limits, metering, support, launch controls, referrals, operator APIs, and platform primitives should remain modular wizard opt-ins.
+- Generated apps should stay AI-native after scaffold, with a shared app-local planning workspace and feature-aware follow-up guidance for Claude, Codex, and OpenCode.
+
 ## Verification Standard
 
 Any migration or cleanup against this plan should verify:
@@ -54,3 +61,5 @@ The previous implementation plan now lives at [`/Volumes/dev/create-gmacko-app/d
 For the broader “make this a showcase and highly adoptable starter” roadmap, see [`/Volumes/dev/create-gmacko-app/docs/plans/2026-03-25-template-showcase-roadmap.md`](/Volumes/dev/create-gmacko-app/docs/plans/2026-03-25-template-showcase-roadmap.md).
 
 For the execution-grade breakdown of that roadmap, including task order, files, and verification gates, see [`/Volumes/dev/create-gmacko-app/docs/plans/2026-03-25-template-showcase-execution-plan.md`](/Volumes/dev/create-gmacko-app/docs/plans/2026-03-25-template-showcase-execution-plan.md).
+
+For the dedicated SaaS scaffold expansion plan, including wizard options, schema direction, bootstrap flow, and operator lane work, see [`/Volumes/dev/create-gmacko-app/docs/plans/2026-03-27-saas-scaffold-implementation.md`](/Volumes/dev/create-gmacko-app/docs/plans/2026-03-27-saas-scaffold-implementation.md).
