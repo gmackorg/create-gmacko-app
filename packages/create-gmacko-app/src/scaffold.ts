@@ -217,7 +217,7 @@ export const saasFeatures = {
   support: ${options.saasSupport},
   launch: ${options.saasLaunch},
   referrals: ${options.saasReferrals},
-  operatorApis: ${options.saasOperatorApis || options.trpcOperators},
+  operatorApis: ${options.saasOperatorApis},
 } as const;
 
 export type SaasFeatures = typeof saasFeatures;
@@ -505,7 +505,11 @@ function buildTrpcOperatorsBlock(): string {
 
 - This scaffold includes CLI + MCP wrappers over the same tRPC API.
 - Use \`pnpm trpc:ops -- --help\` for the terminal operator surface.
-- Use \`pnpm mcp:app\` to run the local MCP server once \`GMACKO_API_URL\` and \`GMACKO_API_KEY\` are set.
+- Start with \`pnpm trpc:ops -- auth_help\` for login guidance.
+- Use \`pnpm trpc:ops -- get_workspace_context\` to inspect the current workspace.
+- Use \`pnpm trpc:ops -- list_api_keys\` and \`pnpm trpc:ops -- create_api_key --name automation\` for automation credentials.
+- Use \`pnpm trpc:ops -- get_billing_overview\` for usage and limits.
+- Use \`pnpm mcp:app\` to run the local MCP server. \`auth_help\` works without an API key; protected tools require \`GMACKO_API_KEY\`.
 `;
 }
 

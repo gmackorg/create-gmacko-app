@@ -52,6 +52,12 @@ describe("operator core", () => {
     );
   });
 
+  it("returns login guidance without requiring an authenticated client", async () => {
+    await expect(
+      executeOperatorTool(undefined as never, "auth_help"),
+    ).resolves.toContain("browser-based OAuth or magic-link sign-in");
+  });
+
   it("executes workspace and billing tools against the shared client", async () => {
     const client = createMockClient() as never;
 

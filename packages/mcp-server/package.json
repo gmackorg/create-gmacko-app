@@ -16,6 +16,7 @@
     "dev": "tsup src/index.ts --format esm --watch",
     "format": "biome check .",
     "lint": "oxlint .",
+    "test": "vitest run src/__tests__/core.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -30,6 +31,7 @@
     "@types/node": "catalog:",
     "oxlint": "catalog:",
     "tsup": "^8.5.1",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^4.1.0"
   }
 }

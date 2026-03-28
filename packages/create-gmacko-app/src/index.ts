@@ -226,12 +226,16 @@ function applyOperatorLaneFlags(
   options: CliOptions,
   opts: Record<string, unknown>,
 ): void {
-  const requested =
-    opts.saasOperatorApis === true || opts.trpcOperators === true;
-
-  if (opts.saasOperatorApis !== undefined || opts.trpcOperators !== undefined) {
+  if (opts.saasOperatorApis !== undefined) {
+    const requested = opts.saasOperatorApis === true;
     options.saasOperatorApis = requested;
-    options.trpcOperators = requested;
+    if (requested) {
+      options.trpcOperators = true;
+    }
+  }
+
+  if (opts.trpcOperators !== undefined) {
+    options.trpcOperators = opts.trpcOperators === true;
   }
 }
 

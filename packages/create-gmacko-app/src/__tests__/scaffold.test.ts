@@ -867,6 +867,9 @@ describe("create-gmacko-app scaffold", () => {
       expect(
         fileExists(result.appPath, "packages/mcp-server/package.json"),
       ).toBe(true);
+      expect(
+        fileExists(result.appPath, "packages/mcp-server/src/core.ts"),
+      ).toBe(true);
 
       const rootReadme = readFile(result.appPath, "README.md");
       const integrationsConfig = readFile(
@@ -903,27 +906,33 @@ describe("create-gmacko-app scaffold", () => {
       appsToClean.push(result.appPath);
 
       expect(result.exitCode).toBe(0);
-      expect(fileExists(result.appPath, "apps/nextjs/src/app/pricing/page.tsx")).toBe(
-        true,
-      );
-      expect(fileExists(result.appPath, "apps/nextjs/src/app/faq/page.tsx")).toBe(
-        true,
-      );
-      expect(fileExists(result.appPath, "apps/nextjs/src/app/changelog/page.tsx")).toBe(
-        true,
-      );
-      expect(fileExists(result.appPath, "apps/nextjs/src/app/contact/page.tsx")).toBe(
-        true,
-      );
-      expect(fileExists(result.appPath, "apps/nextjs/src/app/privacy/page.tsx")).toBe(
-        true,
-      );
-      expect(fileExists(result.appPath, "apps/nextjs/src/app/terms/page.tsx")).toBe(
-        true,
-      );
+      expect(
+        fileExists(result.appPath, "apps/nextjs/src/app/pricing/page.tsx"),
+      ).toBe(true);
+      expect(
+        fileExists(result.appPath, "apps/nextjs/src/app/faq/page.tsx"),
+      ).toBe(true);
+      expect(
+        fileExists(result.appPath, "apps/nextjs/src/app/changelog/page.tsx"),
+      ).toBe(true);
+      expect(
+        fileExists(result.appPath, "apps/nextjs/src/app/contact/page.tsx"),
+      ).toBe(true);
+      expect(
+        fileExists(result.appPath, "apps/nextjs/src/app/privacy/page.tsx"),
+      ).toBe(true);
+      expect(
+        fileExists(result.appPath, "apps/nextjs/src/app/terms/page.tsx"),
+      ).toBe(true);
 
-      const publicHome = readFile(result.appPath, "apps/nextjs/src/app/page.tsx");
-      const adminRouter = readFile(result.appPath, "packages/api/src/router/admin.ts");
+      const publicHome = readFile(
+        result.appPath,
+        "apps/nextjs/src/app/page.tsx",
+      );
+      const adminRouter = readFile(
+        result.appPath,
+        "packages/api/src/router/admin.ts",
+      );
 
       expect(publicHome).toContain("Maintenance mode");
       expect(publicHome).toContain("Request access");
@@ -972,6 +981,10 @@ describe("create-gmacko-app scaffold", () => {
       const operatorCorePackage = readJson<{
         name?: string;
       }>(result.appPath, "packages/operator-core/package.json");
+      const integrationsConfig = readFile(
+        result.appPath,
+        "packages/config/src/integrations.ts",
+      );
       const trpcCliPackage = readJson<{
         name?: string;
         bin?: Record<string, string>;
@@ -984,6 +997,10 @@ describe("create-gmacko-app scaffold", () => {
         result.appPath,
         "packages/mcp-server/src/index.ts",
       );
+      const mcpServerCoreSource = readFile(
+        result.appPath,
+        "packages/mcp-server/src/core.ts",
+      );
       const rootReadme = readFile(result.appPath, "README.md");
 
       expect(rootPackage.scripts?.["trpc:ops"]).toContain("@gmacko/trpc-cli");
@@ -992,8 +1009,11 @@ describe("create-gmacko-app scaffold", () => {
       expect(trpcCliPackage.name).toBe("@gmacko/trpc-cli");
       expect(Object.keys(trpcCliPackage.bin ?? {})).toContain("gmacko-ops");
       expect(trpcCliSource).toContain("@gmacko/operator-core");
-      expect(mcpServerSource).toContain("@gmacko/operator-core");
+      expect(mcpServerCoreSource).toContain("@gmacko/operator-core");
       expect(mcpServerSource).toContain('name: "gmacko-app"');
+      expect(mcpServerSource).not.toContain(
+        "Error: GMACKO_API_KEY environment variable is required",
+      );
       expect(mcpConfig.mcpServers?.["gmacko-app"]?.command).toBe("pnpm");
       expect(mcpConfig.mcpServers?.["gmacko-app"]?.args).toContain(
         "@gmacko/mcp-server",
@@ -1004,7 +1024,11 @@ describe("create-gmacko-app scaffold", () => {
       });
       expect(rootReadme).toContain("CLI + MCP wrappers over the same tRPC API");
       expect(rootReadme).toContain("pnpm trpc:ops -- --help");
+      expect(rootReadme).toContain("pnpm trpc:ops -- auth_help");
+      expect(rootReadme).toContain("pnpm trpc:ops -- get_workspace_context");
+      expect(rootReadme).toContain("pnpm trpc:ops -- list_api_keys");
       expect(rootReadme).toContain("pnpm mcp:app");
+      expect(integrationsConfig).toContain("operatorApis: false");
 
       const doctorScript = readFile(result.appPath, "scripts/doctor.sh");
       expect(doctorScript).toContain("Operator API lane detected");
