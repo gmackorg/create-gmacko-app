@@ -54,7 +54,10 @@ export async function WaitlistForm(props: {
   }
 
   return (
-    <form action={submitWaitlist} className="border-border bg-card rounded-3xl border p-6 shadow-sm">
+    <form
+      action={submitWaitlist}
+      className="border-border bg-card rounded-3xl border p-6 shadow-sm"
+    >
       <div className="space-y-2">
         <h2 className="text-2xl font-semibold">{props.title}</h2>
         <p className="text-muted-foreground text-sm">{props.description}</p>

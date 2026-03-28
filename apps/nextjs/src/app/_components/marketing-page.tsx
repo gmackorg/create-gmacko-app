@@ -62,9 +62,14 @@ export function MarketingPage(props: {
                 Platform surface
               </p>
               <div className="space-y-3 text-sm">
-                <p>Public landing, FAQ, changelog, contact, privacy, and terms.</p>
+                <p>
+                  Public landing, FAQ, changelog, contact, privacy, and terms.
+                </p>
                 <p>Launch controls, waitlist review, and referrals in admin.</p>
-                <p>Optional billing, collaboration, and operator APIs remain modular.</p>
+                <p>
+                  Optional billing, collaboration, and operator APIs remain
+                  modular.
+                </p>
               </div>
             </div>
           </aside>

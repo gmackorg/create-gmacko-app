@@ -8,12 +8,12 @@ import { auth, getSession } from "~/auth/server";
 import { HydrateClient, prefetch, trpc } from "~/trpc/server";
 import { AuthShowcase } from "./_components/auth-showcase";
 import { MarketingPage } from "./_components/marketing-page";
-import { WaitlistForm } from "./_components/waitlist-form";
 import {
   CreatePostForm,
   PostCardSkeleton,
   PostList,
 } from "./_components/posts";
+import { WaitlistForm } from "./_components/waitlist-form";
 
 function LaunchBanner(props: {
   announcementMessage: string | null;
@@ -255,9 +255,13 @@ export default async function HomePage() {
         <div className="border-border bg-card rounded-3xl border p-6 shadow-sm">
           <h2 className="text-xl font-semibold">Product surface</h2>
           <div className="text-muted-foreground mt-4 space-y-3 text-sm leading-6">
-            <p>Landing, pricing, FAQ, changelog, contact, privacy, and terms.</p>
+            <p>
+              Landing, pricing, FAQ, changelog, contact, privacy, and terms.
+            </p>
             <p>Admin launch toggles for maintenance mode and signup control.</p>
-            <p>Waitlist review, referral tracking, and allowlist/domain settings.</p>
+            <p>
+              Waitlist review, referral tracking, and allowlist/domain settings.
+            </p>
           </div>
         </div>
 

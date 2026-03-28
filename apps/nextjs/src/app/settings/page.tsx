@@ -235,21 +235,21 @@ export default async function SettingsPage() {
               {billingOverview.billing.plans.length > 0 ? (
                 <ul className="mt-4 space-y-2">
                   {billingOverview.billing.plans.map((plan) => (
-                      <li
-                        key={plan.id}
-                        className="flex items-center justify-between rounded-lg border px-4 py-3 text-sm"
-                      >
-                        <div>
-                          <p className="font-medium">{plan.name}</p>
-                          <p className="text-muted-foreground">
-                            {formatMoney(plan.amountInCents, plan.currency)} /{" "}
-                            {plan.interval}
-                          </p>
-                        </div>
-                        <span className="text-muted-foreground">
-                          {plan.isDefault ? "Default" : "Optional"}
-                        </span>
-                      </li>
+                    <li
+                      key={plan.id}
+                      className="flex items-center justify-between rounded-lg border px-4 py-3 text-sm"
+                    >
+                      <div>
+                        <p className="font-medium">{plan.name}</p>
+                        <p className="text-muted-foreground">
+                          {formatMoney(plan.amountInCents, plan.currency)} /{" "}
+                          {plan.interval}
+                        </p>
+                      </div>
+                      <span className="text-muted-foreground">
+                        {plan.isDefault ? "Default" : "Optional"}
+                      </span>
+                    </li>
                   ))}
                 </ul>
               ) : (
@@ -285,23 +285,23 @@ export default async function SettingsPage() {
                 {billingOverview.usage.limits.length > 0 ? (
                   <ul className="mt-3 space-y-2 text-sm">
                     {billingOverview.usage.limits.map((limit) => (
-                        <li
-                          key={limit.key}
-                          className="flex items-center justify-between rounded-md border px-3 py-2"
-                        >
-                          <div>
-                            <p className="font-medium">{limit.key}</p>
-                            <p className="text-muted-foreground capitalize">
-                              {limit.period.replaceAll("_", " ")}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p>
-                              {limit.currentUsage} /{" "}
-                              {limit.value === null ? "Unlimited" : limit.value}
-                            </p>
-                          </div>
-                        </li>
+                      <li
+                        key={limit.key}
+                        className="flex items-center justify-between rounded-md border px-3 py-2"
+                      >
+                        <div>
+                          <p className="font-medium">{limit.key}</p>
+                          <p className="text-muted-foreground capitalize">
+                            {limit.period.replaceAll("_", " ")}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p>
+                            {limit.currentUsage} /{" "}
+                            {limit.value === null ? "Unlimited" : limit.value}
+                          </p>
+                        </div>
+                      </li>
                     ))}
                   </ul>
                 ) : (
@@ -316,24 +316,24 @@ export default async function SettingsPage() {
                 {billingOverview.usage.meters.length > 0 ? (
                   <ul className="mt-3 space-y-2 text-sm">
                     {billingOverview.usage.meters.map((meter) => (
-                        <li
-                          key={meter.key}
-                          className="rounded-md border px-3 py-2"
-                        >
-                          <div className="flex items-center justify-between">
-                            <p className="font-medium">{meter.name}</p>
-                            <p>
-                              {meter.currentUsage} {meter.unit}
-                            </p>
-                          </div>
-                          <p className="text-muted-foreground mt-1">
-                            {meter.key} • {meter.aggregation}
+                      <li
+                        key={meter.key}
+                        className="rounded-md border px-3 py-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="font-medium">{meter.name}</p>
+                          <p>
+                            {meter.currentUsage} {meter.unit}
                           </p>
-                          <p className="text-muted-foreground mt-1">
-                            Period {formatDate(meter.latestPeriodStart)} -{" "}
-                            {formatDate(meter.latestPeriodEnd)}
-                          </p>
-                        </li>
+                        </div>
+                        <p className="text-muted-foreground mt-1">
+                          {meter.key} • {meter.aggregation}
+                        </p>
+                        <p className="text-muted-foreground mt-1">
+                          Period {formatDate(meter.latestPeriodStart)} -{" "}
+                          {formatDate(meter.latestPeriodEnd)}
+                        </p>
+                      </li>
                     ))}
                   </ul>
                 ) : (

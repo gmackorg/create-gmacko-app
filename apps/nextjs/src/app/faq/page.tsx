@@ -11,8 +11,8 @@ export default function FaqPage() {
         <section className="border-border bg-card rounded-3xl border p-6 shadow-sm">
           <h2 className="font-semibold">What ships in v1?</h2>
           <p className="text-muted-foreground mt-2 text-sm">
-            The template starts with workspace bootstrap, public launch controls,
-            support pages, and optional SaaS layers.
+            The template starts with workspace bootstrap, public launch
+            controls, support pages, and optional SaaS layers.
           </p>
         </section>
         <section className="border-border bg-card rounded-3xl border p-6 shadow-sm">

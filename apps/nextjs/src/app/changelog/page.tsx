@@ -12,7 +12,9 @@ export default function ChangelogPage() {
           <p className="text-primary text-xs font-semibold uppercase tracking-[0.24em]">
             Latest
           </p>
-          <h2 className="mt-2 font-semibold">Launch controls and public shell</h2>
+          <h2 className="mt-2 font-semibold">
+            Launch controls and public shell
+          </h2>
           <p className="text-muted-foreground mt-2 text-sm">
             Added a marketing homepage, support content, and admin toggles for
             maintenance mode and signup behavior.
