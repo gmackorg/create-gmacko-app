@@ -5,6 +5,7 @@ import {
   user,
   userRoleEnum,
   workspace,
+  workspaceInviteAllowlist,
   workspaceMembership,
   waitlistEntry,
 } from "@gmacko/db/schema";
@@ -144,29 +145,57 @@ export const adminRouter = {
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const [updated] = await ctx.db
-        .update(waitlistEntry)
-        .set({
-          status: input.status,
-          reviewedByUserId: ctx.session.user.id,
-          reviewedAt: new Date(),
-        })
-        .where(eq(waitlistEntry.id, input.waitlistEntryId))
-        .returning({
-          id: waitlistEntry.id,
-          status: waitlistEntry.status,
-          reviewedByUserId: waitlistEntry.reviewedByUserId,
-          reviewedAt: waitlistEntry.reviewedAt,
-        });
+      return ctx.db.transaction(async (tx) => {
+        const currentSettings = await tx.query.applicationSettings.findFirst();
+        const currentWaitlistEntry =
+          (await tx.query.waitlistEntry.findMany()).find(
+            (entry) => entry.id === input.waitlistEntryId,
+          ) ?? null;
 
-      if (!updated) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Waitlist entry not found",
-        });
-      }
+        if (!currentWaitlistEntry) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Waitlist entry not found",
+          });
+        }
 
-      return updated;
+        const [updated] = await tx
+          .update(waitlistEntry)
+          .set({
+            status: input.status,
+            reviewedByUserId: ctx.session.user.id,
+            reviewedAt: new Date(),
+          })
+          .where(eq(waitlistEntry.id, input.waitlistEntryId))
+          .returning({
+            id: waitlistEntry.id,
+            status: waitlistEntry.status,
+            reviewedByUserId: waitlistEntry.reviewedByUserId,
+            reviewedAt: waitlistEntry.reviewedAt,
+          });
+
+        if (!updated) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Waitlist entry not found",
+          });
+        }
+
+        if (
+          input.status === "approved" &&
+          currentWaitlistEntry.status !== "approved" &&
+          currentSettings?.initialWorkspaceId
+        ) {
+          await tx.insert(workspaceInviteAllowlist).values({
+            workspaceId: currentSettings.initialWorkspaceId,
+            email: currentWaitlistEntry.email,
+            role: "member",
+            invitedByUserId: ctx.session.user.id,
+          });
+        }
+
+        return updated;
+      });
     }),
 
   bootstrapStatus: publicProcedure.query(async ({ ctx }) => {

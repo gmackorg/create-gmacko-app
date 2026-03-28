@@ -69,6 +69,16 @@ type TestWaitlistEntry = {
   updatedAt: Date | null;
 };
 
+type TestWorkspaceInviteAllowlistEntry = {
+  id: string;
+  workspaceId: string;
+  email: string;
+  role: "owner" | "admin" | "member";
+  invitedByUserId: string;
+  createdAt: Date;
+  updatedAt: Date | null;
+};
+
 function createFakeDb(input?: {
   user?: TestUser;
   applicationSettings?: TestApplicationSettings | null;
@@ -76,6 +86,7 @@ function createFakeDb(input?: {
   memberships?: TestWorkspaceMembership[];
   failApplicationSettingsInsert?: boolean;
   waitlistEntries?: TestWaitlistEntry[];
+  inviteAllowlistEntries?: TestWorkspaceInviteAllowlistEntry[];
 }) {
   const sortWorkspaces = (rows: TestWorkspace[]) =>
     [...rows].sort(
@@ -99,6 +110,7 @@ function createFakeDb(input?: {
     workspaces: [...(input?.workspaces ?? [])],
     memberships: [...(input?.memberships ?? [])],
     waitlistEntries: [...(input?.waitlistEntries ?? [])],
+    inviteAllowlistEntries: [...(input?.inviteAllowlistEntries ?? [])],
     selectedWaitlistEntryId: null as string | null,
   };
 
@@ -301,8 +313,25 @@ function createFakeDb(input?: {
 
       if (table === workspaceInviteAllowlist) {
         return {
-          values: () => ({
-            returning: async () => [],
+          values: (values: Partial<TestWorkspaceInviteAllowlistEntry>) => ({
+            ...(() => {
+              const row: TestWorkspaceInviteAllowlistEntry = {
+                id: values.id ?? randomUUID(),
+                workspaceId: values.workspaceId ?? "workspace_1",
+                email: values.email ?? "invitee@example.com",
+                role: values.role ?? "member",
+                invitedByUserId: values.invitedByUserId ?? state.user.id,
+                createdAt:
+                  values.createdAt ?? new Date("2026-03-27T02:00:00.000Z"),
+                updatedAt: values.updatedAt ?? null,
+              };
+
+              state.inviteAllowlistEntries.push(row);
+
+              return {
+                returning: async () => [row],
+              };
+            })(),
           }),
         };
       }
@@ -664,5 +693,13 @@ describe("admin launch controls", () => {
 
     expect(state.waitlistEntries[0]?.status).toBe("approved");
     expect(state.waitlistEntries[0]?.reviewedByUserId).toBe("admin_1");
+    expect(state.inviteAllowlistEntries).toContainEqual(
+      expect.objectContaining({
+        workspaceId: "workspace_1",
+        email: "alpha@example.com",
+        role: "member",
+        invitedByUserId: "admin_1",
+      }),
+    );
   });
 });

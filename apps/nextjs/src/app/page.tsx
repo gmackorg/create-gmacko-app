@@ -275,10 +275,9 @@ export default async function HomePage() {
                 : "Production environments fall back to waitlist review when access is blocked."}
             </p>
             <p>
-              Allowed domains:{" "}
-              {launchState.allowedEmailDomains.length > 0
-                ? launchState.allowedEmailDomains.join(", ")
-                : "None yet"}
+              Allowed domains are configured in platform admin settings and can
+              be expanded once the auth flow is tightened beyond the launch
+              shell.
             </p>
           </div>
         </div>
