@@ -1,10 +1,17 @@
 import { appRouter, createTRPCContext } from "@gmacko/api";
+import { isMultiTenant, tenancy } from "@gmacko/config";
 import { Button } from "@gmacko/ui/button";
 import { headers } from "next/headers";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { auth, getSession } from "~/auth/server";
+import {
+  buildWorkspaceHomePath,
+  buildWorkspaceSettingsPath,
+  getPostBootstrapSettingsPath,
+} from "~/lib/workspace";
 import { HydrateClient, prefetch, trpc } from "~/trpc/server";
 import { AuthShowcase } from "./_components/auth-showcase";
 import { MarketingPage } from "./_components/marketing-page";
@@ -48,6 +55,81 @@ function LaunchBanner(props: {
   );
 }
 
+type WorkspaceContext = {
+  availableWorkspaces: Array<{ id: string; name: string; slug: string }>;
+  workspace: { id: string; name: string; slug: string } | null;
+  workspaceRole: "owner" | "admin" | "member" | null;
+  requiresWorkspaceSelection: boolean;
+};
+
+function WorkspaceSurface(props: { workspaceContext: WorkspaceContext }) {
+  return (
+    <section className="w-full max-w-3xl rounded-3xl border p-6 shadow-sm">
+      <div className="space-y-2">
+        <p className="text-primary text-xs font-semibold uppercase tracking-[0.24em]">
+          Workspace
+        </p>
+        <h2 className="text-2xl font-semibold">Switch tenant context</h2>
+        <p className="text-muted-foreground text-sm">
+          Multi-tenant apps stay workspace-scoped across web routes. Pick a
+          workspace to jump into its URL-scoped surface.
+        </p>
+      </div>
+
+      {props.workspaceContext.workspace ? (
+        <div className="bg-card mt-4 rounded-2xl border p-4">
+          <p className="font-medium">{props.workspaceContext.workspace.name}</p>
+          <p className="text-muted-foreground mt-1 text-sm capitalize">
+            {props.workspaceContext.workspaceRole ?? "member"} access
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              href={buildWorkspaceHomePath(
+                props.workspaceContext.workspace.slug,
+              )}
+              className="rounded-full border px-4 py-2 text-sm transition-colors hover:bg-muted"
+            >
+              Open workspace
+            </Link>
+            <Link
+              href={buildWorkspaceSettingsPath(
+                props.workspaceContext.workspace.slug,
+              )}
+              className="rounded-full border px-4 py-2 text-sm transition-colors hover:bg-muted"
+            >
+              Manage settings
+            </Link>
+          </div>
+        </div>
+      ) : props.workspaceContext.requiresWorkspaceSelection ? (
+        <div className="mt-4 rounded-2xl border border-dashed p-4 text-sm">
+          Choose a workspace below before opening tenant-scoped settings.
+        </div>
+      ) : null}
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {props.workspaceContext.availableWorkspaces.map((workspace) => {
+          const isCurrent =
+            workspace.id === props.workspaceContext.workspace?.id;
+          return (
+            <Link
+              key={workspace.id}
+              href={buildWorkspaceHomePath(workspace.slug)}
+              className={`rounded-full border px-4 py-2 text-sm transition-colors ${
+                isCurrent
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border hover:bg-muted"
+              }`}
+            >
+              {workspace.name}
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export default async function HomePage() {
   const session = await getSession();
   const requestHeaders = new Headers(await headers());
@@ -73,6 +155,10 @@ export default async function HomePage() {
   };
   const bootstrapStatus = await caller.admin.bootstrapStatus();
   const launchState = await settingsCaller.getLaunchState();
+  const workspaceContext =
+    session && isMultiTenant()
+      ? ((await caller.settings.getWorkspaceContext()) as WorkspaceContext)
+      : null;
 
   if (bootstrapStatus.requiresSetup) {
     async function completeBootstrap(formData: FormData) {
@@ -98,12 +184,22 @@ export default async function HomePage() {
           authApi: auth.api,
         }),
       );
+      const adminCaller = actionCaller.admin as {
+        completeBootstrap: (input: { workspaceName: string }) => Promise<{
+          workspace: { slug: string };
+        }>;
+      };
 
-      await actionCaller.admin.completeBootstrap({
+      const result = await adminCaller.completeBootstrap({
         workspaceName: workspaceName.trim(),
       });
 
-      redirect("/settings");
+      redirect(
+        getPostBootstrapSettingsPath({
+          tenancyMode: tenancy.mode,
+          workspaceSlug: result.workspace.slug,
+        }),
+      );
     }
 
     return (
@@ -182,6 +278,10 @@ export default async function HomePage() {
               Create <span className="text-primary">T3</span> Turbo
             </h1>
             <AuthShowcase />
+
+            {workspaceContext ? (
+              <WorkspaceSurface workspaceContext={workspaceContext} />
+            ) : null}
 
             <CreatePostForm />
             <div className="w-full max-w-2xl overflow-y-scroll">

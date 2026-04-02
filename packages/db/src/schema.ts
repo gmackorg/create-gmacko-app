@@ -7,6 +7,8 @@ import { user } from "./auth-schema";
 
 export const workspaceRoleEnum = ["owner", "admin", "member"] as const;
 export type WorkspaceRole = (typeof workspaceRoleEnum)[number];
+export const tenancyModeEnum = ["single-tenant", "multi-tenant"] as const;
+export type TenancyMode = (typeof tenancyModeEnum)[number];
 export const billingIntervalEnum = ["month", "year"] as const;
 export type BillingInterval = (typeof billingIntervalEnum)[number];
 export const workspaceSubscriptionStatusEnum = [
@@ -155,6 +157,7 @@ export const applicationSettings = pgTable("application_settings", (t) => ({
   initialWorkspaceId: t
     .uuid()
     .references(() => workspace.id, { onDelete: "set null" }),
+  tenancyMode: t.text().$type<TenancyMode>().notNull().default("single-tenant"),
   maintenanceMode: t.boolean().notNull().default(false),
   signupEnabled: t.boolean().notNull().default(true),
   announcementMessage: t.text(),

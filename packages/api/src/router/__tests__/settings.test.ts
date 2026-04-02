@@ -39,6 +39,7 @@ type TestApplicationSettings = {
   setupCompletedAt: Date | null;
   setupCompletedByUserId: string | null;
   initialWorkspaceId: string | null;
+  tenancyMode?: "single-tenant" | "multi-tenant";
   createdAt: Date;
   updatedAt: Date | null;
 };
@@ -140,6 +141,8 @@ function createCaller(options?: {
   subscriptions?: TestWorkspaceSubscription[];
   usageMeters?: TestUsageMeter[];
   usageRollups?: TestWorkspaceUsageRollup[];
+  headers?: Record<string, string>;
+  tenancyMode?: "single-tenant" | "multi-tenant";
 }) {
   const state = {
     user: options?.sessionUser ?? {
@@ -165,6 +168,8 @@ function createCaller(options?: {
     selectedInviteId: null as string | null,
   };
 
+  const headers = new Headers(options?.headers);
+
   const sortMemberships = () =>
     [...state.memberships].sort(
       (a, b) =>
@@ -178,6 +183,13 @@ function createCaller(options?: {
         a.createdAt.getTime() - b.createdAt.getTime() ||
         a.id.localeCompare(b.id),
     );
+
+  const getActiveWorkspaceId = () =>
+    state.selectedWorkspaceId ??
+    headers.get("x-gmacko-workspace-id") ??
+    state.applicationSettings?.initialWorkspaceId ??
+    sortMemberships()[0]?.workspaceId ??
+    null;
 
   const makeRowsQuery = <T>(rows: T[]) => {
     const query = {
@@ -195,6 +207,7 @@ function createCaller(options?: {
   };
 
   const db = {
+    execute: vi.fn(async () => undefined),
     query: {
       applicationSettings: {
         findFirst: vi.fn(async () => state.applicationSettings),
@@ -228,10 +241,7 @@ function createCaller(options?: {
       workspace: {
         findFirst: vi.fn(async () => {
           const workspaceId =
-            state.selectedWorkspaceId ??
-            state.applicationSettings?.initialWorkspaceId ??
-            sortWorkspaces()[0]?.id ??
-            null;
+            getActiveWorkspaceId() ?? sortWorkspaces()[0]?.id ?? null;
 
           const row = workspaceId
             ? (state.workspaces.find((entry) => entry.id === workspaceId) ??
@@ -244,6 +254,7 @@ function createCaller(options?: {
 
           return row;
         }),
+        findMany: vi.fn(async () => sortWorkspaces()),
       },
       workspaceInviteAllowlist: {
         findFirst: vi.fn(async ({ where }: { where?: unknown } = {}) => {
@@ -251,8 +262,8 @@ function createCaller(options?: {
           const row =
             state.allowlistEntries.find(
               (entry) =>
-                entry.workspaceId === state.selectedWorkspaceId ||
-                entry.id === state.selectedWorkspaceId,
+                entry.workspaceId === getActiveWorkspaceId() ||
+                entry.id === getActiveWorkspaceId(),
             ) ?? null;
 
           state.selectedInviteId = row?.id ?? null;
@@ -276,7 +287,7 @@ function createCaller(options?: {
         findFirst: vi.fn(
           async () =>
             state.subscriptions.find(
-              (entry) => entry.workspaceId === state.selectedWorkspaceId,
+              (entry) => entry.workspaceId === getActiveWorkspaceId(),
             ) ?? null,
         ),
       },
@@ -286,7 +297,7 @@ function createCaller(options?: {
       workspaceUsageRollup: {
         findMany: vi.fn(async () =>
           [...state.usageRollups].filter(
-            (entry) => entry.workspaceId === state.selectedWorkspaceId,
+            (entry) => entry.workspaceId === getActiveWorkspaceId(),
           ),
         ),
       },
@@ -312,7 +323,7 @@ function createCaller(options?: {
             returning: async () => {
               const row: TestAllowlistEntry = {
                 id: values.id ?? randomUUID(),
-                workspaceId: values.workspaceId ?? state.selectedWorkspaceId!,
+                workspaceId: values.workspaceId ?? getActiveWorkspaceId()!,
                 email: values.email ?? "invitee@example.com",
                 role: values.role ?? "member",
                 invitedByUserId: values.invitedByUserId ?? state.user.id,
@@ -334,7 +345,7 @@ function createCaller(options?: {
             returning: async () => {
               const row: TestWorkspaceMembership = {
                 id: values.id ?? randomUUID(),
-                workspaceId: values.workspaceId ?? state.selectedWorkspaceId!,
+                workspaceId: values.workspaceId ?? getActiveWorkspaceId()!,
                 userId: values.userId ?? state.user.id,
                 role: values.role ?? "member",
                 createdAt:
@@ -375,13 +386,15 @@ function createCaller(options?: {
 
       throw new Error("Unexpected delete");
     }),
-    transaction: vi.fn(async () => {
-      throw new Error("Unexpected transaction");
-    }),
+    transaction: vi.fn(async (fn: (tx: typeof db) => Promise<unknown>) =>
+      fn(db),
+    ),
   };
 
   const caller = appRouter.createCaller({
     db: db as never,
+    headers,
+    tenancyMode: options?.tenancyMode ?? "single-tenant",
     session: {
       user: state.user,
       session: null,
@@ -395,10 +408,43 @@ function createCaller(options?: {
     },
   } as never);
 
-  return { caller, state };
+  return { caller, db, state };
 }
 
 describe("settings workspace context", () => {
+  it("applies database session context before resolving tenant-scoped workspace state", async () => {
+    const { caller, db } = createCaller({
+      tenancyMode: "multi-tenant",
+      workspaces: [
+        {
+          id: "workspace_1",
+          name: "Acme",
+          slug: "acme",
+          ownerUserId: "user_1",
+          createdAt: new Date("2026-03-27T01:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+      memberships: [
+        {
+          id: "membership_1",
+          workspaceId: "workspace_1",
+          userId: "user_1",
+          role: "owner",
+          createdAt: new Date("2026-03-27T01:10:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+    });
+
+    await (
+      caller.settings as { getWorkspaceContext: () => Promise<unknown> }
+    ).getWorkspaceContext();
+
+    expect(db.transaction).toHaveBeenCalled();
+    expect(db.execute).toHaveBeenCalled();
+  });
+
   it("prefers initialWorkspaceId when selecting the visible workspace", async () => {
     const { caller } = createCaller({
       sessionUser: {
@@ -480,15 +526,30 @@ describe("settings workspace context", () => {
     const settingsCaller = caller.settings as unknown as {
       getWorkspaceContext: () => Promise<{
         workspace: { id: string; name: string; slug: string } | null;
+        availableWorkspaces: Array<{ id: string; name: string; slug: string }>;
         workspaceRole: "owner" | "admin" | "member" | null;
         platformRole: "user" | "admin";
         canManageWorkspace: boolean;
         isPlatformAdmin: boolean;
         inviteAllowlistCount: number;
+        requiresWorkspaceSelection: boolean;
+        workspaceSelectionSource: string;
       }>;
     };
 
     await expect(settingsCaller.getWorkspaceContext()).resolves.toEqual({
+      availableWorkspaces: [
+        {
+          id: "workspace_1",
+          name: "Atlas",
+          slug: "atlas",
+        },
+        {
+          id: "workspace_2",
+          name: "Beacon",
+          slug: "beacon",
+        },
+      ],
       workspace: {
         id: "workspace_2",
         name: "Beacon",
@@ -499,6 +560,8 @@ describe("settings workspace context", () => {
       canManageWorkspace: true,
       isPlatformAdmin: true,
       inviteAllowlistCount: 2,
+      requiresWorkspaceSelection: false,
+      workspaceSelectionSource: "default",
     });
   });
 
@@ -574,15 +637,30 @@ describe("settings workspace context", () => {
     const settingsCaller = caller.settings as unknown as {
       getWorkspaceContext: () => Promise<{
         workspace: { id: string; name: string; slug: string } | null;
+        availableWorkspaces: Array<{ id: string; name: string; slug: string }>;
         workspaceRole: "owner" | "admin" | "member" | null;
         platformRole: "user" | "admin";
         canManageWorkspace: boolean;
         isPlatformAdmin: boolean;
         inviteAllowlistCount: number;
+        requiresWorkspaceSelection: boolean;
+        workspaceSelectionSource: string;
       }>;
     };
 
     await expect(settingsCaller.getWorkspaceContext()).resolves.toEqual({
+      availableWorkspaces: [
+        {
+          id: "workspace_1",
+          name: "Atlas",
+          slug: "atlas",
+        },
+        {
+          id: "workspace_2",
+          name: "Beacon",
+          slug: "beacon",
+        },
+      ],
       workspace: {
         id: "workspace_1",
         name: "Atlas",
@@ -593,6 +671,182 @@ describe("settings workspace context", () => {
       canManageWorkspace: false,
       isPlatformAdmin: false,
       inviteAllowlistCount: 1,
+      requiresWorkspaceSelection: false,
+      workspaceSelectionSource: "default",
+    });
+  });
+
+  it("honors explicit workspace headers in multi-tenant mode", async () => {
+    const { caller } = createCaller({
+      tenancyMode: "multi-tenant",
+      headers: {
+        "x-gmacko-workspace-id": "workspace_2",
+      },
+      sessionUser: {
+        id: "user_2",
+        name: "Jordan",
+        email: "jordan@example.com",
+        emailVerified: true,
+        image: null,
+        role: "user",
+        createdAt: new Date("2026-03-27T00:00:00.000Z"),
+        updatedAt: new Date("2026-03-27T00:00:00.000Z"),
+      },
+      applicationSettings: {
+        id: randomUUID(),
+        setupCompletedAt: new Date("2026-03-27T01:00:00.000Z"),
+        setupCompletedByUserId: "admin_1",
+        initialWorkspaceId: "workspace_1",
+        tenancyMode: "multi-tenant",
+        createdAt: new Date("2026-03-27T01:00:00.000Z"),
+        updatedAt: null,
+      },
+      workspaces: [
+        {
+          id: "workspace_1",
+          name: "Atlas",
+          slug: "atlas",
+          ownerUserId: "user_2",
+          createdAt: new Date("2026-03-27T00:00:00.000Z"),
+          updatedAt: null,
+        },
+        {
+          id: "workspace_2",
+          name: "Beacon",
+          slug: "beacon",
+          ownerUserId: "user_2",
+          createdAt: new Date("2026-03-27T01:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+      memberships: [
+        {
+          id: "membership_1",
+          workspaceId: "workspace_1",
+          userId: "user_2",
+          role: "member",
+          createdAt: new Date("2026-03-27T00:00:00.000Z"),
+          updatedAt: null,
+        },
+        {
+          id: "membership_2",
+          workspaceId: "workspace_2",
+          userId: "user_2",
+          role: "owner",
+          createdAt: new Date("2026-03-27T01:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+    });
+
+    const settingsCaller = caller.settings as unknown as {
+      getWorkspaceContext: () => Promise<{
+        workspace: { id: string; name: string; slug: string } | null;
+        workspaceRole: "owner" | "admin" | "member" | null;
+        requiresWorkspaceSelection: boolean;
+        workspaceSelectionSource: string;
+      }>;
+    };
+
+    await expect(settingsCaller.getWorkspaceContext()).resolves.toMatchObject({
+      workspace: {
+        id: "workspace_2",
+        name: "Beacon",
+        slug: "beacon",
+      },
+      workspaceRole: "owner",
+      requiresWorkspaceSelection: false,
+      workspaceSelectionSource: "header",
+    });
+  });
+
+  it("requires workspace selection in multi-tenant mode when no workspace is requested", async () => {
+    const { caller } = createCaller({
+      tenancyMode: "multi-tenant",
+      sessionUser: {
+        id: "user_2",
+        name: "Jordan",
+        email: "jordan@example.com",
+        emailVerified: true,
+        image: null,
+        role: "user",
+        createdAt: new Date("2026-03-27T00:00:00.000Z"),
+        updatedAt: new Date("2026-03-27T00:00:00.000Z"),
+      },
+      applicationSettings: {
+        id: randomUUID(),
+        setupCompletedAt: new Date("2026-03-27T01:00:00.000Z"),
+        setupCompletedByUserId: "admin_1",
+        initialWorkspaceId: null,
+        tenancyMode: "multi-tenant",
+        createdAt: new Date("2026-03-27T01:00:00.000Z"),
+        updatedAt: null,
+      },
+      workspaces: [
+        {
+          id: "workspace_1",
+          name: "Atlas",
+          slug: "atlas",
+          ownerUserId: "user_2",
+          createdAt: new Date("2026-03-27T00:00:00.000Z"),
+          updatedAt: null,
+        },
+        {
+          id: "workspace_2",
+          name: "Beacon",
+          slug: "beacon",
+          ownerUserId: "user_2",
+          createdAt: new Date("2026-03-27T01:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+      memberships: [
+        {
+          id: "membership_1",
+          workspaceId: "workspace_1",
+          userId: "user_2",
+          role: "member",
+          createdAt: new Date("2026-03-27T00:00:00.000Z"),
+          updatedAt: null,
+        },
+        {
+          id: "membership_2",
+          workspaceId: "workspace_2",
+          userId: "user_2",
+          role: "owner",
+          createdAt: new Date("2026-03-27T01:00:00.000Z"),
+          updatedAt: null,
+        },
+      ],
+    });
+
+    const settingsCaller = caller.settings as unknown as {
+      getWorkspaceContext: () => Promise<{
+        workspace: { id: string; name: string; slug: string } | null;
+        workspaceRole: "owner" | "admin" | "member" | null;
+        availableWorkspaces: Array<{ id: string; name: string; slug: string }>;
+        requiresWorkspaceSelection: boolean;
+        workspaceSelectionSource: string;
+      }>;
+    };
+
+    await expect(settingsCaller.getWorkspaceContext()).resolves.toMatchObject({
+      workspace: null,
+      workspaceRole: null,
+      availableWorkspaces: [
+        {
+          id: "workspace_1",
+          name: "Atlas",
+          slug: "atlas",
+        },
+        {
+          id: "workspace_2",
+          name: "Beacon",
+          slug: "beacon",
+        },
+      ],
+      requiresWorkspaceSelection: true,
+      workspaceSelectionSource: "none",
     });
   });
 });

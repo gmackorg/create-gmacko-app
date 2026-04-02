@@ -15,10 +15,13 @@ export interface PlatformConfig {
   tanstackStart: boolean;
 }
 
+export type TenancyMode = "single-tenant" | "multi-tenant";
+
 export interface CliOptions {
   appName: string;
   displayName: string;
   packageScope: string;
+  tenancyMode: TenancyMode;
   platforms: PlatformConfig;
   saasCollaboration: boolean;
   saasBilling: boolean;

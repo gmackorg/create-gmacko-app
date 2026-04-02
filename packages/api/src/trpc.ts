@@ -1,3 +1,4 @@
+import { tenancy } from "@gmacko/config";
 import { and, eq, isNull } from "@gmacko/db";
 import { db } from "@gmacko/db/client";
 import { apiKeys, user } from "@gmacko/db/schema";
@@ -99,12 +100,14 @@ export const createTRPCContext = async (opts: {
       if (userRecord) {
         return {
           authApi: opts.authApi,
+          headers: opts.headers,
           session: {
             user: userRecord,
             session: null,
           },
           apiKeyAuth,
           db,
+          tenancyMode: tenancy.mode,
         };
       }
     }
@@ -116,9 +119,11 @@ export const createTRPCContext = async (opts: {
 
   return {
     authApi: opts.authApi,
+    headers: opts.headers,
     session,
     apiKeyAuth: null as ApiKeyAuth | null,
     db,
+    tenancyMode: tenancy.mode,
   };
 };
 /**

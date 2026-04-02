@@ -3,7 +3,7 @@ import pc from "picocolors";
 import validateNpmPackageName from "validate-npm-package-name";
 import { getDefaultOptions, runPrompts } from "./prompts.js";
 import { scaffold } from "./scaffold.js";
-import type { CliOptions, IntegrationConfig } from "./types.js";
+import type { CliOptions, IntegrationConfig, TenancyMode } from "./types.js";
 
 const program = new Command();
 
@@ -24,6 +24,10 @@ program
   .option("--no-mobile", "Exclude Expo mobile app")
   .option("--tanstack-start", "Include TanStack Start app")
   .option("--no-tanstack-start", "Exclude TanStack Start app (default)")
+  .option(
+    "--tenancy-mode <mode>",
+    "Tenancy mode for the generated app (single-tenant, multi-tenant)",
+  )
   .option("--saas-collaboration", "Add collaboration layers to the SaaS app")
   .option("--saas-billing", "Add billing and plans to the SaaS app")
   .option("--saas-metering", "Add metering and usage rollups to the SaaS app")
@@ -119,6 +123,9 @@ program
           opts.forgegraphProductionDomain as string;
       }
       if (opts.packageScope) options.packageScope = opts.packageScope as string;
+      if (opts.tenancyMode) {
+        options.tenancyMode = parseTenancyMode(opts.tenancyMode as string);
+      }
       if (opts.integrations !== undefined) {
         options.integrations = parseIntegrations(
           opts.integrations as string,
@@ -129,6 +136,7 @@ program
     } else {
       options = await runPrompts(appName, {
         packageScope: opts.packageScope as string | undefined,
+        tenancyMode: opts.tenancyMode as TenancyMode | undefined,
       });
       if (opts.prune !== undefined) options.prune = opts.prune === true;
       if (opts.install !== undefined) options.install = opts.install !== false;
@@ -156,6 +164,9 @@ program
       if (opts.forgegraphProductionDomain) {
         options.forgegraphProductionDomain =
           opts.forgegraphProductionDomain as string;
+      }
+      if (opts.tenancyMode) {
+        options.tenancyMode = parseTenancyMode(opts.tenancyMode as string);
       }
     }
 
@@ -193,6 +204,19 @@ function parseIntegrations(
       provider: set.has("storage") ? "uploadthing" : "none",
     },
   };
+}
+
+function parseTenancyMode(value: string): TenancyMode {
+  if (value === "single-tenant" || value === "multi-tenant") {
+    return value;
+  }
+
+  console.error(
+    pc.red(
+      `Invalid tenancy mode: ${value}. Expected "single-tenant" or "multi-tenant".`,
+    ),
+  );
+  process.exit(1);
 }
 
 function applySaasCapabilityFlags(

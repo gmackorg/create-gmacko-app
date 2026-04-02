@@ -631,6 +631,9 @@ importers:
       '@gmacko/tsconfig':
         specifier: workspace:*
         version: link:../../tooling/typescript
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.5.0
       oxlint:
         specifier: 'catalog:'
         version: 1.56.0
@@ -742,6 +745,9 @@ importers:
       '@gmacko/tsconfig':
         specifier: workspace:*
         version: link:../../tooling/typescript
+      '@gmacko/vitest-config':
+        specifier: workspace:*
+        version: link:../../tooling/vitest
       '@types/node':
         specifier: 'catalog:'
         version: 25.5.0
@@ -757,6 +763,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@25.5.0)(jsdom@27.4.0(@noble/hashes@2.0.1)(bufferutil@4.1.0)(utf-8-validate@6.0.4))(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.2))
 
   packages/email:
     dependencies:

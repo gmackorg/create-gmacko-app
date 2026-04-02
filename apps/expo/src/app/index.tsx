@@ -1,3 +1,4 @@
+import { isMultiTenant } from "@gmacko/config";
 import { useTranslationsNative } from "@gmacko/i18n/native";
 import { LegendList } from "@legendapp/list";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -10,6 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { RouterOutputs } from "~/utils/api";
 import { trpc } from "~/utils/api";
 import { authClient } from "~/utils/auth";
+import { setActiveWorkspaceId } from "~/utils/workspace-store";
 
 function PostCard(props: {
   post: RouterOutputs["post"]["all"][number];
@@ -180,8 +182,13 @@ function MobileAuth() {
 export default function Index() {
   const queryClient = useQueryClient();
   const t = useTranslationsNative();
+  const { data: session } = authClient.useSession();
 
   const postQuery = useQuery(trpc.post.all.queryOptions());
+  const workspaceContextQuery = useQuery({
+    ...trpc.settings.getWorkspaceContext.queryOptions(),
+    enabled: isMultiTenant() && Boolean(session?.user),
+  });
 
   const deletePostMutation = useMutation(
     trpc.post.delete.mutationOptions({
@@ -189,6 +196,19 @@ export default function Index() {
         queryClient.invalidateQueries(trpc.post.all.queryFilter()),
     }),
   );
+
+  const handleWorkspaceSelect = async (workspaceId: string) => {
+    setActiveWorkspaceId(workspaceId);
+    await Promise.all([
+      queryClient.invalidateQueries(
+        trpc.settings.getWorkspaceContext.queryFilter(),
+      ),
+      queryClient.invalidateQueries(
+        trpc.settings.getBillingOverview.queryFilter(),
+      ),
+      queryClient.invalidateQueries(trpc.settings.listInvites.queryFilter()),
+    ]);
+  };
 
   return (
     <SafeAreaView className="bg-background">
@@ -200,6 +220,69 @@ export default function Index() {
         </Text>
 
         <MobileAuth />
+
+        {isMultiTenant() && session?.user && workspaceContextQuery.data ? (
+          <View className="border-border bg-card mt-4 rounded-lg border p-4">
+            <Text className="text-foreground text-lg font-semibold">
+              Workspace
+            </Text>
+            <Text className="text-muted-foreground mt-2">
+              Mobile keeps one active workspace in secure storage. Switching
+              here updates tenant-scoped API requests immediately.
+            </Text>
+
+            {workspaceContextQuery.data.workspace ? (
+              <View className="border-border bg-background mt-4 rounded-lg border p-3">
+                <Text className="text-foreground font-medium">
+                  {workspaceContextQuery.data.workspace.name}
+                </Text>
+                <Text className="text-muted-foreground mt-1 capitalize">
+                  {workspaceContextQuery.data.workspaceRole ?? "member"} access
+                </Text>
+              </View>
+            ) : workspaceContextQuery.data.requiresWorkspaceSelection ? (
+              <Text className="text-muted-foreground mt-4">
+                Choose a workspace to load tenant-scoped settings and billing.
+              </Text>
+            ) : null}
+
+            <View className="mt-4 gap-2">
+              {workspaceContextQuery.data.availableWorkspaces.map(
+                (workspace) => {
+                  const isCurrent =
+                    workspace.id === workspaceContextQuery.data.workspace?.id;
+
+                  return (
+                    <Pressable
+                      key={workspace.id}
+                      onPress={() => void handleWorkspaceSelect(workspace.id)}
+                      className={`rounded-lg border px-4 py-3 ${
+                        isCurrent
+                          ? "border-primary bg-primary/10"
+                          : "border-border bg-background"
+                      }`}
+                    >
+                      <Text className="text-foreground font-medium">
+                        {workspace.name}
+                      </Text>
+                      <Text className="text-muted-foreground mt-1">
+                        {workspace.slug}
+                      </Text>
+                    </Pressable>
+                  );
+                },
+              )}
+            </View>
+
+            <Link href="/settings" asChild>
+              <Pressable className="bg-primary mt-4 rounded-md px-4 py-3">
+                <Text className="text-primary-foreground text-center font-medium">
+                  Open workspace settings
+                </Text>
+              </Pressable>
+            </Link>
+          </View>
+        ) : null}
 
         <View className="py-2">
           <Text className="text-primary font-semibold italic">

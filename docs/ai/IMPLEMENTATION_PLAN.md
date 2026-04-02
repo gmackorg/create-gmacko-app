@@ -39,7 +39,9 @@
 
 ### 4. SaaS Scaffold Expansion
 
-- The generated app should support a guided first-run bootstrap flow, workspace-centric onboarding, and a future-friendly SaaS schema.
+- The generated app should support a guided first-run bootstrap flow, scaffold-time tenancy selection, workspace-centric onboarding, and a future-friendly SaaS schema.
+- `single-tenant` and `multi-tenant` scaffolds should share one workspace-based schema and RBAC model instead of forking the data layer.
+- Workspace-owned data should be protected through Postgres session context plus RLS helpers, not only app-layer filters.
 - SaaS layers such as collaboration, billing, limits, metering, support, launch controls, referrals, operator APIs, and platform primitives should remain modular wizard opt-ins.
 - Generated apps should stay AI-native after scaffold, with a shared app-local planning workspace and feature-aware follow-up guidance for Claude, Codex, and OpenCode.
 
@@ -63,3 +65,5 @@ For the broader “make this a showcase and highly adoptable starter” roadmap,
 For the execution-grade breakdown of that roadmap, including task order, files, and verification gates, see [`/Volumes/dev/create-gmacko-app/docs/plans/2026-03-25-template-showcase-execution-plan.md`](/Volumes/dev/create-gmacko-app/docs/plans/2026-03-25-template-showcase-execution-plan.md).
 
 For the dedicated SaaS scaffold expansion plan, including wizard options, schema direction, bootstrap flow, and operator lane work, see [`/Volumes/dev/create-gmacko-app/docs/plans/2026-03-27-saas-scaffold-implementation.md`](/Volumes/dev/create-gmacko-app/docs/plans/2026-03-27-saas-scaffold-implementation.md).
+
+For the tenancy, RBAC, and Postgres RLS design and implementation breakdown, see [`/Volumes/dev/create-gmacko-app/docs/plans/2026-04-02-rbac-multitenancy-rls-design.md`](/Volumes/dev/create-gmacko-app/docs/plans/2026-04-02-rbac-multitenancy-rls-design.md) and [`/Volumes/dev/create-gmacko-app/docs/plans/2026-04-02-rbac-multitenancy-rls-implementation.md`](/Volumes/dev/create-gmacko-app/docs/plans/2026-04-02-rbac-multitenancy-rls-implementation.md).

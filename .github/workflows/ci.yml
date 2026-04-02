@@ -116,4 +116,5 @@ jobs:
       - name: Build
         run: pnpm build
         env:
-          SKIP_ENV_VALIDATION: true
+          SKIP_ENV_VALIDATION: "1"
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres

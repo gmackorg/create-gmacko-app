@@ -130,6 +130,7 @@ function createFakeDb(input?: {
   };
 
   const db = {
+    execute: vi.fn(async () => undefined),
     query: {
       applicationSettings: {
         findFirst: vi.fn(async () => state.applicationSettings),
@@ -398,10 +399,32 @@ function createCaller(options?: {
     },
   } as never);
 
-  return { caller, state };
+  return { caller, db, state };
 }
 
 describe("admin bootstrap", () => {
+  it("applies database session context during bootstrap completion", async () => {
+    const { caller, db } = createCaller();
+    const adminCaller = caller.admin as unknown as {
+      completeBootstrap: (input: { workspaceName: string }) => Promise<unknown>;
+    };
+
+    await adminCaller.completeBootstrap({ workspaceName: "Acme HQ" });
+
+    expect(db.execute).toHaveBeenCalled();
+  });
+
+  it("applies anonymous database session context during bootstrap status checks", async () => {
+    const { caller, db } = createCaller({ sessionUser: null });
+    const adminCaller = caller.admin as unknown as {
+      bootstrapStatus: () => Promise<unknown>;
+    };
+
+    await adminCaller.bootstrapStatus();
+
+    expect(db.execute).toHaveBeenCalled();
+  });
+
   it("reports when the app still needs first-run setup", async () => {
     const { caller } = createCaller({ sessionUser: null });
     const adminCaller = caller.admin as unknown as {

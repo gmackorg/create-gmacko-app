@@ -50,6 +50,10 @@ if [ "$HAS_DOCKER_COMPOSE" -eq 1 ]; then
   echo "Pushing schema to local Postgres..."
   pnpm db:push
   echo ""
+
+  echo "Applying workspace RLS policies..."
+  pnpm db:rls
+  echo ""
 else
   echo "Skipping db:push because Docker Compose was unavailable."
   echo ""

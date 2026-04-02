@@ -18,6 +18,7 @@
     "db:generate": "pnpm -F @gmacko/db generate",
     "db:migrate": "pnpm -F @gmacko/db migrate",
     "db:push": "turbo -F @gmacko/db push",
+    "db:rls": "pnpm -F @gmacko/db rls",
     "db:check": "pnpm -F @gmacko/db check",
     "db:seed": "pnpm -F @gmacko/db seed",
     "db:studio": "turbo -F @gmacko/db studio",

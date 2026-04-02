@@ -51,6 +51,12 @@ export const saasFeatures = {
 
 export type SaasFeatures = typeof saasFeatures;
 
+export const tenancy = {
+  mode: "single-tenant" as "single-tenant" | "multi-tenant",
+} as const;
+
+export type Tenancy = typeof tenancy;
+
 export const platformPrimitives = {
   featureFlags: {
     enabled: true,
@@ -102,5 +108,7 @@ export const isSaasSupportEnabled = () => saasFeatures.support;
 export const isSaasLaunchEnabled = () => saasFeatures.launch;
 export const isSaasReferralsEnabled = () => saasFeatures.referrals;
 export const isSaasOperatorApisEnabled = () => saasFeatures.operatorApis;
+export const isSingleTenant = () => tenancy.mode === "single-tenant";
+export const isMultiTenant = () => tenancy.mode === "multi-tenant";
 export const isEmailDeliveryEnabled = () =>
   platformPrimitives.emailDelivery.enabled;

@@ -1,6 +1,6 @@
 import { isPlatformAdminRole } from "@gmacko/auth";
 import { platformPrimitives } from "@gmacko/config";
-import { eq } from "@gmacko/db";
+import { applyDatabaseSessionContext, eq } from "@gmacko/db";
 import {
   applicationSettings,
   user,
@@ -14,6 +14,7 @@ import type { TRPCRouterRecord } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod/v4";
 
+import type { createTRPCContext } from "../trpc";
 import { protectedProcedure, publicProcedure } from "../trpc";
 
 function slugifyWorkspaceName(name: string): string {
@@ -53,6 +54,59 @@ const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
     },
   });
 });
+
+type AdminContext = Awaited<ReturnType<typeof createTRPCContext>> & {
+  session: NonNullable<
+    Awaited<ReturnType<typeof createTRPCContext>>["session"]
+  >;
+};
+
+function getAdminContextRole(ctx: {
+  session: { user: { id: string; email: string; role?: string } };
+  tenancyMode: "single-tenant" | "multi-tenant";
+  db: AdminContext["db"];
+}) {
+  return (ctx.session.user.role as "user" | "admin" | undefined) ?? "user";
+}
+
+async function withAdminDatabaseContext<TResult>(
+  ctx: AdminContext,
+  workspaceId: string | null | undefined,
+  callback: (tx: AdminContext["db"]) => Promise<TResult>,
+) {
+  return ctx.db.transaction(async (tx): Promise<TResult> => {
+    await applyDatabaseSessionContext(tx as never, {
+      tenancyMode: ctx.tenancyMode,
+      userId: ctx.session.user.id,
+      userEmail: ctx.session.user.email,
+      workspaceId: workspaceId ?? null,
+      platformRole: getAdminContextRole(ctx),
+    });
+
+    return callback(tx as unknown as AdminContext["db"]);
+  }) as Promise<TResult>;
+}
+
+async function withBootstrapStatusDatabaseContext<TResult>(
+  ctx: Awaited<ReturnType<typeof createTRPCContext>>,
+  callback: (
+    tx: Awaited<ReturnType<typeof createTRPCContext>>["db"],
+  ) => Promise<TResult>,
+) {
+  return ctx.db.transaction(async (tx): Promise<TResult> => {
+    await applyDatabaseSessionContext(tx as never, {
+      tenancyMode: ctx.tenancyMode,
+      userId: "",
+      userEmail: "",
+      workspaceId: null,
+      platformRole: "user",
+    });
+
+    return callback(
+      tx as unknown as Awaited<ReturnType<typeof createTRPCContext>>["db"],
+    );
+  }) as Promise<TResult>;
+}
 
 export const adminRouter = {
   getLaunchControls: adminProcedure.query(async ({ ctx }) => {
@@ -174,70 +228,78 @@ export const adminRouter = {
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      return ctx.db.transaction(async (tx) => {
-        const currentSettings = await tx.query.applicationSettings.findFirst();
-        const currentWaitlistEntry =
-          (await tx.query.waitlistEntry.findMany()).find(
-            (entry) => entry.id === input.waitlistEntryId,
-          ) ?? null;
+      const currentSettings =
+        await ctx.db.query.applicationSettings.findFirst();
 
-        if (!currentWaitlistEntry) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Waitlist entry not found",
-          });
-        }
+      return withAdminDatabaseContext(
+        ctx,
+        currentSettings?.initialWorkspaceId ?? null,
+        async (tx) => {
+          const currentWaitlistEntry =
+            (await tx.query.waitlistEntry.findMany()).find(
+              (entry) => entry.id === input.waitlistEntryId,
+            ) ?? null;
 
-        const [updated] = await tx
-          .update(waitlistEntry)
-          .set({
-            status: input.status,
-            reviewedByUserId: ctx.session.user.id,
-            reviewedAt: new Date(),
-          })
-          .where(eq(waitlistEntry.id, input.waitlistEntryId))
-          .returning({
-            id: waitlistEntry.id,
-            status: waitlistEntry.status,
-            reviewedByUserId: waitlistEntry.reviewedByUserId,
-            reviewedAt: waitlistEntry.reviewedAt,
-          });
+          if (!currentWaitlistEntry) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Waitlist entry not found",
+            });
+          }
 
-        if (!updated) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Waitlist entry not found",
-          });
-        }
+          const [updated] = await tx
+            .update(waitlistEntry)
+            .set({
+              status: input.status,
+              reviewedByUserId: ctx.session.user.id,
+              reviewedAt: new Date(),
+            })
+            .where(eq(waitlistEntry.id, input.waitlistEntryId))
+            .returning({
+              id: waitlistEntry.id,
+              status: waitlistEntry.status,
+              reviewedByUserId: waitlistEntry.reviewedByUserId,
+              reviewedAt: waitlistEntry.reviewedAt,
+            });
 
-        if (
-          input.status === "approved" &&
-          currentWaitlistEntry.status !== "approved" &&
-          currentSettings?.initialWorkspaceId
-        ) {
-          await tx.insert(workspaceInviteAllowlist).values({
-            workspaceId: currentSettings.initialWorkspaceId,
-            email: currentWaitlistEntry.email,
-            role: "member",
-            invitedByUserId: ctx.session.user.id,
-          });
-        }
+          if (!updated) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Waitlist entry not found",
+            });
+          }
 
-        return updated;
-      });
+          if (
+            input.status === "approved" &&
+            currentWaitlistEntry.status !== "approved" &&
+            currentSettings?.initialWorkspaceId
+          ) {
+            await tx.insert(workspaceInviteAllowlist).values({
+              workspaceId: currentSettings.initialWorkspaceId,
+              email: currentWaitlistEntry.email,
+              role: "member",
+              invitedByUserId: ctx.session.user.id,
+            });
+          }
+
+          return updated;
+        },
+      );
     }),
 
   bootstrapStatus: publicProcedure.query(async ({ ctx }) => {
-    const settings = await ctx.db.query.applicationSettings.findFirst();
-    const existingWorkspace = await ctx.db.select().from(workspace).limit(1);
+    return withBootstrapStatusDatabaseContext(ctx, async (tx) => {
+      const settings = await tx.query.applicationSettings.findFirst();
+      const existingWorkspace = await tx.select().from(workspace).limit(1);
 
-    return {
-      isInitialized: !!settings?.setupCompletedAt,
-      requiresSetup: !settings?.setupCompletedAt,
-      hasExistingWorkspace: existingWorkspace.length > 0,
-      setupCompletedAt: settings?.setupCompletedAt ?? null,
-      initialWorkspaceId: settings?.initialWorkspaceId ?? null,
-    };
+      return {
+        isInitialized: !!settings?.setupCompletedAt,
+        requiresSetup: !settings?.setupCompletedAt,
+        hasExistingWorkspace: existingWorkspace.length > 0,
+        setupCompletedAt: settings?.setupCompletedAt ?? null,
+        initialWorkspaceId: settings?.initialWorkspaceId ?? null,
+      };
+    });
   }),
 
   completeBootstrap: protectedProcedure
@@ -247,7 +309,7 @@ export const adminRouter = {
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      return ctx.db.transaction(async (tx) => {
+      return withAdminDatabaseContext(ctx, null, async (tx) => {
         const existingSettings = await tx.query.applicationSettings.findFirst();
         const existingWorkspace = await tx.select().from(workspace).limit(1);
 
@@ -352,7 +414,9 @@ export const adminRouter = {
    */
   stats: adminProcedure.query(async ({ ctx }) => {
     const users = await ctx.db.select().from(user);
-    const workspaces = await ctx.db.select().from(workspace);
+    const workspaces = await withAdminDatabaseContext(ctx, null, async (tx) =>
+      tx.select().from(workspace),
+    );
     const totalUsers = users.length;
     const adminUsers = users.filter((u) => u.role === "admin").length;
 
@@ -365,22 +429,30 @@ export const adminRouter = {
   }),
 
   listWorkspaces: adminProcedure.query(async ({ ctx }) => {
-    const workspaces = await ctx.db
-      .select()
-      .from(workspace)
-      .orderBy(workspace.createdAt);
-    const memberships = await ctx.db.select().from(workspaceMembership);
+    const workspaces = await withAdminDatabaseContext(ctx, null, async (tx) =>
+      tx.select().from(workspace).orderBy(workspace.createdAt),
+    );
 
-    return workspaces.map((entry) => ({
-      id: entry.id,
-      name: entry.name,
-      slug: entry.slug,
-      ownerUserId: entry.ownerUserId,
-      membershipCount: memberships.filter(
-        (membership) => membership.workspaceId === entry.id,
-      ).length,
-      createdAt: entry.createdAt,
-    }));
+    return Promise.all(
+      workspaces.map(async (entry) => {
+        const memberships = await withAdminDatabaseContext(
+          ctx,
+          entry.id,
+          async (tx) => tx.select().from(workspaceMembership),
+        );
+
+        return {
+          id: entry.id,
+          name: entry.name,
+          slug: entry.slug,
+          ownerUserId: entry.ownerUserId,
+          membershipCount: memberships.filter(
+            (membership) => membership.workspaceId === entry.id,
+          ).length,
+          createdAt: entry.createdAt,
+        };
+      }),
+    );
   }),
 
   /**
