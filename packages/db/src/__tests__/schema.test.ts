@@ -1,10 +1,10 @@
 import { getTableConfig } from "drizzle-orm/pg-core";
-// @ts-expect-error vitest is installed in sibling workspace test packages
 import { describe, expect, it } from "vitest";
 
 import { userRoleEnum } from "../auth-schema";
 import {
   applicationSettings,
+  tenancyModeEnum,
   workspace,
   workspaceInviteAllowlist,
   workspaceMembership,
@@ -43,5 +43,10 @@ describe("SaaS workspace schema", () => {
     expect(
       inviteConfig.uniqueConstraints.map((constraint) => constraint.getName()),
     ).toContain("workspace_invite_allowlist_workspace_email_unique");
+  });
+
+  it("tracks scaffold-selected tenancy mode in application settings", () => {
+    expect(tenancyModeEnum).toEqual(["single-tenant", "multi-tenant"]);
+    expect(applicationSettings.tenancyMode).toBeDefined();
   });
 });

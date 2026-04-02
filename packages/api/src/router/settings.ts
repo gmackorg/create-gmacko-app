@@ -1,6 +1,6 @@
 import { canManageWorkspace, isPlatformAdminRole } from "@gmacko/auth";
 import { integrations, platformPrimitives, saasFeatures } from "@gmacko/config";
-import { and, eq, isNull } from "@gmacko/db";
+import { and, applyDatabaseSessionContext, eq, isNull } from "@gmacko/db";
 import {
   apiKeys,
   billingPlanLimit,
@@ -27,6 +27,30 @@ type SettingsContext = Awaited<ReturnType<typeof createTRPCContext>> & {
     Awaited<ReturnType<typeof createTRPCContext>>["session"]
   >;
 };
+
+type WorkspaceSelectionSource = "header" | "default" | "none";
+
+function getContextPlatformRole(ctx: SettingsContext) {
+  return (ctx.session.user as { role?: "user" | "admin" }).role ?? "user";
+}
+
+async function withTenantDatabaseContext<TResult>(
+  ctx: SettingsContext,
+  workspaceId: string | null | undefined,
+  callback: (tx: SettingsContext["db"]) => Promise<TResult>,
+) {
+  return ctx.db.transaction(async (tx): Promise<TResult> => {
+    await applyDatabaseSessionContext(tx as never, {
+      tenancyMode: ctx.tenancyMode,
+      userId: ctx.session.user.id,
+      userEmail: ctx.session.user.email,
+      workspaceId: workspaceId ?? null,
+      platformRole: getContextPlatformRole(ctx),
+    });
+
+    return callback(tx as unknown as SettingsContext["db"]);
+  }) as Promise<TResult>;
+}
 
 function generateApiKey(): string {
   return `gmk_${randomBytes(32).toString("base64url")}`;
@@ -69,6 +93,16 @@ function getLaunchDefaults() {
   };
 }
 
+function getRequestedWorkspaceSelection(headers: Headers) {
+  const workspaceId = headers.get("x-gmacko-workspace-id")?.trim() ?? "";
+  const workspaceSlug = headers.get("x-gmacko-workspace-slug")?.trim() ?? "";
+
+  return {
+    workspaceId: workspaceId.length > 0 ? workspaceId : null,
+    workspaceSlug: workspaceSlug.length > 0 ? workspaceSlug : null,
+  };
+}
+
 async function getWorkspaceScope(ctx: SettingsContext) {
   const [dbUser] = await ctx.db
     .select({
@@ -80,47 +114,85 @@ async function getWorkspaceScope(ctx: SettingsContext) {
     .limit(1);
 
   const settings = await ctx.db.query.applicationSettings.findFirst();
-
-  const membership = settings?.initialWorkspaceId
-    ? await ctx.db.query.workspaceMembership.findFirst({
-        where: and(
-          eq(workspaceMembership.userId, ctx.session.user.id),
-          eq(workspaceMembership.workspaceId, settings.initialWorkspaceId),
-        ),
-      })
-    : await ctx.db.query.workspaceMembership.findFirst({
+  const requestedWorkspace = getRequestedWorkspaceSelection(ctx.headers);
+  const { memberships, workspaces } = await withTenantDatabaseContext(
+    ctx,
+    requestedWorkspace.workspaceId,
+    async (tx) => {
+      const memberships = await tx.query.workspaceMembership.findMany({
         where: eq(workspaceMembership.userId, ctx.session.user.id),
         orderBy: (membership, { asc }) => [
           asc(membership.createdAt),
           asc(membership.id),
         ],
       });
-
-  const fallbackWorkspace =
-    !membership && settings?.initialWorkspaceId
-      ? await ctx.db.query.workspace.findFirst({
-          where: eq(workspace.id, settings.initialWorkspaceId),
+      const membershipByWorkspaceId = new Map(
+        memberships.map((membership) => [membership.workspaceId, membership]),
+      );
+      const workspaces = (
+        await tx.query.workspace.findMany({
+          orderBy: (entry, { asc }) => [asc(entry.createdAt), asc(entry.id)],
         })
+      ).filter((entry) => membershipByWorkspaceId.has(entry.id));
+
+      return { memberships, workspaces };
+    },
+  );
+  const membershipByWorkspaceId = new Map(
+    memberships.map((membership) => [membership.workspaceId, membership]),
+  );
+
+  let currentWorkspace = null as (typeof workspaces)[number] | null;
+  let currentMembership = null as (typeof memberships)[number] | null;
+  let workspaceSelectionSource: WorkspaceSelectionSource = "none";
+
+  if (requestedWorkspace.workspaceId || requestedWorkspace.workspaceSlug) {
+    currentWorkspace =
+      workspaces.find((entry) =>
+        requestedWorkspace.workspaceId
+          ? entry.id === requestedWorkspace.workspaceId
+          : entry.slug === requestedWorkspace.workspaceSlug,
+      ) ?? null;
+    currentMembership = currentWorkspace
+      ? (membershipByWorkspaceId.get(currentWorkspace.id) ?? null)
       : null;
+    workspaceSelectionSource = currentWorkspace ? "header" : "none";
+  } else if (ctx.tenancyMode === "single-tenant") {
+    const fallbackWorkspaceId =
+      settings?.initialWorkspaceId ?? memberships[0]?.workspaceId ?? null;
 
-  const currentWorkspace = membership
-    ? await ctx.db.query.workspace.findFirst({
-        where: eq(workspace.id, membership.workspaceId),
-      })
-    : fallbackWorkspace;
+    currentWorkspace = fallbackWorkspaceId
+      ? (workspaces.find((entry) => entry.id === fallbackWorkspaceId) ?? null)
+      : null;
+    currentMembership = currentWorkspace
+      ? (membershipByWorkspaceId.get(currentWorkspace.id) ?? null)
+      : null;
+    workspaceSelectionSource = currentWorkspace ? "default" : "none";
+  } else if (workspaces.length === 1) {
+    currentWorkspace = workspaces[0] ?? null;
+    currentMembership = currentWorkspace
+      ? (membershipByWorkspaceId.get(currentWorkspace.id) ?? null)
+      : null;
+    workspaceSelectionSource = currentWorkspace ? "default" : "none";
+  }
 
-  const currentWorkspaceId =
-    currentWorkspace?.id ?? settings?.initialWorkspaceId ?? null;
-  const currentWorkspaceRole = membership?.role ?? null;
+  const currentWorkspaceId = currentWorkspace?.id ?? null;
+  const currentWorkspaceRole = currentMembership?.role ?? null;
   const canManageCurrentWorkspace = canManageWorkspace(currentWorkspaceRole);
 
   return {
+    availableWorkspaces: workspaces,
     currentWorkspace,
     currentWorkspaceId,
     currentWorkspaceRole,
     canManageCurrentWorkspace,
+    requiresWorkspaceSelection:
+      ctx.tenancyMode === "multi-tenant" &&
+      currentWorkspaceId === null &&
+      workspaces.length > 1,
     platformRole: dbUser?.role ?? "user",
     isPlatformAdmin: isPlatformAdminRole(dbUser?.role),
+    workspaceSelectionSource,
   };
 }
 
@@ -212,13 +284,22 @@ export const settingsRouter = {
     const workspaceScope = await getWorkspaceScope(ctx);
     const { currentWorkspace, currentWorkspaceId } = workspaceScope;
     const inviteAllowlistEntries = currentWorkspaceId
-      ? await ctx.db.query.workspaceInviteAllowlist.findMany({
-          where: eq(workspaceInviteAllowlist.workspaceId, currentWorkspaceId),
-          columns: { id: true },
-        })
+      ? await withTenantDatabaseContext(ctx, currentWorkspaceId, async (tx) =>
+          tx.query.workspaceInviteAllowlist.findMany({
+            where: eq(workspaceInviteAllowlist.workspaceId, currentWorkspaceId),
+            columns: { id: true },
+          }),
+        )
       : [];
 
     return {
+      availableWorkspaces: workspaceScope.availableWorkspaces.map(
+        (workspaceEntry) => ({
+          id: workspaceEntry.id,
+          name: workspaceEntry.name,
+          slug: workspaceEntry.slug,
+        }),
+      ),
       workspace: currentWorkspace
         ? {
             id: currentWorkspace.id,
@@ -231,6 +312,8 @@ export const settingsRouter = {
       canManageWorkspace: workspaceScope.canManageCurrentWorkspace,
       isPlatformAdmin: workspaceScope.isPlatformAdmin,
       inviteAllowlistCount: inviteAllowlistEntries.length,
+      requiresWorkspaceSelection: workspaceScope.requiresWorkspaceSelection,
+      workspaceSelectionSource: workspaceScope.workspaceSelectionSource,
     };
   }),
 
@@ -291,33 +374,35 @@ export const settingsRouter = {
       };
     }
 
+    const currentWorkspaceId = workspaceScope.currentWorkspaceId;
+
     const billingVisible = saasFeatures.billing;
     const usageVisible = saasFeatures.billing || saasFeatures.metering;
 
-    const [plans, subscription, meters, rollups] = await Promise.all([
-      ctx.db.query.billingPlan.findMany({
-        orderBy: (plan, { asc }) => [asc(plan.amountInCents), asc(plan.name)],
-      }),
-      ctx.db.query.workspaceSubscription.findFirst({
-        where: eq(
-          workspaceSubscription.workspaceId,
-          workspaceScope.currentWorkspaceId,
-        ),
-      }),
-      ctx.db.query.usageMeter.findMany({
-        orderBy: (meter, { asc }) => [asc(meter.name), asc(meter.key)],
-      }),
-      ctx.db.query.workspaceUsageRollup.findMany({
-        where: eq(
-          workspaceUsageRollup.workspaceId,
-          workspaceScope.currentWorkspaceId,
-        ),
-        orderBy: (rollup, { desc }) => [
-          desc(rollup.periodEnd),
-          desc(rollup.createdAt),
-        ],
-      }),
-    ]);
+    const [plans, subscription, meters, rollups] =
+      await withTenantDatabaseContext(ctx, currentWorkspaceId, async (tx) =>
+        Promise.all([
+          tx.query.billingPlan.findMany({
+            orderBy: (plan, { asc }) => [
+              asc(plan.amountInCents),
+              asc(plan.name),
+            ],
+          }),
+          tx.query.workspaceSubscription.findFirst({
+            where: eq(workspaceSubscription.workspaceId, currentWorkspaceId),
+          }),
+          tx.query.usageMeter.findMany({
+            orderBy: (meter, { asc }) => [asc(meter.name), asc(meter.key)],
+          }),
+          tx.query.workspaceUsageRollup.findMany({
+            where: eq(workspaceUsageRollup.workspaceId, currentWorkspaceId),
+            orderBy: (rollup, { desc }) => [
+              desc(rollup.periodEnd),
+              desc(rollup.createdAt),
+            ],
+          }),
+        ]),
+      );
 
     const currentPlan =
       (subscription?.planId
@@ -427,13 +512,17 @@ export const settingsRouter = {
       return [];
     }
 
-    const invites = await ctx.db.query.workspaceInviteAllowlist.findMany({
-      where: eq(
-        workspaceInviteAllowlist.workspaceId,
-        workspaceScope.currentWorkspaceId,
-      ),
-      orderBy: (invite, { asc }) => [asc(invite.createdAt), asc(invite.id)],
-    });
+    const currentWorkspaceId = workspaceScope.currentWorkspaceId;
+
+    const invites = await withTenantDatabaseContext(
+      ctx,
+      currentWorkspaceId,
+      async (tx) =>
+        tx.query.workspaceInviteAllowlist.findMany({
+          where: eq(workspaceInviteAllowlist.workspaceId, currentWorkspaceId),
+          orderBy: (invite, { asc }) => [asc(invite.createdAt), asc(invite.id)],
+        }),
+    );
 
     return invites.map((invite) => ({
       id: invite.id,
@@ -462,109 +551,114 @@ export const settingsRouter = {
         });
       }
 
+      const currentWorkspaceId = workspaceScope.currentWorkspaceId;
       const inviteEmail = input.email.trim().toLowerCase();
-      const existingInvites =
-        await ctx.db.query.workspaceInviteAllowlist.findMany({
-          where: eq(
-            workspaceInviteAllowlist.workspaceId,
-            workspaceScope.currentWorkspaceId,
-          ),
-        });
+      return withTenantDatabaseContext(ctx, currentWorkspaceId, async (tx) => {
+        const existingInvites =
+          await tx.query.workspaceInviteAllowlist.findMany({
+            where: eq(workspaceInviteAllowlist.workspaceId, currentWorkspaceId),
+          });
 
-      const existingInvite = existingInvites.find(
-        (invite) => invite.email.toLowerCase() === inviteEmail,
-      );
+        const existingInvite = existingInvites.find(
+          (invite) => invite.email.toLowerCase() === inviteEmail,
+        );
 
-      if (existingInvite) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "An invite already exists for that email",
-        });
-      }
+        if (existingInvite) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "An invite already exists for that email",
+          });
+        }
 
-      const [createdInvite] = await ctx.db
-        .insert(workspaceInviteAllowlist)
-        .values({
-          workspaceId: workspaceScope.currentWorkspaceId,
-          email: inviteEmail,
-          role: input.role,
-          invitedByUserId: ctx.session.user.id,
-        })
-        .returning({
-          id: workspaceInviteAllowlist.id,
-          email: workspaceInviteAllowlist.email,
-          role: workspaceInviteAllowlist.role,
-        });
+        const [createdInvite] = await tx
+          .insert(workspaceInviteAllowlist)
+          .values({
+            workspaceId: currentWorkspaceId,
+            email: inviteEmail,
+            role: input.role,
+            invitedByUserId: ctx.session.user.id,
+          })
+          .returning({
+            id: workspaceInviteAllowlist.id,
+            email: workspaceInviteAllowlist.email,
+            role: workspaceInviteAllowlist.role,
+          });
 
-      return createdInvite;
+        return createdInvite;
+      });
     }),
 
   acceptInvite: protectedProcedure
     .input(z.object({ inviteId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const invites = await ctx.db.query.workspaceInviteAllowlist.findMany();
-      const invite = invites.find((entry) => entry.id === input.inviteId);
+      return withTenantDatabaseContext(ctx, null, async (tx) => {
+        const invites = await tx.query.workspaceInviteAllowlist.findMany();
+        const invite = invites.find((entry) => entry.id === input.inviteId);
 
-      if (!invite) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Invite not found",
+        if (!invite) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Invite not found",
+          });
+        }
+
+        if (
+          invite.email.toLowerCase() !== ctx.session.user.email.toLowerCase()
+        ) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Invite not found for this account",
+          });
+        }
+
+        if (invite.role === "owner") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Owner invites are not supported in v1",
+          });
+        }
+
+        const memberships = await tx.query.workspaceMembership.findMany({
+          where: eq(workspaceMembership.userId, ctx.session.user.id),
         });
-      }
+        const existingMembership = memberships.find(
+          (membership) => membership.workspaceId === invite.workspaceId,
+        );
+        const hasAnotherWorkspaceMembership = memberships.some(
+          (membership) => membership.workspaceId !== invite.workspaceId,
+        );
 
-      if (invite.email.toLowerCase() !== ctx.session.user.email.toLowerCase()) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Invite not found for this account",
-        });
-      }
+        if (hasAnotherWorkspaceMembership) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message:
+              "This account is already attached to a different workspace",
+          });
+        }
 
-      if (invite.role === "owner") {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Owner invites are not supported in v1",
-        });
-      }
+        const membership =
+          existingMembership ??
+          (
+            await tx
+              .insert(workspaceMembership)
+              .values({
+                workspaceId: invite.workspaceId,
+                userId: ctx.session.user.id,
+                role: invite.role,
+              })
+              .returning({
+                workspaceId: workspaceMembership.workspaceId,
+                role: workspaceMembership.role,
+              })
+          )[0];
 
-      const memberships = await ctx.db.query.workspaceMembership.findMany({
-        where: eq(workspaceMembership.userId, ctx.session.user.id),
+        await tx
+          .delete(workspaceInviteAllowlist)
+          .where(eq(workspaceInviteAllowlist.id, invite.id))
+          .returning({ id: workspaceInviteAllowlist.id });
+
+        return membership;
       });
-      const existingMembership = memberships.find(
-        (membership) => membership.workspaceId === invite.workspaceId,
-      );
-      const hasAnotherWorkspaceMembership = memberships.some(
-        (membership) => membership.workspaceId !== invite.workspaceId,
-      );
-
-      if (hasAnotherWorkspaceMembership) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "This account is already attached to a different workspace",
-        });
-      }
-
-      const membership =
-        existingMembership ??
-        (
-          await ctx.db
-            .insert(workspaceMembership)
-            .values({
-              workspaceId: invite.workspaceId,
-              userId: ctx.session.user.id,
-              role: invite.role,
-            })
-            .returning({
-              workspaceId: workspaceMembership.workspaceId,
-              role: workspaceMembership.role,
-            })
-        )[0];
-
-      await ctx.db
-        .delete(workspaceInviteAllowlist)
-        .where(eq(workspaceInviteAllowlist.id, invite.id))
-        .returning({ id: workspaceInviteAllowlist.id });
-
-      return membership;
     }),
 
   getPreferences: protectedProcedure.query(async ({ ctx }) => {

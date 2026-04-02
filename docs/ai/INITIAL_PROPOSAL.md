@@ -19,7 +19,7 @@ The primary users are small product teams and solo founders who want to launch a
 
 ## Core Experience
 
-The generated app should start with a guided first-run setup instead of a half-configured blank shell. An operator should be able to initialize the app, create the first platform admin, create the first user, and create the first named workspace in one flow. From there, the app should expose a workspace-centric SaaS structure with optional layers selected in the onboarding wizard: collaboration, billing, limits, metering, support, marketing shell, waitlist, referrals, feature flags, jobs, compliance, and operator APIs.
+The generated app should start with a guided first-run setup instead of a half-configured blank shell. An operator should be able to initialize the app, create the first platform admin, create the first user, and create the first named workspace in one flow. At scaffold time, the creation wizard should let the team choose `single-tenant` or `multi-tenant` mode. From there, the app should expose a workspace-centric SaaS structure with optional layers selected in the onboarding wizard: collaboration, billing, limits, metering, support, marketing shell, waitlist, referrals, feature flags, jobs, compliance, and operator APIs.
 
 The public side should also feel product-ready from day one. A generated app should be able to ship with a landing page, pricing, FAQ, changelog, contact/support flow, legal pages, optional waitlist mode, and controlled signup behavior. After scaffold, the repo should recommend the next Claude/Codex/OpenCode workflows and optional skills to help the team tailor onboarding, design, mobile, billing, and marketing to the specific product.
 
@@ -28,10 +28,14 @@ The public side should also feel product-ready from day one. A generated app sho
 ### Must-have v1 capabilities
 
 - Guided first-run bootstrap UI for uninitialized apps.
-- Workspace-centric SaaS model with one visible workspace per user in v1.
-- Future-friendly membership schema even though multi-workspace UX stays out of v1.
+- Scaffold-time tenancy selection between `single-tenant` and `multi-tenant`.
+- Shared workspace-centric schema across both tenancy modes.
+- Single-tenant apps hide workspace switching while still using the shared workspace model.
+- Multi-tenant apps support explicit workspace selection and switching.
 - Workspace naming during onboarding.
 - Separate workspace roles and platform admin roles.
+- Fixed RBAC roles with platform roles (`user | admin`) and workspace roles (`owner | admin | member`).
+- Postgres RLS as the hard tenant-isolation boundary for workspace-owned data.
 - Separate wizard opt-ins for SaaS capability layers instead of one giant bundle.
 - Optional collaboration layer with invites.
 - Optional billing layer with per-workspace plans, limits, and optional metering.
@@ -45,7 +49,6 @@ The public side should also feel product-ready from day one. A generated app sho
 
 ### Explicit non-goals for this phase
 
-- Multi-workspace switching UX.
 - Ownership transfer flow.
 - Advanced audit logging.
 - Webhooks framework.

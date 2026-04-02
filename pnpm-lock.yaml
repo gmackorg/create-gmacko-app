@@ -742,6 +742,9 @@ importers:
       '@gmacko/tsconfig':
         specifier: workspace:*
         version: link:../../tooling/typescript
+      '@gmacko/vitest-config':
+        specifier: workspace:*
+        version: link:../../tooling/vitest
       '@types/node':
         specifier: 'catalog:'
         version: 25.5.0
@@ -757,6 +760,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@25.5.0)(jsdom@27.4.0(@noble/hashes@2.0.1)(bufferutil@4.1.0)(utf-8-validate@6.0.4))(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.2))
 
   packages/email:
     dependencies:
@@ -15944,7 +15950,7 @@ snapshots:
       metro-babel-transformer: 0.83.3
       metro-cache: 0.83.3
       metro-cache-key: 0.83.3
-      metro-config: 0.83.3(bufferutil@4.1.0)(utf-8-validate@6.0.4)
+      metro-config: 0.83.3(bufferutil@4.1.0)
       metro-core: 0.83.3
       metro-file-map: 0.83.3
       metro-minify-terser: 0.83.3
@@ -15953,7 +15959,7 @@ snapshots:
       metro-source-map: 0.83.3
       metro-symbolicate: 0.83.3
       metro-transform-plugins: 0.83.3
-      metro-transform-worker: 0.83.3(bufferutil@4.1.0)
+      metro-transform-worker: 0.83.3(bufferutil@4.1.0)(utf-8-validate@6.0.4)
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -24069,6 +24075,21 @@ snapshots:
       - supports-color
       - utf-8-validate
 
+  metro-config@0.83.3(bufferutil@4.1.0):
+    dependencies:
+      connect: 3.7.0
+      flow-enums-runtime: 0.0.6
+      jest-validate: 29.7.0
+      metro: 0.83.3(bufferutil@4.1.0)
+      metro-cache: 0.83.3
+      metro-core: 0.83.3
+      metro-runtime: 0.83.3
+      yaml: 2.8.2
+    transitivePeerDependencies:
+      - bufferutil
+      - supports-color
+      - utf-8-validate
+
   metro-config@0.83.3(bufferutil@4.1.0)(utf-8-validate@6.0.4):
     dependencies:
       connect: 3.7.0
@@ -24331,26 +24352,6 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  metro-transform-worker@0.83.3(bufferutil@4.1.0):
-    dependencies:
-      '@babel/core': 7.29.0
-      '@babel/generator': 7.29.1
-      '@babel/parser': 7.29.2
-      '@babel/types': 7.29.0
-      flow-enums-runtime: 0.0.6
-      metro: 0.83.3(bufferutil@4.1.0)
-      metro-babel-transformer: 0.83.3
-      metro-cache: 0.83.3
-      metro-cache-key: 0.83.3
-      metro-minify-terser: 0.83.3
-      metro-source-map: 0.83.3
-      metro-transform-plugins: 0.83.3
-      nullthrows: 1.1.1
-    transitivePeerDependencies:
-      - bufferutil
-      - supports-color
-      - utf-8-validate
-
   metro-transform-worker@0.83.3(bufferutil@4.1.0)(utf-8-validate@6.0.4):
     dependencies:
       '@babel/core': 7.29.0
@@ -24484,7 +24485,7 @@ snapshots:
       metro-babel-transformer: 0.83.3
       metro-cache: 0.83.3
       metro-cache-key: 0.83.3
-      metro-config: 0.83.3(bufferutil@4.1.0)(utf-8-validate@6.0.4)
+      metro-config: 0.83.3(bufferutil@4.1.0)
       metro-core: 0.83.3
       metro-file-map: 0.83.3
       metro-resolver: 0.83.3
@@ -24492,7 +24493,7 @@ snapshots:
       metro-source-map: 0.83.3
       metro-symbolicate: 0.83.3
       metro-transform-plugins: 0.83.3
-      metro-transform-worker: 0.83.3(bufferutil@4.1.0)
+      metro-transform-worker: 0.83.3(bufferutil@4.1.0)(utf-8-validate@6.0.4)
       mime-types: 2.1.35
       nullthrows: 1.1.1
       serialize-error: 2.1.0

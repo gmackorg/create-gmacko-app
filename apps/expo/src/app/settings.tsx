@@ -1,3 +1,4 @@
+import { isMultiTenant } from "@gmacko/config";
 import {
   supportedLocales,
   useLocaleNative,
@@ -20,6 +21,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { trpc } from "~/utils/api";
 import { authClient } from "~/utils/auth";
 import { setLocale } from "~/utils/i18n";
+import { setActiveWorkspaceId } from "~/utils/workspace-store";
 
 const PERMISSIONS = ["read", "write", "delete", "admin"] as const;
 const COLLABORATION_ROLES = ["member", "admin"] as const;
@@ -533,6 +535,105 @@ function CollaborationSection() {
   );
 }
 
+function WorkspaceSection() {
+  const queryClient = useQueryClient();
+  const { data: workspaceContext, isLoading } = useQuery(
+    trpc.settings.getWorkspaceContext.queryOptions(),
+  );
+
+  if (!isMultiTenant()) {
+    return null;
+  }
+
+  if (isLoading) {
+    return (
+      <View className="border-border bg-card rounded-lg border p-4">
+        <Text className="text-foreground text-lg font-semibold">Workspace</Text>
+        <Text className="text-muted-foreground mt-2">Loading...</Text>
+      </View>
+    );
+  }
+
+  if (!workspaceContext) {
+    return null;
+  }
+
+  const handleWorkspaceSelect = async (workspaceId: string) => {
+    setActiveWorkspaceId(workspaceId);
+    await queryClient.invalidateQueries(
+      trpc.settings.getWorkspaceContext.queryFilter(),
+    );
+    await queryClient.invalidateQueries(
+      trpc.settings.getBillingOverview.queryFilter(),
+    );
+    await queryClient.invalidateQueries(
+      trpc.settings.listInvites.queryFilter(),
+    );
+  };
+
+  return (
+    <View className="border-border bg-card rounded-lg border p-4">
+      <Text className="text-foreground mb-2 text-lg font-semibold">
+        Workspace
+      </Text>
+      <Text className="text-muted-foreground mb-4">
+        Mobile keeps the active workspace in secure storage and sends that
+        workspace id on tenant-scoped API requests.
+      </Text>
+
+      {workspaceContext.workspace ? (
+        <View className="border-border bg-background mb-4 rounded-lg border p-3">
+          <Text className="text-foreground font-medium">
+            {workspaceContext.workspace.name}
+          </Text>
+          <Text className="text-muted-foreground mt-1">
+            Slug: {workspaceContext.workspace.slug}
+          </Text>
+          <Text className="text-muted-foreground mt-1 capitalize">
+            Role: {workspaceContext.workspaceRole ?? "none"}
+          </Text>
+        </View>
+      ) : workspaceContext.requiresWorkspaceSelection ? (
+        <View className="border-border mb-4 rounded-lg border border-dashed p-3">
+          <Text className="text-foreground font-medium">
+            Choose a workspace
+          </Text>
+          <Text className="text-muted-foreground mt-1">
+            This account has access to more than one workspace, so the mobile
+            client needs an explicit active workspace before tenant-scoped
+            settings can load.
+          </Text>
+        </View>
+      ) : null}
+
+      <View className="gap-2">
+        {workspaceContext.availableWorkspaces.map((workspace) => {
+          const isCurrent = workspace.id === workspaceContext.workspace?.id;
+
+          return (
+            <Pressable
+              key={workspace.id}
+              onPress={() => void handleWorkspaceSelect(workspace.id)}
+              className={`rounded-lg border px-4 py-3 ${
+                isCurrent
+                  ? "border-primary bg-primary/10"
+                  : "border-border bg-background"
+              }`}
+            >
+              <Text className="text-foreground font-medium">
+                {workspace.name}
+              </Text>
+              <Text className="text-muted-foreground mt-1">
+                {workspace.slug}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 function BillingUsageSection() {
   const { data, isLoading } = useQuery(
     trpc.settings.getBillingOverview.queryOptions(),
@@ -729,6 +830,7 @@ export default function SettingsScreen() {
         <Text className="text-foreground mb-4 text-2xl font-bold">
           Settings
         </Text>
+        <WorkspaceSection />
         <PreferencesSection />
         <ApiKeysSection />
         <BillingUsageSection />

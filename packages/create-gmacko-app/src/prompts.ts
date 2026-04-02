@@ -5,6 +5,7 @@ import type {
   CliOptions,
   IntegrationConfig,
   IntegrationPreset,
+  TenancyMode,
 } from "./types.js";
 import {
   CORE_INTEGRATIONS,
@@ -70,6 +71,28 @@ export async function runPrompts(
   });
 
   if (p.isCancel(packageScope)) {
+    p.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  const tenancyMode = await p.select({
+    message: "Which tenancy mode should the generated app use?",
+    options: [
+      {
+        value: "single-tenant",
+        label: "Single-tenant",
+        hint: "recommended default",
+      },
+      {
+        value: "multi-tenant",
+        label: "Multi-tenant",
+        hint: "workspace switching and tenant-aware UI",
+      },
+    ],
+    initialValue: defaults.tenancyMode ?? "single-tenant",
+  });
+
+  if (p.isCancel(tenancyMode)) {
     p.cancel("Operation cancelled.");
     process.exit(0);
   }
@@ -188,6 +211,7 @@ export async function runPrompts(
     appName,
     displayName: displayName as string,
     packageScope: packageScope as string,
+    tenancyMode: tenancyMode as TenancyMode,
     platforms: {
       web: (platforms as string[]).includes("web"),
       mobile: (platforms as string[]).includes("mobile"),
@@ -383,6 +407,7 @@ export function getDefaultOptions(appName: string): CliOptions {
     appName,
     displayName: toTitleCase(appName),
     packageScope: "@gmacko",
+    tenancyMode: "single-tenant",
     platforms: {
       web: true,
       mobile: true,

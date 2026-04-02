@@ -6,6 +6,8 @@ import superjson from "superjson";
 
 import { authClient } from "./auth";
 import { getBaseUrl } from "./base-url";
+import { buildWorkspaceRequestHeaders } from "./workspace";
+import { getActiveWorkspaceId } from "./workspace-store";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,7 +33,7 @@ export const trpc = createTRPCOptionsProxy<AppRouter>({
         transformer: superjson,
         url: `${getBaseUrl()}/api/trpc`,
         headers() {
-          const headers = new Map<string, string>();
+          const headers = buildWorkspaceRequestHeaders(getActiveWorkspaceId());
           headers.set("x-trpc-source", "expo-react");
 
           const cookies = authClient.getCookie();

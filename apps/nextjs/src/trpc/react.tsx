@@ -9,10 +9,12 @@ import {
   loggerLink,
 } from "@trpc/client";
 import { createTRPCContext } from "@trpc/tanstack-react-query";
-import { useState } from "react";
+import { usePathname } from "next/navigation";
+import { useRef, useState } from "react";
 import SuperJSON from "superjson";
 
 import { env } from "~/env";
+import { getWorkspaceSelectionHeaders } from "~/lib/workspace";
 import { createQueryClient } from "./query-client";
 
 let clientQueryClientSingleton: QueryClient | undefined = undefined;
@@ -30,6 +32,9 @@ export const { useTRPC, TRPCProvider } = createTRPCContext<AppRouter>();
 
 export function TRPCReactProvider(props: { children: React.ReactNode }) {
   const queryClient = getQueryClient();
+  const pathname = usePathname();
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
 
   const [trpcClient] = useState(() =>
     createTRPCClient<AppRouter>({
@@ -43,7 +48,11 @@ export function TRPCReactProvider(props: { children: React.ReactNode }) {
           transformer: SuperJSON,
           url: getBaseUrl() + "/api/trpc",
           headers() {
-            const headers = new Headers();
+            const headers = getWorkspaceSelectionHeaders(
+              typeof window === "undefined"
+                ? pathnameRef.current
+                : window.location.pathname,
+            );
             headers.set("x-trpc-source", "nextjs-react");
             return headers;
           },

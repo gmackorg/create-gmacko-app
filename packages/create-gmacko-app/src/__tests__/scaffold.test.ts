@@ -895,6 +895,67 @@ describe("create-gmacko-app scaffold", () => {
       expect(integrationsConfig).toContain("operatorApis: true");
     }, 120000);
 
+    it("should scaffold multi-tenant config when requested", async () => {
+      const appName = generateAppName("multi-tenant");
+      const result = await runCli({
+        appName,
+        flags: [
+          "--yes",
+          "--no-install",
+          "--no-git",
+          "--tenancy-mode=multi-tenant",
+        ],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+
+      const rootReadme = readFile(result.appPath, "README.md");
+      const integrationsConfig = readFile(
+        result.appPath,
+        "packages/config/src/integrations.ts",
+      );
+      const manifest = readJson<{ tenancyMode: string }>(
+        result.appPath,
+        "gmacko.integrations.json",
+      );
+
+      expect(rootReadme).toContain("Tenancy mode: multi-tenant");
+      expect(integrationsConfig).toContain("export const tenancy = {");
+      expect(integrationsConfig).toContain('mode: "multi-tenant"');
+      expect(integrationsConfig).toContain(
+        "export const isMultiTenant = () =>",
+      );
+      expect(manifest.tenancyMode).toBe("multi-tenant");
+    }, 120000);
+
+    it("should default to single-tenant config", async () => {
+      const appName = generateAppName("single-tenant-default");
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-install", "--no-git"],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+
+      const rootReadme = readFile(result.appPath, "README.md");
+      const integrationsConfig = readFile(
+        result.appPath,
+        "packages/config/src/integrations.ts",
+      );
+
+      expect(rootReadme).toContain("Tenancy mode: single-tenant");
+      expect(integrationsConfig).toContain('mode: "single-tenant"');
+      expect(integrationsConfig).toContain(
+        "export const isSingleTenant = () =>",
+      );
+    }, 120000);
+
     it("should scaffold launch-control pages and public-shell copy", async () => {
       const appName = generateAppName("launch-shell");
       const result = await runCli({
@@ -1237,6 +1298,7 @@ describe("create-gmacko-app scaffold", () => {
       expect(pkg.scripts?.["bootstrap:local"]).toBe(
         "./scripts/bootstrap-local.sh",
       );
+      expect(pkg.scripts?.["db:rls"]).toBe("pnpm -F @gmacko/db rls");
       expect(pkg.scripts?.["check:fast"]).toBe("pnpm lint && pnpm typecheck");
       expect(pkg.scripts?.check).toBe(
         "pnpm check:fast && pnpm test && pnpm build",
@@ -1273,6 +1335,7 @@ describe("create-gmacko-app scaffold", () => {
       expect(bootstrapScript).toContain("pnpm auth:generate");
       expect(bootstrapScript).toContain("pnpm db:generate");
       expect(bootstrapScript).toContain("pnpm db:push");
+      expect(bootstrapScript).toContain("pnpm db:rls");
       expect(bootstrapScript).toContain("pnpm check:fast");
       expect(bootstrapScript).toContain(
         "Docker Compose was not found. Start Postgres another way",
@@ -1776,6 +1839,7 @@ describe("create-gmacko-app scaffold", () => {
         platforms: Record<string, boolean>;
         scaffoldedAt: string;
         packageScope: string;
+        tenancyMode: string;
       }>(result.appPath, "gmacko.integrations.json");
 
       expect(manifest.preset).toBeDefined();
@@ -1783,6 +1847,7 @@ describe("create-gmacko-app scaffold", () => {
       expect(manifest.platforms).toBeDefined();
       expect(manifest.scaffoldedAt).toBeDefined();
       expect(manifest.packageScope).toBe("@gmacko");
+      expect(manifest.tenancyMode).toBe("single-tenant");
     }, 120000);
   });
 });

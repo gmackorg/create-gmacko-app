@@ -222,6 +222,12 @@ export const saasFeatures = {
 
 export type SaasFeatures = typeof saasFeatures;
 
+export const tenancy = {
+  mode: "${options.tenancyMode}" as "single-tenant" | "multi-tenant",
+} as const;
+
+export type Tenancy = typeof tenancy;
+
 export const isSentryEnabled = () => integrations.sentry;
 export const isPostHogEnabled = () => integrations.posthog;
 export const isStripeEnabled = () => integrations.stripe;
@@ -239,6 +245,8 @@ export const isSaasSupportEnabled = () => saasFeatures.support;
 export const isSaasLaunchEnabled = () => saasFeatures.launch;
 export const isSaasReferralsEnabled = () => saasFeatures.referrals;
 export const isSaasOperatorApisEnabled = () => saasFeatures.operatorApis;
+export const isSingleTenant = () => tenancy.mode === "single-tenant";
+export const isMultiTenant = () => tenancy.mode === "multi-tenant";
 `;
 
   fs.writeFileSync(configPath, content);
@@ -280,6 +288,7 @@ function createManifest(targetDir: string, options: CliOptions): void {
     platforms: options.platforms,
     scaffoldedAt: new Date().toISOString(),
     packageScope: options.packageScope,
+    tenancyMode: options.tenancyMode,
   };
 
   fs.writeJsonSync(path.join(targetDir, "gmacko.integrations.json"), manifest, {
@@ -565,6 +574,7 @@ function buildScaffoldProfileBlock(options: CliOptions): string {
 > **Scaffold profile**
 > - Platforms: ${platforms.join(", ") || "none selected"}
 > - Integrations: ${integrations.join(", ") || "core only"}
+> - Tenancy mode: ${options.tenancyMode}
 > - SaaS layers: ${saasLayers.join(", ") || "none selected"}
 > - Default deploy path: ForgeGraph + Nix + colocated Postgres
 > - Workers lane: ${options.vinext ? "vinext enabled (experimental)" : "not scaffolded"}

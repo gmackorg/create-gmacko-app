@@ -14,6 +14,14 @@
     "./schema": {
       "types": "./dist/schema.d.ts",
       "default": "./src/schema.ts"
+    },
+    "./rls": {
+      "types": "./dist/rls.d.ts",
+      "default": "./src/rls.ts"
+    },
+    "./tenant": {
+      "types": "./dist/tenant.d.ts",
+      "default": "./src/tenant.ts"
     }
   },
   "license": "MIT",
@@ -23,6 +31,9 @@
     "dev": "tsc",
     "format": "biome check .",
     "lint": "oxlint .",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "rls": "pnpm with-env tsx src/rls.ts",
     "generate": "pnpm with-env drizzle-kit generate",
     "migrate": "pnpm with-env drizzle-kit migrate",
     "push": "pnpm with-env drizzle-kit push",
@@ -41,10 +52,12 @@
   "devDependencies": {
     "@biomejs/biome": "catalog:",
     "@gmacko/tsconfig": "workspace:*",
+    "@gmacko/vitest-config": "workspace:*",
     "@types/node": "catalog:",
     "drizzle-kit": "^0.31.10",
     "oxlint": "catalog:",
     "tsx": "^4.21.0",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^4.1.0"
   }
 }
