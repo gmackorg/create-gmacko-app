@@ -12,5 +12,6 @@ describe("root Dockerfile workspace copies", () => {
 
     expect(dockerfile).toContain("COPY --from=deps /app/packages ./packages");
     expect(dockerfile).toContain("COPY --from=deps /app/tooling ./tooling");
+    expect(dockerfile).toContain("ENV SKIP_ENV_VALIDATION=1");
   });
 });
