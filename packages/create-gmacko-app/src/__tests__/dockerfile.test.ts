@@ -26,4 +26,16 @@ describe("root Dockerfile workspace copies", () => {
     expect(turboConfig.globalPassThroughEnv).toContain("SKIP_ENV_VALIDATION");
     expect(turboConfig.globalPassThroughEnv).toContain("DOCKER_BUILD");
   });
+
+  it("provides placeholder build env in the CI workflow", () => {
+    const ciWorkflow = fs.readFileSync(
+      path.resolve(process.cwd(), "../../.github/workflows/ci.yml"),
+      "utf8",
+    );
+
+    expect(ciWorkflow).toContain('SKIP_ENV_VALIDATION: "1"');
+    expect(ciWorkflow).toContain(
+      "DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres",
+    );
+  });
 });
