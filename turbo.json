@@ -101,6 +101,8 @@
   "globalPassThroughEnv": [
     "NODE_ENV",
     "CI",
+    "SKIP_ENV_VALIDATION",
+    "DOCKER_BUILD",
     "NEXT_RUNTIME",
     "npm_lifecycle_event"
   ]

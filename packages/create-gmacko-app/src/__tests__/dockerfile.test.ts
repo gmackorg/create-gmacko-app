@@ -14,4 +14,13 @@ describe("root Dockerfile workspace copies", () => {
     expect(dockerfile).toContain("COPY --from=deps /app/tooling ./tooling");
     expect(dockerfile).toContain("ENV SKIP_ENV_VALIDATION=1");
   });
+
+  it("passes docker build env through turbo tasks", () => {
+    const turboConfig = JSON.parse(
+      fs.readFileSync(path.resolve(process.cwd(), "../../turbo.json"), "utf8"),
+    ) as { globalPassThroughEnv?: string[] };
+
+    expect(turboConfig.globalPassThroughEnv).toContain("SKIP_ENV_VALIDATION");
+    expect(turboConfig.globalPassThroughEnv).toContain("DOCKER_BUILD");
+  });
 });
