@@ -48,7 +48,7 @@ COPY --from=deps /app/tooling ./tooling
 COPY . .
 
 # Build arguments
-ARG DATABASE_URL
+ARG DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/postgres
 ARG AUTH_SECRET
 ARG SKIP_ENV_VALIDATION=1
 ARG DOCKER_BUILD=true

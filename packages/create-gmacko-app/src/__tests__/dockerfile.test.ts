@@ -12,6 +12,9 @@ describe("root Dockerfile workspace copies", () => {
 
     expect(dockerfile).toContain("COPY --from=deps /app/packages ./packages");
     expect(dockerfile).toContain("COPY --from=deps /app/tooling ./tooling");
+    expect(dockerfile).toContain(
+      "ARG DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/postgres",
+    );
     expect(dockerfile).toContain("ENV SKIP_ENV_VALIDATION=1");
   });
 
