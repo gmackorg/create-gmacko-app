@@ -22,19 +22,10 @@ FROM base AS deps
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY .npmrc* ./
 
-# Copy all package.json files for workspace resolution
-COPY apps/nextjs/package.json ./apps/nextjs/
-COPY packages/api/package.json ./packages/api/
-COPY packages/auth/package.json ./packages/auth/
-COPY packages/config/package.json ./packages/config/
-COPY packages/db/package.json ./packages/db/
-COPY packages/monitoring/package.json ./packages/monitoring/
-COPY packages/analytics/package.json ./packages/analytics/
-COPY packages/ui/package.json ./packages/ui/
-COPY packages/validators/package.json ./packages/validators/
-COPY packages/settings/package.json ./packages/settings/
-COPY tooling/tailwind/package.json ./tooling/tailwind/
-COPY tooling/typescript/package.json ./tooling/typescript/
+# Copy workspace sources so pnpm resolves the full workspace graph.
+COPY apps ./apps
+COPY packages ./packages
+COPY tooling ./tooling
 
 # Install dependencies
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
@@ -49,18 +40,9 @@ WORKDIR /app
 
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/nextjs ./apps/nextjs
-COPY --from=deps /app/packages/api ./packages/api
-COPY --from=deps /app/packages/auth ./packages/auth
-COPY --from=deps /app/packages/config ./packages/config
-COPY --from=deps /app/packages/db ./packages/db
-COPY --from=deps /app/packages/monitoring ./packages/monitoring
-COPY --from=deps /app/packages/analytics ./packages/analytics
-COPY --from=deps /app/packages/ui ./packages/ui
-COPY --from=deps /app/packages/validators ./packages/validators
-COPY --from=deps /app/packages/settings ./packages/settings
-COPY --from=deps /app/tooling/tailwind ./tooling/tailwind
-COPY --from=deps /app/tooling/typescript ./tooling/typescript
+COPY --from=deps /app/apps ./apps
+COPY --from=deps /app/packages ./packages
+COPY --from=deps /app/tooling ./tooling
 
 # Copy source code
 COPY . .
