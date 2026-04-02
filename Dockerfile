@@ -49,8 +49,18 @@ WORKDIR /app
 
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/nextjs/node_modules ./apps/nextjs/node_modules
-COPY --from=deps /app/packages/*/node_modules ./packages/
+COPY --from=deps /app/apps/nextjs ./apps/nextjs
+COPY --from=deps /app/packages/api ./packages/api
+COPY --from=deps /app/packages/auth ./packages/auth
+COPY --from=deps /app/packages/config ./packages/config
+COPY --from=deps /app/packages/db ./packages/db
+COPY --from=deps /app/packages/monitoring ./packages/monitoring
+COPY --from=deps /app/packages/analytics ./packages/analytics
+COPY --from=deps /app/packages/ui ./packages/ui
+COPY --from=deps /app/packages/validators ./packages/validators
+COPY --from=deps /app/packages/settings ./packages/settings
+COPY --from=deps /app/tooling/tailwind ./tooling/tailwind
+COPY --from=deps /app/tooling/typescript ./tooling/typescript
 
 # Copy source code
 COPY . .

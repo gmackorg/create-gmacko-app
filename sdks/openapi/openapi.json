@@ -1,0 +1,358 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Gmacko API (API V1)",
+    "version": "1.0.0",
+    "description": "API documentation for your application",
+    "x-api-version": "v1"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000/api",
+      "description": "API Server",
+      "variables": {
+        "version": {
+          "default": "v1",
+          "enum": ["v1", "v2"],
+          "description": "API version"
+        }
+      }
+    }
+  ],
+  "paths": {
+    "/v1/trpc/auth.getSession": {
+      "get": {
+        "tags": ["auth"],
+        "summary": "Get current session",
+        "description": "Returns the current user session if authenticated",
+        "parameters": [
+          {
+            "name": "X-API-Version",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "v1"
+            },
+            "description": "API version (alternative to URL versioning)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session data",
+            "headers": {
+              "X-API-Version": {
+                "description": "The API version used for this request",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/trpc/post.all": {
+      "get": {
+        "tags": ["post"],
+        "summary": "Get all posts",
+        "description": "Returns all posts",
+        "parameters": [
+          {
+            "name": "X-API-Version",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "v1"
+            },
+            "description": "API version (alternative to URL versioning)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of posts",
+            "headers": {
+              "X-API-Version": {
+                "description": "The API version used for this request",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "content": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/trpc/post.byId": {
+      "get": {
+        "tags": ["post"],
+        "summary": "Get post by ID",
+        "description": "Returns a single post by its ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-API-Version",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "v1"
+            },
+            "description": "API version (alternative to URL versioning)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Post data",
+            "headers": {
+              "X-API-Version": {
+                "description": "The API version used for this request",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Post not found"
+          }
+        }
+      }
+    },
+    "/v1/trpc/post.create": {
+      "post": {
+        "tags": ["post"],
+        "summary": "Create a new post",
+        "description": "Creates a new post (requires authentication)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-API-Version",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "v1"
+            },
+            "description": "API version (alternative to URL versioning)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "content"],
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "content": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Created post",
+            "headers": {
+              "X-API-Version": {
+                "description": "The API version used for this request",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/trpc/post.delete": {
+      "post": {
+        "tags": ["post"],
+        "summary": "Delete a post",
+        "description": "Deletes a post by ID (requires authentication)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-API-Version",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "v1"
+            },
+            "description": "API version (alternative to URL versioning)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["id"],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Post deleted",
+            "headers": {
+              "X-API-Version": {
+                "description": "The API version used for this request",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "auth",
+      "description": "Authentication endpoints"
+    },
+    {
+      "name": "post",
+      "description": "Post management endpoints"
+    }
+  ]
+}

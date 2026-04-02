@@ -18,9 +18,11 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "pretest": "pnpm build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "pretest:e2e": "pnpm build",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:e2e:update": "vitest run --config vitest.e2e.config.ts --update"
   },
