@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import path from "node:path";
 import fs from "fs-extra";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -16,6 +17,14 @@ import {
 describe("create-gmacko-app scaffold", () => {
   let tempDir: string;
   const appsToClean: string[] = [];
+  const jjAvailable = (() => {
+    try {
+      execSync("jj --version", { stdio: "ignore" });
+      return true;
+    } catch {
+      return false;
+    }
+  })();
 
   beforeAll(() => {
     tempDir = ensureTempDir();
@@ -1416,7 +1425,7 @@ describe("create-gmacko-app scaffold", () => {
       expect(doctorScript).toContain("RESEND_API_KEY");
     }, 120000);
 
-    it("should initialize a jj repo by default", async () => {
+    it("should initialize a jj repo by default and fall back to git otherwise", async () => {
       const appName = generateAppName("jj-repo");
       const result = await runCli({
         appName,
@@ -1427,8 +1436,16 @@ describe("create-gmacko-app scaffold", () => {
       appsToClean.push(result.appPath);
 
       expect(result.exitCode).toBe(0);
-      expect(fileExists(result.appPath, ".jj")).toBe(true);
       expect(fileExists(result.appPath, ".git")).toBe(true);
+
+      if (jjAvailable) {
+        expect(fileExists(result.appPath, ".jj")).toBe(true);
+      } else {
+        expect(fileExists(result.appPath, ".jj")).toBe(false);
+        expect(result.stdout).toContain(
+          "jj was unavailable; falling back to a plain Git repo.",
+        );
+      }
     }, 120000);
 
     it("should scaffold without the legacy eslint and prettier stack", async () => {
