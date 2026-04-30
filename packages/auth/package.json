@@ -27,6 +27,7 @@
     "@better-auth/cli": "catalog:",
     "@biomejs/biome": "catalog:",
     "@gmacko/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
     "oxlint": "catalog:",
     "typescript": "catalog:"
   }
