@@ -4,7 +4,7 @@ import type { WorkspaceRole } from "@gmacko/db/schema";
 import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { oAuthProxy } from "better-auth/plugins";
+import { magicLink, oAuthProxy } from "better-auth/plugins";
 
 export function isPlatformAdminRole(
   role: "user" | "admin" | null | undefined,
@@ -25,11 +25,18 @@ export function initAuth<
   productionUrl: string;
   secret: string | undefined;
 
-  discordClientId: string;
-  discordClientSecret: string;
+  githubClientId: string;
+  githubClientSecret: string;
+  googleClientId: string;
+  googleClientSecret: string;
   appleClientId?: string;
   appleClientSecret?: string;
   appleBundleIdentifier?: string;
+  bypassMagicLink?: boolean;
+  sendMagicLinkEmail?: (params: {
+    email: string;
+    url: string;
+  }) => Promise<void>;
   extraPlugins?: TExtraPlugins;
 }) {
   const config = {
@@ -43,13 +50,27 @@ export function initAuth<
         productionURL: options.productionUrl,
       }),
       expo(),
+      magicLink({
+        sendMagicLink: async ({ email, url }) => {
+          if (options.bypassMagicLink) {
+            console.log(`[auth] Magic link for ${email}: ${url}`);
+            return;
+          }
+          if (options.sendMagicLinkEmail) {
+            await options.sendMagicLinkEmail({ email, url });
+          }
+        },
+      }),
       ...(options.extraPlugins ?? []),
     ],
     socialProviders: {
-      discord: {
-        clientId: options.discordClientId,
-        clientSecret: options.discordClientSecret,
-        redirectURI: `${options.productionUrl}/api/auth/callback/discord`,
+      github: {
+        clientId: options.githubClientId,
+        clientSecret: options.githubClientSecret,
+      },
+      google: {
+        clientId: options.googleClientId,
+        clientSecret: options.googleClientSecret,
       },
       ...(options.appleClientId && options.appleClientSecret
         ? {
@@ -61,7 +82,11 @@ export function initAuth<
           }
         : {}),
     },
-    trustedOrigins: ["expo://", "https://appleid.apple.com"],
+    trustedOrigins: [
+      "expo://",
+      "https://appleid.apple.com",
+      "https://gmacko.localhost",
+    ],
     onAPIError: {
       onError(error, ctx) {
         console.error("BETTER AUTH API ERROR", error, ctx);

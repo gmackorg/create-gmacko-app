@@ -1,0 +1,6 @@
+{
+  "name": "gmacko",
+  "apps": {
+    "apps/nextjs": { "name": "gmacko", "script": "dev:app" }
+  }
+}

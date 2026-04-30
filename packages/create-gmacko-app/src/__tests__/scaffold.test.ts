@@ -1444,9 +1444,9 @@ describe("create-gmacko-app scaffold", () => {
     expect(e2eWorkflow).toContain(
       "pnpm --dir packages/create-gmacko-app build",
     );
-    expect(e2eWorkflow).toContain('AUTH_DISCORD_ID="test-discord-client-id"');
+    expect(e2eWorkflow).toContain('AUTH_GITHUB_ID="test-github-client-id"');
     expect(e2eWorkflow).toContain(
-      'AUTH_DISCORD_SECRET="test-discord-client-secret"',
+      'AUTH_GITHUB_SECRET="test-github-client-secret"',
     );
     expect(e2eWorkflow).toContain(
       'CLOUDFLARE_ACCOUNT_ID="test-cloudflare-account"',

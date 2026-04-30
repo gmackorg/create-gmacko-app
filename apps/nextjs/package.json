@@ -5,7 +5,8 @@
   "scripts": {
     "build": "pnpm with-env next build",
     "clean": "git clean -xdf .cache .next .turbo node_modules playwright-report storybook-static test-results",
-    "dev": "pnpm with-env next dev",
+    "dev": "portless",
+    "dev:app": "pnpm with-env next dev",
     "format": "biome check .",
     "lint": "oxlint .",
     "storybook": "SKIP_ENV_VALIDATION=1 storybook dev -p 6006",

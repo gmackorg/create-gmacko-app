@@ -1,0 +1,66 @@
+tokens:
+  test_token_admin:
+    login: dev-user
+    scopes:
+      - repo
+      - user
+
+github:
+  users:
+    - login: dev-user
+      name: Dev User
+      email: dev@gmacko.localhost
+  oauth_apps:
+    - client_id: dev-github-client
+      client_secret: dev-github-secret
+      name: gmacko (dev)
+      redirect_uris:
+        - https://gmacko.localhost/api/auth/callback/github
+
+google:
+  users:
+    - email: dev@gmail.com
+      name: Dev User
+      email_verified: true
+  oauth_clients:
+    - client_id: dev-google-client
+      client_secret: dev-google-secret
+      name: gmacko (dev)
+      redirect_uris:
+        - https://gmacko.localhost/api/auth/callback/google
+
+apple:
+  users:
+    - email: dev@icloud.com
+      name: Dev User
+  oauth_clients:
+    - client_id: com.gmacko.dev
+      team_id: DEVTEAM01
+      name: gmacko (dev)
+      redirect_uris:
+        - https://gmacko.localhost/api/auth/callback/apple
+
+stripe:
+  customers:
+    - email: dev@gmacko.localhost
+      name: Dev User
+  products:
+    - name: Pro Plan
+      description: Monthly pro subscription
+  prices:
+    - product_name: Pro Plan
+      currency: usd
+      unit_amount: 2000
+
+resend:
+  domains:
+    - name: gmacko.localhost
+      region: us-east-1
+
+postgres:
+  port: 5432
+  databases:
+    - name: gmacko_dev
+
+redis:
+  port: 6379

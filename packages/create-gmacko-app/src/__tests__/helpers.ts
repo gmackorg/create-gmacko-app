@@ -233,8 +233,10 @@ export function createMockEnv(appPath: string): void {
 # Mock environment for testing
 DATABASE_URL="postgresql://test:test@localhost:5432/test"
 AUTH_SECRET="test-secret-key-for-testing-only"
-AUTH_DISCORD_ID="test-discord-client-id"
-AUTH_DISCORD_SECRET="test-discord-client-secret"
+AUTH_GITHUB_ID="test-github-client-id"
+AUTH_GITHUB_SECRET="test-github-client-secret"
+AUTH_GOOGLE_ID="test-google-client-id"
+AUTH_GOOGLE_SECRET="test-google-client-secret"
 AUTH_URL="http://localhost:3000"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 NEXT_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"

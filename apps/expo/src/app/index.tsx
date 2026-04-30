@@ -152,14 +152,14 @@ function MobileAuth() {
           session
             ? authClient.signOut()
             : authClient.signIn.social({
-                provider: "discord",
+                provider: "github",
                 callbackURL: "/",
               })
         }
         className="bg-primary flex items-center rounded-sm p-2"
       >
         <Text>
-          {session ? t("auth.signOut") : t("auth.signIn") + " With Discord"}
+          {session ? t("auth.signOut") : t("auth.signIn") + " With GitHub"}
         </Text>
       </Pressable>
       {!session && appleAuthAvailable ? (

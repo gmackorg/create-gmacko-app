@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-HAS_DOCKER_COMPOSE=0
+HAS_PORTLESS=0
 HAS_PLACEHOLDER_FORGEGRAPH=0
 
 echo "==================================="
@@ -26,16 +26,32 @@ if [ ! -f .env ]; then
   echo ""
 fi
 
-if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-  HAS_DOCKER_COMPOSE=1
-  echo "Starting local Postgres..."
-  docker compose up -d postgres
-  echo ""
+# Check for portless
+if command -v portless >/dev/null 2>&1; then
+  HAS_PORTLESS=1
+  echo "portless detected."
 else
-  echo "Docker Compose not available; skipping local Postgres startup."
-  echo "Docker Compose was not found. Start Postgres another way, then re-run:"
-  echo "  pnpm db:push"
+  echo "portless not found. Install with: npm i -g portless"
+  echo "portless gives your app a stable HTTPS URL: https://gmacko.localhost"
   echo ""
+fi
+
+# Start emulate for local Postgres (and other services)
+echo "Starting emulate services (Postgres, Redis, OAuth emulators)..."
+echo "Run 'pnpm dev:emulate' in a separate terminal, or use 'pnpm dev:all' to start everything."
+echo ""
+
+# Wait briefly for emulate Postgres if it's running
+if command -v pg_isready >/dev/null 2>&1; then
+  echo "Checking for Postgres on localhost:5432..."
+  if pg_isready -h localhost -p 5432 -q 2>/dev/null; then
+    echo "Postgres is ready."
+  else
+    echo "Postgres not detected on localhost:5432."
+    echo "Start it with: pnpm dev:emulate"
+    echo "Or use Docker: docker compose up -d postgres"
+    echo ""
+  fi
 fi
 
 echo "Generating auth artifacts..."
@@ -46,12 +62,13 @@ echo "Generating database artifacts..."
 pnpm db:generate
 echo ""
 
-if [ "$HAS_DOCKER_COMPOSE" -eq 1 ]; then
+if command -v pg_isready >/dev/null 2>&1 && pg_isready -h localhost -p 5432 -q 2>/dev/null; then
   echo "Pushing schema to local Postgres..."
   pnpm db:push
   echo ""
 else
-  echo "Skipping db:push because Docker Compose was unavailable."
+  echo "Skipping db:push — Postgres not available."
+  echo "Start emulate or Docker, then run: pnpm db:push"
   echo ""
 fi
 
@@ -67,6 +84,15 @@ echo "==================================="
 echo "  Bootstrap Complete"
 echo "==================================="
 echo ""
+echo "Dev environment:"
+if [ "$HAS_PORTLESS" -eq 1 ]; then
+  echo "  App:      https://gmacko.localhost (via portless)"
+else
+  echo "  App:      http://localhost:3000 (install portless for HTTPS)"
+fi
+echo "  Emulate:  pnpm dev:emulate (Postgres, Redis, OAuth, Stripe, Resend)"
+echo "  All:      pnpm dev:all (emulate + app together)"
+echo ""
 echo "Recommended next commands:"
 if [ "$HAS_PLACEHOLDER_FORGEGRAPH" -eq 1 ]; then
   echo "ForgeGraph placeholders are still present in .forgegraph.yaml."
@@ -79,9 +105,4 @@ else
   echo "  pnpm forge:doctor"
   echo "  pnpm dlx @forgegraph/cli@latest --help  # optional global/published CLI"
 fi
-
-if [ "$HAS_DOCKER_COMPOSE" -eq 1 ]; then
-  echo "  pnpm dev"
-else
-  echo "  pnpm dev  # after your Postgres instance is running"
-fi
+echo "  pnpm dev:all"

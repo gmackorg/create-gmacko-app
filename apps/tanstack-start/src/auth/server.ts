@@ -5,14 +5,17 @@ import { env } from "~/env";
 import { getBaseUrl } from "~/lib/url";
 
 export const auth = initAuth({
-  baseUrl: getBaseUrl(),
+  baseUrl: env.PORTLESS_URL ?? getBaseUrl(),
   productionUrl: env.APP_URL ?? getBaseUrl(),
   secret: env.AUTH_SECRET,
-  discordClientId: env.AUTH_DISCORD_ID,
-  discordClientSecret: env.AUTH_DISCORD_SECRET,
+  githubClientId: env.AUTH_GITHUB_ID,
+  githubClientSecret: env.AUTH_GITHUB_SECRET,
+  googleClientId: env.AUTH_GOOGLE_ID,
+  googleClientSecret: env.AUTH_GOOGLE_SECRET,
   appleClientId: env.AUTH_APPLE_ID,
   appleClientSecret: env.AUTH_APPLE_SECRET,
   appleBundleIdentifier: env.AUTH_APPLE_BUNDLE_ID,
+  bypassMagicLink: env.BYPASS_MAGIC_LINK,
 
   extraPlugins: [tanstackStartCookies()],
 });

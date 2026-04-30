@@ -3,27 +3,47 @@ import { useNavigate } from "@tanstack/react-router";
 
 import { authClient } from "~/auth/client";
 
+function SocialSignInButton({
+  provider,
+  label,
+}: {
+  provider: "github" | "google" | "apple";
+  label: string;
+}) {
+  const navigate = useNavigate();
+
+  return (
+    <Button
+      className="w-full"
+      size="lg"
+      variant="outline"
+      onClick={async () => {
+        const res = await authClient.signIn.social({
+          provider,
+          callbackURL: "/",
+        });
+        if (!res.data?.url) {
+          throw new Error("No URL returned from signInSocial");
+        }
+        await navigate({ href: res.data.url, replace: true });
+      }}
+    >
+      {label}
+    </Button>
+  );
+}
+
 export function AuthShowcase() {
   const { data: session } = authClient.useSession();
   const navigate = useNavigate();
 
   if (!session) {
     return (
-      <Button
-        size="lg"
-        onClick={async () => {
-          const res = await authClient.signIn.social({
-            provider: "discord",
-            callbackURL: "/",
-          });
-          if (!res.data?.url) {
-            throw new Error("No URL returned from signInSocial");
-          }
-          await navigate({ href: res.data.url, replace: true });
-        }}
-      >
-        Sign in with Discord
-      </Button>
+      <div className="flex flex-col items-center gap-4">
+        <SocialSignInButton provider="github" label="Sign in with GitHub" />
+        <SocialSignInButton provider="google" label="Sign in with Google" />
+        <SocialSignInButton provider="apple" label="Sign in with Apple" />
+      </div>
     );
   }
 
