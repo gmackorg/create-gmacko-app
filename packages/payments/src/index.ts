@@ -6,6 +6,9 @@ let stripeClient: Stripe | null = null;
 export interface StripeConfig {
   secretKey: string;
   apiVersion?: Stripe.LatestApiVersion;
+  host?: string;
+  protocol?: "https" | "http";
+  port?: number;
 }
 
 /**
@@ -21,6 +24,13 @@ export function initStripe(config: StripeConfig): Stripe | null {
   if (!stripeClient) {
     stripeClient = new Stripe(config.secretKey, {
       apiVersion: config.apiVersion,
+      ...(config.host
+        ? {
+            host: config.host,
+            protocol: config.protocol ?? "https",
+            port: config.port ?? 443,
+          }
+        : {}),
     });
   }
 

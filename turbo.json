@@ -113,6 +113,12 @@
     "CI",
     "NEXT_RUNTIME",
     "PORTLESS_URL",
+    "AUTH_GITHUB_URL",
+    "AUTH_GITHUB_API_URL",
+    "AUTH_GOOGLE_URL",
+    "AUTH_GOOGLE_TOKEN_URL",
+    "AUTH_APPLE_URL",
+    "RESEND_BASE_URL",
     "npm_lifecycle_event"
   ]
 }

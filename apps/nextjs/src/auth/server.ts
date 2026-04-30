@@ -24,6 +24,11 @@ export const auth = initAuth({
   appleClientId: env.AUTH_APPLE_ID,
   appleClientSecret: env.AUTH_APPLE_SECRET,
   appleBundleIdentifier: env.AUTH_APPLE_BUNDLE_ID,
+  githubUrl: env.AUTH_GITHUB_URL,
+  githubApiUrl: env.AUTH_GITHUB_API_URL,
+  googleUrl: env.AUTH_GOOGLE_URL,
+  googleTokenUrl: env.AUTH_GOOGLE_TOKEN_URL,
+  appleUrl: env.AUTH_APPLE_URL,
   bypassMagicLink: env.BYPASS_MAGIC_LINK,
   extraPlugins: [nextCookies()],
 });

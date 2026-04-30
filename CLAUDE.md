@@ -25,6 +25,29 @@ If the repo was scaffolded with the optional SaaS bootstrap pack, run that flow 
 4. the generated [`docs/ai/BOOTSTRAP_PLAYBOOK.md`](./docs/ai/BOOTSTRAP_PLAYBOOK.md), which splits guidance into `Claude-only`, `Codex`, and `OpenCode` sections and adds feature-aware follow-ups for the selected SaaS layers
 5. the local follow-up skills in `.claude/skills/bootstrap-saas`, `.claude/skills/launch-landing-page`, `.claude/skills/setup-stripe-billing`, `.claude/skills/bootstrap-expo-app`, and `.claude/skills/test-mobile-with-maestro`
 
+## Local Development (emulate + portless)
+
+The local dev stack uses [`emulate`](../emulate) for service emulation and `portless` for HTTPS `.localhost` URLs. Run `pnpm dev` to start both.
+
+**Service URLs** (available when running with `--portless`):
+- App: `https://gmacko.localhost`
+- GitHub OAuth: `https://github.emulate.localhost`
+- Google OAuth: `https://google.emulate.localhost`
+- Apple OAuth: `https://apple.emulate.localhost`
+- Stripe: `https://stripe.emulate.localhost`
+- Resend (email): `https://resend.emulate.localhost`
+- Postgres: `localhost:5432` (PGlite over wire protocol)
+- Redis: `localhost:6379` (redis-memory-server)
+
+**SDK wiring for emulate** (set in `.env`):
+- `AUTH_GITHUB_URL`, `AUTH_GITHUB_API_URL`, `AUTH_GOOGLE_URL`, `AUTH_GOOGLE_TOKEN_URL`, `AUTH_APPLE_URL` — override OAuth provider base URLs (defaults to real provider URLs when unset)
+- `RESEND_BASE_URL` — native Resend SDK override, no code changes needed
+- Stripe: pass `host`/`protocol`/`port` via `StripeConfig` when calling `initStripe`
+- `PORTLESS_URL` — used as app `baseURL` for auth
+- `BYPASS_MAGIC_LINK=true` — logs magic link URLs to console instead of sending email
+
+**Seed data** is in `emulate.config.yaml` (OAuth client IDs, test users, Stripe products).
+
 ## UI Workflow
 
 - Use Storybook for isolated UI work with `pnpm --filter @gmacko/nextjs storybook`.

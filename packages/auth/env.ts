@@ -11,6 +11,11 @@ export function authEnv() {
       AUTH_APPLE_ID: z.string().min(1).optional(),
       AUTH_APPLE_SECRET: z.string().min(1).optional(),
       AUTH_APPLE_BUNDLE_ID: z.string().min(1).optional(),
+      AUTH_GITHUB_URL: z.string().url().optional(),
+      AUTH_GITHUB_API_URL: z.string().url().optional(),
+      AUTH_GOOGLE_URL: z.string().url().optional(),
+      AUTH_GOOGLE_TOKEN_URL: z.string().url().optional(),
+      AUTH_APPLE_URL: z.string().url().optional(),
       AUTH_SECRET:
         process.env.NODE_ENV === "production"
           ? z.string().min(1)

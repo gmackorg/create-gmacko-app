@@ -19,6 +19,30 @@ This repository is set up to work well with `Codex`, `Claude Code`, and `OpenCod
 3. Write or update `DESIGN.md` when UI, product tone, or interaction patterns change materially.
 4. Keep implementation work anchored to the current docs instead of stale conversation context.
 
+## Local Development (emulate + portless)
+
+The local dev stack replaces Docker Compose with `emulate` (Postgres via PGlite, Redis via redis-memory-server, plus GitHub/Google/Apple/Stripe/Resend service emulators) and `portless` for HTTPS `.localhost` URLs.
+
+**How SDK wiring works:**
+- OAuth providers: `initAuth` uses better-auth's `genericOAuth` plugin with configurable provider URLs (defaults to real GitHub/Google/Apple URLs when env vars are unset). Set `AUTH_GITHUB_URL` etc. to point at emulate for local dev.
+- Resend: the SDK natively reads `RESEND_BASE_URL` from the environment.
+- Stripe: the `@gmacko/payments` package accepts `host`/`protocol`/`port` in `StripeConfig` for base URL override.
+- Seed data (test users, OAuth apps, Stripe products) lives in `emulate.config.yaml`.
+
+**Key env vars for local dev:**
+| Variable | Purpose |
+| --- | --- |
+| `PORTLESS_URL` | App base URL (`https://gmacko.localhost`) |
+| `AUTH_GITHUB_URL` | GitHub OAuth base URL (default: `https://github.com`) |
+| `AUTH_GITHUB_API_URL` | GitHub API base URL (default: `https://api.github.com`) |
+| `AUTH_GOOGLE_URL` | Google OAuth issuer URL (default: `https://accounts.google.com`) |
+| `AUTH_GOOGLE_TOKEN_URL` | Google token endpoint (default: `https://oauth2.googleapis.com/token`) |
+| `AUTH_APPLE_URL` | Apple OAuth issuer URL (default: `https://appleid.apple.com`) |
+| `RESEND_BASE_URL` | Resend API base URL |
+| `BYPASS_MAGIC_LINK` | Log magic links to console |
+| `DATABASE_URL` | PGlite wire protocol (`postgresql://localhost:5432/gmacko_dev`) |
+| `REDIS_URL` | redis-memory-server (`redis://localhost:6379`) |
+
 ## Agent-Specific Notes
 
 ### Codex

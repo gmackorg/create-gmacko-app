@@ -32,6 +32,11 @@ export function initAuth<
   appleClientId?: string;
   appleClientSecret?: string;
   appleBundleIdentifier?: string;
+  githubUrl?: string;
+  githubApiUrl?: string;
+  googleUrl?: string;
+  googleTokenUrl?: string;
+  appleUrl?: string;
   bypassMagicLink?: boolean;
   sendMagicLinkEmail?: (params: {
     email: string;
@@ -39,6 +44,13 @@ export function initAuth<
   }) => Promise<void>;
   extraPlugins?: TExtraPlugins;
 }) {
+  const ghUrl = options.githubUrl ?? "https://github.com";
+  const ghApiUrl = options.githubApiUrl ?? "https://api.github.com";
+  const googleUrl = options.googleUrl ?? "https://accounts.google.com";
+  const googleTokenUrl =
+    options.googleTokenUrl ?? "https://oauth2.googleapis.com/token";
+  const appleUrl = options.appleUrl ?? "https://appleid.apple.com";
+
   const config = {
     database: drizzleAdapter(db, {
       provider: "pg",
@@ -67,10 +79,15 @@ export function initAuth<
       github: {
         clientId: options.githubClientId,
         clientSecret: options.githubClientSecret,
+        authorizationEndpoint: `${ghUrl}/login/oauth/authorize`,
+        tokenEndpoint: `${ghUrl}/login/oauth/access_token`,
+        userInfoEndpoint: `${ghApiUrl}/user`,
       },
       google: {
         clientId: options.googleClientId,
         clientSecret: options.googleClientSecret,
+        authorizationEndpoint: `${googleUrl}/o/oauth2/v2/auth`,
+        tokenEndpoint: googleTokenUrl,
       },
       ...(options.appleClientId && options.appleClientSecret
         ? {
@@ -78,15 +95,14 @@ export function initAuth<
               clientId: options.appleClientId,
               clientSecret: options.appleClientSecret,
               appBundleIdentifier: options.appleBundleIdentifier,
+              authorizationEndpoint: `${appleUrl}/auth/authorize`,
+              tokenEndpoint: `${appleUrl}/auth/token`,
+              jwksEndpoint: `${appleUrl}/auth/keys`,
             },
           }
         : {}),
     },
-    trustedOrigins: [
-      "expo://",
-      "https://appleid.apple.com",
-      "https://gmacko.localhost",
-    ],
+    trustedOrigins: ["expo://", appleUrl, "https://gmacko.localhost"],
     onAPIError: {
       onError(error, ctx) {
         console.error("BETTER AUTH API ERROR", error, ctx);
