@@ -1274,9 +1274,7 @@ describe("create-gmacko-app scaffold", () => {
       expect(bootstrapScript).toContain("pnpm db:generate");
       expect(bootstrapScript).toContain("pnpm db:push");
       expect(bootstrapScript).toContain("pnpm check:fast");
-      expect(bootstrapScript).toContain(
-        "Docker Compose was not found. Start Postgres another way",
-      );
+      expect(bootstrapScript).toContain("pnpm dev:emulate");
       expect(bootstrapScript).toContain(
         "ForgeGraph placeholders are still present in .forgegraph.yaml",
       );

@@ -53,6 +53,9 @@ dist/
 # turbo
 .turbo
 
+# emulate (PGlite data)
+data/
+
 # tanstack
 .tanstack
 # Claude Code

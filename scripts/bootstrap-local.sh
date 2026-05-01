@@ -36,9 +36,14 @@ else
   echo ""
 fi
 
-# Start emulate for local Postgres (and other services)
-echo "Starting emulate services (Postgres, Redis, OAuth emulators)..."
-echo "Run 'pnpm dev:emulate' in a separate terminal, or use 'pnpm dev:all' to start everything."
+# Generate emulate config if missing
+if [ ! -f emulate.config.yaml ]; then
+  echo "Generating emulate.config.yaml..."
+  npx @gmacko/emulate init --slug gmacko
+  echo ""
+fi
+
+echo "Start emulate services with 'pnpm dev:emulate' or 'pnpm dev:all'."
 echo ""
 
 # Wait briefly for emulate Postgres if it's running

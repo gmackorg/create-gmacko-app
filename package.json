@@ -32,10 +32,10 @@
     "forge:deploy:production": "forge deploy create production --wait",
     "trpc:ops": "pnpm --filter @gmacko/trpc-cli exec gmacko-ops",
     "mcp:app": "pnpm --filter @gmacko/mcp-server exec gmacko-mcp",
-    "dev": "portless",
+    "dev": "concurrently \"pnpm dev:emulate\" \"portless\"",
     "dev:app": "turbo watch dev --continue",
     "dev:next": "turbo watch dev -F @gmacko/nextjs...",
-    "dev:emulate": "npx emulate --portless",
+    "dev:emulate": "npx @gmacko/emulate --portless",
     "dev:all": "concurrently \"pnpm dev:emulate\" \"pnpm dev\"",
     "dev:mobile": "./scripts/dev-mobile.sh",
     "format": "turbo run format",
@@ -49,6 +49,7 @@
     "knip": "knip",
     "check:fast": "pnpm lint && pnpm typecheck",
     "check": "pnpm check:fast && pnpm test && pnpm build",
+    "test:emulate": "vitest run --config test/vitest.config.ts",
     "e2e:cli:full": "RUN_E2E=true pnpm --dir packages/create-gmacko-app vitest run src/__tests__/e2e.test.ts",
     "release:cli:dry-run": "mkdir -p .artifacts && cd packages/create-gmacko-app && npm pack --pack-destination ../../.artifacts >/dev/null",
     "check:release": "pnpm --dir packages/create-gmacko-app test && pnpm --dir packages/create-gmacko-app build && pnpm release:cli:dry-run",
@@ -74,6 +75,7 @@
     "@commitlint/cli": "catalog:",
     "@commitlint/config-conventional": "catalog:",
     "@forgegraph/cli": "^0.3.0",
+    "@gmacko/emulate": "^0.5.1",
     "@turbo/gen": "^2.8.18",
     "concurrently": "^9.1.0",
     "dotenv-cli": "^11.0.0",
@@ -82,6 +84,7 @@
     "oxlint": "catalog:",
     "portless": "^0.5.0",
     "turbo": "^2.8.18",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^4.1.0"
   }
 }

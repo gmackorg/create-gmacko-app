@@ -27,7 +27,7 @@ If the repo was scaffolded with the optional SaaS bootstrap pack, run that flow 
 
 ## Local Development (emulate + portless)
 
-The local dev stack uses [`emulate`](../emulate) for service emulation and `portless` for HTTPS `.localhost` URLs. Run `pnpm dev` to start both.
+The local dev stack uses [`@gmacko/emulate`](https://www.npmjs.com/package/@gmacko/emulate) for service emulation and `portless` for HTTPS `.localhost` URLs. Run `npx @gmacko/emulate init` to generate an `emulate.config.yaml`, then `pnpm dev` to start both. Use `--slug <name>` to namespace services (e.g. `gmacko.emulate.localhost`) so multiple projects can run concurrently.
 
 **Service URLs** (available when running with `--portless`):
 - App: `https://gmacko.localhost`

@@ -29,6 +29,8 @@
     "check": "pnpm with-env drizzle-kit check",
     "seed": "pnpm with-env tsx src/seed.ts",
     "studio": "pnpm with-env drizzle-kit studio",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false",
     "with-env": "dotenv -e ../../.env --"
   },
@@ -45,6 +47,7 @@
     "drizzle-kit": "^0.31.10",
     "oxlint": "catalog:",
     "tsx": "^4.21.0",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^4.1.0"
   }
 }

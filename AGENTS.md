@@ -21,7 +21,7 @@ This repository is set up to work well with `Codex`, `Claude Code`, and `OpenCod
 
 ## Local Development (emulate + portless)
 
-The local dev stack replaces Docker Compose with `emulate` (Postgres via PGlite, Redis via redis-memory-server, plus GitHub/Google/Apple/Stripe/Resend service emulators) and `portless` for HTTPS `.localhost` URLs.
+The local dev stack replaces Docker Compose with [`@gmacko/emulate`](https://www.npmjs.com/package/@gmacko/emulate) (Postgres via PGlite, Redis via redis-memory-server, plus GitHub/Google/Apple/Stripe/Resend service emulators) and `portless` for HTTPS `.localhost` URLs. Run `npx @gmacko/emulate init` to generate an `emulate.config.yaml` matching your production OAuth/service config. Use `--slug <name>` to namespace services so multiple projects can run concurrently.
 
 **How SDK wiring works:**
 - OAuth providers: `initAuth` uses better-auth's `genericOAuth` plugin with configurable provider URLs (defaults to real GitHub/Google/Apple URLs when env vars are unset). Set `AUTH_GITHUB_URL` etc. to point at emulate for local dev.
