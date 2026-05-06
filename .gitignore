@@ -61,3 +61,4 @@ data/
 # Claude Code
 .claude/settings.local.json
 session-ses_*.md
+.claude/skills/gstack/
