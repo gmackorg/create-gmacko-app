@@ -44,6 +44,7 @@ linkWorkspacePackages: true
 onlyBuiltDependencies:
   - '@tailwindcss/oxide'
   - esbuild
+  - protobufjs
 
 overrides:
   '@types/minimatch': 5.1.2
