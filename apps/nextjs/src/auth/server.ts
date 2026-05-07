@@ -30,7 +30,8 @@ export const auth = initAuth({
   googleTokenUrl: env.AUTH_GOOGLE_TOKEN_URL,
   appleUrl: env.AUTH_APPLE_URL,
   bypassMagicLink: env.BYPASS_MAGIC_LINK,
-  extraPlugins: [nextCookies()],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- pkg.pr.new causes duplicate @better-auth/core type instances
+  extraPlugins: [nextCookies() as any],
 });
 
 export const getSession = cache(async () =>
