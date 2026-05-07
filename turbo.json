@@ -119,6 +119,9 @@
     "AUTH_GOOGLE_TOKEN_URL",
     "AUTH_APPLE_URL",
     "RESEND_BASE_URL",
+    "OTEL_ENABLED",
+    "OTEL_EXPORTER_OTLP_ENDPOINT",
+    "OTEL_SERVICE_NAME",
     "npm_lifecycle_event"
   ]
 }

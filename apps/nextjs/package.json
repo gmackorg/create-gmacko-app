@@ -26,6 +26,7 @@
     "@gmacko/db": "workspace:*",
     "@gmacko/i18n": "workspace:*",
     "@gmacko/monitoring": "workspace:*",
+    "@gmacko/telemetry": "workspace:*",
     "@gmacko/ui": "workspace:*",
     "@gmacko/validators": "workspace:*",
     "@sentry/nextjs": "^10.44.0",
