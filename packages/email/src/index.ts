@@ -1,5 +1,8 @@
 import { integrations } from "@gmacko/config";
+import { createLogger } from "@gmacko/logging";
 import { Resend } from "resend";
+
+const log = createLogger({ module: "email" });
 
 let resendClient: Resend | null = null;
 
@@ -14,7 +17,7 @@ export interface EmailConfig {
  */
 export function initEmail(config: EmailConfig): Resend | null {
   if (!integrations.email.enabled) {
-    console.log("[Email disabled] Email initialization skipped");
+    log.debug("email initialization skipped (integration disabled)");
     return null;
   }
 
@@ -52,7 +55,10 @@ export async function sendEmail(
 ): Promise<{ id: string } | null> {
   const client = getEmailClient();
   if (!client) {
-    console.log("[Email disabled] Cannot send email:", params.subject);
+    log.debug(
+      { subject: params.subject },
+      "email send skipped (integration disabled)",
+    );
     return null;
   }
 

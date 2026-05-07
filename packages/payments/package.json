@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@gmacko/config": "workspace:*",
+    "@gmacko/logging": "workspace:*",
     "stripe": "^20.4.1"
   },
   "devDependencies": {

@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@gmacko/config": "workspace:*",
+    "@gmacko/logging": "workspace:*",
     "uploadthing": "^7.7.4"
   },
   "devDependencies": {

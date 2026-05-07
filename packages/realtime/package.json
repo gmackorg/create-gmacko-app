@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@gmacko/config": "workspace:*",
+    "@gmacko/logging": "workspace:*",
     "pusher": "^5.3.3",
     "pusher-js": "^8.4.2"
   },

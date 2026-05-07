@@ -1,6 +1,9 @@
 import { integrations } from "@gmacko/config";
+import { createLogger } from "@gmacko/logging";
 import Pusher from "pusher";
 import PusherClient from "pusher-js";
+
+const log = createLogger({ module: "realtime" });
 
 let pusherServer: Pusher | null = null;
 let pusherClient: PusherClient | null = null;
@@ -23,7 +26,7 @@ export interface PusherClientConfig {
  */
 export function initPusherServer(config: PusherServerConfig): Pusher | null {
   if (!integrations.realtime.enabled) {
-    console.log("[Realtime disabled] Pusher server initialization skipped");
+    log.debug("pusher server initialization skipped (integration disabled)");
     return null;
   }
 
@@ -48,7 +51,7 @@ export function initPusherClient(
   config: PusherClientConfig,
 ): PusherClient | null {
   if (!integrations.realtime.enabled) {
-    console.log("[Realtime disabled] Pusher client initialization skipped");
+    log.debug("pusher client initialization skipped (integration disabled)");
     return null;
   }
 
@@ -91,7 +94,7 @@ export async function triggerEvent(
 ): Promise<boolean> {
   const server = getPusherServer();
   if (!server) {
-    console.log("[Realtime disabled] Cannot trigger event:", event);
+    log.debug({ event }, "event trigger skipped (integration disabled)");
     return false;
   }
 

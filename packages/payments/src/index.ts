@@ -1,5 +1,8 @@
 import { integrations } from "@gmacko/config";
+import { createLogger } from "@gmacko/logging";
 import Stripe from "stripe";
+
+const log = createLogger({ module: "payments" });
 
 let stripeClient: Stripe | null = null;
 
@@ -17,7 +20,7 @@ export interface StripeConfig {
  */
 export function initStripe(config: StripeConfig): Stripe | null {
   if (!integrations.stripe) {
-    console.log("[Stripe disabled] Stripe initialization skipped");
+    log.debug("stripe initialization skipped (integration disabled)");
     return null;
   }
 
@@ -55,7 +58,7 @@ export async function createCheckoutSession(
 ): Promise<Stripe.Checkout.Session | null> {
   const stripe = getStripe();
   if (!stripe) {
-    console.log("[Stripe disabled] Cannot create checkout session");
+    log.debug("checkout session skipped (integration disabled)");
     return null;
   }
   return stripe.checkout.sessions.create(params);
@@ -69,7 +72,7 @@ export async function createBillingPortalSession(
 ): Promise<Stripe.BillingPortal.Session | null> {
   const stripe = getStripe();
   if (!stripe) {
-    console.log("[Stripe disabled] Cannot create billing portal session");
+    log.debug("billing portal session skipped (integration disabled)");
     return null;
   }
   return stripe.billingPortal.sessions.create(params);

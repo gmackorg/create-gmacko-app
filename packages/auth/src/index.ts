@@ -1,10 +1,13 @@
 import { expo } from "@better-auth/expo";
 import { db } from "@gmacko/db/client";
 import type { WorkspaceRole } from "@gmacko/db/schema";
+import { createLogger } from "@gmacko/logging";
 import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { magicLink, oAuthProxy } from "better-auth/plugins";
+
+const log = createLogger({ module: "auth" });
 
 export function isPlatformAdminRole(
   role: "user" | "admin" | null | undefined,
@@ -65,7 +68,7 @@ export function initAuth<
       magicLink({
         sendMagicLink: async ({ email, url }) => {
           if (options.bypassMagicLink) {
-            console.log(`[auth] Magic link for ${email}: ${url}`);
+            log.info({ email, url }, "magic link generated (bypass mode)");
             return;
           }
           if (options.sendMagicLinkEmail) {
@@ -105,7 +108,7 @@ export function initAuth<
     trustedOrigins: ["expo://", appleUrl, "https://gmacko.localhost"],
     onAPIError: {
       onError(error, ctx) {
-        console.error("BETTER AUTH API ERROR", error, ctx);
+        log.error({ err: error, context: ctx }, "better-auth API error");
       },
     },
   } satisfies BetterAuthOptions;

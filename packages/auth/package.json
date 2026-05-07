@@ -19,6 +19,7 @@
   "dependencies": {
     "@better-auth/expo": "catalog:",
     "@gmacko/db": "workspace:*",
+    "@gmacko/logging": "workspace:*",
     "@t3-oss/env-core": "^0.13.10",
     "better-auth": "catalog:",
     "zod": "catalog:"

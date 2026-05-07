@@ -1,7 +1,10 @@
 import { integrations } from "@gmacko/config";
+import { createLogger } from "@gmacko/logging";
 import type { FileRouter } from "uploadthing/next";
 import { createUploadthing } from "uploadthing/next";
 import { UploadThingError } from "uploadthing/server";
+
+const log = createLogger({ module: "storage" });
 
 /**
  * Create an UploadThing file router
@@ -11,7 +14,7 @@ export function createFileRouter(): ReturnType<
   typeof createUploadthing
 > | null {
   if (!integrations.storage.enabled) {
-    console.log("[Storage disabled] UploadThing initialization skipped");
+    log.debug("uploadthing initialization skipped (integration disabled)");
     return null;
   }
 

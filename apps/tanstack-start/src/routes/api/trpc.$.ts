@@ -1,8 +1,11 @@
 import { appRouter, createTRPCContext } from "@gmacko/api";
+import { createLogger } from "@gmacko/logging";
 import { createFileRoute } from "@tanstack/react-router";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 
 import { auth } from "~/auth/server";
+
+const log = createLogger({ module: "trpc-handler" });
 
 const handler = (req: Request) =>
   fetchRequestHandler({
@@ -15,7 +18,7 @@ const handler = (req: Request) =>
         headers: req.headers,
       }),
     onError({ error, path }) {
-      console.error(`>>> tRPC Error on '${path}'`, error);
+      log.error({ err: error, path }, "tRPC error");
     },
   });
 

@@ -161,7 +161,7 @@ importers:
     dependencies:
       '@better-auth/expo':
         specifier: 'catalog:'
-        version: 1.5.5(6bd715f3b9a4e7d929d89af485f01a72)
+        version: 1.5.5(1ab9e0bd2475dcb03b7edf2d796d4a93)
       '@expo/metro-runtime':
         specifier: ~55.0.6
         version: 55.0.6(@expo/dom-webview@55.0.3)(expo@55.0.7)(react-dom@19.2.4(react@19.2.4))(react-native@0.84.1(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.4)(utf-8-validate@6.0.4))(react@19.2.4)
@@ -319,6 +319,9 @@ importers:
       '@gmacko/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@gmacko/logging':
+        specifier: workspace:*
+        version: link:../../packages/logging
       '@gmacko/monitoring':
         specifier: workspace:*
         version: link:../../packages/monitoring
@@ -440,6 +443,9 @@ importers:
       '@gmacko/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@gmacko/logging':
+        specifier: workspace:*
+        version: link:../../packages/logging
       '@gmacko/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -629,6 +635,9 @@ importers:
       '@gmacko/db':
         specifier: workspace:*
         version: link:../db
+      '@gmacko/logging':
+        specifier: workspace:*
+        version: link:../logging
       '@t3-oss/env-core':
         specifier: ^0.13.10
         version: 0.13.10(arktype@2.1.20)(typescript@5.9.3)(valibot@1.0.0-beta.15(typescript@5.9.3))(zod@4.3.6)
@@ -786,6 +795,9 @@ importers:
       '@gmacko/config':
         specifier: workspace:*
         version: link:../config
+      '@gmacko/logging':
+        specifier: workspace:*
+        version: link:../logging
       resend:
         specifier: ^6.9.4
         version: 6.9.4(@react-email/render@1.1.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4))
@@ -1055,6 +1067,9 @@ importers:
       '@gmacko/config':
         specifier: workspace:*
         version: link:../config
+      '@gmacko/logging':
+        specifier: workspace:*
+        version: link:../logging
       stripe:
         specifier: ^20.4.1
         version: 20.4.1(@types/node@25.5.0)
@@ -1111,6 +1126,9 @@ importers:
       '@gmacko/config':
         specifier: workspace:*
         version: link:../config
+      '@gmacko/logging':
+        specifier: workspace:*
+        version: link:../logging
       pusher:
         specifier: ^5.3.3
         version: 5.3.3
@@ -1161,6 +1179,9 @@ importers:
       '@gmacko/config':
         specifier: workspace:*
         version: link:../config
+      '@gmacko/logging':
+        specifier: workspace:*
+        version: link:../logging
       uploadthing:
         specifier: ^7.7.4
         version: 7.7.4(express@5.2.1)(h3@1.15.4)(next@16.2.1(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(tailwindcss@4.2.2)
@@ -14780,12 +14801,12 @@ snapshots:
       nanostores: 1.2.0
       zod: 4.3.6
 
-  '@better-auth/core@1.5.5(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-call@1.3.2(zod@4.3.6))(jose@6.2.1)(kysely@0.28.16)(nanostores@1.2.0)':
+  '@better-auth/core@1.5.5(@better-auth/utils@0.4.0)(@better-fetch/fetch@1.1.21)(better-call@1.3.5(zod@4.3.6))(jose@6.2.1)(kysely@0.28.16)(nanostores@1.2.0)':
     dependencies:
-      '@better-auth/utils': 0.3.1
+      '@better-auth/utils': 0.4.0
       '@better-fetch/fetch': 1.1.21
       '@standard-schema/spec': 1.1.0
-      better-call: 1.3.2(zod@4.3.6)
+      better-call: 1.3.5(zod@4.3.6)
       jose: 6.2.1
       kysely: 0.28.16
       nanostores: 1.2.0
@@ -14845,9 +14866,9 @@ snapshots:
     optionalDependencies:
       drizzle-orm: 0.41.0(@neondatabase/serverless@1.0.2)(@opentelemetry/api@1.9.1)(@planetscale/database@1.19.0)(@prisma/client@5.22.0(prisma@5.22.0))(@types/better-sqlite3@7.6.13)(@types/pg@8.18.0)(@vercel/postgres@0.10.0(utf-8-validate@6.0.4))(better-sqlite3@12.8.0)(gel@2.0.0)(kysely@0.28.16)(mysql2@3.11.3)(pg@8.20.0)(postgres@3.4.8)(prisma@5.22.0)
 
-  '@better-auth/expo@1.5.5(6bd715f3b9a4e7d929d89af485f01a72)':
+  '@better-auth/expo@1.5.5(1ab9e0bd2475dcb03b7edf2d796d4a93)':
     dependencies:
-      '@better-auth/core': 1.5.5(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-call@1.3.2(zod@4.3.6))(jose@6.2.1)(kysely@0.28.16)(nanostores@1.2.0)
+      '@better-auth/core': 1.5.5(@better-auth/utils@0.4.0)(@better-fetch/fetch@1.1.21)(better-call@1.3.5(zod@4.3.6))(jose@6.2.1)(kysely@0.28.16)(nanostores@1.2.0)
       '@better-fetch/fetch': 1.1.21
       better-auth: https://pkg.pr.new/better-auth@8814(@opentelemetry/api@1.9.1)(@prisma/client@5.22.0(prisma@5.22.0))(@tanstack/react-start@1.166.17(crossws@0.4.4(srvx@0.11.12))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.2))(webpack@5.104.1(esbuild@0.27.4)))(better-sqlite3@12.8.0)(drizzle-kit@0.31.10)(mongodb@7.1.0(socks@2.8.7))(mysql2@3.11.3)(next@16.2.1(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(pg@8.20.0)(prisma@5.22.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(solid-js@1.9.9)(vitest@4.1.0(@opentelemetry/api@1.9.1)(@types/node@25.5.0)(jsdom@27.4.0(@noble/hashes@2.0.1)(bufferutil@4.1.0)(utf-8-validate@6.0.4))(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.2)))
       better-call: 1.3.2(zod@4.3.6)
@@ -17712,7 +17733,7 @@ snapshots:
   '@opentelemetry/resources@2.7.1(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.1)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/semantic-conventions': 1.40.0
 
   '@opentelemetry/resources@2.7.1(@opentelemetry/api@1.9.1)':
