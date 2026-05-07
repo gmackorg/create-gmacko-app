@@ -3,6 +3,9 @@ export const integrations = {
   sentry: true,
   posthog: true,
 
+  // Telemetry (default ON)
+  telemetry: true,
+
   // Payments - Web (default OFF)
   stripe: false,
 
@@ -95,6 +98,7 @@ export const isRealtimeEnabled = () => integrations.realtime.enabled;
 export const isStorageEnabled = () => integrations.storage.enabled;
 export const isI18nEnabled = () => integrations.i18n;
 export const isOpenApiEnabled = () => integrations.openapi;
+export const isTelemetryEnabled = () => integrations.telemetry;
 export const isSaasCollaborationEnabled = () => saasFeatures.collaboration;
 export const isSaasBillingEnabled = () => saasFeatures.billing;
 export const isSaasMeteringEnabled = () => saasFeatures.metering;
