@@ -35,6 +35,7 @@
     "@gmacko/auth": "workspace:*",
     "@gmacko/config": "workspace:*",
     "@gmacko/db": "workspace:*",
+    "@gmacko/telemetry": "workspace:*",
     "@gmacko/validators": "workspace:*",
     "@trpc/server": "catalog:",
     "superjson": "catalog:",
