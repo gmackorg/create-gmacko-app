@@ -1,6 +1,8 @@
 import { integrations } from "@gmacko/config";
 import pino from "pino";
 
+import { getOtelMixin } from "./otel.js";
+
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
 
 export interface LogContext {
@@ -32,11 +34,6 @@ interface SentryLike {
   captureException: (error: unknown) => void;
   captureMessage: (message: string) => void;
   withScope: (callback: (scope: SentryScope) => void) => void;
-  startInactiveSpan: (options: {
-    name: string;
-    op: string;
-    attributes?: Record<string, string | number | boolean>;
-  }) => SentrySpan | undefined;
 }
 
 interface SentryScope {
@@ -44,12 +41,6 @@ interface SentryScope {
   setLevel: (level: string) => void;
   setFingerprint: (fingerprint: string[]) => void;
   setTag: (key: string, value: string) => void;
-}
-
-interface SentrySpan {
-  end: () => void;
-  setAttribute: (key: string, value: string | number | boolean) => void;
-  setStatus: (status: { code: number }) => void;
 }
 
 /**
@@ -101,6 +92,9 @@ function createBaseLogger() {
 
     // Timestamp format
     timestamp: pino.stdTimeFunctions.isoTime,
+
+    // Inject OTel trace context (traceId, spanId) into every log line
+    mixin: getOtelMixin,
 
     // Pretty print in development
     transport: isDev
@@ -665,92 +659,6 @@ export function createRequestLoggingHandler(
  */
 export function generateRequestId(): string {
   return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 9)}`;
-}
-
-// ============================================================================
-// Transaction/Span Helpers for Performance Monitoring
-// ============================================================================
-
-/**
- * Start a Sentry transaction for performance monitoring
- */
-export async function startTransaction(
-  name: string,
-  op: string,
-  data?: Record<string, unknown>,
-): Promise<{
-  finish: () => void;
-  setData: (key: string, value: unknown) => void;
-  setStatus: (status: "ok" | "error" | "cancelled") => void;
-} | null> {
-  const sentry = await getSentry();
-  if (!sentry) {
-    return null;
-  }
-
-  const attributes: Record<string, string | number | boolean> = {};
-  if (data) {
-    for (const [key, value] of Object.entries(data)) {
-      if (
-        typeof value === "string" ||
-        typeof value === "number" ||
-        typeof value === "boolean"
-      ) {
-        attributes[key] = value;
-      }
-    }
-  }
-
-  const span = sentry.startInactiveSpan({
-    name,
-    op,
-    attributes,
-  });
-
-  if (!span) return null;
-
-  return {
-    finish: () => span.end(),
-    setData: (key, value) => {
-      if (
-        typeof value === "string" ||
-        typeof value === "number" ||
-        typeof value === "boolean"
-      ) {
-        span.setAttribute(key, value);
-      }
-    },
-    setStatus: (status) => {
-      const statusMap = {
-        ok: { code: 1 },
-        error: { code: 2 },
-        cancelled: { code: 2 },
-      };
-      span.setStatus(statusMap[status]);
-    },
-  };
-}
-
-/**
- * Wrap an async function with Sentry performance monitoring
- */
-export async function withPerformanceTracking<T>(
-  name: string,
-  op: string,
-  fn: () => Promise<T>,
-): Promise<T> {
-  const transaction = await startTransaction(name, op);
-
-  try {
-    const result = await fn();
-    transaction?.setStatus("ok");
-    return result;
-  } catch (error) {
-    transaction?.setStatus("error");
-    throw error;
-  } finally {
-    transaction?.finish();
-  }
 }
 
 export type { Logger } from "pino";
