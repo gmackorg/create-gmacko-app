@@ -76,6 +76,8 @@ export async function scaffold(options: CliOptions): Promise<void> {
     configureExpoApp(targetDir, options.appName, options.displayName);
   }
 
+  configurePairingSurfaces(targetDir, options);
+
   customizeGeneratedReadme(targetDir, options);
   pruneOptionalLanes(targetDir, options);
 
@@ -969,8 +971,8 @@ function configureExpoApp(
   );
   content = content.replace(/return "Gmacko";/, `return "${displayName}";`);
   content = content.replace(
-    /return "Gmacko \(Beta\)";/,
-    `return "${displayName} (Beta)";`,
+    /return "Gmacko \(Preview\)";/,
+    `return "${displayName} (Preview)";`,
   );
   content = content.replace(
     /return "Gmacko \(Dev\)";/,
@@ -1151,6 +1153,75 @@ export function Providers({ children }: ProvidersProps) {
 }
 `,
   );
+}
+
+/**
+ * The device-pairing UI spans two platforms: the web app (nextjs) both
+ * generates the QR and hosts the /device approval page, and the mobile app
+ * (expo) scans it. Each half is a dead-end without the other, so when a
+ * platform is pruned we strip the orphaned entry points rather than ship
+ * links and panels that can't work.
+ */
+function configurePairingSurfaces(
+  targetDir: string,
+  options: CliOptions,
+): void {
+  if (options.platforms.web && !options.platforms.mobile) {
+    // No mobile app to pair — drop the "Pair Mobile Device" settings panel
+    // (its copy tells the user to open a mobile app that doesn't exist). The
+    // generic /device approval page and device-authorization plugin stay,
+    // since a CLI or other device client can still use the code flow.
+    const settingsPage = path.join(
+      targetDir,
+      "apps/nextjs/src/app/settings/page.tsx",
+    );
+    fs.removeSync(
+      path.join(
+        targetDir,
+        "apps/nextjs/src/app/settings/_components/pair-device.tsx",
+      ),
+    );
+    removeSnippet(
+      settingsPage,
+      'import { PairDeviceSection } from "./_components/pair-device";\n',
+    );
+    removeSnippet(settingsPage, "        <PairDeviceSection />\n");
+  }
+
+  if (options.platforms.mobile && !options.platforms.web) {
+    // No web app to generate or approve pairing codes — drop the mobile QR
+    // sign-in entry point (and the now-unused scanner dependency) so it
+    // doesn't dead-end.
+    fs.removeSync(path.join(targetDir, "apps/expo/src/app/pair.tsx"));
+    fs.removeSync(path.join(targetDir, "apps/expo/src/utils/pairing.ts"));
+    fs.removeSync(path.join(targetDir, "apps/expo/src/utils/pairing.test.ts"));
+    removeSnippet(
+      path.join(targetDir, "apps/expo/src/app/index.tsx"),
+      `      {!session ? (
+        <Link asChild href="/pair">
+          <Pressable className="border-input mt-3 flex items-center rounded-sm border p-2">
+            <Text className="text-foreground">Sign in with QR Code</Text>
+          </Pressable>
+        </Link>
+      ) : null}
+`,
+    );
+    removeSnippet(
+      path.join(targetDir, "apps/expo/app.config.ts"),
+      `    [
+      "expo-camera",
+      {
+        cameraPermission:
+          "Allow $(PRODUCT_NAME) to use the camera to scan sign-in QR codes.",
+      },
+    ],
+`,
+    );
+    removeSnippet(
+      path.join(targetDir, "apps/expo/package.json"),
+      '    "expo-camera": "~55.0.17",\n',
+    );
+  }
 }
 
 function removeSnippet(filePath: string, snippet: string): void {
