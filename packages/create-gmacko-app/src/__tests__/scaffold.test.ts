@@ -1618,6 +1618,60 @@ describe("create-gmacko-app scaffold", () => {
       expect(fileExists(result.appPath, "apps/expo")).toBe(false);
     }, 120000);
 
+    it("should drop the mobile pairing panel from web when --no-mobile", async () => {
+      const appName = generateAppName("no-mobile-pairing");
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-install", "--no-git", "--no-mobile"],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+      // The "Pair Mobile Device" panel tells the user to open a mobile app
+      // that no longer exists — it must be stripped.
+      expect(
+        fileExists(
+          result.appPath,
+          "apps/nextjs/src/app/settings/_components/pair-device.tsx",
+        ),
+      ).toBe(false);
+      const settings = readFile(
+        result.appPath,
+        "apps/nextjs/src/app/settings/page.tsx",
+      );
+      expect(settings).not.toContain("PairDeviceSection");
+      // The generic /device approval page stays (usable by non-mobile clients).
+      expect(
+        fileExists(result.appPath, "apps/nextjs/src/app/device/page.tsx"),
+      ).toBe(true);
+    }, 120000);
+
+    it("should drop the mobile QR sign-in when web is absent (--no-web + mobile)", async () => {
+      const appName = generateAppName("no-web-pairing");
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-install", "--no-git", "--no-web"],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+      expect(fileExists(result.appPath, "apps/expo")).toBe(true);
+      // No web app to generate/approve pairing codes — the QR entry point
+      // and its scanner dependency must be gone.
+      expect(fileExists(result.appPath, "apps/expo/src/app/pair.tsx")).toBe(
+        false,
+      );
+      const home = readFile(result.appPath, "apps/expo/src/app/index.tsx");
+      expect(home).not.toContain('href="/pair"');
+      expect(home).not.toContain("Sign in with QR Code");
+      const expoPkg = readFile(result.appPath, "apps/expo/package.json");
+      expect(expoPkg).not.toContain("expo-camera");
+    }, 120000);
+
     it("should include tanstack-start when --tanstack-start is passed", async () => {
       const appName = generateAppName("with-tanstack");
       const result = await runCli({
