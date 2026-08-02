@@ -108,8 +108,17 @@ export async function scaffold(options: CliOptions): Promise<void> {
     try {
       execSync("pnpm install", { cwd: targetDir, stdio: "pipe" });
       spinner.stop("Dependencies installed");
-    } catch {
+    } catch (err) {
       spinner.stop("Failed to install dependencies");
+      // Surface why — a swallowed install failure otherwise only shows up later
+      // as confusing "turbo: not found" errors.
+      const stderr =
+        err && typeof err === "object" && "stderr" in err
+          ? String((err as { stderr?: unknown }).stderr ?? "")
+          : "";
+      if (stderr.trim()) {
+        p.log.error(stderr.trim().split("\n").slice(-25).join("\n"));
+      }
       p.log.warn("Run 'pnpm install' manually to complete setup");
     }
   }
