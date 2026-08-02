@@ -45,6 +45,19 @@ export function ensureCliBuilt(): void {
 }
 
 /**
+ * Whether a command is on PATH. Used to keep tests robust to tools that may not
+ * be installed on every runner (e.g. `jj` is absent on CI ubuntu images).
+ */
+export function isCommandAvailable(command: string): boolean {
+  try {
+    execSync(`command -v ${command}`, { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Generate a unique app name for testing
  */
 export function generateAppName(prefix = "test-app"): string {

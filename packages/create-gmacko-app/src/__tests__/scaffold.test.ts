@@ -9,6 +9,7 @@ import {
   ensureTempDir,
   fileExists,
   generateAppName,
+  isCommandAvailable,
   readFile,
   readJson,
   runCli,
@@ -1397,8 +1398,15 @@ describe("create-gmacko-app scaffold", () => {
       appsToClean.push(result.appPath);
 
       expect(result.exitCode).toBe(0);
-      expect(fileExists(result.appPath, ".jj")).toBe(true);
       expect(fileExists(result.appPath, ".git")).toBe(true);
+      // jj creates a colocated repo (.jj + .git) when installed; otherwise the
+      // scaffolder falls back to a plain git repo. Don't require jj on the runner
+      // (CI ubuntu images don't ship it).
+      if (isCommandAvailable("jj")) {
+        expect(fileExists(result.appPath, ".jj")).toBe(true);
+      } else {
+        expect(fileExists(result.appPath, ".jj")).toBe(false);
+      }
     }, 120000);
 
     it("should scaffold without the legacy eslint and prettier stack", async () => {

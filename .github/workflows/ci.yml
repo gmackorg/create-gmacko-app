@@ -120,3 +120,8 @@ jobs:
         run: pnpm build
         env:
           SKIP_ENV_VALIDATION: true
+          # Placeholder so @gmacko/db/client (which throws at import if unset)
+          # can instantiate during `next build` page-data collection. postgres-js
+          # is lazy — no connection is made at build time, and route handlers are
+          # not prerendered. Real DATABASE_URL is injected at deploy/runtime.
+          DATABASE_URL: postgresql://build:build@localhost:5432/build

@@ -109,6 +109,8 @@ jobs:
         run: pnpm build
         env:
           SKIP_ENV_VALIDATION: true
+          # See ci.yml: placeholder so the db client can instantiate at build.
+          DATABASE_URL: postgresql://build:build@localhost:5432/build
 
       - name: Check bundle size
         run: |

@@ -1196,6 +1196,7 @@ function shouldCopyTemplatePath(src: string, templateRoot: string): boolean {
 
   if (
     basename === ".git" ||
+    basename === ".jj" ||
     basename === "node_modules" ||
     basename === ".turbo" ||
     basename === ".cache" ||
