@@ -46,8 +46,10 @@ export default defineConfig({
     // previously the webServer was disabled in CI and nothing served the app, so
     // every test failed with "Connection refused".
     command: process.env.CI ? "pnpm start" : "pnpm dev",
-    url: baseURL,
+    // Probe the lightweight health endpoint for readiness rather than the home
+    // page, whose SSR runs several tRPC/DB queries and can be slow to first byte.
+    url: process.env.CI ? `${baseURL}/api/health` : baseURL,
     reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
+    timeout: 180 * 1000,
   },
 });
