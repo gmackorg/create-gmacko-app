@@ -40,6 +40,9 @@ jobs:
       - name: Format check
         run: pnpm format
 
+      - name: App standards
+        run: pnpm check:standards
+
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest

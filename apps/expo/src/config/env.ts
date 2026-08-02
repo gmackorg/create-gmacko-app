@@ -1,22 +1,22 @@
 import Constants from "expo-constants";
 
-export type AppEnvironment = "development" | "preview" | "production";
+import {
+  type AppEnvironment,
+  collectEnvironmentErrors,
+  type EnvironmentConfig,
+  type ObservabilityConfig,
+  validateEnvironment,
+} from "./env-validation";
 
-interface ObservabilityConfig {
-  sentryDsn?: string;
-  posthogKey?: string;
-  posthogHost: string;
-}
-
-interface EnvironmentConfig {
-  apiUrl: string;
-  environment: AppEnvironment;
-  isDevelopment: boolean;
-  isPreview: boolean;
-  isProduction: boolean;
-  enableDebugMode: boolean;
-  observability: ObservabilityConfig;
-}
+// Re-export the pure validation API so existing import sites (`~/config/env`)
+// keep working; the logic lives in the RN-free `env-validation` module.
+export {
+  type AppEnvironment,
+  collectEnvironmentErrors,
+  type EnvironmentConfig,
+  type ObservabilityConfig,
+  validateEnvironment,
+};
 
 function getAppEnvironment(): AppEnvironment {
   // Read the build variant (APP_VARIANT); tolerate the legacy APP_ENV/"staging".

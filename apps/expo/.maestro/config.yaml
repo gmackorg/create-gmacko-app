@@ -9,10 +9,12 @@ flows:
   - flows/*.yaml
 
 # Environment variables (can be overridden via CLI)
+# Test credentials must be supplied via env / CI secrets — no working defaults
+# are committed. Run with: TEST_EMAIL=… TEST_PASSWORD=… maestro test …
 env:
   API_URL: ${API_URL:-http://localhost:3000}
-  TEST_EMAIL: ${TEST_EMAIL:-test@example.com}
-  TEST_PASSWORD: ${TEST_PASSWORD:-testpassword123}
+  TEST_EMAIL: ${TEST_EMAIL}
+  TEST_PASSWORD: ${TEST_PASSWORD}
 
 # Timeout settings (in milliseconds)
 launchTimeout: 30000
