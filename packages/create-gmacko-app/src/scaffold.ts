@@ -106,7 +106,14 @@ export async function scaffold(options: CliOptions): Promise<void> {
   if (options.install) {
     spinner.start("Installing dependencies...");
     try {
-      execSync("pnpm install", { cwd: targetDir, stdio: "pipe" });
+      // Force a non-frozen install: scaffolding rewrites package.json (name,
+      // integrations, pruned deps) without regenerating the lockfile, and pnpm
+      // implies --frozen-lockfile under CI=1 — which then fails instantly on the
+      // now-stale lockfile.
+      execSync("pnpm install --no-frozen-lockfile", {
+        cwd: targetDir,
+        stdio: "pipe",
+      });
       spinner.stop("Dependencies installed");
     } catch (err) {
       spinner.stop("Failed to install dependencies");
