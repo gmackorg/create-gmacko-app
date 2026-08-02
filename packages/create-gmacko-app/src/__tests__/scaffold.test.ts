@@ -5,9 +5,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   cleanupApp,
   EXPECTED_FILES,
+  ensureCliBuilt,
   ensureTempDir,
   fileExists,
   generateAppName,
+  isCommandAvailable,
   readFile,
   readJson,
   runCli,
@@ -18,6 +20,7 @@ describe("create-gmacko-app scaffold", () => {
   const appsToClean: string[] = [];
 
   beforeAll(() => {
+    ensureCliBuilt();
     tempDir = ensureTempDir();
   });
 
@@ -497,7 +500,9 @@ describe("create-gmacko-app scaffold", () => {
         `const base = "com.gmacko.${appName.replace(/-/g, "")}"`,
       );
       expect(expoConfig).toContain(`return "${expectedDisplayName}";`);
-      expect(expoConfig).toContain(`return "${expectedDisplayName} (Beta)";`);
+      expect(expoConfig).toContain(
+        `return "${expectedDisplayName} (Preview)";`,
+      );
       expect(expoConfig).toContain(`return "${expectedDisplayName} (Dev)";`);
       expect(expoConfig).toContain("EXPO_PUBLIC_APP_DOMAIN");
       expect(expoConfig).toContain('"change-me.example.com"');
@@ -1266,7 +1271,9 @@ describe("create-gmacko-app scaffold", () => {
       expect(pkg.scripts?.["bootstrap:local"]).toBe(
         "./scripts/bootstrap-local.sh",
       );
-      expect(pkg.scripts?.["check:fast"]).toBe("pnpm lint && pnpm typecheck");
+      expect(pkg.scripts?.["check:fast"]).toBe(
+        "pnpm lint && pnpm typecheck && pnpm check:standards",
+      );
       expect(pkg.scripts?.check).toBe(
         "pnpm check:fast && pnpm test && pnpm build",
       );
@@ -1391,8 +1398,15 @@ describe("create-gmacko-app scaffold", () => {
       appsToClean.push(result.appPath);
 
       expect(result.exitCode).toBe(0);
-      expect(fileExists(result.appPath, ".jj")).toBe(true);
       expect(fileExists(result.appPath, ".git")).toBe(true);
+      // jj creates a colocated repo (.jj + .git) when installed; otherwise the
+      // scaffolder falls back to a plain git repo. Don't require jj on the runner
+      // (CI ubuntu images don't ship it).
+      if (isCommandAvailable("jj")) {
+        expect(fileExists(result.appPath, ".jj")).toBe(true);
+      } else {
+        expect(fileExists(result.appPath, ".jj")).toBe(false);
+      }
     }, 120000);
 
     it("should scaffold without the legacy eslint and prettier stack", async () => {

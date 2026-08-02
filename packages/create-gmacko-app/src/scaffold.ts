@@ -969,8 +969,8 @@ function configureExpoApp(
   );
   content = content.replace(/return "Gmacko";/, `return "${displayName}";`);
   content = content.replace(
-    /return "Gmacko \(Beta\)";/,
-    `return "${displayName} (Beta)";`,
+    /return "Gmacko \(Preview\)";/,
+    `return "${displayName} (Preview)";`,
   );
   content = content.replace(
     /return "Gmacko \(Dev\)";/,
@@ -1196,6 +1196,7 @@ function shouldCopyTemplatePath(src: string, templateRoot: string): boolean {
 
   if (
     basename === ".git" ||
+    basename === ".jj" ||
     basename === "node_modules" ||
     basename === ".turbo" ||
     basename === ".cache" ||

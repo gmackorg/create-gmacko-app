@@ -64,7 +64,8 @@ export async function setup() {
   }
 
   const services = ["github", "google", "apple", "stripe", "resend"];
-  if (!(await isPortOpen(5432))) {
+  const startsPostgres = !(await isPortOpen(5432));
+  if (startsPostgres) {
     services.push("postgres");
   }
 
@@ -91,6 +92,12 @@ export async function setup() {
 
   try {
     await waitForPort(4000);
+    // The Postgres (PGlite-over-wire) service can bind its port slightly after
+    // the hub. Wait for it too so DB tests don't race a not-yet-listening
+    // backend (a chronic source of flaky 5432 connection timeouts in CI).
+    if (startsPostgres) {
+      await waitForPort(5432);
+    }
   } catch (err) {
     releaseLock();
     throw err;

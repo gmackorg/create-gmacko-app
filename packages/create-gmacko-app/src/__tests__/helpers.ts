@@ -27,6 +27,36 @@ export function getCliPath(): string {
   return path.join(__dirname, "../../dist/index.js");
 }
 
+const CLI_PACKAGE_ROOT = path.resolve(__dirname, "..", "..");
+let cliBuilt = false;
+
+/**
+ * Build the CLI (dist/index.js) that the scaffold/e2e suites spawn via runCli().
+ *
+ * turbo's `test` task only dependsOn `^build` (upstream workspace deps) and this
+ * package has none, so nothing builds the CLI before its tests run. Without this,
+ * every runCli() spawns a missing dist/index.js and exits 1 (the whole scaffold
+ * suite failed this way). Runs once per vitest process; tsup is ~0.5s.
+ */
+export function ensureCliBuilt(): void {
+  if (cliBuilt) return;
+  execSync("pnpm build", { cwd: CLI_PACKAGE_ROOT, stdio: "pipe" });
+  cliBuilt = true;
+}
+
+/**
+ * Whether a command is on PATH. Used to keep tests robust to tools that may not
+ * be installed on every runner (e.g. `jj` is absent on CI ubuntu images).
+ */
+export function isCommandAvailable(command: string): boolean {
+  try {
+    execSync(`command -v ${command}`, { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Generate a unique app name for testing
  */

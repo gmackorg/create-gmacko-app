@@ -43,7 +43,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        run: pnpm -F @gmacko/nextjs exec playwright install --with-deps chromium
+        # playwright.config.ts defines chromium, firefox, webkit, mobile-chrome
+        # (Pixel 5 / chromium) and mobile-safari (iPhone 12 / webkit). Install all
+        # three engines so every configured project can launch (webkit was missing,
+        # failing the mobile-safari/webkit projects).
+        run: pnpm -F @gmacko/nextjs exec playwright install --with-deps chromium firefox webkit
 
       - name: Build application
         run: pnpm build

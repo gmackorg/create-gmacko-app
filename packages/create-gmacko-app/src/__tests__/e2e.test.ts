@@ -22,6 +22,7 @@ import {
   cleanupApp,
   createFakeCliBin,
   createMockEnv,
+  ensureCliBuilt,
   ensureTempDir,
   fileExists,
   generateAppName,
@@ -38,6 +39,7 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
   const appsToClean: string[] = [];
 
   beforeAll(() => {
+    ensureCliBuilt();
     tempDir = ensureTempDir();
     console.log(`E2E tests using temp directory: ${tempDir}`);
   });

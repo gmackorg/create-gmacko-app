@@ -4,6 +4,6 @@ export {
   SpanStatusCode,
   trace,
 } from "@opentelemetry/api";
-export { initTelemetry } from "./init.js";
-export { getMetrics } from "./metrics.js";
-export { withSpan } from "./span.js";
+export { initTelemetry } from "./init";
+export { getMetrics } from "./metrics";
+export { withSpan } from "./span";
