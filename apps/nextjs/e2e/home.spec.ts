@@ -20,23 +20,27 @@ test.describe("Home Page", () => {
   }) => {
     await page.goto("/");
 
+    // The scaffold ships GitHub/Google/Apple social sign-in (see auth-showcase),
+    // not Discord. Assert at least one real provider button is present.
     const signInButton = page.getByRole("button", {
-      name: /sign in with discord/i,
+      name: /sign in with (github|google|apple)/i,
     });
-    await expect(signInButton).toBeVisible();
+    await expect(signInButton.first()).toBeVisible();
   });
 });
 
 test.describe("Navigation", () => {
-  test("should navigate to settings page when authenticated", async ({
-    page,
-  }) => {
-    // This test would require authentication setup
-    // For now, just verify the settings route exists
+  test("gates the settings page behind authentication", async ({ page }) => {
     await page.goto("/settings");
 
-    // Should redirect to home if not authenticated
-    await expect(page).toHaveURL("/");
+    // An unauthenticated visit must not expose settings management — the app
+    // sends the user to the sign-in / first-run setup flow. Assert a sign-in
+    // affordance is shown (robust to the exact redirect target).
+    await expect(
+      page
+        .getByRole("button", { name: /sign in with (github|google|apple)/i })
+        .first(),
+    ).toBeVisible();
   });
 });
 
@@ -45,6 +49,10 @@ test.describe("Accessibility", () => {
     page,
   }) => {
     await page.goto("/");
+
+    // Wait for the page to actually render (first-run SSR runs several DB/tRPC
+    // queries and can be slow to first paint) before asserting the landmark.
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 
     // Basic accessibility checks
     const main = page.locator("main");

@@ -14,46 +14,25 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # ============================================
-# Dependencies stage - install all deps
-# ============================================
-FROM base AS deps
-
-# Copy workspace configuration
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
-COPY .npmrc* ./
-
-# Copy all package.json files for workspace resolution
-COPY apps/nextjs/package.json ./apps/nextjs/
-COPY packages/api/package.json ./packages/api/
-COPY packages/auth/package.json ./packages/auth/
-COPY packages/config/package.json ./packages/config/
-COPY packages/db/package.json ./packages/db/
-COPY packages/monitoring/package.json ./packages/monitoring/
-COPY packages/analytics/package.json ./packages/analytics/
-COPY packages/ui/package.json ./packages/ui/
-COPY packages/validators/package.json ./packages/validators/
-COPY packages/settings/package.json ./packages/settings/
-COPY tooling/tailwind/package.json ./tooling/tailwind/
-COPY tooling/typescript/package.json ./tooling/typescript/
-
-# Install dependencies
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile
-
-# ============================================
-# Builder stage - build the app
+# Builder stage - install workspace + build the app
 # ============================================
 FROM base AS builder
 
 WORKDIR /app
 
-# Copy dependencies from deps stage
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/nextjs/node_modules ./apps/nextjs/node_modules
-COPY --from=deps /app/packages/*/node_modules ./packages/
-
-# Copy source code
+# Copy the entire workspace so pnpm can resolve every package. A hand-maintained
+# list of per-package `COPY package.json` lines drifts as packages are added
+# (this build was red because i18n/logging/telemetry were missing), and the old
+# `COPY packages/*/node_modules ./packages/` flattened per-package node_modules
+# (breaking validators' zod / @gmacko/tsconfig resolution). Copy-all + install
+# is simpler and correct.
 COPY . .
+
+# Install WITH devDependencies — the build needs tsc/tsup/next/etc. NODE_ENV is
+# intentionally left unset here so pnpm keeps devDependencies; it is set to
+# production only for the build step below.
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile
 
 # Build arguments
 ARG DATABASE_URL
@@ -61,7 +40,9 @@ ARG AUTH_SECRET
 ARG SKIP_ENV_VALIDATION=true
 ARG DOCKER_BUILD=true
 
-# Set environment for build
+# Set environment for build. DATABASE_URL is a placeholder so @gmacko/db/client
+# (which throws at import if unset) can instantiate during `next build` page-data
+# collection — postgres-js connects lazily, so no DB is contacted at build time.
 ENV DATABASE_URL=${DATABASE_URL}
 ENV AUTH_SECRET=${AUTH_SECRET}
 ENV SKIP_ENV_VALIDATION=${SKIP_ENV_VALIDATION}

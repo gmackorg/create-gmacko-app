@@ -40,12 +40,16 @@ export default defineConfig({
       use: { ...devices["iPhone 12"] },
     },
   ],
-  webServer: process.env.CI
-    ? undefined
-    : {
-        command: "pnpm dev",
-        url: baseURL,
-        reuseExistingServer: !process.env.CI,
-        timeout: 120 * 1000,
-      },
+  webServer: {
+    // In CI, serve the built app (the workflow runs `pnpm build` first); locally
+    // start the dev server. Playwright waits for `url` before running the suite —
+    // previously the webServer was disabled in CI and nothing served the app, so
+    // every test failed with "Connection refused".
+    command: process.env.CI ? "pnpm start" : "pnpm dev",
+    // Probe the lightweight health endpoint for readiness rather than the home
+    // page, whose SSR runs several tRPC/DB queries and can be slow to first byte.
+    url: process.env.CI ? `${baseURL}/api/health` : baseURL,
+    reuseExistingServer: !process.env.CI,
+    timeout: 180 * 1000,
+  },
 });
