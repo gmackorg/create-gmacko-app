@@ -111,6 +111,7 @@
   "globalPassThroughEnv": [
     "NODE_ENV",
     "CI",
+    "SKIP_ENV_VALIDATION",
     "NEXT_RUNTIME",
     "PORTLESS_URL",
     "AUTH_GITHUB_URL",
