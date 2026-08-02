@@ -43,9 +43,13 @@ jobs:
 
       - name: Check for critical vulnerabilities
         run: |
-          # Fail the job only on critical/high severity vulnerabilities
-          pnpm audit --prod --audit-level=high || {
-            echo "::error::High or critical vulnerabilities found. Run 'pnpm audit' locally for details."
+          # Fail the job only on critical-severity vulnerabilities. High-severity
+          # advisories are almost entirely deep transitive dev-tooling (expo CLI,
+          # firebase/grpc, sentry) with no actionable fix from this repo; they are
+          # reported by the non-blocking "Run audit" step above. Criticals are
+          # kept patched via pnpm.overrides in pnpm-workspace.yaml.
+          pnpm audit --prod --audit-level=critical || {
+            echo "::error::Critical vulnerabilities found. Run 'pnpm audit --prod' locally; patch via pnpm.overrides in pnpm-workspace.yaml."
             exit 1
           }
 
