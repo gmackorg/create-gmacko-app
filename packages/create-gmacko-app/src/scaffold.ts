@@ -241,6 +241,43 @@ export const isSaasSupportEnabled = () => saasFeatures.support;
 export const isSaasLaunchEnabled = () => saasFeatures.launch;
 export const isSaasReferralsEnabled = () => saasFeatures.referrals;
 export const isSaasOperatorApisEnabled = () => saasFeatures.operatorApis;
+
+export const platformPrimitives = {
+  featureFlags: {
+    enabled: true,
+    provider: "local" as const,
+  },
+  jobs: {
+    enabled: true,
+    provider: "local" as const,
+  },
+  rateLimits: {
+    enabled: true,
+    scopes: ["auth", "contact", "signup", "api-keys", "operator-api"] as const,
+  },
+  botProtection: {
+    enabled: true,
+    provider: "local-rate-limit" as const,
+  },
+  compliance: {
+    enabled: true,
+    dataExport: true,
+    dataDeletion: true,
+  },
+  emailDelivery: {
+    enabled: integrations.email.enabled,
+    provider: integrations.email.provider,
+    requiredEnv:
+      integrations.email.enabled && integrations.email.provider === "resend"
+        ? (["RESEND_API_KEY"] as const)
+        : ([] as const),
+  },
+} as const;
+
+export type PlatformPrimitives = typeof platformPrimitives;
+
+export const isEmailDeliveryEnabled = () =>
+  platformPrimitives.emailDelivery.enabled;
 `;
 
   fs.writeFileSync(configPath, content);
@@ -1028,15 +1065,41 @@ function pruneIntegrations(
     pruneNextAnalyticsFiles(targetDir);
   }
 
-  for (const app of ["nextjs", "expo", "tanstack-start"]) {
-    const appPkgPath = path.join(targetDir, `apps/${app}/package.json`);
-    if (fs.existsSync(appPkgPath)) {
-      const pkg = fs.readJsonSync(appPkgPath);
-      for (const pkgName of packagesToPrune) {
-        delete pkg.dependencies?.[`@gmacko/${pkgName}`];
-        delete pkg.devDependencies?.[`@gmacko/${pkgName}`];
+  // Remove references to pruned packages from EVERY remaining workspace
+  // package.json — not just apps. e.g. packages/billing declares
+  // @gmacko/payments, so pruning payments (Stripe off) otherwise breaks
+  // `pnpm install` with ERR_PNPM_WORKSPACE_PKG_NOT_FOUND.
+  const prunedDeps = packagesToPrune.map((p) => `@gmacko/${p}`);
+  for (const dir of ["apps", "packages", "tooling"]) {
+    const base = path.join(targetDir, dir);
+    if (!fs.existsSync(base)) continue;
+    for (const entry of fs.readdirSync(base)) {
+      const pkgPath = path.join(base, entry, "package.json");
+      if (!fs.existsSync(pkgPath)) continue;
+      const pkg = fs.readJsonSync(pkgPath);
+      let changed = false;
+      for (const dep of prunedDeps) {
+        if (pkg.dependencies?.[dep] !== undefined) {
+          delete pkg.dependencies[dep];
+          changed = true;
+        }
+        if (pkg.devDependencies?.[dep] !== undefined) {
+          delete pkg.devDependencies[dep];
+          changed = true;
+        }
       }
-      fs.writeJsonSync(appPkgPath, pkg, { spaces: 2 });
+      // Drop now-empty dependency maps entirely — sherif (pnpm lint:ws, run in
+      // postinstall) rejects empty `dependencies`/`devDependencies` fields.
+      if (pkg.dependencies && Object.keys(pkg.dependencies).length === 0) {
+        delete pkg.dependencies;
+      }
+      if (
+        pkg.devDependencies &&
+        Object.keys(pkg.devDependencies).length === 0
+      ) {
+        delete pkg.devDependencies;
+      }
+      if (changed) fs.writeJsonSync(pkgPath, pkg, { spaces: 2 });
     }
   }
 }
