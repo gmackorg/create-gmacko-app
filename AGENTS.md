@@ -43,6 +43,45 @@ The local dev stack replaces Docker Compose with [`@gmacko/emulate`](https://www
 | `DATABASE_URL` | PGlite wire protocol (`postgresql://localhost:5432/gmacko_dev`) |
 | `REDIS_URL` | redis-memory-server (`redis://localhost:6379`) |
 
+## App Invariants (enforced by `pnpm check:standards`)
+
+These are non-negotiable patterns that scaffolded apps must keep. Each maps to a
+real bug that shipped into a generated app. `pnpm check:standards`
+(`scripts/check-app-standards.mjs`, run in CI + `pnpm check:fast`) fails a PR
+that breaks one. When a violation is a justified exception, silence that single
+line with `// gmacko-standards-disable-next-line <rule>` and a reason.
+
+- **Read validated env, not `process.env`** (`no-raw-process-env`). In app
+  `src/**`, import the typed `env` (`~/env`, `@gmacko/*/env`) instead of reading
+  `process.env.*` directly; add the var to the env schema if missing. `NODE_ENV`
+  and `PORT` are the only conventional exceptions.
+- **Validate env at boot** — the Expo entry (`apps/expo/index.ts`) imports the
+  `validate-boot` side-effect before `expo-router/entry`, and `config/env.ts`
+  **throws** in preview/production for a missing/placeholder API URL or missing
+  Sentry/PostHog config. Don't downgrade this to a silent fallback.
+- **Exact-host checks, not substring** (`exact-host-check`). Validate an API host
+  with `new URL(x).hostname === host`, never `url.includes(host)` (bypassable).
+- **No committed credentials** (`no-committed-credentials`). Test/e2e configs and
+  `.env.example` must require creds via env (throw/blank if unset) and only carry
+  non-functional placeholders (`user@example.com`, `set-me-via-ci-secret`) — no
+  working defaults, no `${VAR:-realsecret}` fallbacks.
+- **Gate debug/verify routes** (`gate-debug-routes`). Any `dev`/`debug`/`verify`
+  HTTP route must require a bearer secret (fail closed if unset in prod) or be
+  restricted to non-production before it can capture events or leak env info.
+- **True account deletion** (`no-partial-account-deletion`). Deletion must remove
+  the auth `user` (which cascades sessions/accounts/apikeys via the schema), not
+  just an app-specific table — App Store 5.1.1(v). Route deletion through
+  `settings.deleteAccount`; don't hand-roll a partial delete.
+- **Observability is part of boot validation** — the Expo boot check above treats
+  a missing Sentry DSN / PostHog key as a hard error in preview/production, so a
+  store build with no telemetry fails fast rather than shipping blind. This is
+  enforced twice: at build time by `pnpm --filter @gmacko/expo check:observability`
+  (gates `build:preview`/`build:prod` and the `mobile-production` workflow, failing
+  before a cloud build starts), and at runtime by `src/config/env-validation.ts`.
+- **Health endpoints never leak internals in production** — `api/health`,
+  `api/health/ready`, and `.well-known/forge-health` return a generic message when
+  `NODE_ENV === "production"`; raw error detail is dev-only.
+
 ## Agent-Specific Notes
 
 ### Codex

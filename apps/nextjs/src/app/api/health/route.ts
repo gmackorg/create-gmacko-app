@@ -31,8 +31,14 @@ async function checkDatabase(): Promise<CheckResult> {
   } catch (error) {
     return {
       status: "fail",
+      // Never leak internal error details (host, driver, credentials) to an
+      // unauthenticated health probe in production; mirror .well-known/forge-health.
       message:
-        error instanceof Error ? error.message : "Database connection failed",
+        process.env.NODE_ENV === "production"
+          ? "Database connection failed"
+          : error instanceof Error
+            ? error.message
+            : "Database connection failed",
       responseTime: Date.now() - start,
     };
   }
