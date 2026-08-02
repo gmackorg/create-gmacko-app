@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   cleanupApp,
   EXPECTED_FILES,
+  ensureCliBuilt,
   ensureTempDir,
   fileExists,
   generateAppName,
@@ -18,6 +19,7 @@ describe("create-gmacko-app scaffold", () => {
   const appsToClean: string[] = [];
 
   beforeAll(() => {
+    ensureCliBuilt();
     tempDir = ensureTempDir();
   });
 
@@ -497,7 +499,9 @@ describe("create-gmacko-app scaffold", () => {
         `const base = "com.gmacko.${appName.replace(/-/g, "")}"`,
       );
       expect(expoConfig).toContain(`return "${expectedDisplayName}";`);
-      expect(expoConfig).toContain(`return "${expectedDisplayName} (Beta)";`);
+      expect(expoConfig).toContain(
+        `return "${expectedDisplayName} (Preview)";`,
+      );
       expect(expoConfig).toContain(`return "${expectedDisplayName} (Dev)";`);
       expect(expoConfig).toContain("EXPO_PUBLIC_APP_DOMAIN");
       expect(expoConfig).toContain('"change-me.example.com"');
@@ -1266,7 +1270,9 @@ describe("create-gmacko-app scaffold", () => {
       expect(pkg.scripts?.["bootstrap:local"]).toBe(
         "./scripts/bootstrap-local.sh",
       );
-      expect(pkg.scripts?.["check:fast"]).toBe("pnpm lint && pnpm typecheck");
+      expect(pkg.scripts?.["check:fast"]).toBe(
+        "pnpm lint && pnpm typecheck && pnpm check:standards",
+      );
       expect(pkg.scripts?.check).toBe(
         "pnpm check:fast && pnpm test && pnpm build",
       );
