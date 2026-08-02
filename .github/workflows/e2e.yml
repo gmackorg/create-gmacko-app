@@ -133,8 +133,11 @@ jobs:
 
       - name: Install Maestro
         run: |
-          brew install maestro
-          maestro --version
+          # Official installer puts the binary in ~/.maestro/bin (the Homebrew
+          # cask does not link a `maestro` onto PATH). Persist it for later steps.
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          "$HOME/.maestro/bin/maestro" --version
 
       - name: Build iOS app
         run: |
