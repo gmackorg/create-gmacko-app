@@ -84,9 +84,9 @@ jobs:
       - name: Scaffold app
         run: |
           mkdir -p /tmp/e2e-test
+          cd /tmp/e2e-test
           node ${{ github.workspace }}/packages/create-gmacko-app/dist/index.js test-app-default \
             --yes --no-git
-        working-directory: /tmp/e2e-test
         env:
           CI: "true"
 
@@ -192,9 +192,9 @@ jobs:
       - name: Scaffold operator app
         run: |
           mkdir -p /tmp/e2e-test
+          cd /tmp/e2e-test
           node ${{ github.workspace }}/packages/create-gmacko-app/dist/index.js test-app-operators \
             --yes --no-git --no-mobile --saas-bootstrap --trpc-operators
-        working-directory: /tmp/e2e-test
         env:
           CI: "true"
 
