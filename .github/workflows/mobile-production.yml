@@ -58,6 +58,19 @@ jobs:
         run: pnpm install --frozen-lockfile
         working-directory: .
 
+      # Fail fast before a 20-minute cloud build if observability/API config is
+      # missing or points at the scaffold placeholder host. When the values live
+      # only in EAS secrets (not visible here), this passes with a warning and
+      # the runtime boot guard in src/config/env-validation.ts is the backstop.
+      - name: Observability gate
+        run: node ./scripts/check-observability.mjs production
+        env:
+          EXPO_PUBLIC_PRODUCTION_API_URL: ${{ secrets.EXPO_PUBLIC_PRODUCTION_API_URL }}
+          EXPO_PUBLIC_SENTRY_DSN_PROD: ${{ secrets.EXPO_PUBLIC_SENTRY_DSN_PROD }}
+          EXPO_PUBLIC_SENTRY_DSN: ${{ secrets.EXPO_PUBLIC_SENTRY_DSN }}
+          EXPO_PUBLIC_POSTHOG_KEY_PROD: ${{ secrets.EXPO_PUBLIC_POSTHOG_KEY_PROD }}
+          EXPO_PUBLIC_POSTHOG_KEY: ${{ secrets.EXPO_PUBLIC_POSTHOG_KEY }}
+
       - name: EAS build (production)
         run: |
           eas build \

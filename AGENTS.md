@@ -74,7 +74,13 @@ line with `// gmacko-standards-disable-next-line <rule>` and a reason.
   `settings.deleteAccount`; don't hand-roll a partial delete.
 - **Observability is part of boot validation** — the Expo boot check above treats
   a missing Sentry DSN / PostHog key as a hard error in preview/production, so a
-  store build with no telemetry fails fast rather than shipping blind.
+  store build with no telemetry fails fast rather than shipping blind. This is
+  enforced twice: at build time by `pnpm --filter @gmacko/expo check:observability`
+  (gates `build:preview`/`build:prod` and the `mobile-production` workflow, failing
+  before a cloud build starts), and at runtime by `src/config/env-validation.ts`.
+- **Health endpoints never leak internals in production** — `api/health`,
+  `api/health/ready`, and `.well-known/forge-health` return a generic message when
+  `NODE_ENV === "production"`; raw error detail is dev-only.
 
 ## Agent-Specific Notes
 

@@ -21,7 +21,14 @@ export async function GET() {
       {
         status: "not_ready",
         timestamp: new Date().toISOString(),
-        error: error instanceof Error ? error.message : "Unknown error",
+        // Mask internal error details from an unauthenticated probe in
+        // production; mirror .well-known/forge-health.
+        error:
+          process.env.NODE_ENV === "production"
+            ? "Service dependencies unavailable"
+            : error instanceof Error
+              ? error.message
+              : "Unknown error",
       },
       { status: 503 },
     );
