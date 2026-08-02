@@ -26,6 +26,20 @@ jobs:
     name: Web E2E Tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test -d test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,6 +69,13 @@ jobs:
           SKIP_ENV_VALIDATION: true
           DATABASE_URL: "postgresql://test:test@localhost:5432/test"
           AUTH_SECRET: "test-secret-for-ci-builds"
+
+      # Create the schema in the service Postgres so the app's session/auth
+      # queries succeed when Playwright drives it (pages otherwise 500).
+      - name: Push database schema
+        run: pnpm -F @gmacko/db push --force
+        env:
+          DATABASE_URL: "postgresql://test:test@localhost:5432/test"
 
       - name: Run E2E tests
         run: pnpm e2e:web
