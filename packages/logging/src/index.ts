@@ -1,7 +1,7 @@
 import { integrations } from "@gmacko/config";
 import pino from "pino";
 
-import { getOtelMixin } from "./otel.js";
+import { getOtelMixin } from "./otel";
 
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
 
