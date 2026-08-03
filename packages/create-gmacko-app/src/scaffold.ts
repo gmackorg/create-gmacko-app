@@ -942,7 +942,6 @@ export default {
         {
           fetchAsset: (assetPath) =>
             env.ASSETS.fetch(new Request(new URL(assetPath, request.url))),
-          imageConfig,
           transformImage: async (body, { width, format, quality }) => {
             const result = await env.IMAGES.input(body)
               .transform(width > 0 ? { width } : {})
@@ -951,6 +950,7 @@ export default {
           },
         },
         allowedWidths,
+        imageConfig,
       );
     }
 
