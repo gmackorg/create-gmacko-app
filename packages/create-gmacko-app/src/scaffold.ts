@@ -727,10 +727,13 @@ function addOptionalOperatorScripts(
   };
 
   rootPackage.scripts ??= {};
+  // Run the operator CLI / MCP server source via tsx. pnpm never links a
+  // workspace package's OWN declared bin into node_modules/.bin, so the
+  // `exec gmacko-ops` / `exec gmacko-mcp` bin forms fail EACCES.
   rootPackage.scripts["trpc:ops"] =
-    "pnpm --filter @gmacko/trpc-cli exec gmacko-ops";
+    "pnpm --filter @gmacko/trpc-cli exec tsx src/index.ts";
   rootPackage.scripts["mcp:app"] =
-    "pnpm --filter @gmacko/mcp-server exec gmacko-mcp";
+    "pnpm --filter @gmacko/mcp-server exec tsx src/index.ts";
 
   fs.writeJsonSync(rootPackagePath, rootPackage, { spaces: 2 });
 }
@@ -759,7 +762,7 @@ function customizeMcpConfig(targetDir: string, options: CliOptions): void {
   mcpConfig.mcpServers ??= {};
   mcpConfig.mcpServers["gmacko-app"] = {
     command: "pnpm",
-    args: ["--filter", "@gmacko/mcp-server", "exec", "gmacko-mcp"],
+    args: ["--filter", "@gmacko/mcp-server", "exec", "tsx", "src/index.ts"],
     env: {
       GMACKO_API_URL: "http://localhost:3000",
       GMACKO_API_KEY: "change-me",
