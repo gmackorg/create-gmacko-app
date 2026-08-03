@@ -1448,6 +1448,16 @@ importers:
         specifier: ^4.21.0
         version: 4.21.0
 
+  sdks/openapi:
+    dependencies:
+      '@gmacko/api':
+        specifier: workspace:*
+        version: link:../../packages/api
+    devDependencies:
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+
   tooling/github: {}
 
   tooling/openapi-generator:
