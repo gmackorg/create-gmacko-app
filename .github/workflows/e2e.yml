@@ -106,8 +106,12 @@ jobs:
 
       - name: Install Maestro
         run: |
-          brew install maestro
-          maestro --version
+          # `brew install maestro` installs the Maestro.app CASK and leaves no
+          # `maestro` CLI on PATH (exit 127). Use the official installer, which
+          # drops the CLI in ~/.maestro/bin.
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          "$HOME/.maestro/bin/maestro" --version
 
       - name: Build iOS app
         run: |
