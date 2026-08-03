@@ -41,7 +41,7 @@
     "@gmacko/tsconfig": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:react19",
-    "expo-localization": "~55.0.9",
+    "expo-localization": "~56.0.6",
     "oxlint": "catalog:",
     "typescript": "catalog:"
   },

@@ -53,6 +53,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const sentryPlugin = getSentryConfig();
   const plugins: ExpoConfig["plugins"] = [
     "expo-apple-authentication",
+    "expo-localization",
     "expo-router",
     "expo-secure-store",
     "expo-web-browser",
