@@ -681,6 +681,14 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
       nextPkg.scripts["build:vinext"] = "echo skip-vinext-build";
       nextFs.writeFileSync(nextPkgPath, JSON.stringify(nextPkg, null, 2));
 
+      // Replace the real wrangler bin(s) with a fake. pnpm prepends
+      // node_modules/.bin when running scripts, which shadows anything on
+      // PATH, so a PATH-only fake never wins — overwrite the resolved bin.
+      require("child_process").execSync(
+        `for w in $(find . -path '*/node_modules/.bin/wrangler'); do rm -f "$w"; printf '#!/bin/sh\\necho "fake-wrangler $@"\\n' > "$w"; chmod +x "$w"; done`,
+        { cwd: appPath, shell: "/bin/sh" },
+      );
+
       const fakeBin = createFakeCliBin(appPath, {
         wrangler: 'echo "fake-wrangler $@"',
       });
