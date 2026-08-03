@@ -313,7 +313,8 @@ function updatePackageScope(targetDir: string, scope: string): void {
       file.endsWith(".ts") ||
       file.endsWith(".tsx") ||
       file.endsWith(".js") ||
-      file.endsWith(".mjs")
+      file.endsWith(".mjs") ||
+      file.endsWith(".css")
     ) {
       try {
         let content = fs.readFileSync(file, "utf-8");

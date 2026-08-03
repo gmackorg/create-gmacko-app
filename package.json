@@ -14,7 +14,7 @@
     "setup": "./scripts/setup.sh",
     "bootstrap:local": "./scripts/bootstrap-local.sh",
     "provision": "./scripts/provision.sh",
-    "auth:generate": "pnpm -F @gmacko/auth generate",
+    "auth:generate": "pnpm -F @gmacko/config build && pnpm -F @gmacko/auth generate",
     "db:generate": "pnpm -F @gmacko/db generate",
     "db:migrate": "pnpm -F @gmacko/db migrate",
     "db:push": "turbo -F @gmacko/db push",
