@@ -980,9 +980,20 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
       // via turbo (not a bare `-F ... build`) so its workspace deps
       // (@gmacko/operator-core → @gmacko/trpc-client) build first — tsup's
       // `--dts` needs their declarations or it fails TS2307.
+      // Build @gmacko/trpc-cli via turbo (not a bare `-F ... build`) so its
+      // workspace deps (@gmacko/operator-core → @gmacko/trpc-client) build
+      // first — tsup's `--dts` needs their declarations or it fails TS2307.
+      //
+      // Then invoke the built entry directly. The `pnpm trpc:ops` script
+      // (`pnpm --filter @gmacko/trpc-cli exec gmacko-ops`) is BROKEN as
+      // written: pnpm never links a workspace package's OWN bin into any
+      // node_modules/.bin, so `exec gmacko-ops` always fails EACCES. (The
+      // matrix job only "passes" because its `grep gmacko-ops` matches that
+      // error text — a false positive; same latent bug affects `mcp:app`.)
+      // Running the entry via node validates the CLI genuinely renders help.
       const result = runInApp(
         appPath,
-        "pnpm exec turbo run build --filter=@gmacko/trpc-cli && pnpm trpc:ops -- --help",
+        "pnpm exec turbo run build --filter=@gmacko/trpc-cli && pnpm --filter @gmacko/trpc-cli exec node dist/index.js --help",
         {
           timeout: 180000,
         },
