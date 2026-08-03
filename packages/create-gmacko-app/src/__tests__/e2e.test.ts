@@ -782,24 +782,13 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
       console.log("[E2E] Running operator CLI help smoke check...");
       createMockEnv(appPath);
 
-      // Build @gmacko/trpc-cli via turbo (not a bare `-F ... build`) so its
-      // workspace deps (@gmacko/operator-core → @gmacko/trpc-client) build
-      // first — tsup's `--dts` needs their declarations or it fails TS2307.
-      //
-      // Then invoke the built entry directly. The `pnpm trpc:ops` script
-      // (`pnpm --filter @gmacko/trpc-cli exec gmacko-ops`) is BROKEN as
-      // written: pnpm never links a workspace package's OWN bin into any
-      // node_modules/.bin, so `exec gmacko-ops` always fails EACCES. (The
-      // matrix job only "passes" because its `grep gmacko-ops` matches that
-      // error text — a false positive; same latent bug affects `mcp:app`.)
-      // Running the entry via node validates the CLI genuinely renders help.
-      const result = runInApp(
-        appPath,
-        "pnpm exec turbo run build --filter=@gmacko/trpc-cli && pnpm --filter @gmacko/trpc-cli exec node dist/index.js --help",
-        {
-          timeout: 180000,
-        },
-      );
+      // `pnpm trpc:ops` runs the operator CLI source via tsx (no build/bin
+      // linking needed — a workspace package's own bin is never linked into
+      // node_modules/.bin, which is why the old `exec gmacko-ops` form failed
+      // EACCES). This exercises the real script users run.
+      const result = runInApp(appPath, "pnpm trpc:ops -- --help", {
+        timeout: 180000,
+      });
 
       if (!result.success) {
         console.error("[E2E] Operator CLI help failed:");

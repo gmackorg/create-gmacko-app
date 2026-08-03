@@ -225,8 +225,13 @@ jobs:
 
       - name: Smoke operator CLI help
         run: |
+          # pipefail so a failing trpc:ops fails the step (tee would otherwise
+          # swallow its exit code), and grep for the distinctive help tagline
+          # rather than "gmacko-ops" — the latter also appears in error output,
+          # which previously let a broken CLI false-pass.
+          set -o pipefail
           pnpm trpc:ops -- --help | tee /tmp/e2e-test/operator-help.log
-          grep 'gmacko-ops' /tmp/e2e-test/operator-help.log || (echo "Operator CLI help did not render" && exit 1)
+          grep 'CLI + MCP wrappers over the same tRPC API' /tmp/e2e-test/operator-help.log || (echo "Operator CLI help did not render" && exit 1)
         working-directory: /tmp/e2e-test/test-app-operators
 
       - name: Verify bootstrap artifacts
