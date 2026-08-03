@@ -784,11 +784,13 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
 
       // @gmacko/trpc-cli exposes the `gmacko-ops` bin as ./dist/index.js but
       // has no prepare/postinstall build, so a fresh install never builds it
-      // and `pnpm trpc:ops` fails with "Command gmacko-ops not found". Build
-      // it first so the bin resolves.
+      // and `pnpm trpc:ops` fails with "Command gmacko-ops not found". Build it
+      // via turbo (not a bare `-F ... build`) so its workspace deps
+      // (@gmacko/operator-core → @gmacko/trpc-client) build first — tsup's
+      // `--dts` needs their declarations or it fails TS2307.
       const result = runInApp(
         appPath,
-        "pnpm -F @gmacko/trpc-cli build && pnpm trpc:ops -- --help",
+        "pnpm exec turbo run build --filter=@gmacko/trpc-cli && pnpm trpc:ops -- --help",
         {
           timeout: 180000,
         },
