@@ -62,3 +62,6 @@ data/
 .claude/settings.local.json
 session-ses_*.md
 .claude/skills/gstack/
+
+# Generated OpenAPI spec (produced by the SDK Generation workflow)
+sdks/openapi/openapi.json
