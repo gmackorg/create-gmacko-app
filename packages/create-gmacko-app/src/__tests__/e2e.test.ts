@@ -214,9 +214,9 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
         "apps/nextjs/src/app/api/health/route.ts",
       );
 
-      expect(healthRoute).toContain('status: "healthy"');
-      expect(healthRoute).toContain('status: "degraded"');
-      expect(healthRoute).toContain('status: "unhealthy"');
+      expect(healthRoute).toContain('return "healthy"');
+      expect(healthRoute).toContain('return "degraded"');
+      expect(healthRoute).toContain('return "unhealthy"');
       expect(healthRoute).toContain("return NextResponse.json");
     });
   });

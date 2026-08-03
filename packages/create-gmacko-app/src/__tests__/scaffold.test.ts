@@ -1521,7 +1521,7 @@ describe("create-gmacko-app scaffold", () => {
     expect(e2eWorkflow).toContain("pnpm auth:generate");
     expect(e2eWorkflow).toContain("pnpm db:generate");
     expect(e2eWorkflow).toContain(
-      "grep 'status: \"healthy\"' apps/nextjs/src/app/api/health/route.ts",
+      "grep 'return \"healthy\"' apps/nextjs/src/app/api/health/route.ts",
     );
     expect(e2eWorkflow).toContain("Cloudflare Workers env values");
     expect(e2eWorkflow).toContain("fake-wrangler deploy --env staging");
