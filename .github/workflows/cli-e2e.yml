@@ -121,8 +121,8 @@ jobs:
 
       - name: Verify local forge CLI resolution
         run: |
-          pnpm exec forge --version | tee /tmp/e2e-test/forge-version.log
-          grep '^0\.' /tmp/e2e-test/forge-version.log || (echo "Local forge CLI did not resolve from repo install" && exit 1)
+          pnpm exec forge version | tee /tmp/e2e-test/forge-version.log
+          grep -E 'forge [0-9]+\.' /tmp/e2e-test/forge-version.log || (echo "Local forge CLI did not resolve from repo install" && exit 1)
         working-directory: /tmp/e2e-test/test-app-default
 
       - name: Smoke ForgeGraph scripts
@@ -546,7 +546,7 @@ jobs:
           pnpm run doctor | tee /tmp/e2e-test/vinext-doctor.log
           grep 'Cloudflare Workers lane detected' /tmp/e2e-test/vinext-doctor.log || (echo "Doctor did not detect Cloudflare lane" && exit 1)
           grep 'Wrangler CLI available' /tmp/e2e-test/vinext-doctor.log || (echo "Doctor did not detect Wrangler CLI" && exit 1)
-          grep 'Cloudflare Workers credentials present' /tmp/e2e-test/vinext-doctor.log || (echo "Doctor did not detect Cloudflare credentials" && exit 1)
+          grep 'Cloudflare Workers env values' /tmp/e2e-test/vinext-doctor.log || (echo "Doctor did not detect Cloudflare credentials" && exit 1)
         working-directory: /tmp/e2e-test/test-app-vinext
 
       - name: Run fast checks
