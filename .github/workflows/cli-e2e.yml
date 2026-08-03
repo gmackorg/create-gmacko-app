@@ -491,7 +491,7 @@ jobs:
   e2e-vinext:
     name: E2E - Vinext
     needs: build-cli
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8-cores
     timeout-minutes: 60
     steps:
       - name: Checkout
@@ -563,7 +563,7 @@ jobs:
           # The vinext/Vite Cloudflare build is memory-heavy; cap the V8 heap so
           # it doesn't exhaust the runner (which surfaces as a "runner received
           # shutdown signal" cancellation mid-transform).
-          NODE_OPTIONS: "--max-old-space-size=4096"
+          NODE_OPTIONS: "--max-old-space-size=8192"
 
       - name: Smoke Cloudflare deploy script
         run: |
@@ -643,7 +643,7 @@ jobs:
     name: E2E - Full Vitest Suite
     if: github.event_name == 'workflow_dispatch'
     needs: build-cli
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8-cores
     timeout-minutes: 120
     steps:
       - name: Checkout
@@ -668,5 +668,5 @@ jobs:
           # This suite also scaffolds + builds a vinext app; cap the V8 heap so
           # its memory-heavy Vite build doesn't OOM the runner (inherited by the
           # child build processes).
-          NODE_OPTIONS: "--max-old-space-size=4096"
+          NODE_OPTIONS: "--max-old-space-size=8192"
           KEEP_TEST_APPS: ${{ inputs.keep_test_apps && 'true' || 'false' }}
