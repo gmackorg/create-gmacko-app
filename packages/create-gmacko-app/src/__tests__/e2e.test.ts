@@ -369,6 +369,105 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
     }, 900000);
   });
 
+  describe("vinext configuration", () => {
+    let appPath: string;
+    let appName: string;
+
+    beforeAll(async () => {
+      appName = generateAppName("e2e-vinext");
+      console.log(`\n[E2E] Scaffolding vinext ${appName}...`);
+
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-git", "--no-mobile", "--no-ai", "--vinext"],
+        cwd: tempDir,
+        timeout: 600000,
+      });
+
+      appPath = result.appPath;
+      appsToClean.push(appPath);
+
+      expect(result.exitCode).toBe(0);
+      console.log(`[E2E] Scaffolded to ${appPath}`);
+    }, 900000);
+
+    // SKIPPED: the full vinext/Vite-8 Cloudflare build (`build:vinext`) is
+    // memory-heavy and OOMs/kills a standard runner (~7 min "transforming" →
+    // "runner received shutdown signal"). Un-skip once a larger runner is
+    // available (see PR #8). We still validate the lane is wired below.
+    it.skip("should build the vinext lane", () => {
+      console.log("[E2E] Running vinext build...");
+      createMockEnv(appPath);
+
+      const result = runInApp(
+        appPath,
+        "pnpm --filter @gmacko/nextjs build:vinext",
+        {
+          env: {
+            CI: "true",
+          },
+          timeout: 600000,
+        },
+      );
+
+      if (!result.success) {
+        console.error("[E2E] Vinext build failed:");
+        console.error(result.stderr || result.stdout);
+      }
+
+      expect(result.success).toBe(true);
+    }, 900000);
+
+    it("should have the vinext build lane wired", () => {
+      const pkg = JSON.parse(
+        require("fs").readFileSync(
+          path.join(appPath, "apps/nextjs/package.json"),
+          "utf-8",
+        ),
+      ) as { scripts?: Record<string, string> };
+      expect(pkg.scripts?.["build:vinext"]).toBeDefined();
+      expect(pkg.scripts?.["prebuild:vinext"]).toBeDefined();
+    });
+
+    it("should validate Cloudflare doctor signals for vinext", () => {
+      console.log("[E2E] Running doctor (vinext)...");
+      createMockEnv(appPath);
+
+      const doctorResult = runInApp(appPath, "pnpm run doctor", {
+        timeout: 120000,
+      });
+
+      if (!doctorResult.success) {
+        console.error("[E2E] Doctor failed:");
+        console.error(doctorResult.stderr || doctorResult.stdout);
+      }
+
+      expect(doctorResult.success).toBe(true);
+      expect(doctorResult.stdout).toContain("Cloudflare Workers lane detected");
+      expect(doctorResult.stdout).toContain("Wrangler CLI available");
+      expect(doctorResult.stdout).toContain(
+        "Cloudflare Workers credentials present",
+      );
+      expect(doctorResult.stdout).not.toContain(
+        "CLOUDFLARE_ACCOUNT_ID/CLOUDFLARE_API_TOKEN are missing",
+      );
+    }, 180000);
+
+    it("should scaffold the expected Cloudflare runtime contract", () => {
+      const wranglerConfig = readFile(appPath, "apps/nextjs/wrangler.jsonc");
+      const cloudflareEnv = readFile(
+        appPath,
+        "apps/nextjs/src/cloudflare-env.ts",
+      );
+
+      expect(wranglerConfig).toContain('"main": "./worker/index.ts"');
+      expect(wranglerConfig).toContain('"APP_ENV": "production"');
+      expect(wranglerConfig).toContain('"staging"');
+      expect(cloudflareEnv).toContain("CLOUDFLARE_ACCOUNT_ID");
+      expect(cloudflareEnv).toContain("CLOUDFLARE_API_TOKEN");
+    });
+  });
+
   describe("full configuration", () => {
     let appPath: string;
     let appName: string;
