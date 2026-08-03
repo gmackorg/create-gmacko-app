@@ -671,6 +671,16 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
       console.log("[E2E] Running fake Cloudflare deploy smoke test...");
       createMockEnv(appPath);
 
+      // Stub build:vinext to a no-op for this smoke. deploy:cloudflare:staging
+      // chains `build:vinext && wrangler deploy`, and the real vinext/Vite
+      // build OOMs a standard runner (see the skipped "should build the vinext
+      // lane"). We only need to confirm the deploy script reaches wrangler.
+      const nextPkgPath = path.join(appPath, "apps/nextjs/package.json");
+      const nextFs = require("fs");
+      const nextPkg = JSON.parse(nextFs.readFileSync(nextPkgPath, "utf-8"));
+      nextPkg.scripts["build:vinext"] = "echo skip-vinext-build";
+      nextFs.writeFileSync(nextPkgPath, JSON.stringify(nextPkg, null, 2));
+
       const fakeBin = createFakeCliBin(appPath, {
         wrangler: 'echo "fake-wrangler $@"',
       });
