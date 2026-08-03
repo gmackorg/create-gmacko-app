@@ -24,6 +24,12 @@ concurrency:
   group: cli-e2e-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Scaffold from this checkout instead of cloning main, so template changes in
+  # the branch under test are actually exercised (the CLI defaults to cloning
+  # https://github.com/gmackorg/create-gmacko-app.git otherwise).
+  CREATE_GMACKO_APP_TEMPLATE_REPO: ${{ github.workspace }}
+
 jobs:
   build-cli:
     name: Build CLI
