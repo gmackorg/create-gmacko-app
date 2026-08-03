@@ -12,6 +12,8 @@ on:
       - "packages/auth/**"
       - "packages/db/**"
       - "packages/ui/**"
+      - ".github/workflows/e2e.yml"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -26,20 +28,6 @@ jobs:
     name: Web E2E Tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U test -d test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,11 +45,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        # playwright.config.ts defines chromium, firefox, webkit, mobile-chrome
-        # (Pixel 5 / chromium) and mobile-safari (iPhone 12 / webkit). Install all
-        # three engines so every configured project can launch (webkit was missing,
-        # failing the mobile-safari/webkit projects).
-        run: pnpm -F @gmacko/nextjs exec playwright install --with-deps chromium firefox webkit
+        run: pnpm -F @gmacko/nextjs exec playwright install --with-deps chromium
 
       - name: Build application
         run: pnpm build
@@ -70,24 +54,13 @@ jobs:
           DATABASE_URL: "postgresql://test:test@localhost:5432/test"
           AUTH_SECRET: "test-secret-for-ci-builds"
 
-      # Create the schema in the service Postgres so the app's session/auth
-      # queries succeed when Playwright drives it (pages otherwise 500).
-      - name: Push database schema
-        run: pnpm -F @gmacko/db push --force
-        env:
-          DATABASE_URL: "postgresql://test:test@localhost:5432/test"
-
       - name: Run E2E tests
-        # Run Playwright directly (not via `turbo run e2e`) so the webServer's
-        # stdout/stderr streams to the log and the full step env reaches the
-        # `next start` process without turbo's env filtering.
-        run: pnpm -F @gmacko/nextjs exec playwright test
+        run: pnpm e2e:web
         env:
           CI: true
           PLAYWRIGHT_BASE_URL: "http://localhost:3000"
           DATABASE_URL: "postgresql://test:test@localhost:5432/test"
           AUTH_SECRET: "test-secret-for-ci-builds"
-          SKIP_ENV_VALIDATION: "true"
 
       - name: Upload test results
         if: always()
@@ -109,7 +82,7 @@ jobs:
     name: Mobile E2E Tests (Maestro)
     runs-on: macos-latest
     timeout-minutes: 45
-    if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'run-mobile-e2e')
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'run-mobile-e2e')
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -133,20 +106,25 @@ jobs:
 
       - name: Install Maestro
         run: |
-          # Official installer puts the binary in ~/.maestro/bin (the Homebrew
-          # cask does not link a `maestro` onto PATH). Persist it for later steps.
-          curl -fsSL "https://get.maestro.mobile.dev" | bash
-          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
-          "$HOME/.maestro/bin/maestro" --version
+          brew install maestro
+          maestro --version
 
       - name: Build iOS app
         run: |
           cd apps/expo
           npx expo prebuild --platform ios --clean
-          xcodebuild -workspace ios/*.xcworkspace \
-            -scheme "$(ls ios/*.xcworkspace | head -1 | xargs basename -s .xcworkspace)" \
+          # `ls -d` yields the workspace directory itself; a bare `ls` lists its
+          # CONTENTS and picks up `contents.xcworkspacedata`, producing a bogus
+          # scheme. The Expo scheme matches the workspace basename.
+          WORKSPACE=$(ls -d ios/*.xcworkspace | head -1)
+          SCHEME=$(basename "$WORKSPACE" .xcworkspace)
+          echo "Building workspace=$WORKSPACE scheme=$SCHEME"
+          # `-sdk iphonesimulator` builds a generic simulator binary without
+          # pinning a specific device (device names vary by Xcode version).
+          xcodebuild -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
             -configuration Debug \
-            -destination 'platform=iOS Simulator,name=iPhone 15' \
+            -sdk iphonesimulator \
             -derivedDataPath build \
             build
         env:
@@ -154,13 +132,30 @@ jobs:
 
       - name: Boot iOS Simulator
         run: |
-          xcrun simctl boot "iPhone 15" || true
+          # Pick the first available iPhone simulator by UDID rather than
+          # hardcoding a device name (e.g. "iPhone 15" isn't present on every
+          # Xcode version).
+          DEVICE_ID=$(xcrun simctl list devices available \
+            | grep 'iPhone' \
+            | grep -oE '[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}' \
+            | head -1)
+          if [ -z "$DEVICE_ID" ]; then
+            echo "No available iPhone simulator found"; xcrun simctl list devices; exit 1
+          fi
+          echo "SIMULATOR_ID=$DEVICE_ID" >> "$GITHUB_ENV"
+          echo "Booting simulator $DEVICE_ID"
+          xcrun simctl boot "$DEVICE_ID" || true
+          xcrun simctl bootstatus "$DEVICE_ID" -b || true
           xcrun simctl list devices booted
 
       - name: Install app on Simulator
         run: |
           APP_PATH=$(find apps/expo/build -name "*.app" -type d | head -1)
-          xcrun simctl install booted "$APP_PATH"
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app bundle found under apps/expo/build"; find apps/expo/build -name "*.app"; exit 1
+          fi
+          echo "Installing $APP_PATH onto $SIMULATOR_ID"
+          xcrun simctl install "$SIMULATOR_ID" "$APP_PATH"
 
       - name: Run Maestro E2E tests
         run: |
