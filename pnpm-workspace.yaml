@@ -56,6 +56,11 @@ overrides:
   expo: 56.0.18
   expo-modules-core: 56.0.22
   react-native: 0.85.3
+  # Transitive native modules that resolved below SDK-56 canonical and fail to
+  # compile against RN 0.85.3 (react-native-svg's RCTImageResponseObserverProxy
+  # C++ API changed; expo-image 55 predates RN 0.85).
+  react-native-svg: 15.15.4
+  expo-image: 56.0.11
   better-auth: https://pkg.pr.new/better-auth@8814
   '@better-auth/core': https://pkg.pr.new/better-auth/better-auth/@better-auth/core@e9a2a6d
   # Force patched versions of transitive deps with critical advisories
