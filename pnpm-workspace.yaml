@@ -49,6 +49,13 @@ onlyBuiltDependencies:
 overrides:
   '@types/minimatch': 5.1.2
   lightningcss: 1.30.1
+  # Collapse Expo SDK version skew onto SDK 56 canonical. Packages that don't
+  # declare expo directly (analytics/i18n/notifications, and purchases via
+  # react-native-purchases) otherwise resolve stale expo@54/55 + emc, which
+  # breaks expo-notifications' permission types and risks native build skew.
+  expo: 56.0.18
+  expo-modules-core: 56.0.22
+  react-native: 0.85.3
   better-auth: https://pkg.pr.new/better-auth@8814
   '@better-auth/core': https://pkg.pr.new/better-auth/better-auth/@better-auth/core@e9a2a6d
   # Force patched versions of transitive deps with critical advisories
