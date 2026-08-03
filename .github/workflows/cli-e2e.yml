@@ -562,7 +562,7 @@ jobs:
           # The vinext/Vite Cloudflare build is memory-heavy; cap the V8 heap so
           # it doesn't exhaust the runner (which surfaces as a "runner received
           # shutdown signal" cancellation mid-transform).
-          NODE_OPTIONS: "--max-old-space-size=6144"
+          NODE_OPTIONS: "--max-old-space-size=4096"
         env:
           CI: "true"
 
@@ -666,4 +666,8 @@ jobs:
         run: pnpm --dir packages/create-gmacko-app exec vitest run src/__tests__/e2e.test.ts
         env:
           RUN_E2E: "true"
+          # This suite also scaffolds + builds a vinext app; cap the V8 heap so
+          # its memory-heavy Vite build doesn't OOM the runner (inherited by the
+          # child build processes).
+          NODE_OPTIONS: "--max-old-space-size=4096"
           KEEP_TEST_APPS: ${{ inputs.keep_test_apps && 'true' || 'false' }}
