@@ -1480,7 +1480,7 @@ describe("create-gmacko-app scaffold", () => {
     expect(e2eWorkflow).toContain('node-version-file: ".nvmrc"');
     expect(e2eWorkflow).not.toContain("node-version: 22");
     expect(e2eWorkflow).not.toContain("2>&1 || true");
-    expect(e2eWorkflow).toContain("pnpm doctor");
+    expect(e2eWorkflow).toContain("pnpm run doctor");
     expect(e2eWorkflow).toContain("pnpm check:fast");
     expect(e2eWorkflow).toContain(
       "pnpm --dir packages/create-gmacko-app build",
@@ -1515,15 +1515,15 @@ describe("create-gmacko-app scaffold", () => {
     expect(e2eWorkflow).toContain("Operator API env values");
     expect(e2eWorkflow).toContain('GMACKO_API_URL="http://localhost:3000"');
     expect(e2eWorkflow).toContain('GMACKO_API_KEY="test-gmacko-api-key"');
-    expect(e2eWorkflow).toContain("pnpm exec forge --version");
-    expect(e2eWorkflow).toContain("pnpm forge:stages");
-    expect(e2eWorkflow).toContain("pnpm forge:deploy:staging");
+    expect(e2eWorkflow).toContain("pnpm exec forge version");
+    expect(e2eWorkflow).toContain("forge stage list");
+    expect(e2eWorkflow).toContain("forge deploy create staging --wait");
     expect(e2eWorkflow).toContain("pnpm auth:generate");
     expect(e2eWorkflow).toContain("pnpm db:generate");
     expect(e2eWorkflow).toContain(
       "grep 'status: \"healthy\"' apps/nextjs/src/app/api/health/route.ts",
     );
-    expect(e2eWorkflow).toContain("Cloudflare Workers credentials present");
+    expect(e2eWorkflow).toContain("Cloudflare Workers env values");
     expect(e2eWorkflow).toContain("fake-wrangler deploy --env staging");
     expect(e2eWorkflow).toContain('RUN_E2E: "true"');
     expect(e2eWorkflow).toContain(

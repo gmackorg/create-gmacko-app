@@ -49,6 +49,13 @@ export async function scaffold(options: CliOptions): Promise<void> {
 
   updatePackageJson(targetDir, options);
   updateIntegrationsConfig(targetDir, options, options.integrations);
+  // Prune BEFORE renaming the package scope. The prune helpers operate on the
+  // default @gmacko/* names (removing pruned packages and scrubbing their
+  // imports/deps); running after updatePackageScope would miss the @scope/*
+  // references and leave dangling workspace deps and broken imports.
+  if (options.prune) {
+    pruneIntegrations(targetDir, options.integrations);
+  }
   updatePackageScope(targetDir, options.packageScope);
   createManifest(targetDir, options);
   createForgeGraphConfig(targetDir, options);
@@ -92,10 +99,6 @@ export async function scaffold(options: CliOptions): Promise<void> {
     fs.removeSync(path.join(targetDir, "scripts/provision.sh"));
   }
 
-  if (options.prune) {
-    pruneIntegrations(targetDir, options.integrations);
-  }
-
   spinner.stop("Project configured");
 
   if (options.git) {
@@ -106,10 +109,26 @@ export async function scaffold(options: CliOptions): Promise<void> {
   if (options.install) {
     spinner.start("Installing dependencies...");
     try {
-      execSync("pnpm install", { cwd: targetDir, stdio: "pipe" });
+      // Force a non-frozen install: scaffolding rewrites package.json (name,
+      // integrations, pruned deps) without regenerating the lockfile, and pnpm
+      // implies --frozen-lockfile under CI=1 — which then fails instantly on the
+      // now-stale lockfile.
+      execSync("pnpm install --no-frozen-lockfile", {
+        cwd: targetDir,
+        stdio: "pipe",
+      });
       spinner.stop("Dependencies installed");
-    } catch {
+    } catch (err) {
       spinner.stop("Failed to install dependencies");
+      // Surface why — a swallowed install failure otherwise only shows up later
+      // as confusing "turbo: not found" errors.
+      const stderr =
+        err && typeof err === "object" && "stderr" in err
+          ? String((err as { stderr?: unknown }).stderr ?? "")
+          : "";
+      if (stderr.trim()) {
+        p.log.error(stderr.trim().split("\n").slice(-25).join("\n"));
+      }
       p.log.warn("Run 'pnpm install' manually to complete setup");
     }
   }
@@ -241,6 +260,43 @@ export const isSaasSupportEnabled = () => saasFeatures.support;
 export const isSaasLaunchEnabled = () => saasFeatures.launch;
 export const isSaasReferralsEnabled = () => saasFeatures.referrals;
 export const isSaasOperatorApisEnabled = () => saasFeatures.operatorApis;
+
+export const platformPrimitives = {
+  featureFlags: {
+    enabled: true,
+    provider: "local" as const,
+  },
+  jobs: {
+    enabled: true,
+    provider: "local" as const,
+  },
+  rateLimits: {
+    enabled: true,
+    scopes: ["auth", "contact", "signup", "api-keys", "operator-api"] as const,
+  },
+  botProtection: {
+    enabled: true,
+    provider: "local-rate-limit" as const,
+  },
+  compliance: {
+    enabled: true,
+    dataExport: true,
+    dataDeletion: true,
+  },
+  emailDelivery: {
+    enabled: integrations.email.enabled,
+    provider: integrations.email.provider,
+    requiredEnv:
+      integrations.email.enabled && integrations.email.provider === "resend"
+        ? (["RESEND_API_KEY"] as const)
+        : ([] as const),
+  },
+} as const;
+
+export type PlatformPrimitives = typeof platformPrimitives;
+
+export const isEmailDeliveryEnabled = () =>
+  platformPrimitives.emailDelivery.enabled;
 `;
 
   fs.writeFileSync(configPath, content);
@@ -262,7 +318,11 @@ function updatePackageScope(targetDir: string, scope: string): void {
       try {
         let content = fs.readFileSync(file, "utf-8");
         if (content.includes("@gmacko/")) {
-          content = content.replace(/@gmacko\//g, `${scope}/`);
+          // Rename internal workspace packages only. @gmacko/emulate is an
+          // external published dev dependency — renaming it to @scope/emulate
+          // makes `pnpm install` 404. Preserve it (and any future external
+          // @gmacko/* deps added here).
+          content = content.replace(/@gmacko\/(?!emulate\b)/g, `${scope}/`);
           fs.writeFileSync(file, content);
         }
       } catch {
@@ -1028,15 +1088,41 @@ function pruneIntegrations(
     pruneNextAnalyticsFiles(targetDir);
   }
 
-  for (const app of ["nextjs", "expo", "tanstack-start"]) {
-    const appPkgPath = path.join(targetDir, `apps/${app}/package.json`);
-    if (fs.existsSync(appPkgPath)) {
-      const pkg = fs.readJsonSync(appPkgPath);
-      for (const pkgName of packagesToPrune) {
-        delete pkg.dependencies?.[`@gmacko/${pkgName}`];
-        delete pkg.devDependencies?.[`@gmacko/${pkgName}`];
+  // Remove references to pruned packages from EVERY remaining workspace
+  // package.json — not just apps. e.g. packages/billing declares
+  // @gmacko/payments, so pruning payments (Stripe off) otherwise breaks
+  // `pnpm install` with ERR_PNPM_WORKSPACE_PKG_NOT_FOUND.
+  const prunedDeps = packagesToPrune.map((p) => `@gmacko/${p}`);
+  for (const dir of ["apps", "packages", "tooling"]) {
+    const base = path.join(targetDir, dir);
+    if (!fs.existsSync(base)) continue;
+    for (const entry of fs.readdirSync(base)) {
+      const pkgPath = path.join(base, entry, "package.json");
+      if (!fs.existsSync(pkgPath)) continue;
+      const pkg = fs.readJsonSync(pkgPath);
+      let changed = false;
+      for (const dep of prunedDeps) {
+        if (pkg.dependencies?.[dep] !== undefined) {
+          delete pkg.dependencies[dep];
+          changed = true;
+        }
+        if (pkg.devDependencies?.[dep] !== undefined) {
+          delete pkg.devDependencies[dep];
+          changed = true;
+        }
       }
-      fs.writeJsonSync(appPkgPath, pkg, { spaces: 2 });
+      // Drop now-empty dependency maps entirely — sherif (pnpm lint:ws, run in
+      // postinstall) rejects empty `dependencies`/`devDependencies` fields.
+      if (pkg.dependencies && Object.keys(pkg.dependencies).length === 0) {
+        delete pkg.dependencies;
+      }
+      if (
+        pkg.devDependencies &&
+        Object.keys(pkg.devDependencies).length === 0
+      ) {
+        delete pkg.devDependencies;
+      }
+      if (changed) fs.writeJsonSync(pkgPath, pkg, { spaces: 2 });
     }
   }
 }

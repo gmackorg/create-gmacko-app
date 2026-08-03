@@ -1,4 +1,5 @@
 {
   "name": "@gmacko/github",
+  "private": true,
   "scripts": {}
 }

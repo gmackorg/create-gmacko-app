@@ -167,7 +167,7 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
       console.log("[E2E] Verifying local forge CLI resolution...");
       createMockEnv(appPath);
 
-      const result = runInApp(appPath, "pnpm exec forge --version", {
+      const result = runInApp(appPath, "pnpm exec forge version", {
         timeout: 120000,
       });
 
@@ -177,7 +177,7 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
       }
 
       expect(result.success).toBe(true);
-      expect(result.stdout.trim()).toMatch(/^0\\./);
+      expect(result.stdout.trim()).toMatch(/forge \d+\./);
     }, 180000);
 
     it("should complete auth and db bootstrap commands", () => {
@@ -340,7 +340,7 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
       console.log("[E2E] Running doctor (vinext)...");
       createMockEnv(appPath);
 
-      const doctorResult = runInApp(appPath, "pnpm doctor", {
+      const doctorResult = runInApp(appPath, "pnpm run doctor", {
         timeout: 120000,
       });
 
@@ -733,7 +733,7 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
       console.log("[E2E] Running doctor (operator lane)...");
       createMockEnv(appPath);
 
-      const doctorResult = runInApp(appPath, "pnpm doctor", {
+      const doctorResult = runInApp(appPath, "pnpm run doctor", {
         timeout: 180000,
       });
 
