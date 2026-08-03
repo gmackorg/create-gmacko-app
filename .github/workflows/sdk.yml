@@ -53,7 +53,9 @@ jobs:
       - name: Generate OpenAPI spec
         # OpenApi.fromApi(AppApi) over @gmacko/domain: the contract's own
         # package version is the spec version.
-        run: pnpm -F @gmacko/openapi-spec generate
+        run: |
+          pnpm -F @gmacko/config build
+          pnpm -F @gmacko/openapi-spec generate
 
       - name: Upload spec artifact
         uses: actions/upload-artifact@v4
