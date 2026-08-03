@@ -1278,7 +1278,7 @@ describe("create-gmacko-app scaffold", () => {
         "pnpm check:fast && pnpm test && pnpm build",
       );
       expect(pkg.scripts?.["e2e:cli:full"]).toBe(
-        "RUN_E2E=true pnpm --dir packages/create-gmacko-app vitest run src/__tests__/e2e.test.ts",
+        "RUN_E2E=true pnpm --dir packages/create-gmacko-app exec vitest run src/__tests__/e2e.test.ts",
       );
       expect(pkg.scripts?.["release:cli:dry-run"]).toBeDefined();
       expect(pkg.scripts?.["check:release"]).toBe(
@@ -1527,7 +1527,7 @@ describe("create-gmacko-app scaffold", () => {
     expect(e2eWorkflow).toContain("fake-wrangler deploy --env staging");
     expect(e2eWorkflow).toContain('RUN_E2E: "true"');
     expect(e2eWorkflow).toContain(
-      "pnpm --dir packages/create-gmacko-app vitest run src/__tests__/e2e.test.ts",
+      "pnpm --dir packages/create-gmacko-app exec vitest run src/__tests__/e2e.test.ts",
     );
   });
 

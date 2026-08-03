@@ -51,7 +51,7 @@
     "check:fast": "pnpm lint && pnpm typecheck && pnpm check:standards",
     "check": "pnpm check:fast && pnpm test && pnpm build",
     "test:emulate": "vitest run --config test/vitest.config.ts",
-    "e2e:cli:full": "RUN_E2E=true pnpm --dir packages/create-gmacko-app vitest run src/__tests__/e2e.test.ts",
+    "e2e:cli:full": "RUN_E2E=true pnpm --dir packages/create-gmacko-app exec vitest run src/__tests__/e2e.test.ts",
     "release:cli:dry-run": "mkdir -p .artifacts && cd packages/create-gmacko-app && npm pack --pack-destination ../../.artifacts >/dev/null",
     "check:release": "pnpm --dir packages/create-gmacko-app test && pnpm --dir packages/create-gmacko-app build && pnpm release:cli:dry-run",
     "commitlint": "commitlint --from HEAD~1 --to HEAD",
