@@ -559,12 +559,11 @@ jobs:
         run: pnpm --filter @gmacko/nextjs build:vinext
         working-directory: /tmp/e2e-test/test-app-vinext
         env:
+          CI: "true"
           # The vinext/Vite Cloudflare build is memory-heavy; cap the V8 heap so
           # it doesn't exhaust the runner (which surfaces as a "runner received
           # shutdown signal" cancellation mid-transform).
           NODE_OPTIONS: "--max-old-space-size=4096"
-        env:
-          CI: "true"
 
       - name: Smoke Cloudflare deploy script
         run: |
