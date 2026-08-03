@@ -49,6 +49,13 @@ export async function scaffold(options: CliOptions): Promise<void> {
 
   updatePackageJson(targetDir, options);
   updateIntegrationsConfig(targetDir, options, options.integrations);
+  // Prune BEFORE renaming the package scope. The prune helpers operate on the
+  // default @gmacko/* names (removing pruned packages and scrubbing their
+  // imports/deps); running after updatePackageScope would miss the @scope/*
+  // references and leave dangling workspace deps and broken imports.
+  if (options.prune) {
+    pruneIntegrations(targetDir, options.integrations);
+  }
   updatePackageScope(targetDir, options.packageScope);
   createManifest(targetDir, options);
   createForgeGraphConfig(targetDir, options);
@@ -90,10 +97,6 @@ export async function scaffold(options: CliOptions): Promise<void> {
 
   if (!options.includeProvision) {
     fs.removeSync(path.join(targetDir, "scripts/provision.sh"));
-  }
-
-  if (options.prune) {
-    pruneIntegrations(targetDir, options.integrations);
   }
 
   spinner.stop("Project configured");
@@ -315,7 +318,11 @@ function updatePackageScope(targetDir: string, scope: string): void {
       try {
         let content = fs.readFileSync(file, "utf-8");
         if (content.includes("@gmacko/")) {
-          content = content.replace(/@gmacko\//g, `${scope}/`);
+          // Rename internal workspace packages only. @gmacko/emulate is an
+          // external published dev dependency — renaming it to @scope/emulate
+          // makes `pnpm install` 404. Preserve it (and any future external
+          // @gmacko/* deps added here).
+          content = content.replace(/@gmacko\/(?!emulate\b)/g, `${scope}/`);
           fs.writeFileSync(file, content);
         }
       } catch {
