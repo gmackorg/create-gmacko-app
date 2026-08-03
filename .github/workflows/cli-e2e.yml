@@ -499,8 +499,8 @@ jobs:
   e2e-mobile-only:
     name: E2E - Mobile Only
     needs: build-cli
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+    runs-on: ubuntu-latest-8-cores
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -598,6 +598,10 @@ jobs:
             --integrations ""
         env:
           CI: "true"
+          # The vinext/Vite Cloudflare build is memory-heavy; cap the V8 heap so
+          # it doesn't exhaust the runner (which surfaces as a "runner received
+          # shutdown signal" cancellation mid-transform).
+          NODE_OPTIONS: "--max-old-space-size=8192"
 
       - name: Create mock .env
         run: printf '%s' "$MOCK_ENV" > .env
@@ -694,7 +698,7 @@ jobs:
     name: E2E - Full Vitest Suite
     if: github.event_name == 'workflow_dispatch'
     needs: build-cli
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8-cores
     timeout-minutes: 120
     steps:
       - name: Checkout
