@@ -10,7 +10,6 @@ appId: ${APP_ID}
 # Navigate to profile/settings
 - tapOn:
     text: "Profile|Settings|Account"
-    regex: true
     optional: true
 
 - tapOn:
@@ -20,24 +19,20 @@ appId: ${APP_ID}
 # Wait for profile screen
 - assertVisible:
     text: "Profile|Settings|Account"
-    regex: true
     optional: true
 
 # Tap sign out
 - tapOn:
     text: "Sign [Oo]ut|Log [Oo]ut"
-    regex: true
 
 # Confirm sign out if dialog appears
 - tapOn:
     text: "Confirm|Yes|Sign [Oo]ut"
-    regex: true
     optional: true
 
 # Verify signed out - should see sign in option
 - assertVisible:
     text: "Sign [Ii]n|Log [Ii]n|Welcome"
-    regex: true
     timeout: 5000
 
 # Take screenshot

@@ -23,4 +23,3 @@ appId: ${APP_ID}
 # Alternative: check for any main content
 - assertVisible:
     text: ".*"
-    regex: true

@@ -11,13 +11,11 @@ appId: ${APP_ID}
 # Navigate to sign in (if not already there)
 - tapOn:
     text: "Sign [Ii]n"
-    regex: true
     optional: true
 
 # Wait for sign in screen
 - assertVisible:
     text: "Sign [Ii]n"
-    regex: true
 
 # Enter email
 - tapOn:
@@ -40,13 +38,11 @@ appId: ${APP_ID}
 # Tap sign in button
 - tapOn:
     text: "Sign [Ii]n"
-    regex: true
     index: 1
 
 # Wait for navigation or error
 - assertVisible:
     text: "Welcome|Dashboard|Home|Error|Invalid"
-    regex: true
     timeout: 10000
 
 # Take screenshot of result
