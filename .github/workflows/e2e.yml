@@ -160,6 +160,12 @@ jobs:
           fi
           echo "Installing $APP_PATH onto $SIMULATOR_ID"
           xcrun simctl install "$SIMULATOR_ID" "$APP_PATH"
+          # Derive the actual bundle id from the built app rather than guessing:
+          # a Debug build defaults to the dev variant (com.gmacko.app.dev), not
+          # the production id, so a hardcoded APP_ID fails to launch.
+          BUNDLE_ID=$(plutil -extract CFBundleIdentifier raw "$APP_PATH/Info.plist")
+          echo "Installed bundle id: $BUNDLE_ID"
+          echo "APP_ID=$BUNDLE_ID" >> "$GITHUB_ENV"
 
       - name: Run Maestro E2E tests
         run: |
@@ -170,12 +176,11 @@ jobs:
           # API_URL — they stay in .maestro/flows for apps that wire one up,
           # but the template CI has no backend, so gating on them here would
           # be a false signal.
-          # Pass APP_ID explicitly: a single flow file (unlike the .maestro/
-          # dir) doesn't read config.yaml, which is where the ${APP_ID} default
-          # lives, so without this it resolves to "undefined" and launch fails.
+          # APP_ID comes from the installed app's Info.plist (set in the install
+          # step); a single flow file doesn't read .maestro/config.yaml, so pass
+          # it via -e or ${APP_ID} resolves to "undefined".
           maestro test -e APP_ID="${APP_ID}" .maestro/flows/01-app-launch.yaml
         env:
-          APP_ID: ${{ vars.EXPO_APP_ID || 'com.gmacko.app' }}
           API_URL: "http://localhost:3000"
 
       - name: Upload Maestro screenshots
