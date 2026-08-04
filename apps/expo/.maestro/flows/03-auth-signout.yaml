@@ -33,7 +33,6 @@ appId: ${APP_ID}
 # Verify signed out - should see sign in option
 - assertVisible:
     text: "Sign [Ii]n|Log [Ii]n|Welcome"
-    timeout: 5000
 
 # Take screenshot
 - takeScreenshot: auth-signout-result

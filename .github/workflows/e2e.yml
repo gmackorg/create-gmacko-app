@@ -164,7 +164,13 @@ jobs:
       - name: Run Maestro E2E tests
         run: |
           cd apps/expo
-          maestro test .maestro/
+          # Run the app-launch smoke only: it verifies the app builds,
+          # installs, and renders on the simulator. The auth/CRUD flows
+          # (02/03/05) assert real content that needs a running backend at
+          # API_URL — they stay in .maestro/flows for apps that wire one up,
+          # but the template CI has no backend, so gating on them here would
+          # be a false signal.
+          maestro test .maestro/flows/01-app-launch.yaml
         env:
           APP_ID: ${{ vars.EXPO_APP_ID || 'com.gmacko.app' }}
           API_URL: "http://localhost:3000"

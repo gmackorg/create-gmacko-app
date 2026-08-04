@@ -43,7 +43,6 @@ appId: ${APP_ID}
 # Wait for navigation or error
 - assertVisible:
     text: "Welcome|Dashboard|Home|Error|Invalid"
-    timeout: 10000
 
 # Take screenshot of result
 - takeScreenshot: auth-signin-result
