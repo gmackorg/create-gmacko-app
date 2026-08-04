@@ -170,7 +170,10 @@ jobs:
           # API_URL — they stay in .maestro/flows for apps that wire one up,
           # but the template CI has no backend, so gating on them here would
           # be a false signal.
-          maestro test .maestro/flows/01-app-launch.yaml
+          # Pass APP_ID explicitly: a single flow file (unlike the .maestro/
+          # dir) doesn't read config.yaml, which is where the ${APP_ID} default
+          # lives, so without this it resolves to "undefined" and launch fails.
+          maestro test -e APP_ID="${APP_ID}" .maestro/flows/01-app-launch.yaml
         env:
           APP_ID: ${{ vars.EXPO_APP_ID || 'com.gmacko.app' }}
           API_URL: "http://localhost:3000"
