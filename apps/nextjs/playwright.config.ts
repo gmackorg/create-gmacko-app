@@ -50,6 +50,10 @@ export default defineConfig({
     // page, whose SSR runs several tRPC/DB queries and can be slow to first byte.
     url: process.env.CI ? `${baseURL}/api/health` : baseURL,
     reuseExistingServer: !process.env.CI,
-    timeout: 180 * 1000,
+    // Generous: `next start`'s first /api/health request compiles the route on
+    // demand, which is slow to first byte on a cold CI runner with a large
+    // monorepo node_modules. 180s was occasionally (and, once the Expo native
+    // tree landed in the workspace, consistently) too tight.
+    timeout: 300 * 1000,
   },
 });

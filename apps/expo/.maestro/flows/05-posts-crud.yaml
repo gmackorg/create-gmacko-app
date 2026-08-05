@@ -10,14 +10,11 @@ appId: ${APP_ID}
 # Navigate to posts section
 - tapOn:
     text: "Posts|Feed|Home"
-    regex: true
     optional: true
 
 # Wait for posts to load
 - assertVisible:
     text: "Posts|No posts|Loading"
-    regex: true
-    timeout: 10000
 
 # Take initial screenshot
 - takeScreenshot: posts-initial
@@ -25,7 +22,6 @@ appId: ${APP_ID}
 # Create a new post
 - tapOn:
     text: "Create|New|Add|\\+"
-    regex: true
     optional: true
 
 - tapOn:
@@ -37,7 +33,6 @@ appId: ${APP_ID}
     when:
       visible:
         text: "Title|Create Post|New Post"
-        regex: true
     commands:
       # Enter title
       - tapOn:
@@ -48,20 +43,16 @@ appId: ${APP_ID}
       # Enter content
       - tapOn:
           text: "Content|Description|Body"
-          regex: true
           optional: true
       - inputText: "This is a test post created by Maestro E2E tests"
 
       # Submit
       - tapOn:
           text: "Create|Submit|Save|Post"
-          regex: true
 
       # Wait for success
       - assertVisible:
           text: "Test Post from Maestro|Success|Created"
-          regex: true
-          timeout: 10000
 
 # Take screenshot of result
 - takeScreenshot: posts-after-create
@@ -73,12 +64,10 @@ appId: ${APP_ID}
 
 - tapOn:
     text: "Delete|Remove|Trash"
-    regex: true
     optional: true
 
 - tapOn:
     text: "Confirm|Yes|Delete"
-    regex: true
     optional: true
 
 # Final screenshot

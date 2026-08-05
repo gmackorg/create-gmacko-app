@@ -35,7 +35,7 @@
     "@gmacko/tsconfig": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:react19",
-    "expo-constants": "~55.0.8",
+    "expo-constants": "~56.0.22",
     "oxlint": "catalog:",
     "typescript": "catalog:"
   },
