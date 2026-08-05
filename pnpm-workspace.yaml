@@ -106,7 +106,7 @@ overrides:
   expo-symbols: 56.0.6
   expo-system-ui: 56.0.5
   expo-web-browser: 56.0.6
-  better-auth: https://pkg.pr.new/better-auth@8814
+  better-auth: https://pkg.pr.new/better-auth/better-auth@e9a2a6d
   '@better-auth/core': https://pkg.pr.new/better-auth/better-auth/@better-auth/core@e9a2a6d
   # Force patched versions of transitive deps with critical advisories
   # (GHSA arbitrary-code-exec / DoS / type-confusion). See deps.yml audit gate.
