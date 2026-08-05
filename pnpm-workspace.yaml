@@ -2,6 +2,7 @@ packages:
   - apps/*
   - packages/*
   - tooling/*
+  - sdks/openapi
 
 catalog:
   '@biomejs/biome': ^2.4.8

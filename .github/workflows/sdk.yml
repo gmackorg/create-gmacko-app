@@ -49,7 +49,12 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate OpenAPI spec
-        run: pnpm -F @gmacko/openapi-spec generate
+        # @gmacko/config is the only dist-based package; packages/api/src/openapi
+        # imports its built output, so build it first or the generate script
+        # fails ERR_MODULE_NOT_FOUND on @gmacko/config/dist/index.js.
+        run: |
+          pnpm -F @gmacko/config build
+          pnpm -F @gmacko/openapi-spec generate
         env:
           API_TITLE: "Gmacko API"
           API_VERSION: ${{ github.event.release.tag_name || '1.0.0' }}
@@ -59,6 +64,9 @@ jobs:
         with:
           name: openapi-spec
           path: sdks/openapi/openapi.json
+          # Fail loudly if the spec wasn't generated (the default `warn` let an
+          # empty upload pass, which then broke every downstream download).
+          if-no-files-found: error
 
       - name: Check for spec drift (PR only)
         if: github.event_name == 'pull_request'
@@ -73,6 +81,7 @@ jobs:
     needs: generate-spec
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         language: [typescript, python, go, java, kotlin, swift, rust, ruby]
     steps:
