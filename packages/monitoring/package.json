@@ -27,6 +27,8 @@
     "dev": "tsc",
     "format": "biome check .",
     "lint": "oxlint .",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
@@ -41,7 +43,8 @@
     "@gmacko/tsconfig": "workspace:*",
     "@types/react": "catalog:react19",
     "oxlint": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^4.1.0"
   },
   "peerDependencies": {
     "react": ">=18.0.0"
