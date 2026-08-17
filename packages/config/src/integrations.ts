@@ -1,5 +1,8 @@
 export const integrations = {
   sentry: true,
+  // Preflight crash/error reporter — dual-reports client crashes alongside
+  // Sentry. No-ops at runtime when the app id / ingest key are unset.
+  preflight: true,
   posthog: true,
   forgegraph: false,
   stripe: false,
@@ -70,6 +73,7 @@ export const platformPrimitives = {
 export type PlatformPrimitives = typeof platformPrimitives;
 
 export const isSentryEnabled = () => integrations.sentry;
+export const isPreflightEnabled = () => integrations.preflight;
 export const isPostHogEnabled = () => integrations.posthog;
 export const isStripeEnabled = () => integrations.stripe;
 export const isRevenueCatEnabled = () => integrations.revenuecat;

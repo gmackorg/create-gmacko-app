@@ -23,6 +23,8 @@
     "dev": "tsc",
     "format": "biome check .",
     "lint": "oxlint .",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
@@ -34,7 +36,8 @@
     "@biomejs/biome": "catalog:",
     "@gmacko/tsconfig": "workspace:*",
     "oxlint": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^4.1.0"
   },
   "peerDependencies": {
     "next": ">=15.0.0",
