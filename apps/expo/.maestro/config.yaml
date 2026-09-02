@@ -2,7 +2,7 @@
 # https://maestro.mobile.dev/
 
 # App configuration
-appId: ${APP_ID:-com.gmacko.app}
+appId: ${APP_ID}
 
 # Flow settings
 flows:
