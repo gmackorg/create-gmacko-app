@@ -1,9 +1,10 @@
+import type { ApiKeyScope, InviteRole, Theme } from "@gmacko/domain";
 import {
   supportedLocales,
   useLocaleNative,
   useTranslationsNative,
 } from "@gmacko/i18n/native";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
 import { Stack } from "expo-router";
 import { useState } from "react";
@@ -17,12 +18,21 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { trpc } from "~/utils/api";
+import { mutations, queries } from "~/utils/api";
 import { authClient } from "~/utils/auth";
 import { setLocale } from "~/utils/i18n";
 
-const PERMISSIONS = ["read", "write", "delete", "admin"] as const;
-const COLLABORATION_ROLES = ["member", "admin"] as const;
+const PERMISSIONS: ReadonlyArray<ApiKeyScope> = [
+  "read",
+  "write",
+  "delete",
+  "admin",
+];
+const COLLABORATION_ROLES: ReadonlyArray<InviteRole> = ["member", "admin"];
+
+// Every mutation below invalidates what it makes stale through the query
+// client's mutation cache (the mutation's `invalidates` meta), so no screen
+// calls `invalidateQueries` by hand.
 
 function formatMoney(amountInCents: number, currency: string) {
   return new Intl.NumberFormat("en-US", {
@@ -42,25 +52,18 @@ function formatDate(value: Date | string | null) {
 }
 
 function PreferencesSection() {
-  const queryClient = useQueryClient();
   const _t = useTranslationsNative();
   const currentLocale = useLocaleNative();
 
   const { data: preferences, isLoading } = useQuery(
-    trpc.settings.getPreferences.queryOptions(),
+    queries.settings.getPreferences(),
   );
 
   const { mutate: updatePreferences } = useMutation(
-    trpc.settings.updatePreferences.mutationOptions({
-      onSuccess: () => {
-        void queryClient.invalidateQueries(
-          trpc.settings.getPreferences.queryFilter(),
-        );
-      },
-    }),
+    mutations.settings.updatePreferences(),
   );
 
-  const handleThemeChange = (theme: "light" | "dark" | "system") => {
+  const handleThemeChange = (theme: Theme) => {
     updatePreferences({ theme });
   };
 
@@ -184,53 +187,41 @@ function PreferencesSection() {
 }
 
 function ApiKeysSection() {
-  const queryClient = useQueryClient();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
-  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([
-    "read",
-  ]);
+  const [selectedPermissions, setSelectedPermissions] = useState<
+    Array<ApiKeyScope>
+  >(["read"]);
   const [newKey, setNewKey] = useState<string | null>(null);
 
-  const { data: apiKeys, isLoading } = useQuery(
-    trpc.settings.listApiKeys.queryOptions(),
-  );
+  const { data: apiKeys, isLoading } = useQuery(queries.settings.listApiKeys());
 
-  const { mutate: createKey, isPending: isCreating } = useMutation(
-    trpc.settings.createApiKey.mutationOptions({
-      onSuccess: (data) => {
-        setNewKey(data.key);
-        setNewKeyName("");
-        setSelectedPermissions(["read"]);
-        setShowCreateForm(false);
-        void queryClient.invalidateQueries(
-          trpc.settings.listApiKeys.queryFilter(),
-        );
-      },
-    }),
-  );
+  // Minting and revoking keys takes the `admin` scope on a key; a session
+  // (this app) always may. The plaintext key is in the response once.
+  const { mutate: createKey, isPending: isCreating } = useMutation({
+    ...mutations.settings.createApiKey(),
+    onSuccess: (data) => {
+      setNewKey(data.key);
+      setNewKeyName("");
+      setSelectedPermissions(["read"]);
+      setShowCreateForm(false);
+    },
+    onError: (error) => {
+      Alert.alert("Could not create API key", error.message);
+    },
+  });
 
-  const { mutate: revokeKey, isPending: isRevoking } = useMutation(
-    trpc.settings.revokeApiKey.mutationOptions({
-      onSuccess: () => {
-        void queryClient.invalidateQueries(
-          trpc.settings.listApiKeys.queryFilter(),
-        );
-      },
-    }),
-  );
+  const { mutate: revokeKey, isPending: isRevoking } = useMutation({
+    ...mutations.settings.revokeApiKey(),
+    onError: (error) => {
+      Alert.alert("Could not revoke API key", error.message);
+    },
+  });
 
   const handleCreateKey = () => {
-    if (!newKeyName.trim() || selectedPermissions.length === 0) return;
-    createKey({
-      name: newKeyName,
-      permissions: selectedPermissions as (
-        | "read"
-        | "write"
-        | "delete"
-        | "admin"
-      )[],
-    });
+    const [first, ...rest] = selectedPermissions;
+    if (!newKeyName.trim() || first === undefined) return;
+    createKey({ name: newKeyName, permissions: [first, ...rest] });
   };
 
   const handleRevokeKey = (id: string, name: string) => {
@@ -242,13 +233,13 @@ function ApiKeysSection() {
         {
           text: "Revoke",
           style: "destructive",
-          onPress: () => revokeKey({ id }),
+          onPress: () => revokeKey(id),
         },
       ],
     );
   };
 
-  const togglePermission = (permission: string) => {
+  const togglePermission = (permission: ApiKeyScope) => {
     setSelectedPermissions((prev) =>
       prev.includes(permission)
         ? prev.filter((p) => p !== permission)
@@ -395,40 +386,34 @@ function ApiKeysSection() {
 }
 
 function CollaborationSection() {
-  const queryClient = useQueryClient();
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"admin" | "member">("member");
+  const [inviteRole, setInviteRole] = useState<InviteRole>("member");
 
   const { data: workspaceContext, isLoading: isWorkspaceLoading } = useQuery(
-    trpc.settings.getWorkspaceContext.queryOptions(),
+    queries.settings.workspaceContext(),
   );
 
+  // `listInvites` is `Forbidden{reason: "role"}` unless the caller manages
+  // the workspace, so it only runs once the context says they do.
   const { data: invites, isLoading: isInvitesLoading } = useQuery({
-    ...trpc.settings.listInvites.queryOptions(),
+    ...queries.settings.listInvites(),
     enabled: workspaceContext?.canManageWorkspace ?? false,
   });
 
-  const { mutate: createInvite, isPending: isCreatingInvite } = useMutation(
-    trpc.settings.createInvite.mutationOptions({
-      onSuccess: async () => {
-        setInviteEmail("");
-        setInviteRole("member");
-        await queryClient.invalidateQueries(
-          trpc.settings.getWorkspaceContext.queryFilter(),
-        );
-        await queryClient.invalidateQueries(
-          trpc.settings.listInvites.queryFilter(),
-        );
-        Alert.alert("Invite created", "The teammate invite is now pending.");
-      },
-      onError: (error) => {
-        Alert.alert(
-          "Could not create invite",
-          error.message || "Try again from the current workspace.",
-        );
-      },
-    }),
-  );
+  const { mutate: createInvite, isPending: isCreatingInvite } = useMutation({
+    ...mutations.settings.createInvite(),
+    onSuccess: () => {
+      setInviteEmail("");
+      setInviteRole("member");
+      Alert.alert("Invite created", "The teammate invite is now pending.");
+    },
+    onError: (error) => {
+      Alert.alert(
+        "Could not create invite",
+        error.message || "Try again from the current workspace.",
+      );
+    },
+  });
 
   if (isWorkspaceLoading || !workspaceContext?.canManageWorkspace) {
     return null;
@@ -534,9 +519,7 @@ function CollaborationSection() {
 }
 
 function BillingUsageSection() {
-  const { data, isLoading } = useQuery(
-    trpc.settings.getBillingOverview.queryOptions(),
-  );
+  const { data, isLoading } = useQuery(queries.settings.billingOverview());
 
   if (isLoading) {
     return (
@@ -675,14 +658,18 @@ function BillingUsageSection() {
 }
 
 function AccountSection() {
-  const { mutate: deleteAccount, isPending } = useMutation(
-    trpc.settings.deleteAccount.mutationOptions({
-      onSuccess: async () => {
-        await authClient.signOut();
-        Alert.alert("Account deleted", "Your account has been deleted.");
-      },
-    }),
-  );
+  // Session only on the server (a key can never delete an account); the
+  // mutation clears the whole query cache on success.
+  const { mutate: deleteAccount, isPending } = useMutation({
+    ...mutations.settings.deleteAccount(),
+    onSuccess: async () => {
+      await authClient.signOut();
+      Alert.alert("Account deleted", "Your account has been deleted.");
+    },
+    onError: (error) => {
+      Alert.alert("Could not delete account", error.message);
+    },
+  });
 
   const handleDeleteAccount = () => {
     Alert.alert(
