@@ -20,6 +20,8 @@ import type { MagicLink } from "../index";
 import { AuthSecurityConfig } from "../security-config";
 import { Auth } from "../service";
 import {
+  countingDatabase,
+  makeStatementLog,
   type SignedIn,
   signInWithMagicLink,
   testAuthOptions,
@@ -29,10 +31,14 @@ import { jsonOf, makeTestHandler } from "./test-api";
 const baseUrl = "http://localhost:3001";
 const foreignOrigin = "https://evil.example";
 const links: Array<MagicLink> = [];
+const log = makeStatementLog();
 
+const CountedDatabase = countingDatabase(log).pipe(Layer.provide(layerTest));
 const Services = Layer.mergeAll(
-  layerTest,
-  Auth.layer(testAuthOptions(baseUrl, links)).pipe(Layer.provide(layerTest)),
+  CountedDatabase,
+  Auth.layer(testAuthOptions(baseUrl, links)).pipe(
+    Layer.provide(CountedDatabase),
+  ),
   Layer.succeed(AuthSecurityConfig)({
     allowedOrigins: [baseUrl],
     stage: "development",
@@ -162,6 +168,22 @@ describe("security middlewares", () => {
         _tag: "Forbidden",
         reason: "origin",
       });
+    });
+
+    it("reads the session exactly once when refusing a foreign Origin (one path, one RequestContext)", async () => {
+      // Only the session token: with the cookie cache (session_data) sent,
+      // better-auth would skip the read and hide what is being measured.
+      log.reset();
+      const response = await call("POST", "/write", {
+        cookie: signedIn.sessionCookie,
+        origin: foreignOrigin,
+      });
+      expect(response.status).toBe(403);
+      expect(await jsonOf(response)).toEqual({
+        _tag: "Forbidden",
+        reason: "origin",
+      });
+      expect(log.touching("plain", "session")).toBe(1);
     });
 
     it("refuses a non-GET request with neither Origin nor Sec-Fetch-Site", async () => {
@@ -395,11 +417,8 @@ describe("security middlewares", () => {
         }),
       );
 
-    const join = (
-      email: string,
-      workspaceId: string,
-      role: "owner" | "admin" | "member",
-    ) =>
+    /** `role` is any string: the column is `text`, and one test stores a value the contract does not know. */
+    const join = (email: string, workspaceId: string, role: string) =>
       run(
         Effect.gen(function* () {
           const { db } = yield* Database;
@@ -407,9 +426,11 @@ describe("security middlewares", () => {
             .select({ id: user.id })
             .from(user)
             .where(eq(user.email, email));
-          yield* db
-            .insert(workspaceMembership)
-            .values({ workspaceId, userId: member!.id, role });
+          yield* db.insert(workspaceMembership).values({
+            workspaceId,
+            userId: member!.id,
+            role: role as "member",
+          });
         }),
       );
 
@@ -449,6 +470,31 @@ describe("security middlewares", () => {
         (await call("GET", "/workspace-admin", { cookie: admin.cookie }))
           .status,
       ).toBe(200);
+      expect(
+        (await call("GET", "/workspace-owner", { cookie: admin.cookie }))
+          .status,
+      ).toBe(403);
+
+      const owner = await signIn("wsowner");
+      await join(owner.email, ws.id, "owner");
+      expect(
+        (await call("GET", "/workspace-owner", { cookie: owner.cookie }))
+          .status,
+      ).toBe(200);
+    });
+
+    it("fails closed on a stored role the contract does not know", async () => {
+      const odd = await signIn("bogus-role");
+      const ws = await seedWorkspace(odd.email);
+      await join(odd.email, ws.id, "bogus");
+      for (const path of ["/workspace", "/workspace-owner"] as const) {
+        const response = await call("GET", path, { cookie: odd.cookie });
+        expect(response.status, path).toBe(403);
+        expect(await jsonOf(response)).toEqual({
+          _tag: "Forbidden",
+          reason: "role",
+        });
+      }
     });
 
     it("prefers the initial workspace from application settings when the user is a member of it", async () => {

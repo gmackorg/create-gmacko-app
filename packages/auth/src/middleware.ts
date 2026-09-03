@@ -7,11 +7,14 @@
  *    order and falls through to the next when one fails; a missing cookie
  *    decodes to `Redacted("")`, not a failure. So every scheme here ignores
  *    the decoded credential and looks at the raw request.
- * 2. Bearer beats cookie: with an `Authorization` header present, the
- *    `session` scheme refuses, so a bad key can never fall through to a valid
- *    cookie. The `apiKey` scheme owns the bearer path and, when there is no
- *    bearer, repeats the cookie path so the *last* failure the builder
- *    reports is the cookie's own (`Forbidden(origin)`, not a spurious 401).
+ * 2. Bearer beats cookie: any `Authorization` header (not only
+ *    `Bearer gmk_…`) makes the request a bearer request, so a bad key can
+ *    never fall through to a valid cookie. In `SessionOrKey` the `session`
+ *    scheme exists so OpenAPI shows the cookie and always refuses; the
+ *    `apiKey` scheme, tried last, is the single path for both credentials
+ *    (bearer present ⇒ key path, otherwise cookie path). One path means one
+ *    `RequestContext`, one session read, and the failure the builder reports
+ *    is the cookie's own (`Forbidden(origin)`, not a spurious 401).
  * 3. A bearer on a `Session`-only endpoint is `Forbidden(scope)`.
  * 4. The raw `Cookie` header goes to better-auth, which reads whichever name
  *    it set (`__Secure-` prefixed over https).
@@ -158,14 +161,24 @@ const makeDeps: Effect.Effect<
   return { forRequest, allowedOrigins: new Set(config.allowedOrigins) };
 });
 
-const orDie = <A>(
-  what: string,
-): ((self: Effect.Effect<A, DatabaseError>) => Effect.Effect<A>) =>
-  Effect.catchTag("DatabaseError", (error: DatabaseError) =>
-    Effect.logError(`${what}: database read failed`, error).pipe(
-      Effect.andThen(Effect.die(error)),
-    ),
-  );
+/**
+ * A database failure inside a middleware is a defect. It is not logged
+ * here: the router's logger reports every defect once, with the request, so
+ * a manual `logError` would print it twice. `what` names the read in the
+ * defect for that report.
+ */
+const orDie =
+  (what: string) =>
+  <A, E>(
+    self: Effect.Effect<A, E | DatabaseError>,
+  ): Effect.Effect<A, Exclude<E, DatabaseError>> =>
+    self.pipe(
+      Effect.catchTag("DatabaseError", (error) =>
+        Effect.die(
+          new Error(`${what}: database read failed`, { cause: error }),
+        ),
+      ),
+    ) as Effect.Effect<A, Exclude<E, DatabaseError>>;
 
 const provide = (
   wrapped: Wrapped,
@@ -214,15 +227,7 @@ const keyPath = (
 > =>
   Effect.gen(function* () {
     const context = yield* deps.forRequest(request);
-    const key = yield* keys
-      .authenticate(bearer)
-      .pipe(
-        Effect.catchTag("DatabaseError", (error: DatabaseError) =>
-          Effect.logError("api key lookup: database read failed", error).pipe(
-            Effect.andThen(Effect.die(error)),
-          ),
-        ),
-      );
+    const key = yield* keys.authenticate(bearer).pipe(orDie("api key lookup"));
     if (
       !key.permissions.includes(scope) &&
       !key.permissions.includes("admin")
@@ -271,17 +276,12 @@ const sessionOrKeyLive = <Self>(
       const deps = yield* makeDeps;
       const keys = yield* ApiKeys;
       return tag.of({
-        // Rule 2: a bearer is present, so this scheme refuses and lets the
-        // builder fall through to `apiKey`; its failure is never the last
-        // one reported when a bearer is present.
-        session: (wrapped) =>
-          Effect.gen(function* () {
-            const request = yield* HttpServerRequest.HttpServerRequest;
-            if (bearerOf(request) !== undefined) {
-              return yield* new Unauthorized();
-            }
-            return yield* cookiePath(deps, wrapped, request);
-          }),
+        // Rule 2: `session` is declared so OpenAPI shows the cookie scheme and
+        // always refuses; the builder falls through to `apiKey`, the single
+        // path for both credentials. A cookie request therefore builds one
+        // `RequestContext`, reads the session once, and the failure the
+        // builder reports last is the cookie's own.
+        session: () => Effect.fail(new Unauthorized()),
         apiKey: (wrapped) =>
           Effect.gen(function* () {
             const request = yield* HttpServerRequest.HttpServerRequest;
@@ -326,6 +326,9 @@ export const AdminOnlyLive: Layer.Layer<AdminOnly, never, Auth | Database> =
             user.credential === "key"
               ? user.role
               : yield* context.role(user.id).pipe(orDie("AdminOnly"));
+          // A user deleted since the credential was read has a `null` role;
+          // by contract that is `Forbidden(role)` like any non-admin, not a
+          // 401: the credential itself was valid.
           if (role !== "admin") return yield* new Forbidden({ reason: "role" });
           // The handler sees the role the decision was made on, not the
           // cookie's; a `CurrentUser.role` of "admin" is always fresh here.
@@ -343,6 +346,18 @@ const RANK: Readonly<Record<WorkspaceMemberRole, number>> = {
   admin: 2,
   member: 1,
 };
+
+/**
+ * The rank of a stored role, failing closed: `role` is `text` in the
+ * database, so a value the contract does not know (a bad migration, a hand
+ * edit) ranks 0, below every `minimum`. `RequestContext` already drops such
+ * rows before they reach here; this is the second line. `Object.hasOwn`,
+ * not `in`: a key such as `"constructor"` is `in` every object literal.
+ */
+const rankOf = (role: string | null): number =>
+  role !== null && Object.hasOwn(RANK, role)
+    ? RANK[role as WorkspaceMemberRole]
+    : 0;
 
 /**
  * "The current workspace" is `RequestContext.workspace(userId)`: the initial
@@ -365,11 +380,7 @@ const workspaceRoleLive = <Self>(
           const scope = yield* context
             .workspace(user.id)
             .pipe(orDie(`WorkspaceRole(${minimum})`));
-          if (
-            scope === null ||
-            scope.role === null ||
-            RANK[scope.role] < RANK[minimum]
-          ) {
+          if (scope === null || rankOf(scope.role) < RANK[minimum]) {
             return yield* new Forbidden({ reason: "role" });
           }
           return yield* wrapped;

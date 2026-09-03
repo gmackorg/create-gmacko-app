@@ -13,6 +13,7 @@ export interface AuthSecurityConfigShape {
    * normalised through `new URL(...).origin`; never a substring match.
    */
   readonly allowedOrigins: ReadonlyArray<string>;
+  // TODO(Phase 4): unused — drop with the apps/web cleanup
   readonly stage: Stage;
 }
 

@@ -9,7 +9,10 @@
  *   bypassing the cookie cache — an admin decision must not trust a cookie
  *   that may be five minutes stale (docs/API_AUTH.md, rule 5);
  * - `memberships` / `workspace`: the caller's `workspace_membership` rows and
- *   the "current workspace" resolved from them (see `resolveWorkspace`).
+ *   the "current workspace" resolved from them (see `resolveWorkspace`). A
+ *   row whose `role` is outside `WorkspaceMemberRole` (the column is `text`)
+ *   is not a membership: it is logged and ignored, so an unknown role grants
+ *   nothing rather than failing the request.
  *
  * How it travels. `HttpRouter.toWebHandler` returns `handler(request,
  * context?)` and merges `context` into the request fiber's services
@@ -31,7 +34,7 @@ import {
   type UserId,
   type UserRole,
   type WorkspaceId,
-  type WorkspaceMemberRole,
+  WorkspaceMemberRole,
   WorkspaceMembership,
   type WorkspaceMembershipId,
 } from "@gmacko/domain";
@@ -95,6 +98,9 @@ export const resolveWorkspace = (
 /** Bounded per request: a request rarely asks about more than one user. */
 const CAPACITY = 16;
 
+const isMemberRole = (value: string): value is WorkspaceMemberRole =>
+  (WorkspaceMemberRole.literals as ReadonlyArray<string>).includes(value);
+
 export class RequestContext extends Context.Service<
   RequestContext,
   RequestContextShape
@@ -136,8 +142,12 @@ export class RequestContext extends Context.Service<
               asc(workspaceMembership.id),
             )
             .pipe(
-              Effect.map((rows) =>
-                rows.map(
+              Effect.flatMap((rows) => {
+                // Fail closed: `WorkspaceMembership` validates `role`, and a
+                // stored value it does not know must grant nothing, not 500.
+                const known = rows.filter((row) => isMemberRole(row.role));
+                const ignored = rows.length - known.length;
+                const memberships = known.map(
                   (row) =>
                     new WorkspaceMembership({
                       id: row.id as WorkspaceMembershipId,
@@ -147,8 +157,13 @@ export class RequestContext extends Context.Service<
                       createdAt: row.createdAt,
                       updatedAt: row.updatedAt,
                     }),
-                ),
-              ),
+                );
+                return ignored === 0
+                  ? Effect.succeed(memberships)
+                  : Effect.logWarning(
+                      `workspace_membership: ignored ${ignored} row(s) of user ${userId} with a role outside WorkspaceMemberRole`,
+                    ).pipe(Effect.as(memberships));
+              }),
             ),
       });
 

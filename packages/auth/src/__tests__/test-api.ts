@@ -67,6 +67,13 @@ export class TestApi extends HttpApi.make("test").add(
       })
         .middleware(WorkspaceRole("admin"))
         .middleware(SessionOrKey("read")),
+    )
+    .add(
+      HttpApiEndpoint.get("workspaceOwner", "/workspace-owner", {
+        success: Who,
+      })
+        .middleware(WorkspaceRole("owner"))
+        .middleware(SessionOrKey("read")),
     ),
 ) {}
 
@@ -89,7 +96,8 @@ const Handlers = HttpApiBuilder.group(TestApi, "t", (handlers) =>
     .handle("write", () => who)
     .handle("admin", () => who)
     .handle("workspace", () => who)
-    .handle("workspaceAdmin", () => who),
+    .handle("workspaceAdmin", () => who)
+    .handle("workspaceOwner", () => who),
 );
 
 const PlatformLive = Layer.mergeAll(

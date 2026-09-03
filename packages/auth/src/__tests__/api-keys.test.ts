@@ -5,7 +5,7 @@
  */
 import { createHash } from "node:crypto";
 
-import { Database } from "@gmacko/db";
+import { Database, DatabaseError } from "@gmacko/db";
 import { apiKeys, user } from "@gmacko/db/schema";
 import { layerTest } from "@gmacko/db/testing";
 import { eq } from "drizzle-orm";
@@ -246,6 +246,51 @@ describe("ApiKeys", () => {
       }
       expect(result.rows).toHaveLength(2);
       for (const row of result.rows) expect(row.lastUsedAt).toBeNull();
+    });
+
+    it("still authenticates when the lastUsedAt touch fails: the write is best effort", async () => {
+      const hiccup = new DatabaseError({
+        reason: "other",
+        cause: new Error("write hiccup"),
+      });
+      // The same database, with every `db.update(...)` failing: reads and
+      // inserts go through untouched, so the key can be minted and found.
+      const FailingUpdates = Layer.effect(Database)(
+        Effect.map(Database, (database) => ({
+          ...database,
+          db: new Proxy(database.db, {
+            get: (target, property, receiver) =>
+              property === "update"
+                ? () => ({ set: () => ({ where: () => Effect.fail(hiccup) }) })
+                : Reflect.get(target, property, receiver),
+          }),
+        })),
+      ).pipe(Layer.provide(layerTest));
+      const flaky = ManagedRuntime.make(
+        Layer.provideMerge(ApiKeys.layer, FailingUpdates),
+      );
+      try {
+        const result = await flaky.runPromise(
+          Effect.gen(function* () {
+            const api = yield* ApiKeys;
+            const owner = yield* insertUser(
+              `flaky-${crypto.randomUUID()}@example.com`,
+            );
+            const created = yield* api.create(owner.id, {
+              name: "flaky",
+              permissions: ["read"],
+            });
+            const authenticated = yield* api.authenticate(created.key);
+            const listed = yield* api.list(owner.id);
+            return { created, authenticated, listed };
+          }),
+        );
+        expect(result.authenticated.keyId).toBe(result.created.id);
+        expect(result.authenticated.permissions).toEqual(["read"]);
+        expect(result.listed[0]?.lastUsedAt).toBeNull();
+      } finally {
+        await flaky.dispose();
+      }
     });
   });
 });

@@ -8,7 +8,8 @@
  * `authenticate` is the only read path the middlewares use. An unknown,
  * malformed, expired or revoked key is `Unauthorized`; the caller never falls
  * through to another credential (docs/API_AUTH.md, rule 2). `lastUsedAt` is
- * touched only when the key authenticates.
+ * touched only when the key authenticates, and best effort: a failed touch
+ * is logged, never raised.
  */
 import { Database, type DatabaseError } from "@gmacko/db";
 import { apiKeys, user } from "@gmacko/db/schema";
@@ -54,6 +55,14 @@ export interface CreateApiKeyInput {
 export interface ApiKeysShape {
   readonly generate: Effect.Effect<GeneratedKey>;
   readonly hash: (secret: string) => Effect.Effect<string>;
+  /**
+   * `Unauthorized` for an unknown, malformed, expired or revoked key.
+   * `lastUsedAt` is touched on every successful authentication — even when
+   * a later scope or role check refuses the request: the key was presented
+   * and recognised, which is what the timestamp records. The touch is best
+   * effort: a `DatabaseError` on the write is logged and the key still
+   * authenticates.
+   */
   readonly authenticate: (
     bearer: string,
   ) => Effect.Effect<AuthenticatedKey, Unauthorized | DatabaseError>;
@@ -132,10 +141,17 @@ export class ApiKeys extends Context.Service<ApiKeys, ApiKeysShape>()(
             if (key.expiresAt !== null && key.expiresAt < new Date()) {
               return yield* new Unauthorized();
             }
+            // Best effort: the key has authenticated; a write hiccup here
+            // must not turn a valid read into a 500.
             yield* db
               .update(apiKeys)
               .set({ lastUsedAt: new Date() })
-              .where(eq(apiKeys.id, key.id));
+              .where(eq(apiKeys.id, key.id))
+              .pipe(
+                Effect.catchTag("DatabaseError", (error: DatabaseError) =>
+                  Effect.logWarning("api key lastUsedAt touch failed", error),
+                ),
+              );
             return {
               keyId: key.id as ApiKeyId,
               user: toUser(owner),
