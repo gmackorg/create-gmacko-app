@@ -86,8 +86,10 @@ jobs:
         run: |
           set -o pipefail
           pnpm -F @gmacko/web preview:upload | tee /tmp/versions-upload.log
-          url="$(grep -oE 'https://[A-Za-z0-9.-]+\.workers\.dev' /tmp/versions-upload.log | head -n1)"
-          version="$(grep -oE '[0-9a-f-]{36}' /tmp/versions-upload.log | head -n1)"
+          # `|| true`: with pipefail set, a grep that matches nothing would
+          # otherwise abort the step before the warning below can explain why.
+          url="$(grep -oE 'https://[A-Za-z0-9.-]+\.workers\.dev' /tmp/versions-upload.log | head -n1 || true)"
+          version="$(grep -oE '[0-9a-f-]{36}' /tmp/versions-upload.log | head -n1 || true)"
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           if [ -z "$url" ]; then
