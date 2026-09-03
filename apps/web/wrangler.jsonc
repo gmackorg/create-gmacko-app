@@ -26,12 +26,60 @@
     {
       "binding": "DB",
       "database_name": "gmacko-web",
-      // Placeholder id: local dev and tests use Miniflare's D1; the real
-      // database is provisioned per stage in Phase 7 (ForgeGraph).
+      // Placeholder id: local dev and tests use Miniflare's D1. The real
+      // databases are per environment below (`wrangler d1 create`, see
+      // docs/DEPLOYMENT.md).
       "database_id": "00000000-0000-0000-0000-000000000000",
       // Flat wrangler-style migrations flattened from drizzle-kit's folders by
       // `pnpm -F @gmacko/db generate`. Apply with `pnpm -F @gmacko/db migrate:local`.
       "migrations_dir": "../../packages/db/migrations"
     }
-  ]
+  ],
+  // One Worker and one D1 per stage. Build with `CLOUDFLARE_ENV=<env> vite
+  // build` (the `deploy:<env>` scripts), migrate with
+  // `pnpm -F @gmacko/db migrate:remote --env <env>`, and push the stage's
+  // secrets with `pnpm secrets:push --stage <env>`. Environments inherit
+  // `main`, `compatibility_date`, `observability` and `triggers` from the
+  // top level; `vars` and `d1_databases` are not inherited and are
+  // restated. Replace the placeholder ids after `wrangler d1 create`.
+  "env": {
+    // Per-PR Workers (`--name gmacko-web-pr-<n>`, .github/workflows/preview.yml)
+    // on one shared database until Phase 9 gives each PR its own.
+    "preview": {
+      "name": "gmacko-web-preview",
+      "vars": { "STAGE": "preview" },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "gmacko-web-preview",
+          "database_id": "00000000-0000-0000-0000-000000000001",
+          "migrations_dir": "../../packages/db/migrations"
+        }
+      ]
+    },
+    "staging": {
+      "name": "gmacko-web-staging",
+      "vars": { "STAGE": "staging" },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "gmacko-web-staging",
+          "database_id": "00000000-0000-0000-0000-000000000002",
+          "migrations_dir": "../../packages/db/migrations"
+        }
+      ]
+    },
+    "production": {
+      "name": "gmacko-web",
+      "vars": { "STAGE": "production" },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "gmacko-web",
+          "database_id": "00000000-0000-0000-0000-000000000003",
+          "migrations_dir": "../../packages/db/migrations"
+        }
+      ]
+    }
+  }
 }
