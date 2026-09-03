@@ -190,6 +190,8 @@ describe("responses round-trip through JSON", () => {
 describe("AdminApi", () => {
   it("declares the eleven admin endpoints with their credentials", () => {
     const credentialErrors = ["401 Unauthorized", "403 Forbidden"];
+    /** Every `/admin/*` endpoint also counts against the operator-api rate limit. */
+    const adminErrors = [...credentialErrors, "429 RateLimited"];
     const admin = {
       credential: "SessionOrKey(admin)",
       roles: ["AdminOnly"],
@@ -201,7 +203,7 @@ describe("AdminApi", () => {
         path: "/admin/launch-controls",
         ...admin,
         success: 200,
-        errors: credentialErrors,
+        errors: adminErrors,
       },
       {
         id: "updateLaunchControls",
@@ -209,7 +211,7 @@ describe("AdminApi", () => {
         path: "/admin/launch-controls",
         ...admin,
         success: 200,
-        errors: credentialErrors,
+        errors: adminErrors,
       },
       {
         id: "listWaitlistEntries",
@@ -217,7 +219,7 @@ describe("AdminApi", () => {
         path: "/admin/waitlist",
         ...admin,
         success: 200,
-        errors: credentialErrors,
+        errors: adminErrors,
       },
       {
         id: "reviewWaitlistEntry",
@@ -225,7 +227,12 @@ describe("AdminApi", () => {
         path: "/admin/waitlist/:id/review",
         ...admin,
         success: 200,
-        errors: [...credentialErrors, "404 NotFound", "409 Conflict"],
+        errors: [
+          ...credentialErrors,
+          "404 NotFound",
+          "409 Conflict",
+          "429 RateLimited",
+        ],
       },
       {
         id: "bootstrapStatus",
@@ -251,7 +258,7 @@ describe("AdminApi", () => {
         path: "/admin/stats",
         ...admin,
         success: 200,
-        errors: credentialErrors,
+        errors: adminErrors,
       },
       {
         id: "listWorkspaces",
@@ -259,7 +266,7 @@ describe("AdminApi", () => {
         path: "/admin/workspaces",
         ...admin,
         success: 200,
-        errors: credentialErrors,
+        errors: adminErrors,
       },
       {
         id: "listUsers",
@@ -267,7 +274,7 @@ describe("AdminApi", () => {
         path: "/admin/users",
         ...admin,
         success: 200,
-        errors: credentialErrors,
+        errors: adminErrors,
       },
       {
         id: "updateUserRole",
@@ -275,7 +282,12 @@ describe("AdminApi", () => {
         path: "/admin/users/:userId/role",
         ...admin,
         success: 200,
-        errors: [...credentialErrors, "404 NotFound", "409 Conflict"],
+        errors: [
+          ...credentialErrors,
+          "404 NotFound",
+          "409 Conflict",
+          "429 RateLimited",
+        ],
       },
       {
         id: "getUser",
@@ -283,7 +295,7 @@ describe("AdminApi", () => {
         path: "/admin/users/:userId",
         ...admin,
         success: 200,
-        errors: [...credentialErrors, "404 NotFound"],
+        errors: [...credentialErrors, "404 NotFound", "429 RateLimited"],
       },
     ]);
   });

@@ -13,8 +13,8 @@ read back out of the contract with `HttpApi.reflect`, so it is the contract, not
 | Credential | Accepts | Refuses with |
 | --- | --- | --- |
 | public | anything, including no credential | — |
-| `Session` | the better-auth session cookie (`better-auth.session_token`, `__Secure-` prefixed over https); on non-GET requests only when `Origin` is on the allowlist | 401 `Unauthorized` (no or invalid session), 403 `Forbidden(origin)`, 403 `Forbidden(scope)` for a bearer key |
-| `SessionOrKey(scope)` | the session cookie as above, **or** `Authorization: Bearer gmk_…` whose permissions include `scope` or `admin` | 401 `Unauthorized` (invalid, expired or revoked key: no fall-through to the cookie), 403 `Forbidden(scope)` (key lacks the scope), 403 `Forbidden(origin)` |
+| `Session` | the better-auth session cookie (`better-auth.session_token`, `__Secure-` prefixed over https); on non-GET requests only when `Origin` is on the allowlist or the request carries `Sec-Fetch-Site: same-origin` (browsers omit `Origin` on same-origin non-CORS requests) | 401 `Unauthorized` (no or invalid session), 403 `Forbidden(origin)`, 403 `Forbidden(scope)` for any `Authorization` header |
+| `SessionOrKey(scope)` | the session cookie as above (same `Origin` / `Sec-Fetch-Site` rule on non-GET), **or** `Authorization: Bearer gmk_…` whose permissions include `scope` or `admin` | 401 `Unauthorized` (invalid, expired or revoked key, or any non-`Bearer gmk_` `Authorization` header: no fall-through to the cookie), 403 `Forbidden(scope)` (key lacks the scope), 403 `Forbidden(origin)` |
 
 Role middlewares run inside the credential middleware and read the `CurrentUser` it provided:
 
@@ -30,43 +30,47 @@ completing bootstrap are `Session` only: a leaked key must never reach them.
 
 ## Endpoints
 
-| Group | Endpoint | Method | Path | Credential | Key scope | Roles | Success | Errors |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| health | `live` | GET | `/api/health/live` | public | — | — | 200 | — |
-| health | `ready` | GET | `/api/health/ready` | public | — | — | 200 | 503 `Unhealthy` |
-| health | `full` | GET | `/api/health` | public | — | — | 200 | 503 `UnhealthyReport` |
-| health | `forge` | GET | `/.well-known/forge-health` | public | — | — | 200 | 503 `ForgeUnhealthy` |
-| auth | `session` | GET | `/api/auth/session` | public | — | — | 200 | — |
-| auth | `secret` | GET | `/api/auth/secret` | `SessionOrKey(read)` | read | — | 200 | 401 `Unauthorized`, 403 `Forbidden` |
-| posts | `list` | GET | `/api/posts` | public | — | — | 200 | — |
-| posts | `byId` | GET | `/api/posts/:id` | public | — | — | 200 | 404 `NotFound` |
-| posts | `create` | POST | `/api/posts` | `SessionOrKey(write)` | write | — | 201 | 401 `Unauthorized`, 403 `Forbidden` |
-| posts | `remove` | DELETE | `/api/posts/:id` | `SessionOrKey(delete)` | delete | — | 204 | 401 `Unauthorized`, 403 `Forbidden`, 404 `NotFound` |
-| settings | `launchState` | GET | `/api/launch-state` | public | — | — | 200 | — |
-| settings | `submitWaitlistEntry` | POST | `/api/waitlist` | public | — | — | 201 | 429 `RateLimited` |
-| settings | `workspaceContext` | GET | `/api/workspace` | `SessionOrKey(read)` | read | — | 200 | 401 `Unauthorized`, 403 `Forbidden` |
-| settings | `platformPrimitives` | GET | `/api/platform-primitives` | `SessionOrKey(read)` | read | — | 200 | 401 `Unauthorized`, 403 `Forbidden` |
-| settings | `billingOverview` | GET | `/api/billing` | `SessionOrKey(read)` | read | — | 200 | 401 `Unauthorized`, 403 `Forbidden` |
-| settings | `listInvites` | GET | `/api/workspace/invites` | `SessionOrKey(read)` | read | `WorkspaceRole(admin)` | 200 | 401 `Unauthorized`, 403 `Forbidden` |
-| settings | `createInvite` | POST | `/api/workspace/invites` | `SessionOrKey(write)` | write | `WorkspaceRole(admin)` | 201 | 401 `Unauthorized`, 403 `Forbidden`, 409 `Conflict` |
-| settings | `acceptInvite` | POST | `/api/workspace/invites/:inviteId/accept` | `SessionOrKey(write)` | write | — | 200 | 401 `Unauthorized`, 403 `Forbidden`, 404 `NotFound`, 409 `Conflict` |
-| settings | `getPreferences` | GET | `/api/preferences` | `SessionOrKey(read)` | read | — | 200 | 401 `Unauthorized`, 403 `Forbidden` |
-| settings | `updatePreferences` | PATCH | `/api/preferences` | `SessionOrKey(write)` | write | — | 200 | 401 `Unauthorized`, 403 `Forbidden` |
-| settings | `listApiKeys` | GET | `/api/api-keys` | `SessionOrKey(read)` | read | — | 200 | 401 `Unauthorized`, 403 `Forbidden` |
-| settings | `createApiKey` | POST | `/api/api-keys` | `SessionOrKey(admin)` | admin | — | 201 | 401 `Unauthorized`, 403 `Forbidden` |
-| settings | `revokeApiKey` | DELETE | `/api/api-keys/:id` | `SessionOrKey(admin)` | admin | — | 204 | 401 `Unauthorized`, 403 `Forbidden`, 404 `NotFound` |
-| settings | `deleteAccount` | DELETE | `/api/account` | `Session` | — | — | 204 | 401 `Unauthorized`, 403 `Forbidden` |
-| admin | `launchControls` | GET | `/api/admin/launch-controls` | `SessionOrKey(admin)` | admin | `AdminOnly` | 200 | 401 `Unauthorized`, 403 `Forbidden` |
-| admin | `updateLaunchControls` | PATCH | `/api/admin/launch-controls` | `SessionOrKey(admin)` | admin | `AdminOnly` | 200 | 401 `Unauthorized`, 403 `Forbidden` |
-| admin | `listWaitlistEntries` | GET | `/api/admin/waitlist` | `SessionOrKey(admin)` | admin | `AdminOnly` | 200 | 401 `Unauthorized`, 403 `Forbidden` |
-| admin | `reviewWaitlistEntry` | POST | `/api/admin/waitlist/:id/review` | `SessionOrKey(admin)` | admin | `AdminOnly` | 200 | 401 `Unauthorized`, 403 `Forbidden`, 404 `NotFound`, 409 `Conflict` |
-| admin | `bootstrapStatus` | GET | `/api/bootstrap` | public | — | — | 200 | — |
-| admin | `completeBootstrap` | POST | `/api/bootstrap/complete` | `Session` | — | — | 201 | 401 `Unauthorized`, 403 `Forbidden`, 409 `Conflict` |
-| admin | `stats` | GET | `/api/admin/stats` | `SessionOrKey(admin)` | admin | `AdminOnly` | 200 | 401 `Unauthorized`, 403 `Forbidden` |
-| admin | `listWorkspaces` | GET | `/api/admin/workspaces` | `SessionOrKey(admin)` | admin | `AdminOnly` | 200 | 401 `Unauthorized`, 403 `Forbidden` |
-| admin | `listUsers` | GET | `/api/admin/users` | `SessionOrKey(admin)` | admin | `AdminOnly` | 200 | 401 `Unauthorized`, 403 `Forbidden` |
-| admin | `updateUserRole` | PATCH | `/api/admin/users/:userId/role` | `SessionOrKey(admin)` | admin | `AdminOnly` | 200 | 401 `Unauthorized`, 403 `Forbidden`, 404 `NotFound`, 409 `Conflict` |
-| admin | `getUser` | GET | `/api/admin/users/:userId` | `SessionOrKey(admin)` | admin | `AdminOnly` | 200 | 401 `Unauthorized`, 403 `Forbidden`, 404 `NotFound` |
+Every endpoint under `/api` (the health probes excepted) also carries the `EndpointBoundary` middleware:
+one span named `group.endpoint`, and 500 `InternalError` for anything unhandled. `Rate limit` names the
+`RateLimit` scope a call counts against (429 `RateLimited` over the allowance).
+
+| Group | Endpoint | Method | Path | Credential | Key scope | Roles | Rate limit | Success | Errors |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| health | `live` | GET | `/api/health/live` | public | — | — | — | 200 | — |
+| health | `ready` | GET | `/api/health/ready` | public | — | — | — | 200 | 503 `Unhealthy` |
+| health | `full` | GET | `/api/health` | public | — | — | — | 200 | 503 `UnhealthyReport` |
+| health | `forge` | GET | `/.well-known/forge-health` | public | — | — | — | 200 | 503 `ForgeUnhealthy` |
+| auth | `session` | GET | `/api/auth/session` | public | — | — | — | 200 | 500 `InternalError` |
+| auth | `secret` | GET | `/api/auth/secret` | `SessionOrKey(read)` | read | — | — | 200 | 401 `Unauthorized`, 403 `Forbidden`, 500 `InternalError` |
+| posts | `list` | GET | `/api/posts` | public | — | — | — | 200 | 500 `InternalError` |
+| posts | `byId` | GET | `/api/posts/:id` | public | — | — | — | 200 | 404 `NotFound`, 500 `InternalError` |
+| posts | `create` | POST | `/api/posts` | `SessionOrKey(write)` | write | — | — | 201 | 401 `Unauthorized`, 403 `Forbidden`, 500 `InternalError` |
+| posts | `remove` | DELETE | `/api/posts/:id` | `SessionOrKey(delete)` | delete | — | — | 204 | 401 `Unauthorized`, 403 `Forbidden`, 404 `NotFound`, 500 `InternalError` |
+| settings | `launchState` | GET | `/api/launch-state` | public | — | — | — | 200 | 500 `InternalError` |
+| settings | `submitWaitlistEntry` | POST | `/api/waitlist` | public | — | — | contact | 201 | 429 `RateLimited`, 500 `InternalError` |
+| settings | `workspaceContext` | GET | `/api/workspace` | `SessionOrKey(read)` | read | — | — | 200 | 401 `Unauthorized`, 403 `Forbidden`, 500 `InternalError` |
+| settings | `platformPrimitives` | GET | `/api/platform-primitives` | `SessionOrKey(read)` | read | — | — | 200 | 401 `Unauthorized`, 403 `Forbidden`, 500 `InternalError` |
+| settings | `billingOverview` | GET | `/api/billing` | `SessionOrKey(read)` | read | — | — | 200 | 401 `Unauthorized`, 403 `Forbidden`, 500 `InternalError` |
+| settings | `listInvites` | GET | `/api/workspace/invites` | `SessionOrKey(read)` | read | `WorkspaceRole(admin)` | — | 200 | 401 `Unauthorized`, 403 `Forbidden`, 500 `InternalError` |
+| settings | `createInvite` | POST | `/api/workspace/invites` | `SessionOrKey(write)` | write | `WorkspaceRole(admin)` | — | 201 | 401 `Unauthorized`, 403 `Forbidden`, 409 `Conflict`, 500 `InternalError` |
+| settings | `acceptInvite` | POST | `/api/workspace/invites/:inviteId/accept` | `SessionOrKey(write)` | write | — | — | 200 | 401 `Unauthorized`, 403 `Forbidden`, 404 `NotFound`, 409 `Conflict`, 500 `InternalError` |
+| settings | `getPreferences` | GET | `/api/preferences` | `SessionOrKey(read)` | read | — | — | 200 | 401 `Unauthorized`, 403 `Forbidden`, 500 `InternalError` |
+| settings | `updatePreferences` | PATCH | `/api/preferences` | `SessionOrKey(write)` | write | — | — | 200 | 401 `Unauthorized`, 403 `Forbidden`, 500 `InternalError` |
+| settings | `listApiKeys` | GET | `/api/api-keys` | `SessionOrKey(read)` | read | — | — | 200 | 401 `Unauthorized`, 403 `Forbidden`, 500 `InternalError` |
+| settings | `createApiKey` | POST | `/api/api-keys` | `SessionOrKey(admin)` | admin | — | api-keys | 201 | 401 `Unauthorized`, 403 `Forbidden`, 429 `RateLimited`, 500 `InternalError` |
+| settings | `revokeApiKey` | DELETE | `/api/api-keys/:id` | `SessionOrKey(admin)` | admin | — | api-keys | 204 | 401 `Unauthorized`, 403 `Forbidden`, 404 `NotFound`, 429 `RateLimited`, 500 `InternalError` |
+| settings | `deleteAccount` | DELETE | `/api/account` | `Session` | — | — | — | 204 | 401 `Unauthorized`, 403 `Forbidden`, 500 `InternalError` |
+| admin | `launchControls` | GET | `/api/admin/launch-controls` | `SessionOrKey(admin)` | admin | `AdminOnly` | operator-api | 200 | 401 `Unauthorized`, 403 `Forbidden`, 429 `RateLimited`, 500 `InternalError` |
+| admin | `updateLaunchControls` | PATCH | `/api/admin/launch-controls` | `SessionOrKey(admin)` | admin | `AdminOnly` | operator-api | 200 | 401 `Unauthorized`, 403 `Forbidden`, 429 `RateLimited`, 500 `InternalError` |
+| admin | `listWaitlistEntries` | GET | `/api/admin/waitlist` | `SessionOrKey(admin)` | admin | `AdminOnly` | operator-api | 200 | 401 `Unauthorized`, 403 `Forbidden`, 429 `RateLimited`, 500 `InternalError` |
+| admin | `reviewWaitlistEntry` | POST | `/api/admin/waitlist/:id/review` | `SessionOrKey(admin)` | admin | `AdminOnly` | operator-api | 200 | 401 `Unauthorized`, 403 `Forbidden`, 404 `NotFound`, 409 `Conflict`, 429 `RateLimited`, 500 `InternalError` |
+| admin | `bootstrapStatus` | GET | `/api/bootstrap` | public | — | — | — | 200 | 500 `InternalError` |
+| admin | `completeBootstrap` | POST | `/api/bootstrap/complete` | `Session` | — | — | — | 201 | 401 `Unauthorized`, 403 `Forbidden`, 409 `Conflict`, 500 `InternalError` |
+| admin | `stats` | GET | `/api/admin/stats` | `SessionOrKey(admin)` | admin | `AdminOnly` | operator-api | 200 | 401 `Unauthorized`, 403 `Forbidden`, 429 `RateLimited`, 500 `InternalError` |
+| admin | `listWorkspaces` | GET | `/api/admin/workspaces` | `SessionOrKey(admin)` | admin | `AdminOnly` | operator-api | 200 | 401 `Unauthorized`, 403 `Forbidden`, 429 `RateLimited`, 500 `InternalError` |
+| admin | `listUsers` | GET | `/api/admin/users` | `SessionOrKey(admin)` | admin | `AdminOnly` | operator-api | 200 | 401 `Unauthorized`, 403 `Forbidden`, 429 `RateLimited`, 500 `InternalError` |
+| admin | `updateUserRole` | PATCH | `/api/admin/users/:userId/role` | `SessionOrKey(admin)` | admin | `AdminOnly` | operator-api | 200 | 401 `Unauthorized`, 403 `Forbidden`, 404 `NotFound`, 409 `Conflict`, 429 `RateLimited`, 500 `InternalError` |
+| admin | `getUser` | GET | `/api/admin/users/:userId` | `SessionOrKey(admin)` | admin | `AdminOnly` | operator-api | 200 | 401 `Unauthorized`, 403 `Forbidden`, 404 `NotFound`, 429 `RateLimited`, 500 `InternalError` |
 
 ## Implementation rules (Phase 3)
 
@@ -78,12 +82,17 @@ effect 4.0.0-rc.112's `HttpApiBuilder` runs security middlewares and from better
    `securityDecode` yields `Redacted("")` for a cookie that is absent rather than failing. The `session`
    scheme implementation therefore ignores the decoded credential and calls better-auth
    `getSession({ headers })` on the raw request; an empty or invalid cookie ends in 401 `Unauthorized`.
-2. **Bearer takes precedence.** When an `Authorization: Bearer gmk_…` header is present the `session`
-   scheme refuses (fails with `Unauthorized`) instead of looking at the cookie, so an invalid, expired
-   or revoked key can never fall through to a valid cookie in the same request.
-3. **A bearer on a `Session`-only endpoint is `Forbidden(scope)`.** `Session` declares the cookie scheme
-   only; its implementation answers 403 `Forbidden({ reason: "scope" })` when a bearer header is present,
-   never 401, so the client learns the credential kind is wrong rather than missing.
+2. **Bearer takes precedence.** When an `Authorization` header is present the request is a bearer request:
+   `SessionOrKey`'s `apiKey` scheme takes the key path and never looks at the cookie, so an invalid, expired
+   or revoked key can never fall through to a valid cookie in the same request. The `session` scheme of
+   `SessionOrKey` is declared so OpenAPI shows the cookie and always refuses; the `apiKey` scheme, tried
+   last, handles both credentials (bearer present ⇒ key path, otherwise cookie path), so a cookie request
+   reads the session once and the failure reported is the cookie's own.
+3. **Any `Authorization` header (not only `Bearer gmk_…`) is treated as a bearer credential, and a bearer
+   on a `Session`-only endpoint is `Forbidden(scope)`.** A `Basic` or malformed header is a wrong credential,
+   not a missing one: `Session` answers 403 `Forbidden({ reason: "scope" })`, never 401, so the client learns
+   the credential kind is wrong rather than missing; `SessionOrKey` refuses it on the key path with 401
+   `Unauthorized` rather than ignoring it and reading the cookie.
 4. **The declared cookie name is the non-secure one.** OpenAPI shows `better-auth.session_token`. In
    secure stages (https base URL: staging, production) better-auth writes `__Secure-better-auth.session_token`,
    which the implementation reads from the raw `Cookie` header; `sessionCookieName(secure)` in

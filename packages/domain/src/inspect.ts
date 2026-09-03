@@ -4,8 +4,10 @@
  * The credential matrix in docs/API_AUTH.md and the contract tests are both
  * derived from this, so neither can drift from the declarations.
  */
+import { Context } from "effect";
 import { HttpApi, HttpApiMiddleware } from "effect/unstable/httpapi";
 
+import { type RateLimitScope, RateLimitScopeAnnotation } from "./middleware";
 import { ApiKeyScope } from "./roles";
 
 export interface EndpointInfo {
@@ -22,14 +24,19 @@ export interface EndpointInfo {
   /** Keys of the security middlewares (the ones with a scheme). */
   readonly securityMiddlewares: ReadonlyArray<string>;
   /**
-   * `true` when a security middleware is the *last* entry of the endpoint's
-   * middleware list. rc.112's `HttpApiBuilder` (`applyMiddleware`) wraps the
-   * handler with each middleware in insertion order, so the last one runs
-   * outermost: only then does the credential middleware run before the role
-   * checks that `require` the `CurrentUser` it provides. `false` for public
-   * endpoints (nothing to be outermost).
+   * `true` when a security middleware is the *last* credential-or-role entry
+   * of the endpoint's middleware list. rc.112's `HttpApiBuilder`
+   * (`applyMiddleware`) wraps the handler with each middleware in insertion
+   * order, so the last one runs outermost: only then does the credential
+   * middleware run before the role checks that `require` the `CurrentUser`
+   * it provides. Middlewares that neither provide nor require `CurrentUser`
+   * (`RateLimit`, `EndpointBoundary`) are transparent to this rule and may
+   * sit outside the credential. `false` for public endpoints (nothing to be
+   * outermost).
    */
   readonly securityIsOutermost: boolean;
+  /** The `RateLimit` scope the endpoint is annotated with, or `null` when unlimited. */
+  readonly rateLimit: RateLimitScope | null;
   readonly successStatus: number;
   readonly errors: ReadonlyArray<{
     readonly status: number;
@@ -91,11 +98,17 @@ export const inspectApi = (api: HttpApi.Top): ReadonlyArray<EndpointInfo> => {
     onEndpoint: ({ group, endpoint, middleware, successes, errors }) => {
       const security: Array<string> = [];
       const roles: Array<string> = [];
-      const ordered = [...middleware];
-      const last = ordered[ordered.length - 1];
+      // Only the middlewares that take part in the CurrentUser flow: the
+      // credential (provides it) and the roles (require it).
+      const credentialOrRole = [...middleware].filter(
+        (service) =>
+          HttpApiMiddleware.isSecurity(service) ||
+          describeRole(service.key) !== null,
+      );
+      const last = credentialOrRole[credentialOrRole.length - 1];
       const securityIsOutermost =
         last !== undefined && HttpApiMiddleware.isSecurity(last);
-      for (const service of ordered) {
+      for (const service of credentialOrRole) {
         if (HttpApiMiddleware.isSecurity(service)) {
           security.push(service.key);
           continue;
@@ -103,6 +116,10 @@ export const inspectApi = (api: HttpApi.Top): ReadonlyArray<EndpointInfo> => {
         const role = describeRole(service.key);
         if (role) roles.push(role);
       }
+      const rateLimit = Context.getOption(
+        endpoint.annotations,
+        RateLimitScopeAnnotation,
+      );
       const successStatus =
         [...successes.keys()].sort((a, b) => a - b)[0] ?? 204;
       const errorRows = [...errors.entries()]
@@ -119,6 +136,7 @@ export const inspectApi = (api: HttpApi.Top): ReadonlyArray<EndpointInfo> => {
         roles,
         securityMiddlewares: security,
         securityIsOutermost,
+        rateLimit: rateLimit._tag === "Some" ? rateLimit.value : null,
         successStatus,
         errors: errorRows,
       });

@@ -7,6 +7,7 @@ import {
 
 import { User, UserId } from "../auth/models";
 import { Conflict, NotFound } from "../errors";
+import { RateLimit, RateLimitScopeAnnotation } from "../middleware";
 import { AdminOnly, Session, SessionOrKey } from "../security";
 import { WaitlistEntry, WaitlistEntryId } from "../settings/models";
 import {
@@ -27,9 +28,10 @@ import {
 /**
  * Every `/admin/*` endpoint takes `SessionOrKey(admin)` (a session, or a key
  * holding the `admin` scope) and then `AdminOnly` (the user's platform role
- * is `admin`; a key scope never grants that). Bootstrap sits outside
- * `/admin`: its status is public and completing it is first-come,
- * first-served for any session, which is what makes the first user admin.
+ * is `admin`; a key scope never grants that), and counts against the
+ * `operator-api` rate limit. Bootstrap sits outside `/admin`: its status is
+ * public and completing it is first-come, first-served for any session,
+ * which is what makes the first user admin.
  */
 export class AdminApi extends HttpApiGroup.make("admin")
   .add(
@@ -37,7 +39,9 @@ export class AdminApi extends HttpApiGroup.make("admin")
       success: LaunchControls,
     })
       .middleware(AdminOnly)
-      .middleware(SessionOrKey("admin")),
+      .middleware(SessionOrKey("admin"))
+      .annotate(RateLimitScopeAnnotation, "operator-api")
+      .middleware(RateLimit),
   )
   .add(
     HttpApiEndpoint.patch("updateLaunchControls", "/admin/launch-controls", {
@@ -45,14 +49,18 @@ export class AdminApi extends HttpApiGroup.make("admin")
       success: ApplicationSettings,
     })
       .middleware(AdminOnly)
-      .middleware(SessionOrKey("admin")),
+      .middleware(SessionOrKey("admin"))
+      .annotate(RateLimitScopeAnnotation, "operator-api")
+      .middleware(RateLimit),
   )
   .add(
     HttpApiEndpoint.get("listWaitlistEntries", "/admin/waitlist", {
       success: Schema.Array(WaitlistEntry),
     })
       .middleware(AdminOnly)
-      .middleware(SessionOrKey("admin")),
+      .middleware(SessionOrKey("admin"))
+      .annotate(RateLimitScopeAnnotation, "operator-api")
+      .middleware(RateLimit),
   )
   .add(
     HttpApiEndpoint.post("reviewWaitlistEntry", "/admin/waitlist/:id/review", {
@@ -65,7 +73,9 @@ export class AdminApi extends HttpApiGroup.make("admin")
       error: [NotFound, Conflict],
     })
       .middleware(AdminOnly)
-      .middleware(SessionOrKey("admin")),
+      .middleware(SessionOrKey("admin"))
+      .annotate(RateLimitScopeAnnotation, "operator-api")
+      .middleware(RateLimit),
   )
   .add(
     HttpApiEndpoint.get("bootstrapStatus", "/bootstrap", {
@@ -84,14 +94,18 @@ export class AdminApi extends HttpApiGroup.make("admin")
       success: AdminStats,
     })
       .middleware(AdminOnly)
-      .middleware(SessionOrKey("admin")),
+      .middleware(SessionOrKey("admin"))
+      .annotate(RateLimitScopeAnnotation, "operator-api")
+      .middleware(RateLimit),
   )
   .add(
     HttpApiEndpoint.get("listWorkspaces", "/admin/workspaces", {
       success: Schema.Array(AdminWorkspace),
     })
       .middleware(AdminOnly)
-      .middleware(SessionOrKey("admin")),
+      .middleware(SessionOrKey("admin"))
+      .annotate(RateLimitScopeAnnotation, "operator-api")
+      .middleware(RateLimit),
   )
   .add(
     HttpApiEndpoint.get("listUsers", "/admin/users", {
@@ -99,7 +113,9 @@ export class AdminApi extends HttpApiGroup.make("admin")
       success: UserList,
     })
       .middleware(AdminOnly)
-      .middleware(SessionOrKey("admin")),
+      .middleware(SessionOrKey("admin"))
+      .annotate(RateLimitScopeAnnotation, "operator-api")
+      .middleware(RateLimit),
   )
   .add(
     HttpApiEndpoint.patch("updateUserRole", "/admin/users/:userId/role", {
@@ -110,7 +126,9 @@ export class AdminApi extends HttpApiGroup.make("admin")
       error: [NotFound, Conflict],
     })
       .middleware(AdminOnly)
-      .middleware(SessionOrKey("admin")),
+      .middleware(SessionOrKey("admin"))
+      .annotate(RateLimitScopeAnnotation, "operator-api")
+      .middleware(RateLimit),
   )
   .add(
     HttpApiEndpoint.get("getUser", "/admin/users/:userId", {
@@ -119,5 +137,7 @@ export class AdminApi extends HttpApiGroup.make("admin")
       error: NotFound,
     })
       .middleware(AdminOnly)
-      .middleware(SessionOrKey("admin")),
+      .middleware(SessionOrKey("admin"))
+      .annotate(RateLimitScopeAnnotation, "operator-api")
+      .middleware(RateLimit),
   ) {}

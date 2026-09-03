@@ -5,7 +5,8 @@ import {
   HttpApiSchema,
 } from "effect/unstable/httpapi";
 
-import { Conflict, NotFound, RateLimited } from "../errors";
+import { Conflict, NotFound } from "../errors";
+import { RateLimit, RateLimitScopeAnnotation } from "../middleware";
 import { Session, SessionOrKey, WorkspaceRole } from "../security";
 import {
   ApiKey,
@@ -36,7 +37,8 @@ import {
  * deleting the account is `Session` only, so a leaked key cannot do it.
  * Role middlewares are declared before the credential one: the credential
  * middleware runs outermost and provides the `CurrentUser` the role check
- * reads.
+ * reads. `RateLimit` (contact form, key management) is declared after it,
+ * so an over-limit caller is refused before any credential is read.
  */
 export class SettingsApi extends HttpApiGroup.make("settings")
   .add(
@@ -48,8 +50,9 @@ export class SettingsApi extends HttpApiGroup.make("settings")
     HttpApiEndpoint.post("submitWaitlistEntry", "/waitlist", {
       payload: WaitlistSubmit,
       success: WaitlistSubmission.pipe(HttpApiSchema.status(201)),
-      error: RateLimited,
-    }),
+    })
+      .annotate(RateLimitScopeAnnotation, "contact")
+      .middleware(RateLimit),
   )
   .add(
     HttpApiEndpoint.get("workspaceContext", "/workspace", {
@@ -115,13 +118,19 @@ export class SettingsApi extends HttpApiGroup.make("settings")
     HttpApiEndpoint.post("createApiKey", "/api-keys", {
       payload: CreateApiKey,
       success: ApiKeyCreated.pipe(HttpApiSchema.status(201)),
-    }).middleware(SessionOrKey("admin")),
+    })
+      .middleware(SessionOrKey("admin"))
+      .annotate(RateLimitScopeAnnotation, "api-keys")
+      .middleware(RateLimit),
   )
   .add(
     HttpApiEndpoint.delete("revokeApiKey", "/api-keys/:id", {
       params: { id: ApiKeyId },
       error: NotFound,
-    }).middleware(SessionOrKey("admin")),
+    })
+      .middleware(SessionOrKey("admin"))
+      .annotate(RateLimitScopeAnnotation, "api-keys")
+      .middleware(RateLimit),
   )
   .add(
     HttpApiEndpoint.delete("deleteAccount", "/account").middleware(Session),

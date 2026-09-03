@@ -545,7 +545,7 @@ describe("SettingsApi", () => {
         credential: "SessionOrKey(admin)",
         roles: [],
         success: 201,
-        errors: credentialErrors,
+        errors: [...credentialErrors, "429 RateLimited"],
       },
       {
         id: "revokeApiKey",
@@ -554,7 +554,7 @@ describe("SettingsApi", () => {
         credential: "SessionOrKey(admin)",
         roles: [],
         success: 204,
-        errors: [...credentialErrors, "404 NotFound"],
+        errors: [...credentialErrors, "404 NotFound", "429 RateLimited"],
       },
       {
         id: "deleteAccount",
