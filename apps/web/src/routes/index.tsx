@@ -24,15 +24,30 @@ import { AuthShowcase } from "~/component/auth-showcase";
 import { api } from "~/lib/api";
 import { useTRPC } from "~/lib/trpc";
 
+/** Swallows only the listed tagged errors; rethrows everything else. */
+const orNull =
+  (...tags: ReadonlyArray<string>) =>
+  (error: unknown): null => {
+    const tag = (error as { readonly _tag?: unknown } | null)?._tag;
+    if (typeof tag === "string" && tags.includes(tag)) return null;
+    throw error;
+  };
+
 export const Route = createFileRoute("/")({
   loader: async ({ context }) => {
     const { trpc, queryClient } = context;
     void queryClient.prefetchQuery(trpc.post.all.queryOptions());
     // On the server this goes through the in-process transport (cookie
-    // forwarded, no network hop); on client navigation it is a fetch.
+    // forwarded, no network hop); on client navigation it is a fetch. The
+    // probe may be unhealthy (503 `Unhealthy`) and the session public
+    // endpoint may 500; both render as "unavailable" rather than failing
+    // the page. Anything else (a transport failure, a decode error) is a
+    // bug and propagates.
     const [ready, me] = await Promise.all([
-      api((client) => client.health.ready()).catch(() => null),
-      api((client) => client.session.me()).catch(() => null),
+      api((client) => client.health.ready()).catch(
+        orNull("Unhealthy", "InternalError"),
+      ),
+      api((client) => client.auth.session()).catch(orNull("InternalError")),
     ]);
     return { ready, me };
   },

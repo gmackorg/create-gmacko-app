@@ -1,18 +1,18 @@
 /**
- * `AppConfig.fromBindings`: the magic-link bypass is a development-only
- * switch. Anywhere else it must stop the Worker at load, not silently turn
- * into a sign-in bypass.
+ * `fromBindings`: the magic-link bypass is a development-only switch.
+ * Anywhere else it must stop the Worker at load, not silently turn into a
+ * sign-in bypass.
  */
 import { describe, expect, it } from "vitest";
 
-import { AppConfig } from "../config";
+import { fromBindings } from "../config";
 
 const base = { AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth" };
 
-describe("AppConfig.fromBindings", () => {
+describe("fromBindings", () => {
   it("honours BYPASS_MAGIC_LINK in development", () => {
     for (const value of ["true", "1"]) {
-      const config = AppConfig.fromBindings({
+      const config = fromBindings({
         ...base,
         STAGE: "development",
         BYPASS_MAGIC_LINK: value,
@@ -23,11 +23,11 @@ describe("AppConfig.fromBindings", () => {
   });
 
   it("defaults the bypass to off", () => {
-    const config = AppConfig.fromBindings({ ...base, STAGE: "development" });
+    const config = fromBindings({ ...base, STAGE: "development" });
     expect(config.auth.bypassMagicLink).toBe(false);
     for (const stage of ["preview", "staging", "production"]) {
       expect(
-        AppConfig.fromBindings({
+        fromBindings({
           ...base,
           STAGE: stage,
           BYPASS_MAGIC_LINK: "0",
@@ -39,7 +39,7 @@ describe("AppConfig.fromBindings", () => {
   it("fails at load when BYPASS_MAGIC_LINK is set on any other stage", () => {
     for (const stage of ["preview", "staging", "production"]) {
       expect(() =>
-        AppConfig.fromBindings({
+        fromBindings({
           ...base,
           STAGE: stage,
           BYPASS_MAGIC_LINK: "true",
@@ -51,6 +51,6 @@ describe("AppConfig.fromBindings", () => {
   });
 
   it("rejects an unknown STAGE", () => {
-    expect(() => AppConfig.fromBindings({ ...base, STAGE: "prod" })).toThrow();
+    expect(() => fromBindings({ ...base, STAGE: "prod" })).toThrow();
   });
 });

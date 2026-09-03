@@ -3,8 +3,9 @@
  * handler directly, forwarding the incoming request's cookie and carrying
  * the render's `RequestContext`, so a loader can read the session without a
  * network hop and six calls cost one session read. Runs over the
- * sqlite-node layers.
+ * sqlite-node layers with `@gmacko/api`'s web handler, as the app mounts it.
  */
+import { AppConfig, Background, makeWebHandler } from "@gmacko/api";
 import { RequestContext } from "@gmacko/auth/request-context";
 import { Auth } from "@gmacko/auth/service";
 import {
@@ -14,21 +15,21 @@ import {
 } from "@gmacko/auth/testing";
 import type { Database } from "@gmacko/db";
 import { layerTest } from "@gmacko/db/testing";
+import { AppApi } from "@gmacko/domain";
 import { Context, Effect, Layer, ManagedRuntime } from "effect";
 import { HttpClient } from "effect/unstable/http";
 import { HttpApiClient } from "effect/unstable/httpapi";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { FORWARDED_HEADERS, localTransport } from "~/lib/local-transport";
-import { AppConfig, GmackoApi, makeApiHandler } from "~/server/api";
-import { AuthSecurityConfigLive, makeAuthOptions } from "~/server/auth";
-import { Background } from "~/server/background";
+import { makeAuthOptions } from "~/server/auth";
+import { fromBindings } from "~/server/config";
 
 const baseUrl = "http://localhost:3001";
 const magicLinks: Array<{ email: string; url: string; token: string }> = [];
 const log = makeStatementLog();
 
-const config = AppConfig.fromBindings({
+const config = fromBindings({
   STAGE: "development",
   AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
   PORTLESS_URL: baseUrl,
@@ -44,15 +45,11 @@ const AuthTest = Auth.layer(
     },
   }),
 ).pipe(Layer.provide(DatabaseTest));
-const BackgroundTest = Background.layer((promise) => {
-  void promise;
-});
 const Services = Layer.mergeAll(
   AppConfigTest,
   DatabaseTest,
   AuthTest,
-  BackgroundTest,
-  AuthSecurityConfigLive.pipe(Layer.provide(AppConfigTest)),
+  Background.layerSync,
 );
 
 describe("localTransport", () => {
@@ -66,7 +63,10 @@ describe("localTransport", () => {
 
   beforeAll(() => {
     runtime = ManagedRuntime.make(Services);
-    const api = makeApiHandler(Services, { memoMap: runtime.memoMap });
+    const api = makeWebHandler(Services, {
+      memoMap: runtime.memoMap,
+      disableLogger: true,
+    });
     apiHandler = (request, context) => {
       calls += 1;
       return api.handler(request, context);
@@ -86,7 +86,7 @@ describe("localTransport", () => {
     );
 
   const client = (incoming: Headers, context?: Context.Context<never>) =>
-    HttpApiClient.make(GmackoApi, { baseUrl: "http://localhost" }).pipe(
+    HttpApiClient.make(AppApi, { baseUrl: "http://localhost" }).pipe(
       Effect.provideService(
         HttpClient.HttpClient,
         localTransport(apiHandler, incoming, context),
@@ -110,22 +110,18 @@ describe("localTransport", () => {
 
     const me = await Effect.runPromise(
       Effect.flatMap(client(new Headers({ cookie })), (api) =>
-        api.session.me(),
+        api.auth.session(),
       ),
     );
-    expect(me.user.email).toBe(email);
-    expect(me.user.role).toBe("user");
+    expect(me.credential).toBe("session");
+    expect(me.user?.email).toBe(email);
+    expect(me.user?.role).toBe("user");
 
-    // `me` takes the Session middleware now: anonymous is 401, not a null user.
+    // `auth.session` is public: anonymous is a null user, never 401.
     const anonymous = await Effect.runPromise(
-      Effect.flatMap(client(new Headers()), (api) => api.session.me()).pipe(
-        Effect.result,
-      ),
+      Effect.flatMap(client(new Headers()), (api) => api.auth.session()),
     );
-    expect(anonymous._tag).toBe("Failure");
-    if (anonymous._tag === "Failure") {
-      expect(anonymous.failure).toMatchObject({ _tag: "Unauthorized" });
-    }
+    expect(anonymous).toEqual({ user: null, credential: null });
   });
 
   it("forwards only the cookie: authorization never crosses into the API", async () => {
@@ -143,7 +139,7 @@ describe("localTransport", () => {
     });
 
     const live = await Effect.runPromise(
-      HttpApiClient.make(GmackoApi, { baseUrl: "http://localhost" }).pipe(
+      HttpApiClient.make(AppApi, { baseUrl: "http://localhost" }).pipe(
         Effect.provideService(
           HttpClient.HttpClient,
           localTransport(capturing, incoming),
@@ -175,23 +171,23 @@ describe("localTransport", () => {
     const results = await Effect.runPromise(
       Effect.all(
         [
-          api.session.me(),
+          api.auth.session(),
           api.health.ready(),
-          api.session.me(),
-          api.session.me(),
+          api.auth.session(),
+          api.settings.getPreferences(),
           api.health.live(),
-          api.session.me(),
+          api.auth.session(),
         ],
         { concurrency: "unbounded" },
       ),
     );
     expect(results).toHaveLength(6);
-    expect(results[0].user.email).toBe(email);
+    expect(results[0].user?.email).toBe(email);
 
-    // No endpoint here takes AdminOnly / WorkspaceRole yet (Phase 4), so the
-    // role and membership reads stay at zero; the session read is the one.
+    // One session read for the render; the user row (auth.session returns
+    // it, so the role is fresh) is read once through the same memo.
     expect(log.touching("plain", "session")).toBe(1);
-    expect(log.touching("db", "user")).toBe(0);
+    expect(log.touching("db", "user")).toBe(1);
     expect(log.touching("db", "workspace_membership")).toBe(0);
   });
 });

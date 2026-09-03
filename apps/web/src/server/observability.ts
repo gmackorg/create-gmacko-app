@@ -12,11 +12,10 @@
  * cannot be relied on; every request ends with a `flush` handed to
  * `waitUntil` through the `Background` service (see `runtime.ts`).
  */
+import { Background } from "@gmacko/api";
 import { Duration, Effect, Layer } from "effect";
 import { FetchHttpClient } from "effect/unstable/http";
 import { Otlp, OtlpExporter } from "effect/unstable/observability";
-
-import { Background } from "./background";
 
 export interface ObservabilityOptions {
   readonly endpoint: string | undefined;

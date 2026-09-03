@@ -7,11 +7,11 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 
+import { Background } from "@gmacko/api";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import { OtlpExporter } from "effect/unstable/observability";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { Background } from "../background";
 import { flushTelemetry, Observability } from "../observability";
 
 interface Captured {
