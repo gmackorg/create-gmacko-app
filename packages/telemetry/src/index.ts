@@ -26,17 +26,21 @@ export interface ObservabilityOptions {
   readonly headers?: Readonly<Record<string, string>> | undefined;
   readonly serviceName: string;
   readonly serviceVersion: string;
-  /** Console logger options; `base` defaults to the service name and version. */
+  /**
+   * Console logger options. `base` is merged onto `service` and `version`
+   * (a `stage` field is added, never replaces them).
+   */
   readonly logging?: LoggingOptions | undefined;
 }
 
 const loggingLayer = (options: ObservabilityOptions): Layer.Layer<never> =>
   Logging.layer({
+    ...options.logging,
     base: {
       service: options.serviceName,
       version: options.serviceVersion,
+      ...options.logging?.base,
     },
-    ...options.logging,
   });
 
 export const Observability = {
@@ -71,9 +75,20 @@ export const Observability = {
   },
 };
 
-/** Drains every registered exporter; a no-op when export is off. */
+/** How long a flush may take before it is abandoned; the isolate is on `waitUntil` for it. */
+export const flushTimeout = Duration.seconds(5);
+
+/**
+ * Drains every registered exporter; a no-op when export is off. Always
+ * settles: a collector that hangs is cut off after `flushTimeout` and a
+ * failing export is logged and ignored, so a `waitUntil` handed this never
+ * stalls the isolate or rejects.
+ */
 export const flushTelemetry: Effect.Effect<void, never, OtlpExporter.Flusher> =
-  Effect.flatMap(OtlpExporter.Flusher, (flusher) => flusher.flush);
+  Effect.flatMap(OtlpExporter.Flusher, (flusher) => flusher.flush).pipe(
+    Effect.timeout(flushTimeout),
+    Effect.ignoreCause({ log: "Warn", message: "telemetry flush failed" }),
+  );
 
 /**
  * Wraps a request handler so `flush` runs after every response, success or
