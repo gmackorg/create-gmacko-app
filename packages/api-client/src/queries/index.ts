@@ -13,6 +13,7 @@ import {
 } from "@tanstack/react-query";
 
 import type { ApiClient } from "../client";
+import { ApiClientError } from "../errors";
 import { adminMutations, adminQueries } from "./admin";
 import { authMutations, authQueries } from "./auth";
 import { healthMutations, healthQueries } from "./health";
@@ -34,8 +35,15 @@ export {
   invalidates,
   invalidation,
   type MutationId,
+  removal,
 } from "./invalidation";
-export { type ListUsersInput, type QueryKeys, queryKeys } from "./keys";
+export {
+  LIST_USERS_DEFAULTS,
+  type ListUsersInput,
+  listUsersQuery,
+  type QueryKeys,
+  queryKeys,
+} from "./keys";
 export type { CreatePostInput } from "./posts";
 export type {
   CreateApiKeyInput,
@@ -64,22 +72,61 @@ export const makeMutations = (api: ApiClient) => ({
 });
 export type Mutations = ReturnType<typeof makeMutations>;
 
+/** How many times a retryable failure is retried before the query settles as an error. */
+export const MAX_RETRIES = 3;
+
+/** A contract error: a `Schema.TaggedError` instance decoded from the response. */
+const isDomainError = (error: unknown): boolean =>
+  typeof error === "object" &&
+  error !== null &&
+  typeof (error as { _tag?: unknown })._tag === "string";
+
 /**
- * A `QueryClient` whose mutation cache applies each mutation's
- * `invalidates` meta on success, so screens never invalidate by hand. An
- * app that already owns a client can call `applyInvalidation` from its own
- * `MutationCache.onSuccess` instead.
+ * The default `queries.retry` of `makeQueryClient`, for apps that own their
+ * `QueryClient`. A domain error (`NotFound`, `Forbidden`, `Conflict`, ...)
+ * is an answer, not a fault: retrying it cannot change it and only delays
+ * the screen. Likewise an undeclared 4xx and a request the client could not
+ * encode or a body it could not decode. What is retried, up to `MAX_RETRIES`
+ * times: a transport failure (no response at all), an undeclared 5xx (a
+ * proxy's 502, a cold Worker), and errors this client did not produce
+ * (TanStack's own default).
+ */
+export const shouldRetry = (failureCount: number, error: unknown): boolean => {
+  if (failureCount >= MAX_RETRIES) return false;
+  if (error instanceof ApiClientError) {
+    switch (error.kind) {
+      case "transport":
+        return true;
+      case "status":
+        return error.status === undefined || error.status >= 500;
+      default:
+        return false;
+    }
+  }
+  return !isDomainError(error);
+};
+
+/**
+ * A `QueryClient` whose queries retry per `shouldRetry` and whose mutation
+ * cache applies each mutation's `invalidates` meta on success, so screens
+ * never invalidate by hand. Anything in `config` wins over these defaults.
+ * An app that already owns a client can call `applyInvalidation` from its
+ * own `MutationCache.onSuccess` and pass `shouldRetry` as its `retry`.
  */
 export const makeQueryClient = (
   config: QueryClientConfig = {},
 ): QueryClient => {
   const queryClient: QueryClient = new QueryClient({
     ...config,
+    defaultOptions: {
+      ...config.defaultOptions,
+      queries: { retry: shouldRetry, ...config.defaultOptions?.queries },
+    },
     mutationCache:
       config.mutationCache ??
       new MutationCache({
-        onSuccess: (_data, _variables, _context, mutation) =>
-          applyInvalidation(queryClient, mutation.meta),
+        onSuccess: (_data, variables, _context, mutation) =>
+          applyInvalidation(queryClient, mutation.meta, variables),
       }),
   });
   return queryClient;

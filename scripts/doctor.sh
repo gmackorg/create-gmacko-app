@@ -153,7 +153,7 @@ if [ -f "$ROOT_DIR/apps/nextjs/wrangler.jsonc" ]; then
     "CLOUDFLARE_API_TOKEN"
 fi
 
-if [ -d "$ROOT_DIR/packages/operator-core" ] || [ -d "$ROOT_DIR/packages/trpc-cli" ] || grep -q '"gmacko-app"' "$ROOT_DIR/.mcp.json" 2>/dev/null; then
+if [ -d "$ROOT_DIR/packages/operator-core" ] || [ -d "$ROOT_DIR/packages/api-cli" ] || grep -q '"gmacko-app"' "$ROOT_DIR/.mcp.json" 2>/dev/null; then
   ok "Operator API lane detected"
   check_env_group \
     "Operator API env values" \

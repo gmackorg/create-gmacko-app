@@ -111,9 +111,22 @@ export const makeHttpClient = (
     ),
   );
 
+  // A provider that throws (a token store that failed to read) is a
+  // transport-class failure of this call, not a defect: `run` maps it to
+  // `ApiClientError{kind: "transport"}` like a transport that rejected.
   const withHeaders = HttpClient.mapRequestEffect(dispatch, (request) =>
     Effect.map(
-      Effect.promise(async () => options.headers?.() ?? {}),
+      Effect.tryPromise({
+        try: async () => (await options.headers?.()) ?? {},
+        catch: (cause) =>
+          new HttpClientError.HttpClientError({
+            reason: new HttpClientError.TransportError({
+              request,
+              cause,
+              description: "header provider failed",
+            }),
+          }),
+      }),
       (provided) => {
         const headers: Record<string, string> = present(provided);
         if (options.requestId !== undefined) {

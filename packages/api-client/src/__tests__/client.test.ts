@@ -138,6 +138,40 @@ describe("run", () => {
     expect((error as Error).message).toContain("socket hang up");
   });
 
+  it("wraps a header provider that throws in ApiClientError{kind: transport}, not a defect", async () => {
+    let calls = 0;
+    const sync = makeApiClient({
+      baseUrl: api.baseUrl,
+      transport: (request) => {
+        calls += 1;
+        return api.handler(request);
+      },
+      headers: () => {
+        throw new Error("SecureStore unavailable");
+      },
+    });
+    const error = await sync
+      .run((c) => c.health.live())
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiClientError);
+    expect(error).toMatchObject({ kind: "transport" });
+    expect((error as Error).message).toContain("SecureStore unavailable");
+    // The request never left: no headers, no call.
+    expect(calls).toBe(0);
+
+    const rejecting = makeApiClient({
+      baseUrl: api.baseUrl,
+      transport: (request) => api.handler(request),
+      headers: () => Promise.reject(new Error("token read failed")),
+    });
+    const rejected = await rejecting
+      .run((c) => c.health.live())
+      .catch((e: unknown) => e);
+    expect(rejected).toBeInstanceOf(ApiClientError);
+    expect(rejected).toMatchObject({ kind: "transport" });
+    expect((rejected as Error).message).toContain("token read failed");
+  });
+
   it("wraps an undeclared status in ApiClientError{kind: status, status}", async () => {
     const proxy = makeApiClient({
       baseUrl: api.baseUrl,

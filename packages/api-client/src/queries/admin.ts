@@ -6,11 +6,15 @@ import {
   type UserId,
   type WaitlistEntryId,
 } from "@gmacko/domain";
-import { mutationOptions, queryOptions } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  mutationOptions,
+  queryOptions,
+} from "@tanstack/react-query";
 
 import type { ApiClient } from "../client";
 import { invalidates } from "./invalidation";
-import { type ListUsersInput, queryKeys } from "./keys";
+import { type ListUsersInput, listUsersQuery, queryKeys } from "./keys";
 
 export type UpdateLaunchControlsInput = ConstructorParameters<
   typeof UpdateLaunchControls
@@ -53,16 +57,19 @@ export const adminQueries = (api: ApiClient) => ({
       queryKey: queryKeys.admin.listWorkspaces(),
       queryFn: () => api.run((c) => c.admin.listWorkspaces()),
     }),
-  listUsers: (query: ListUsersInput = {}) =>
-    queryOptions({
-      queryKey: queryKeys.admin.listUsers(query),
-      queryFn: () =>
-        api.run((c) =>
-          c.admin.listUsers({
-            query: { limit: query.limit ?? 20, offset: query.offset ?? 0 },
-          }),
-        ),
-    }),
+  /**
+   * One page of users. The input is normalised first so every spelling of
+   * the default page shares a key; the previous page stays on screen while
+   * the next one loads (`keepPreviousData`).
+   */
+  listUsers: (query?: ListUsersInput) => {
+    const page = listUsersQuery(query);
+    return queryOptions({
+      queryKey: queryKeys.admin.listUsers(page),
+      queryFn: () => api.run((c) => c.admin.listUsers({ query: page })),
+      placeholderData: keepPreviousData,
+    });
+  },
   getUser: (userId: string) =>
     queryOptions({
       queryKey: queryKeys.admin.getUser(userId),

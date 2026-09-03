@@ -10,7 +10,7 @@
  * `instanceof` or `_tag` and never see this class for them.
  */
 export type ApiClientErrorKind =
-  /** The transport threw: DNS, connection, abort, a handler exception. */
+  /** The request never got a response: the transport threw (DNS, connection, abort, a handler exception) or the header provider did. */
   | "transport"
   /** A status the endpoint does not declare (`status` carries it). */
   | "status"

@@ -15,6 +15,7 @@ import {
   makeMutations,
   makeQueries,
   queryKeys,
+  removal,
 } from "../queries";
 
 /** `group.endpoint` for every endpoint of the contract, by method. */
@@ -141,15 +142,25 @@ describe("invalidation map", () => {
       const [group, name] = id.split(".") as [string, string];
       const factory = (mutations as Record<string, Record<string, unknown>>)[
         group
-      ]?.[name] as () => { meta?: { invalidates?: unknown } };
-      expect(factory().meta?.invalidates, id).toEqual(targets);
+      ]?.[name] as () => {
+        meta?: { invalidates?: unknown; removes?: unknown };
+      };
+      const meta = factory().meta;
+      expect(meta?.invalidates, id).toEqual(targets);
+      expect(meta?.removes, id).toBe(removal[id as keyof typeof removal]);
     }
   });
 
   it("covers the reviewer's map", () => {
     const k = queryKeys;
     expect(invalidation["posts.create"]).toEqual([k.posts.list()]);
+    // Removing a post drops its own entry (a refetch would 404) and
+    // stales the list.
     expect(invalidation["posts.remove"]).toEqual([k.posts.list()]);
+    expect(removal["posts.remove"]?.("post_1" as never)).toEqual([
+      k.posts.byId("post_1"),
+    ]);
+    expect(Object.keys(removal)).toEqual(["posts.remove"]);
     expect(invalidation["settings.updatePreferences"]).toEqual([
       k.settings.getPreferences(),
     ]);
@@ -168,6 +179,11 @@ describe("invalidation map", () => {
       k.settings.listApiKeys(),
     ]);
     expect(invalidation["settings.deleteAccount"]).toEqual([CLEAR_ALL]);
+    // The waitlist count rides on the launch controls.
+    expect(invalidation["settings.submitWaitlistEntry"]).toEqual([
+      k.admin.listWaitlistEntries(),
+      k.admin.launchControls(),
+    ]);
     expect(invalidation["admin.reviewWaitlistEntry"]).toEqual([
       k.admin.listWaitlistEntries(),
       k.admin.launchControls(),
@@ -184,9 +200,11 @@ describe("invalidation map", () => {
       k.admin.launchControls(),
     ]);
     // `users` is the prefix of every list page and every detail, so one
-    // key covers the pages the changed row may appear on.
+    // key covers the pages the changed row may appear on; the stats count
+    // users by role.
     expect(invalidation["admin.updateUserRole"]).toEqual([
       k.admin.users,
+      k.admin.stats(),
       k.auth.session(),
     ]);
     expect(k.admin.listUsers().slice(0, k.admin.users.length)).toEqual(

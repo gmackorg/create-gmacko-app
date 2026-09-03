@@ -17,6 +17,19 @@ const health = [...root, "health"] as const;
 
 export type ListUsersInput = Partial<ListUsersQuery>;
 
+/** The server's decoding defaults for `?limit=&offset=` (`ListUsersQuery`). */
+export const LIST_USERS_DEFAULTS: ListUsersQuery = { limit: 20, offset: 0 };
+
+/**
+ * The page a `listUsers` input denotes, defaults applied, so `listUsers()`,
+ * `listUsers({})` and `listUsers({ limit: 20, offset: 0 })` key (and
+ * request) the same page instead of caching it three times.
+ */
+export const listUsersQuery = (query: ListUsersInput = {}): ListUsersQuery => ({
+  limit: query.limit ?? LIST_USERS_DEFAULTS.limit,
+  offset: query.offset ?? LIST_USERS_DEFAULTS.offset,
+});
+
 export const queryKeys = {
   auth: {
     all: auth,
@@ -47,8 +60,9 @@ export const queryKeys = {
     listWorkspaces: () => [...admin, "listWorkspaces"] as const,
     /** Prefix of every user list page and every user detail. */
     users: adminUsers,
-    listUsers: (query: ListUsersInput = {}) =>
-      [...adminUsers, "list", query] as const,
+    /** One key per page: the input is normalised (`listUsersQuery`) before keying. */
+    listUsers: (query?: ListUsersInput) =>
+      [...adminUsers, "list", listUsersQuery(query)] as const,
     getUser: (userId: string) => [...adminUsers, "byId", userId] as const,
   },
   health: {

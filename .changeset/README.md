@@ -4,8 +4,19 @@ This folder manages the versioning and changelogs for publishable packages in th
 
 ## Publishable Packages
 
+Only one package is published to npm:
+
+- `create-gmacko-app` - the scaffolder CLI
+
+Every other package is `private` and never published. `changeset version`
+still bumps and tags them (`privatePackages` in `config.json`), so add a
+changeset when one of these changes in a way a consumer should see:
+
+- `@gmacko/api-client` - the typed API client (`effect/unstable/httpapi`
+  over `@gmacko/domain`) and its TanStack Query layer, used by the web app,
+  Expo, the operator CLI and the MCP server
+- `@gmacko/api-cli` - the operator CLI
 - `@gmacko/mcp-server` - MCP server for AI assistants
-- `@gmacko/trpc-client` - Vanilla tRPC client for external consumers
 
 ## Usage
 
