@@ -4,37 +4,47 @@
  */
 import { Database } from "@gmacko/db";
 import { Context, Effect, Layer } from "effect";
-import type { User } from "./index";
+import type { Session, User } from "./index";
 import { type Auth as AuthInstance, type AuthOptions, makeAuth } from "./index";
 
 /**
  * The authenticated user for the current request is declared by the
  * contract (`@gmacko/domain/security`); re-exported here because this
- * package implements the middlewares that provide it (Phase 3).
+ * package implements the middlewares that provide it (`./middleware`).
  */
 export { CurrentUser, type CurrentUserShape } from "@gmacko/domain/security";
-export type { User } from "./index";
+export type { Session, User } from "./index";
 
 export interface AuthShape {
   /** The raw better-auth instance (for `api.*` calls that need it). */
   readonly instance: AuthInstance;
   /** Serves `/api/auth/*`. better-auth turns its own failures into responses. */
   readonly handler: (request: Request) => Effect.Effect<Response>;
-  /** The session's user for these request headers, or `null` when anonymous. */
+  /**
+   * The session (record + user) for these request headers, or `null` when
+   * anonymous. Served from the signed cookie cache when the browser sent
+   * it; anything that gates on `user.role` must read the row instead
+   * (`RequestContext.role`).
+   */
+  readonly session: (headers: Headers) => Effect.Effect<Session | null>;
+  /** `session(headers).user`, or `null`. */
   readonly currentUser: (headers: Headers) => Effect.Effect<User | null>;
 }
 
 export class Auth extends Context.Service<Auth, AuthShape>()(
   "@gmacko/auth/Auth",
 ) {
-  static make = (instance: AuthInstance): AuthShape => ({
-    instance,
-    handler: (request) => Effect.promise(() => instance.handler(request)),
-    currentUser: (headers) =>
-      Effect.promise(() => instance.api.getSession({ headers })).pipe(
-        Effect.map((session) => session?.user ?? null),
-      ),
-  });
+  static make = (instance: AuthInstance): AuthShape => {
+    const session = (headers: Headers) =>
+      Effect.promise(() => instance.api.getSession({ headers }));
+    return {
+      instance,
+      handler: (request) => Effect.promise(() => instance.handler(request)),
+      session,
+      currentUser: (headers) =>
+        Effect.map(session(headers), (found) => found?.user ?? null),
+    };
+  };
 
   /** Builds the instance over `Database.plain`; the app supplies the options. */
   static layer = (options: AuthOptions): Layer.Layer<Auth, never, Database> =>
