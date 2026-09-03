@@ -27,8 +27,8 @@ docker compose up -d postgres
 # Or use PGlite (Option B: zero dependencies)
 # Set DATABASE_DRIVER=pglite in .env
 
-# Push schema and seed
-pnpm db:push
+# Apply the D1 migrations to the local database and seed the defaults
+pnpm db:migrate:local
 pnpm db:seed
 
 # Start dev server
@@ -81,11 +81,13 @@ tooling/
 | `pnpm test:watch` | Run tests in watch mode |
 | `pnpm test:coverage` | Run tests with coverage |
 | `pnpm e2e:web` | Run Playwright E2E tests |
-| `pnpm db:push` | Push schema to database |
-| `pnpm db:generate` | Generate migration files |
-| `pnpm db:migrate` | Run migrations |
-| `pnpm db:seed` | Seed database |
+| `pnpm db:generate` | Generate a D1 migration from the schema (drizzle-kit + flatten) |
+| `pnpm db:migrate:local` | Apply migrations to the local D1 (`wrangler d1 migrations apply --local`) |
+| `pnpm db:migrate:remote` | Apply migrations to the stage's D1 (`--remote`) |
+| `pnpm db:check` | Validate the migration snapshots (`drizzle-kit check`) |
+| `pnpm db:seed` | Seed the local D1 with the default plans, meters, and settings |
 | `pnpm db:studio` | Open Drizzle Studio |
+| `pnpm db:legacy:push` | Push the legacy Postgres schema (apps/nextjs, until Phase 8) |
 
 ## Branching Strategy
 
@@ -136,9 +138,10 @@ pnpm ui-add
 ## Database Changes
 
 1. Modify `packages/db/src/schema.ts`
-2. Generate migration: `pnpm db:generate`
-3. Apply migration: `pnpm db:migrate`
-4. Update seed data if needed: `packages/db/src/seed.ts`
+2. Generate the migration: `pnpm db:generate`, then review it (expand/contract
+   only, no `__new_` tables; see `docs/drizzle-migrations.md`)
+3. Apply it locally: `pnpm db:migrate:local`
+4. Update the seed if needed: `packages/db/src/seed.ts`, then `pnpm db:seed`
 
 ## Testing
 

@@ -67,13 +67,19 @@ echo "Generating database artifacts..."
 pnpm db:generate
 echo ""
 
+echo "Applying D1 migrations to the local database..."
+pnpm db:migrate:local
+pnpm db:seed
+echo ""
+
+# The legacy Next.js app (apps/nextjs) still runs on Postgres until Phase 8.
 if command -v pg_isready >/dev/null 2>&1 && pg_isready -h localhost -p 5432 -q 2>/dev/null; then
-  echo "Pushing schema to local Postgres..."
-  pnpm db:push
+  echo "Pushing the legacy schema to local Postgres..."
+  pnpm db:legacy:push
   echo ""
 else
-  echo "Skipping db:push — Postgres not available."
-  echo "Start emulate or Docker, then run: pnpm db:push"
+  echo "Skipping db:legacy:push — Postgres not available."
+  echo "Start emulate or Docker, then run: pnpm db:legacy:push"
   echo ""
 fi
 

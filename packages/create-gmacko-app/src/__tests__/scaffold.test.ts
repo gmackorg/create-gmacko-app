@@ -1310,7 +1310,8 @@ describe("create-gmacko-app scaffold", () => {
       expect(bootstrapScript).toContain("pnpm doctor");
       expect(bootstrapScript).toContain("pnpm auth:generate");
       expect(bootstrapScript).toContain("pnpm db:generate");
-      expect(bootstrapScript).toContain("pnpm db:push");
+      expect(bootstrapScript).toContain("pnpm db:migrate:local");
+      expect(bootstrapScript).toContain("pnpm db:legacy:push");
       expect(bootstrapScript).toContain("pnpm check:fast");
       expect(bootstrapScript).toContain("pnpm dev:emulate");
       expect(bootstrapScript).toContain(

@@ -75,7 +75,7 @@ jobs:
       # Create the schema in the service Postgres so the app's session/auth
       # queries succeed when Playwright drives it (pages otherwise 500).
       - name: Push database schema
-        run: pnpm -F @gmacko/legacy-db push --force
+        run: pnpm db:legacy:push --force
         env:
           DATABASE_URL: "postgresql://test:test@localhost:5432/test"
 
