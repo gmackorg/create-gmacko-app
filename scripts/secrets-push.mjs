@@ -8,8 +8,8 @@
  * KEY --stage <stage>`); the Worker reads them as bindings through
  * `AppConfig.fromBindings`. This script lists the stage's keys
  * (`forge secret list --stage`), reads each value (`forge secret get`) and
- * hands it to `wrangler secret put KEY --env <stage>` on stdin, from
- * apps/web, so no value touches a shell argument or a file. Keys that are
+ * hands it to `wrangler secret put KEY --config wrangler.jsonc --env <stage>`
+ * on stdin, from apps/web, so no value touches a shell argument or a file. Keys that are
  * not Worker bindings (a VPS-style `DATABASE_URL`/`REDIS_URL`, ForgeGraph's own `FG_*`)
  * are skipped by default; `--only` restricts to a list, `--skip` extends
  * the skip list. `--dry-run` prints the plan and pushes nothing.
@@ -125,9 +125,24 @@ for (const key of keys) {
     /\r?\n$/,
     "",
   );
+  // `--config` names the source config explicitly: after a `vite build`
+  // the Vite plugin leaves `.wrangler/deploy/config.json`, which redirects
+  // wrangler to the built `dist/server/wrangler.json` (already resolved for
+  // whatever environment that build was for). A secret must go to the
+  // `--env` Worker named in wrangler.jsonc, not to the last build's.
   const put = spawnSync(
     "pnpm",
-    ["exec", "wrangler", "secret", "put", key, "--env", stage],
+    [
+      "exec",
+      "wrangler",
+      "secret",
+      "put",
+      key,
+      "--config",
+      "wrangler.jsonc",
+      "--env",
+      stage,
+    ],
     {
       cwd: APP_DIR,
       input: value,
