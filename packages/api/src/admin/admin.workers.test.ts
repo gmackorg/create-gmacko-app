@@ -51,7 +51,7 @@ const seedUser = (id: string) =>
     ),
   );
 
-const outcome = <A>(result: { _tag: string; failure?: unknown }) =>
+const outcome = (result: { _tag: string; failure?: unknown }) =>
   result._tag === "Success"
     ? "success"
     : (result.failure as { _tag: string; reason?: string }).reason;
