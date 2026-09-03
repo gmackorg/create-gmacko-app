@@ -41,6 +41,17 @@ export const contentSecurityPolicy = (options: HeaderOptions): string => {
     "object-src 'none'",
     "frame-ancestors 'none'",
     "form-action 'self'",
+    // Only the app's own bundles and the SSR inline scripts carrying this
+    // request's nonce. Third-party scripts are deliberately not allowed:
+    // PostHog (src/providers.tsx) runs with @gmacko/analytics/web's
+    // `cspSafeDefaults`, which turn off every feature posthog-js would load
+    // by injecting a <script> from its assets host (session replay, surveys,
+    // web experiments, exception autocapture); its events go over
+    // `connect-src` (the PostHog origin is in `connectSrc`). To enable one of
+    // those features later, keep this directive and pass
+    // `prepare_external_dependency_script: cspNonceScriptHook()` so the
+    // injected script carries the `csp-nonce` meta's value, rather than
+    // adding the assets host here.
     `script-src 'self' 'nonce-${options.nonce}'`,
     // React inline `style=` attributes (sonner, tailwind's cascade layers in
     // dev) need inline styles; scripts never do.

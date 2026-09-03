@@ -549,6 +549,9 @@ importers:
       '@fontsource-variable/geist-mono':
         specifier: ^5.2.7
         version: 5.2.7
+      '@gmacko/analytics':
+        specifier: workspace:*
+        version: link:../../packages/analytics
       '@gmacko/api':
         specifier: workspace:*
         version: link:../../packages/api
@@ -567,12 +570,12 @@ importers:
       '@gmacko/payments':
         specifier: workspace:*
         version: link:../../packages/payments
+      '@gmacko/telemetry':
+        specifier: workspace:*
+        version: link:../../packages/telemetry
       '@gmacko/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-      '@opentelemetry/api':
-        specifier: ^1.9.1
-        version: 1.9.1
       '@sentry/cloudflare':
         specifier: 'catalog:'
         version: 10.73.0(@cloudflare/workers-types@5.20260903.1)(wrangler@4.128.0(@cloudflare/workers-types@5.20260903.1)(bufferutil@4.1.0)(utf-8-validate@6.0.4))
@@ -606,9 +609,6 @@ importers:
       effect:
         specifier: 'catalog:'
         version: 4.0.0-rc.112
-      posthog-js:
-        specifier: 'catalog:'
-        version: 1.362.0
       react:
         specifier: catalog:react19
         version: 19.2.4

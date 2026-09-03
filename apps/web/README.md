@@ -7,8 +7,13 @@ with the Effect HTTP API mounted under `/api/*` (`@gmacko/api`, built in
 ## Scripts
 
 - `pnpm dev` - Vite dev server with the ssr environment running in workerd
-  (`predev` links `.env`, see below).
+  (`predev` links `.env`, see below); `pnpm dev:portless` is the same under
+  portless at `https://gmacko.localhost` (what the root `pnpm dev` runs).
 - `pnpm build` / `pnpm preview` - production build and local preview.
+- `pnpm deploy:<preview|staging|production>` - `CLOUDFLARE_ENV=<env> vite
+  build && wrangler deploy`; `:dry-run` variants compile without uploading.
+  Run through the root `pnpm deploy:<stage>` so the stage's D1 migrations
+  go first (docs/DEPLOYMENT.md).
 - `pnpm e2e` - the Playwright suite (see "Browser tests").
 - `pnpm cf-typegen` - regenerate `worker-configuration.d.ts` from `wrangler.jsonc`.
 
@@ -56,7 +61,9 @@ into the Worker unless `CLOUDFLARE_INCLUDE_PROCESS_ENV=true` (the bridge the
   `Using secrets defined in .env` and every root variable is a binding.
 
 So `predev` (`scripts/link-env.mjs`) creates that symlink (a copy where
-symlinks are unavailable). emulate keeps writing the repo-root `.env`; nothing
+symlinks are unavailable), and under portless `scripts/dev-portless.mjs`
+writes `PORTLESS_URL` to `apps/web/.env.local` (loaded after `.env`) so the
+Worker knows its public origin. emulate keeps writing the repo-root `.env`; nothing
 under `src/` reads `process.env`. `src/env.ts` holds only the browser-visible
 `VITE_*` values (validated with `@t3-oss/env-core`); the server reads its
 bindings once in `src/server/config.ts`. (A `.dev.vars` file must never be
@@ -77,7 +84,7 @@ only reader of these bindings.
 | `AUTH_GITHUB_ID` / `AUTH_GITHUB_SECRET`, `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`, `AUTH_APPLE_*` | OAuth clients (GitHub/Google are generic OAuth providers, Apple is built in). |
 | `AUTH_GITHUB_URL`, `AUTH_GITHUB_API_URL`, `AUTH_GOOGLE_URL`, `AUTH_GOOGLE_TOKEN_URL`, `AUTH_APPLE_URL` | Point the providers at `npx @gmacko/emulate` locally. |
 | `BYPASS_MAGIC_LINK=true` | Print magic links to the server log instead of emailing them. **Development only**: `AppConfig.fromBindings` throws at load when it is set on any other `STAGE`. |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` (+ `OTEL_EXPORTER_OTLP_HEADERS`) | OTLP/HTTP export of traces, logs and metrics (`src/server/observability.ts`); flushed on `waitUntil` after every request. Unset → off. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` (+ `OTEL_EXPORTER_OTLP_HEADERS`) | OTLP/HTTP export of traces, logs and metrics (`@gmacko/telemetry`'s `Observability.layer`, wired in `src/server/runtime.ts`); flushed on `waitUntil` after every request. Unset → off; JSON console logging stays on either way. |
 | `SENTRY_DSN` | Enables `@sentry/cloudflare`'s `withSentry` wrapper in `src/server/worker.ts`. Unset → no-op. |
 | `STRIPE_WEBHOOK_SECRET` | Signing secret for `POST /api/webhooks/stripe`; unset → the route answers 503. |
 | `VITE_SENTRY_DSN`, `VITE_POSTHOG_KEY`, `VITE_POSTHOG_HOST` | Browser Sentry (`src/client.tsx`) and PostHog (`src/providers.tsx`); both off when unset. |

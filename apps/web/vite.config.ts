@@ -1,41 +1,12 @@
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 
 import { cloudflare } from "@cloudflare/vite-plugin";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig } from "vite";
 import tsConfigPaths from "vite-tsconfig-paths";
-
-/**
- * TODO(migration Phase 7): remove once @gmacko/logging and @gmacko/telemetry
- * are rebuilt on Effect and no longer need Node at module scope.
- *
- * Swaps Node-only workspace packages for Worker-safe shims, in the ssr
- * (workerd) environment only. See src/server/shims/*.ts for what each stub
- * covers and why the real package cannot load. @gmacko/payments still
- * imports @gmacko/logging, so the shim stays until then.
- */
-const workerShims = (): Plugin => {
-  const shims: Record<string, string> = {
-    "@gmacko/logging": fileURLToPath(
-      new URL("./src/server/shims/logging.ts", import.meta.url),
-    ),
-    "@gmacko/telemetry": fileURLToPath(
-      new URL("./src/server/shims/telemetry.ts", import.meta.url),
-    ),
-  };
-  return {
-    name: "gmacko:worker-shims",
-    enforce: "pre",
-    resolveId(source) {
-      if (this.environment?.name !== "ssr") return null;
-      return shims[source] ?? null;
-    },
-  };
-};
 
 const { version } = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8"),
@@ -58,7 +29,8 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(version ?? "0.0.0"),
   },
   server: {
-    port: 3001,
+    // portless assigns PORT (scripts/dev-portless.mjs); 3001 otherwise.
+    port: Number(process.env.PORT ?? 3001),
   },
   build: {
     sourcemap: sentryAuthToken ? "hidden" : false,
@@ -80,7 +52,6 @@ export default defineConfig({
     tsConfigPaths({
       projects: ["./tsconfig.json"],
     }),
-    workerShims(),
     // Runs the "ssr" environment (TanStack Start's server build) inside
     // workerd, using wrangler.jsonc for the entry, bindings and compat flags.
     cloudflare({ viteEnvironment: { name: "ssr" }, persistState }),

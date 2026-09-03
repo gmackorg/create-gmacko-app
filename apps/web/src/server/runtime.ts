@@ -16,12 +16,12 @@ import {
 import { RequestContext } from "@gmacko/auth/request-context";
 import { Auth } from "@gmacko/auth/service";
 import { Database } from "@gmacko/db";
+import { flushAfter, flushTelemetry, Observability } from "@gmacko/telemetry";
 import { Context, Effect, Layer, ManagedRuntime } from "effect";
 
 import { env as clientEnv } from "~/env";
 import { AuthLive } from "./auth";
 import { fromBindings, webFromBindings } from "./config";
-import { flushTelemetry, Observability } from "./observability";
 
 /**
  * Deliberately fails fast at module load: a misconfigured STAGE should stop
@@ -46,11 +46,17 @@ const ServicesLive = Layer.mergeAll(
   Background.layer(waitUntil),
   DatabaseLive,
   AuthLive.pipe(Layer.provide(Layer.mergeAll(AppConfigLive, DatabaseLive))),
+  // JSON console logging (Workers Logs) plus, with an endpoint, OTLP export
+  // of traces, logs and metrics; flushed after every request (below).
   Observability.layer({
     endpoint: config.otlp.endpoint,
     headers: config.otlp.headers,
     serviceName: "gmacko-web",
     serviceVersion: config.version,
+    logging: {
+      base: { stage: config.stage },
+      level: config.stage === "development" ? "debug" : "info",
+    },
   }),
 );
 
@@ -58,18 +64,17 @@ const ServicesLive = Layer.mergeAll(
 export const runtime = ManagedRuntime.make(ServicesLive);
 
 /**
- * Ends every request by flushing telemetry on `waitUntil`, so a span is
- * exported even though the isolate idles right after the response.
+ * Ends every request by handing the telemetry flush to `waitUntil` (through
+ * `Background`), so a span is exported even though the isolate idles right
+ * after the response.
  */
-const flushAfter =
-  (respond: ApiHandler): ApiHandler =>
-  async (request, context) => {
-    try {
-      return await respond(request, context);
-    } finally {
-      await runtime.runPromise(flushTelemetry);
-    }
-  };
+const flushOnBackground = (): Promise<void> =>
+  runtime.runPromise(
+    Effect.flatMap(Background, (background) => background.run(flushTelemetry)),
+  );
+const flushed = <Args extends ReadonlyArray<unknown>>(
+  respond: (...args: Args) => Promise<Response>,
+) => flushAfter(respond, flushOnBackground);
 
 /** Longest `x-test-delay` honoured, so a stray header cannot hold a request forever. */
 const MAX_TEST_DELAY_MS = 10_000;
@@ -103,7 +108,7 @@ const api = makeWebHandler(ServicesLive, { memoMap: runtime.memoMap });
  * The SSR path passes `renderContext(...)` so every call of one render
  * shares it.
  */
-export const apiHandler: ApiHandler = flushAfter(withTestDelay(api.handler));
+export const apiHandler: ApiHandler = flushed(withTestDelay(api.handler));
 
 /**
  * The per-request services for one incoming page request: its
@@ -118,8 +123,8 @@ export const renderContext = (
     .then((context) => Context.make(RequestContext, context));
 
 /** better-auth's handler for /api/auth/*. */
-export const authHandler: (request: Request) => Promise<Response> = flushAfter(
-  (request) =>
+export const authHandler: (request: Request) => Promise<Response> = flushed(
+  (request: Request) =>
     runtime.runPromise(Effect.flatMap(Auth, (auth) => auth.handler(request))),
 );
 
