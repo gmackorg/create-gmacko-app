@@ -7,18 +7,13 @@ import { Context, Effect, Layer } from "effect";
 import type { User } from "./index";
 import { type Auth as AuthInstance, type AuthOptions, makeAuth } from "./index";
 
-export type { User } from "./index";
-
 /**
- * The authenticated user for the current request, provided by the session /
- * API-key middleware.
- *
- * TODO(Phase 1): move to packages/domain/src/security.ts, where the API
- * contract declares it; it only lives here until that package exists.
+ * The authenticated user for the current request is declared by the
+ * contract (`@gmacko/domain/security`); re-exported here because this
+ * package implements the middlewares that provide it (Phase 3).
  */
-export class CurrentUser extends Context.Service<CurrentUser, User>()(
-  "@gmacko/auth/CurrentUser",
-) {}
+export { CurrentUser, type CurrentUserShape } from "@gmacko/domain/security";
+export type { User } from "./index";
 
 export interface AuthShape {
   /** The raw better-auth instance (for `api.*` calls that need it). */
