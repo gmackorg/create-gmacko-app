@@ -112,8 +112,14 @@ pnpm db:migrate:local
 pnpm -F @gmacko/db test:workers
 
 # Apply to the stage's database — before `wrangler deploy`, in the same stage
-pnpm db:migrate:remote
+pnpm db:migrate:remote --env staging
+# ...or the whole stage sequence (migrate, abort on failure, deploy):
+pnpm deploy:staging
 ```
+
+The deploy lane (migrate-then-deploy, expand/contract, preview databases,
+secrets) is documented in `docs/DEPLOYMENT.md`; the D1 procedures below are
+what it links to.
 
 There is no `push` and no down migration. To undo, ship a forward migration or
 use Time Travel (below).
