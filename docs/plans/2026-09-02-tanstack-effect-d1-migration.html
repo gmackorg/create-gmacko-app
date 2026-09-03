@@ -126,7 +126,7 @@
   </div>
 
   <div class="progress" aria-label="Phase progress">
-    <i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="active"></i><i class="active"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    <i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="active"></i><i class="done"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
   </div>
 
   <h2>Overview</h2>
@@ -719,7 +719,7 @@ packages/
     <li class="done"><b>Phase 3 — Auth on D1</b> · ~3 days · better-auth sqlite, middleware, API keys.</li>
     <li class="done"><b>Phase 4 — API services</b> · ~6 days · port 26 procedures and ~2,000 lines of tests.</li>
     <li class="active"><b>Phase 5 — Web app</b> · ~6 days · <code>apps/web</code> to page parity.</li>
-    <li class="active"><b>Phase 6 — Clients</b> · ~3 days · api-client, Expo, CLI, MCP, OpenAPI SDK.</li>
+    <li class="done"><b>Phase 6 — Clients</b> · ~3 days · api-client, Expo, CLI, MCP, OpenAPI SDK.</li>
     <li><b>Phase 7 — Platform &amp; CI</b> · ~7 days · observability, wrangler, secrets bridge, rate limiting, preview databases, workflows, emulate, deploy lane.</li>
     <li><b>Phase 8 — Scaffolder, docs, delete Next</b> · ~4 days · the flag day: one merge of the migration branch.</li>
     <li><b>Phase 9 — Post-cutover hardening</b> · ~5 days · Model.Class, rate-limit binding, preview databases, storage, data-migration recipe; ships as 0.2.1.</li>
@@ -862,15 +862,15 @@ packages/
     </tbody>
   </table>
 
-  <h2>Phase 6 — Clients <span class="badge todo">Todo</span></h2>
+  <h2>Phase 6 — Clients <span class="badge done">Done</span></h2>
   <table>
     <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
     <tbody>
-      <tr><td>Rename <code>trpc-client</code> → <code>api-client</code>; <code>makeApiClient</code>, <code>run</code>, transport options (fetch with headers, in-process), <code>queryOptions</code> factories per group</td><td><code>packages/api-client/src/*</code></td><td>Unit tests against in-process handler</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td>Expo: replace <code>utils/api.tsx</code> with <code>api-client</code>; keep better-auth Expo client</td><td><code>apps/expo/src/utils/api.tsx</code></td><td>Expo typecheck + Maestro smoke</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td><code>operator-core</code>: tools call <code>api-client</code>; input schemas derived from the contract's payload Schemas (JSON Schema via <code>Schema.toJsonSchema</code>)</td><td><code>packages/operator-core/src/index.ts</code></td><td>Existing tests pass; MCP tool list unchanged</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td><code>trpc-cli</code> → <code>api-cli</code> (rename, same commands)</td><td><code>packages/api-cli</code></td><td>Smoke against local worker</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td>SDK pipeline cutover: <code>sdks/generated</code> is retired and regenerated from <code>OpenApi.fromApi(AppApi)</code>; <code>tooling/openapi-generator/generate.ts</code> reads the new spec source; <code>sdk.yml</code>'s drift check compares against the new snapshot; paths and component names change, so the SDK ships as a breaking major with a migration note</td><td><code>sdks/openapi</code>, <code>sdks/generated</code>, <code>tooling/openapi-generator</code>, <code>.github/workflows/sdk.yml</code></td><td>Generated SDK compiles; <code>sdk.yml</code> green on the migration branch</td><td><span class="badge todo">Todo</span></td></tr>
+      <tr><td>Rename <code>trpc-client</code> → <code>api-client</code>; <code>makeApiClient</code>, <code>run</code>, transport options (fetch with headers, in-process), <code>queryOptions</code> factories per group</td><td><code>packages/api-client/src/*</code></td><td>Unit tests against in-process handler</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td>Expo: replace <code>utils/api.tsx</code> with <code>api-client</code>; keep better-auth Expo client</td><td><code>apps/expo/src/utils/api.tsx</code></td><td>Expo typecheck + Maestro smoke</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td><code>operator-core</code>: tools call <code>api-client</code>; input schemas derived from the contract's payload Schemas (JSON Schema via <code>Schema.toJsonSchema</code>)</td><td><code>packages/operator-core/src/index.ts</code></td><td>Existing tests pass; MCP tool list unchanged</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td><code>trpc-cli</code> → <code>api-cli</code> (rename, same commands)</td><td><code>packages/api-cli</code></td><td>Smoke against local worker</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td>SDK pipeline cutover: <code>sdks/generated</code> is retired and regenerated from <code>OpenApi.fromApi(AppApi)</code>; <code>tooling/openapi-generator/generate.ts</code> reads the new spec source; <code>sdk.yml</code>'s drift check compares against the new snapshot; paths and component names change, so the SDK ships as a breaking major with a migration note</td><td><code>sdks/openapi</code>, <code>sdks/generated</code>, <code>tooling/openapi-generator</code>, <code>.github/workflows/sdk.yml</code></td><td>Generated SDK compiles; <code>sdk.yml</code> green on the migration branch</td><td><span class="badge done">Done</span></td></tr>
     </tbody>
   </table>
 
