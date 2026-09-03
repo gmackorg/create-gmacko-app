@@ -9,7 +9,7 @@
  *
  * Additional entry points:
  * - @gmacko/flags/react - React hooks and components
- * - @gmacko/flags/server - Server-side helpers for tRPC
+ * - @gmacko/flags/server - Server-side helpers for the API services
  *
  * @example
  * ```ts

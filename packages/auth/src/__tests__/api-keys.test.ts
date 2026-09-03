@@ -140,7 +140,7 @@ describe("ApiKeys", () => {
       });
       expect(JSON.stringify(result.listed)).not.toContain(result.created.key);
 
-      // The row holds the legacy-format hash, never the secret.
+      // The row holds the stored hash format, never the secret.
       expect(result.stored?.keyHash).toBe(legacyHash(result.created.key));
 
       expect(result.foreign._tag).toBe("Failure");

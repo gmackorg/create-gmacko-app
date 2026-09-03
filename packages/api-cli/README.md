@@ -5,9 +5,9 @@ app's HTTP API through `@gmacko/api-client` with a bearer key. The MCP server
 (`@gmacko/mcp-server`) exposes the same tools.
 
 ```bash
-pnpm trpc:ops -- --help
-GMACKO_API_KEY=gmk_... pnpm trpc:ops -- get_workspace_context
-GMACKO_API_KEY=gmk_... pnpm trpc:ops -- create_api_key --name ci --permissions read,write --expiresInDays 30
+pnpm api:ops -- --help
+GMACKO_API_KEY=gmk_... pnpm api:ops -- get_workspace_context
+GMACKO_API_KEY=gmk_... pnpm api:ops -- create_api_key --name ci --permissions read,write --expiresInDays 30
 ```
 
 ## Environment

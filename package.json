@@ -30,7 +30,7 @@
     "forge:stages": "forge stage list",
     "forge:deploy:staging": "forge deploy create staging --wait",
     "forge:deploy:production": "forge deploy create production --wait",
-    "trpc:ops": "pnpm --filter @gmacko/api-cli exec tsx src/index.ts",
+    "api:ops": "pnpm --filter @gmacko/api-cli exec tsx src/index.ts",
     "mcp:app": "pnpm --filter @gmacko/mcp-server exec tsx src/index.ts",
     "dev": "concurrently -n emulate,web -c cyan,green \"pnpm dev:emulate\" \"pnpm dev:web\"",
     "dev:app": "pnpm -F @gmacko/web dev",

@@ -10,7 +10,7 @@ export default function Post() {
   const { data, error, isPending } = useQuery(queries.posts.byId(id));
 
   // The contract answers 404 `NotFound{resource: "post"}` for an unknown id
-  // (the tRPC version returned `undefined`); anything else is a real failure.
+  // (the legacy client returned `undefined`); anything else is a real failure.
   if (error instanceof NotFound) {
     return (
       <SafeAreaView className="bg-background">

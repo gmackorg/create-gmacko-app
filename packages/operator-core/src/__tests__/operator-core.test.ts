@@ -100,7 +100,7 @@ describe("executeOperatorTool", () => {
     const help = await executeOperatorTool(undefined as never, "auth_help");
     expect(help).toContain("GMACKO_API_KEY");
     expect(help).toContain("admin");
-    expect(help).not.toContain("tRPC");
+    expect(help).toContain("HTTP API");
   });
 
   it("rejects an unknown tool", async () => {

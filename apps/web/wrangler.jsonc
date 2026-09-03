@@ -9,8 +9,8 @@
   // Node.js compatibility. With a compatibility_date >= 2026-08-04 workerd
   // enables `nodejs_compat` by default (wrangler NODEJS_COMPAT_DEFAULT_ON_DATE),
   // so nothing is listed here. Turning it off (`no_nodejs_compat`) is not an
-  // option: Phase 0 measured who needs it, and after Phase 5 (the legacy
-  // tRPC/pino/postgres chain is out of this Worker) what remains is
+  // option: Phase 0 measured who needs it, and after Phase 5 (the
+  // legacy API/pino/Postgres chain is out of this Worker) what remains is
   //   - @tanstack/start-server-core: `node:async_hooks` (AsyncLocalStorage for
   //     the request context);
   //   - better-auth: `node:async_hooks`.

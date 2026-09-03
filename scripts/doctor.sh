@@ -122,7 +122,7 @@ check_env_group() {
 }
 
 # The web app reads its bindings from .env (apps/web/.env links to it); there is
-# no DATABASE_URL, the database is a local D1.
+# no database URL to check: the database is a local D1.
 check_env_group "Core app env values" "STAGE" "AUTH_SECRET"
 
 if [ -f "$ROOT_DIR/.forgegraph.yaml" ]; then

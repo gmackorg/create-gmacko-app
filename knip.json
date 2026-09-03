@@ -3,18 +3,15 @@
   "rules": {
     "exports": "off",
     "types": "off",
-    "duplicates": "off"
+    "duplicates": "off",
+    "optionalPeerDependencies": "off"
   },
   "ignore": [".claude/**", "sdks/generated/**"],
   "ignoreDependencies": ["cloudflare"],
   "ignoreBinaries": ["expo", "eas", "maestro", "generate"],
   "workspaces": {
     ".": {
-      "entry": [
-        "scripts/*.mjs",
-        "test/emulate-setup.ts",
-        "turbo/generators/config.ts"
-      ]
+      "entry": ["scripts/*.mjs", "turbo/generators/config.ts"]
     },
     "apps/web": {
       "entry": ["src/client.tsx", "scripts/*.mjs", "e2e/**/*.ts"]

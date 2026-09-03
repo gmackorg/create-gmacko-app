@@ -45,7 +45,7 @@ Notes:
 async function main() {
   const argv = process.argv.slice(2);
   // Skip a leading `--` end-of-options separator (POSIX convention). pnpm
-  // inserts one when forwarding `pnpm run trpc:ops -- <args>` through
+  // inserts one when forwarding `pnpm run api:ops -- <args>` through
   // `pnpm --filter … exec`, so without this `-- --help` would be read as a
   // tool named "--".
   if (argv[0] === "--") argv.shift();

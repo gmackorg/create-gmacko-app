@@ -1,7 +1,7 @@
 /**
  * The settings group through the web handler. The `describe`s marked
- * "(ported)" carry the legacy tRPC `it()`s from
- * packages/legacy-api/src/router/__tests__/settings.test.ts, now against a
+ * "(ported)" carry the `it()`s ported from the legacy router tests
+ * (now deleted), now against a
  * real database instead of a fake `db`.
  */
 import type { RequestContextShape } from "@gmacko/auth/request-context";

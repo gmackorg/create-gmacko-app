@@ -1,7 +1,7 @@
 /**
  * The admin group through the web handler. The `describe`s marked
- * "(ported)" carry the legacy tRPC `it()`s from
- * packages/legacy-api/src/router/__tests__/admin.test.ts; the guarded
+ * "(ported)" carry the `it()`s ported from the legacy router tests
+ * (now deleted); the guarded
  * writes (bootstrap, waitlist review) get their concurrency checks here and,
  * against a real D1, in admin.workers.test.ts.
  */

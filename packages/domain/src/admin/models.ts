@@ -124,7 +124,7 @@ export type ListUsersQuery = typeof ListUsersQuery.Type;
 
 export class UserList extends Schema.Class<UserList>("UserList")({
   users: Schema.Array(User),
-  /** `count(*)` over users (the tRPC version returned the first id). */
+  /** `count(*)` over users (the legacy version returned the first id). */
   total: Schema.Int,
   hasMore: Schema.Boolean,
 }) {}

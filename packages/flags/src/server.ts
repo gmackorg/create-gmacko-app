@@ -4,17 +4,14 @@
  * The evaluation environment is an argument (the app's `AppConfig.stage`),
  * never `process.env`.
  *
- * Usage in tRPC procedures:
- *   import { withFlags, requireFlag, getFlagsForUser } from "@gmacko/flags/server";
+ * Usage in an API service (packages/api):
+ *   import { getFlagsForUser } from "@gmacko/flags/server";
  *
- *   // In a procedure
- *   export const myProcedure = protectedProcedure
- *     .use(withFlags)
- *     .query(async ({ ctx }) => {
- *       if (ctx.flags.isEnabled("betaFeatures")) {
- *         // Beta-only logic
- *       }
- *     });
+ *   // In a handler, with the CurrentUser the credential middleware provided
+ *   const flags = getFlagsForUser(user, config.stage);
+ *   if (flags.isEnabled("betaFeatures")) {
+ *     // Beta-only logic
+ *   }
  */
 import type { RuntimeFlagName } from "./flags";
 import {
@@ -93,7 +90,7 @@ export function getFlagForUser(
 }
 
 /**
- * tRPC middleware context type
+ * Flags context type for a request-scoped service
  * Add this to your context type
  */
 export interface FlagsMiddlewareContext {
@@ -108,12 +105,12 @@ export interface FlagsMiddlewareContext {
 }
 
 /**
- * Create flags context for tRPC middleware
- * Use this in your createContext function or middleware
+ * Create the flags context for a request-scoped service
+ * Use this where the request context is built
  *
  * @example
  * ```ts
- * // In your tRPC context
+ * // In your request context builder
  * export const createContext = async (opts: CreateContextOptions) => {
  *   const user = await getUser(opts);
  *   return {

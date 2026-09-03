@@ -2,7 +2,7 @@
  * Everything a signed-in user (or an operator key) reads and writes about
  * their own account, workspace and billing, plus the public launch state and
  * waitlist. Row models mirror @gmacko/db's tables one to one; response
- * shapes mirror what the tRPC procedures returned, typed where they were
+ * shapes mirror what the legacy procedures returned, typed where they were
  * `string`.
  */
 import { Effect, Schema } from "effect";
