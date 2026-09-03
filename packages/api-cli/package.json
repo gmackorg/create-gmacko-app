@@ -1,0 +1,33 @@
+{
+  "name": "@gmacko/api-cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "gmacko-ops": "./dist/index.js"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "license": "MIT",
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts",
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "dev": "tsup src/index.ts --format esm --watch",
+    "format": "biome check .",
+    "lint": "oxlint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gmacko/operator-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog:",
+    "@gmacko/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "oxlint": "catalog:",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "catalog:"
+  }
+}
