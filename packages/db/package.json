@@ -11,6 +11,10 @@
       "types": "./dist/schema.d.ts",
       "default": "./src/schema.ts"
     },
+    "./seed": {
+      "types": "./dist/seed.d.ts",
+      "default": "./src/seed.ts"
+    },
     "./columns": {
       "types": "./dist/columns.d.ts",
       "default": "./src/columns.ts"
@@ -28,8 +32,11 @@
     "format": "biome check .",
     "lint": "oxlint .",
     "generate": "drizzle-kit generate && node scripts/flatten-migrations.mjs",
+    "check": "drizzle-kit check",
     "migrate:local": "wrangler d1 migrations apply DB --local --config ../../apps/web/wrangler.jsonc",
     "migrate:remote": "wrangler d1 migrations apply DB --remote --config ../../apps/web/wrangler.jsonc",
+    "seed:sql": "tsx scripts/seed-sql.ts",
+    "seed:local": "pnpm seed:sql && wrangler d1 execute DB --local --file seed/seed.sql --config ../../apps/web/wrangler.jsonc",
     "studio": "drizzle-kit studio",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -50,6 +57,7 @@
     "@types/node": "catalog:",
     "drizzle-kit": "catalog:",
     "oxlint": "catalog:",
+    "tsx": "^4.21.0",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "wrangler": "catalog:"

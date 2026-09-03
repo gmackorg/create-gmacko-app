@@ -8,6 +8,11 @@ The `Database` Effect service over Cloudflare D1 (drizzle's Effect API,
 - `src/schema.ts`, `src/auth-schema.ts`, `src/columns.ts`: drizzle tables.
 - `src/database.ts`: the service, `DatabaseError`, `Database.layer(d1)`.
 - `src/testing.ts`: `layerTest` (sqlite-node `:memory:` + migrations).
+- `src/seed.ts`: the default rows (billing plans + limits, usage meters, the
+  `application_settings` singleton) as `seedLocal` (an Effect over
+  `Database`) and `seedSql` (the same statements as literal SQL).
+- `seed/seed.sql`: `seedSql` written out by `pnpm seed:sql`; committed so the
+  diff is reviewable. Regenerate after editing `src/seed.ts`.
 - `drizzle/`: drizzle-kit's migration folders (source of truth, with snapshots).
 - `migrations/`: the same SQL flattened to `<name>.sql` for D1
   (`pnpm generate` runs `scripts/flatten-migrations.mjs`, which also removes
@@ -22,6 +27,14 @@ The `Database` Effect service over Cloudflare D1 (drizzle's Effect API,
   `apps/web/wrangler.jsonc` by hand; keep them in step.
 - `pnpm generate`: drizzle-kit generate + flatten.
 - `pnpm migrate:local` / `pnpm migrate:remote`: `wrangler d1 migrations apply`.
+- `pnpm check`: `drizzle-kit check` (snapshot consistency of `drizzle/`).
+- `pnpm seed:sql`: applies the seed twice to an in-memory database (fails if
+  it no longer matches the schema or stopped being idempotent), then writes
+  `seed/seed.sql`.
+- `pnpm seed:local`: `seed:sql` + `wrangler d1 execute DB --local --file
+  seed/seed.sql` against the local D1 (`pnpm db:seed` from the root; run
+  `migrate:local` first). D1 is reachable only from a Worker or wrangler, so
+  the Effect program cannot be pointed at it directly.
 
 ## Migrations
 
@@ -43,6 +56,22 @@ The `Database` Effect service over Cloudflare D1 (drizzle's Effect API,
   migration, then tighten; add a new table and copy, never drop-and-recreate
   a table that other rows reference. Review every drizzle-kit output for a
   `__new_` table or a `PRAGMA foreign_keys=OFF` line before committing it.
+
+## Seed
+
+- Idempotent by construction: plans and meters upsert on `key`, limits on
+  `(plan_id, key)` with `plan_id` resolved by a subquery on the plan's `key`
+  (an existing plan keeps its own id), and the settings row is inserted only
+  when the table is empty (`insert … select … where not exists`), so an
+  operator-owned row, whatever its id, is never touched. Reseeding restores
+  the default values of seeded rows and leaves everything else alone.
+  `src/__tests__/seed.shared.ts` proves all of that on sqlite-node and D1.
+- No users, sessions, or API keys are seeded; sign-in creates users.
+- `created_at`/`updated_at` of seeded rows are the fixed `SEED_AT` so
+  `seed/seed.sql` is byte-stable across regenerations.
+- From a test or Playwright's global setup: `yield* seedLocal` with a
+  `Database` layer (`layerTest` or `Database.layer(env.DB)`); it runs as one
+  `Database.batch`.
 
 ## Conventions
 
