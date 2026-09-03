@@ -15,8 +15,10 @@ import { Database } from "../database";
 import { seedSql } from "../seed";
 import { layerTest } from "../testing";
 
-const committed = fileURLToPath(
-  new URL("../../seed/seed.sql", import.meta.url),
+// Path strings, not URL objects: the Workers `URL` global collides with Node's `URL` type here.
+const committed = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../seed/seed.sql",
 );
 
 it("seed/seed.sql matches seedSql(...) byte-for-byte", async () => {
