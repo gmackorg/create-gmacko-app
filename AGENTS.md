@@ -19,29 +19,33 @@ This repository is set up to work well with `Codex`, `Claude Code`, and `OpenCod
 3. Write or update `DESIGN.md` when UI, product tone, or interaction patterns change materially.
 4. Keep implementation work anchored to the current docs instead of stale conversation context.
 
-## Local Development (emulate + portless)
+## Local Development (emulate + portless + wrangler)
 
-The local dev stack replaces Docker Compose with [`@gmacko/emulate`](https://www.npmjs.com/package/@gmacko/emulate) (Postgres via PGlite, Redis via redis-memory-server, plus GitHub/Google/Apple/Stripe/Resend service emulators) and `portless` for HTTPS `.localhost` URLs. Run `npx @gmacko/emulate init` to generate an `emulate.config.yaml` matching your production OAuth/service config. Use `--slug <name>` to namespace services so multiple projects can run concurrently.
+`pnpm dev` runs two things: [`@gmacko/emulate`](https://www.npmjs.com/package/@gmacko/emulate) (GitHub/Google/Apple/Stripe/Resend service emulators, no Postgres, no Redis) and the web app (`apps/web`, TanStack Start on workerd via the Cloudflare Vite plugin) under `portless`, at `https://gmacko.localhost`. The database is a local D1 in `apps/web/.wrangler/state`: `pnpm db:migrate:local && pnpm db:seed` once, then sign in with the emulated GitHub. `pnpm dev:next` runs the legacy Next.js app instead (`legacy.gmacko.localhost`, Postgres via `pnpm test:emulate`'s PGlite; Phase 8 deletes it).
+
+**How the Worker gets its variables:** Wrangler and the Vite plugin load `.env` from the directory of `wrangler.jsonc` and never from the repo root, and `process.env` is not copied into the Worker. So `apps/web/.env` is a symlink to the repo-root `.env` (created by the app's `predev`), `.env.example` documents the keys, and `AppConfig.fromBindings` (`apps/web/src/server/config.ts`) is the only reader. Under `pnpm dev`, `apps/web/scripts/dev-portless.mjs` also writes `PORTLESS_URL` into `apps/web/.env.local` so the Worker knows its public origin. **Never create `apps/web/.dev.vars`**: its presence disables `.env` loading; `pnpm check:standards` (`no-dev-vars`) fails on one.
 
 **How SDK wiring works:**
-- OAuth providers: `initAuth` uses better-auth's `genericOAuth` plugin with configurable provider URLs (defaults to real GitHub/Google/Apple URLs when env vars are unset). Set `AUTH_GITHUB_URL` etc. to point at emulate for local dev.
-- Resend: the SDK natively reads `RESEND_BASE_URL` from the environment.
+- OAuth providers: better-auth's generic OAuth providers take their URLs from `AppConfig` (`AUTH_GITHUB_URL`, `AUTH_GOOGLE_URL`, ...; the real provider URLs when unset). Point them at emulate for local dev.
+- Resend: the SDK natively reads `RESEND_BASE_URL`.
 - Stripe: the `@gmacko/payments` package accepts `host`/`protocol`/`port` in `StripeConfig` for base URL override.
-- Seed data (test users, OAuth apps, Stripe products) lives in `emulate.config.yaml`.
+- Seed data (test users, OAuth apps, Stripe products) lives in `emulate.config.yaml`; emulate starts exactly the services that file lists.
 
 **Key env vars for local dev:**
 | Variable | Purpose |
 | --- | --- |
-| `PORTLESS_URL` | App base URL (`https://gmacko.localhost`) |
-| `AUTH_GITHUB_URL` | GitHub OAuth base URL (default: `https://github.com`) |
-| `AUTH_GITHUB_API_URL` | GitHub API base URL (default: `https://api.github.com`) |
-| `AUTH_GOOGLE_URL` | Google OAuth issuer URL (default: `https://accounts.google.com`) |
-| `AUTH_GOOGLE_TOKEN_URL` | Google token endpoint (default: `https://oauth2.googleapis.com/token`) |
-| `AUTH_APPLE_URL` | Apple OAuth issuer URL (default: `https://appleid.apple.com`) |
+| `STAGE` | `development` locally; `preview` / `staging` / `production` are wrangler vars per environment |
+| `APP_URL` / `PORTLESS_URL` | Public origin (`https://gmacko.localhost` under portless, `http://localhost:3001` without) |
+| `AUTH_SECRET`, `AUTH_GITHUB_ID` / `_SECRET`, `AUTH_GOOGLE_ID` / `_SECRET` | better-auth and the emulate OAuth seeds |
+| `AUTH_GITHUB_URL`, `AUTH_GITHUB_API_URL` | GitHub OAuth/API base URLs (default: github.com / api.github.com) |
+| `AUTH_GOOGLE_URL`, `AUTH_GOOGLE_TOKEN_URL` | Google issuer and token endpoint |
+| `AUTH_APPLE_URL` | Apple OAuth issuer URL |
 | `RESEND_BASE_URL` | Resend API base URL |
-| `BYPASS_MAGIC_LINK` | Log magic links to console |
-| `DATABASE_URL` | PGlite wire protocol (`postgresql://localhost:5432/gmacko_dev`) |
-| `REDIS_URL` | redis-memory-server (`redis://localhost:6379`) |
+| `BYPASS_MAGIC_LINK` | Log magic links to the console (development only; other stages refuse to boot with it) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP export of traces/logs/metrics; unset → off |
+| `VITE_POSTHOG_KEY`, `VITE_SENTRY_DSN`, `SENTRY_DSN` | Browser PostHog/Sentry and Worker Sentry; unset → off |
+
+There is no `DATABASE_URL` for the web lane. Stage secrets are set in ForgeGraph and pushed to the Worker with `pnpm secrets:push --stage <stage>` (see `docs/DEPLOYMENT.md`).
 
 ## App Invariants (enforced by `pnpm check:standards`)
 
@@ -54,7 +58,16 @@ line with `// gmacko-standards-disable-next-line <rule>` and a reason.
 - **Read validated env, not `process.env`** (`no-raw-process-env`). In app
   `src/**`, import the typed `env` (`~/env`, `@gmacko/*/env`) instead of reading
   `process.env.*` directly; add the var to the env schema if missing. `NODE_ENV`
-  and `PORT` are the only conventional exceptions.
+  and `PORT` are the only conventional exceptions there. Inside the Worker
+  bundle — every workspace package reachable from `apps/web`'s dependencies,
+  listed by `pnpm check:standards --graph` — there is no process environment at
+  all, so a package reads **no** `process.env`: it takes values as options or
+  from `AppConfig` (`apps/web/src/server/config.ts` is the only reader of
+  bindings). Node-only packages (`api-cli`, `mcp-server`, `realtime`) are not
+  reachable from `apps/web` and keep their typed env modules.
+- **Never create `.dev.vars`** (`no-dev-vars`). Its presence disables wrangler's
+  `.env` loading, which is how emulate's values reach the Worker; stage secrets
+  go in with `pnpm secrets:push --stage <stage>`.
 - **Validate env at boot** — the Expo entry (`apps/expo/index.ts`) imports the
   `validate-boot` side-effect before `expo-router/entry`, and `config/env.ts`
   **throws** in preview/production for a missing/placeholder API URL or missing

@@ -61,10 +61,7 @@ resend:
     - name: gmacko.localhost
       region: us-east-1
 
-postgres:
-  port: 5432
-  databases:
-    - name: gmacko_dev
-
-redis:
-  port: 6379
+# No `postgres:` / `redis:` sections: emulate starts only the services listed
+# here, and the web lane (apps/web) runs on a local D1 (`pnpm db:migrate:local`),
+# with no Redis. The legacy Postgres lane (apps/nextjs, until Phase 8) starts
+# its own PGlite through `pnpm test:emulate` / `test/emulate-setup.ts`.

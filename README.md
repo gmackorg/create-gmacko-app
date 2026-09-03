@@ -164,7 +164,15 @@ pnpm bootstrap:local
 
 # Verify linting and types before you start iterating
 pnpm check:fast
+
+# Local D1 (once), then the dev loop: emulate + apps/web at https://gmacko.localhost
+pnpm db:migrate:local && pnpm db:seed
+pnpm dev
 ```
+
+The web app runs on Cloudflare Workers with a local D1, so there is no
+`DATABASE_URL` to configure; `AGENTS.md` ("Local Development") explains how the
+Worker reads `.env` and why `.dev.vars` must never exist.
 
 If you enable the optional SaaS bootstrap pack during scaffolding, the next Claude Code pass should be:
 
