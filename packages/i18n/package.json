@@ -33,7 +33,6 @@
   "dependencies": {
     "@gmacko/config": "workspace:*",
     "i18next": "^25.8.18",
-    "next-intl": "^4.8.3",
     "react-i18next": "^16.5.8"
   },
   "devDependencies": {
@@ -47,14 +46,10 @@
   },
   "peerDependencies": {
     "expo-localization": ">=17.0.0",
-    "next": ">=15.0.0",
     "react": ">=18.0.0"
   },
   "peerDependenciesMeta": {
     "expo-localization": {
-      "optional": true
-    },
-    "next": {
       "optional": true
     }
   }
