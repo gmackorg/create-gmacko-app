@@ -61,6 +61,10 @@ data/
 
 # wrangler local state
 .wrangler/
+
+# playwright
+playwright-report/
+test-results/
 # Claude Code
 .claude/settings.local.json
 session-ses_*.md
