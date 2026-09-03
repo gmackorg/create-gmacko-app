@@ -651,7 +651,7 @@ describe("create-gmacko-app scaffold", () => {
       expect(fileExists(result.appPath, "deploy/sst")).toBe(false);
     }, 120000);
 
-    it("should scaffold a ForgeGraph-oriented preview workflow", async () => {
+    it("should scaffold a Workers preview workflow", async () => {
       const appName = generateAppName("forgegraph-preview");
       const result = await runCli({
         appName,
@@ -668,7 +668,8 @@ describe("create-gmacko-app scaffold", () => {
         ".github/workflows/preview.yml",
       );
 
-      expect(previewWorkflow).toContain("ForgeGraph");
+      expect(previewWorkflow).toContain("wrangler deploy --env preview");
+      expect(previewWorkflow).toContain("gmacko-web-preview");
       expect(previewWorkflow).not.toContain("DEPLOY_TARGET");
       expect(previewWorkflow).not.toContain("Deploy to Vercel");
       expect(previewWorkflow).not.toContain("Deploy to Kubernetes");
@@ -1340,15 +1341,16 @@ describe("create-gmacko-app scaffold", () => {
       expect(doctorScript).toContain("Cloudflare Workers lane detected");
       expect(doctorScript).toContain("Wrangler CLI available");
       expect(doctorScript).toContain("Cloudflare Workers env values");
-      expect(envExample).toContain("# CORE APP ENV");
-      expect(envExample).toContain("# WEB APP ENV");
+      expect(envExample).toContain("# WEB APP (apps/web)");
       expect(envExample).toContain("# MOBILE APP ENV");
-      expect(envExample).toContain("# FORGEGRAPH DEPLOYMENT ENV");
-      expect(envExample).toContain("# CLOUDFLARE WORKERS ENV");
+      expect(envExample).toContain("# CLOUDFLARE (deploys");
+      expect(envExample).toContain("# LEGACY (apps/nextjs");
+      // The web lane needs no DATABASE_URL; the legacy lane's stays commented out.
       expect(envExample).toContain(
-        'DATABASE_URL="postgresql://postgres:postgres@localhost:5432/gmacko_dev"',
+        '# DATABASE_URL="postgresql://postgres:postgres@localhost:5432/gmacko_dev"',
       );
-      expect(envExample).toContain('# AUTH_SECRET="replace-me-in-forgegraph"');
+      expect(envExample).toContain('STAGE="development"');
+      expect(envExample).toContain("pnpm secrets:push --stage");
       expect(rootReadme).toContain("@forgegraph/cli");
       expect(
         fs.statSync(path.join(result.appPath, "scripts/setup.sh")).mode & 0o111,
