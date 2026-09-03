@@ -12,7 +12,7 @@ flows:
 # Test credentials must be supplied via env / CI secrets — no working defaults
 # are committed. Run with: TEST_EMAIL=… TEST_PASSWORD=… maestro test …
 env:
-  API_URL: ${API_URL:-http://localhost:3000}
+  API_URL: ${API_URL:-http://localhost:3001}
   TEST_EMAIL: ${TEST_EMAIL}
   TEST_PASSWORD: ${TEST_PASSWORD}
 

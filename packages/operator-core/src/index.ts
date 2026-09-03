@@ -22,7 +22,7 @@ import {
 import { Schema } from "effect";
 
 export interface OperatorClientOptions {
-  /** Origin of the API, e.g. `http://localhost:3000` (`GMACKO_API_URL`). */
+  /** Origin of the API, e.g. `http://localhost:3001` (`GMACKO_API_URL`). */
   readonly baseUrl: string;
   /** A `gmk_` key (`GMACKO_API_KEY`); omitted for the public tools. */
   readonly apiKey?: string | undefined;

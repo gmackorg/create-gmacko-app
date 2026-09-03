@@ -20,7 +20,7 @@ type Provider = "github" | "google" | "apple";
  * 1.7 those are ordinary social providers, so `signIn.social` covers all three.
  * Before redirecting, the launch state decides whether sign-in is open at
  * all: maintenance sends people back with a notice, closed sign-up to the
- * waitlist (the same rule the Next.js version applied server-side).
+ * waitlist.
  */
 function SocialSignInButton({
   provider,

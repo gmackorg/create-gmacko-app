@@ -181,7 +181,7 @@ jobs:
           # it via -e or ${APP_ID} resolves to "undefined".
           maestro test -e APP_ID="${APP_ID}" .maestro/flows/01-app-launch.yaml
         env:
-          API_URL: "http://localhost:3000"
+          API_URL: "http://localhost:3001"
 
       - name: Upload Maestro screenshots
         if: always()

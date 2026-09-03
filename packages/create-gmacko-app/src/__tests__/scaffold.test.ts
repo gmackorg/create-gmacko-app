@@ -1310,7 +1310,7 @@ describe("create-gmacko-app scaffold", () => {
       expect(setupScript).toContain("pnpm bootstrap:local");
       expect(setupScript).toContain("@forgegraph/cli");
       expect(setupScript).toContain("pnpm forge:doctor");
-      expect(bootstrapScript).toContain("pnpm doctor");
+      expect(bootstrapScript).toContain("pnpm run doctor");
       expect(bootstrapScript).toContain("pnpm auth:generate");
       expect(bootstrapScript).toContain("pnpm db:generate");
       expect(bootstrapScript).toContain("pnpm db:migrate:local");

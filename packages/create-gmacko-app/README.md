@@ -226,7 +226,7 @@ pnpm bootstrap:local   # doctor, .env, auth + db generate, local D1 migrate + se
 pnpm dev               # emulate + apps/web at https://gmacko.localhost
 ```
 
-`pnpm doctor` checks the local baseline for Node, pnpm, `jj`, `forge`, `.env`, `.forgegraph.yaml`, and the absence of `apps/web/.dev.vars`. It also warns when ForgeGraph config still contains scaffold placeholders, verifies grouped core/ForgeGraph env values, and, when the web app is present, checks Wrangler plus the Cloudflare env values needed for deploys.
+`pnpm run doctor` checks the local baseline for Node, pnpm, `jj`, `forge`, `.env`, `.forgegraph.yaml`, and the absence of `apps/web/.dev.vars`. It also warns when ForgeGraph config still contains scaffold placeholders, verifies grouped core/ForgeGraph env values, and, when the web app is present, checks Wrangler plus the Cloudflare env values needed for deploys.
 
 ## Maintaining The CLI
 

@@ -22,7 +22,7 @@
       "distribution": "internal",
       "env": {
         "APP_VARIANT": "development",
-        "API_URL": "http://localhost:3000",
+        "API_URL": "http://localhost:3001",
         "SENTRY_DSN": "${EXPO_PUBLIC_SENTRY_DSN_DEV}",
         "POSTHOG_KEY": "${EXPO_PUBLIC_POSTHOG_KEY_DEV}",
         "POSTHOG_HOST": "${EXPO_PUBLIC_POSTHOG_HOST}"

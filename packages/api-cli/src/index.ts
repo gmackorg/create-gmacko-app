@@ -25,7 +25,7 @@ Usage:
   gmacko-ops update_preferences [--theme <theme>] [--language <code>] [--timezone <tz>] [--emailNotifications true|false] [--pushNotifications true|false]
 
 Environment:
-  GMACKO_API_URL defaults to http://localhost:3000
+  GMACKO_API_URL defaults to http://localhost:3001
   GMACKO_API_KEY is optional for public calls and required for protected calls
 
 Key scopes:
@@ -69,7 +69,7 @@ async function main() {
   const args = parseFlags(rest);
   const client = createOperatorClient({
     apiKey: process.env.GMACKO_API_KEY,
-    baseUrl: process.env.GMACKO_API_URL ?? "http://localhost:3000",
+    baseUrl: process.env.GMACKO_API_URL ?? "http://localhost:3001",
   });
 
   const output = await executeOperatorTool(client, command, args);

@@ -12,7 +12,7 @@ GMACKO_API_KEY=gmk_... pnpm api:ops -- create_api_key --name ci --permissions re
 
 ## Environment
 
-- `GMACKO_API_URL` — the API origin; defaults to `http://localhost:3000`.
+- `GMACKO_API_URL` — the API origin; defaults to `http://localhost:3001`.
 - `GMACKO_API_KEY` — a `gmk_` key from Settings. Public tools (`list_posts`,
   `get_post`, `auth_help`) work without one.
 

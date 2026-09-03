@@ -21,7 +21,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { Auth } from "../service";
 
-const baseUrl = "http://localhost:3000";
+const baseUrl = "http://localhost:3001";
 const accessToken = "gh-access-token";
 const profile = {
   id: 424242,

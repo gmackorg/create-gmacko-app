@@ -22,7 +22,7 @@ export function createOperatorExecutor(options: {
 }) {
   const client = createOperatorClient({
     apiKey: options.apiKey,
-    baseUrl: options.baseUrl ?? "http://localhost:3000",
+    baseUrl: options.baseUrl ?? "http://localhost:3001",
     transport: options.transport,
   });
 

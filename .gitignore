@@ -8,10 +8,8 @@ node_modules
 # testing
 coverage
 
-# next.js
-.next/
+# build output
 out/
-next-env.d.ts
 storybook-static/
 
 # nitro

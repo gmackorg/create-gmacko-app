@@ -5,7 +5,7 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
 // gets its own bundle id + name so all three install side-by-side; production is
 // produced only through CI (.github/workflows/mobile-production.yml).
 const APP_VARIANT = process.env.APP_VARIANT ?? "development";
-const API_URL = process.env.API_URL ?? "http://localhost:3000";
+const API_URL = process.env.API_URL ?? "http://localhost:3001";
 const ASSOCIATED_DOMAIN =
   process.env.EXPO_PUBLIC_APP_DOMAIN ?? "change-me.example.com";
 

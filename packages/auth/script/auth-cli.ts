@@ -2,7 +2,8 @@
  * @fileoverview better-auth CLI configuration (schema generation only).
  *
  * Consumed by `pnpm -F @gmacko/auth generate`, i.e.
- * `pnpx auth@1.7.2 generate --config script/auth-cli.ts --output ../db/src/auth-schema.ts`.
+ * `pnpx auth@1.7.2 generate --config script/auth-cli.ts --output ../db/.cache/auth-schema.generated.ts`
+ * (the committed `packages/db/src/auth-schema.ts` is reconciled by hand).
  * The CLI evaluates this module and reads the adapter's schema; no query is
  * ever issued, so the D1 binding is a placeholder.
  *
@@ -16,10 +17,10 @@ import { logMagicLink, makeAuth } from "../src/index";
 
 export const auth = makeAuth(
   {
-    baseUrl: "http://localhost:3000",
-    productionUrl: "http://localhost:3000",
+    baseUrl: "http://localhost:3001",
+    productionUrl: "http://localhost:3001",
     secret: "cli-only-secret",
-    allowedOrigins: ["http://localhost:3000"],
+    allowedOrigins: ["http://localhost:3001"],
     github: { clientId: "cli", clientSecret: "cli" },
     google: { clientId: "cli", clientSecret: "cli" },
     apple: { clientId: "cli", clientSecret: "cli" },

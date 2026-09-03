@@ -16,7 +16,7 @@ if [ ! -d node_modules ]; then
 fi
 
 echo "Running doctor checks..."
-pnpm doctor
+pnpm run doctor
 echo ""
 
 if [ ! -f .env ]; then

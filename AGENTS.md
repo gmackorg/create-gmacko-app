@@ -54,6 +54,10 @@ real bug that shipped into a generated app. `pnpm check:standards`
 (`scripts/check-app-standards.mjs`, run in CI + `pnpm check:fast`) fails a PR
 that breaks one. When a violation is a justified exception, silence that single
 line with `// gmacko-standards-disable-next-line <rule>` and a reason.
+Bullets that name a rule id are the ones `check:standards` enforces; the three
+marked *convention* have no rule there — they are checked by
+`pnpm --filter @gmacko/expo check:observability` (boot validation,
+observability) and by the health tests (`packages/api/src/health/health.test.ts`).
 
 - **Read validated env, not `process.env`** (`no-raw-process-env`). In app
   `src/**`, import the typed `env` (`~/env`, `@gmacko/*/env`) instead of reading
@@ -68,7 +72,8 @@ line with `// gmacko-standards-disable-next-line <rule>` and a reason.
 - **Never create `.dev.vars`** (`no-dev-vars`). Its presence disables wrangler's
   `.env` loading, which is how emulate's values reach the Worker; stage secrets
   go in with `pnpm secrets:push --stage <stage>`.
-- **Validate env at boot** — the Expo entry (`apps/expo/index.ts`) imports the
+- **Validate env at boot** (convention; checked by `check:observability`, not
+  `check:standards`) — the Expo entry (`apps/expo/index.ts`) imports the
   `validate-boot` side-effect before `expo-router/entry`, and `config/env.ts`
   **throws** in preview/production for a missing/placeholder API URL or missing
   Sentry/PostHog config. Don't downgrade this to a silent fallback.
@@ -112,13 +117,15 @@ line with `// gmacko-standards-disable-next-line <rule>` and a reason.
   table rebuild cascade-deletes referencing rows. Any file under
   `packages/db/migrations` (after the two pre-provisioning ones) containing
   `__new_` or `PRAGMA foreign_keys=OFF` fails; see `docs/drizzle-migrations.md`.
-- **Observability is part of boot validation** — the Expo boot check above treats
+- **Observability is part of boot validation** (convention; checked by
+  `check:observability`, not `check:standards`) — the Expo boot check above treats
   a missing Sentry DSN / PostHog key as a hard error in preview/production, so a
   store build with no telemetry fails fast rather than shipping blind. This is
   enforced twice: at build time by `pnpm --filter @gmacko/expo check:observability`
   (gates `build:preview`/`build:prod` and the `mobile-production` workflow, failing
   before a cloud build starts), and at runtime by `src/config/env-validation.ts`.
-- **Health endpoints never leak internals in production** — `api/health`,
+- **Health endpoints never leak internals in production** (convention; covered
+  by the health tests, not `check:standards`) — `api/health`,
   `api/health/ready`, and `.well-known/forge-health` return a generic message when
   `NODE_ENV === "production"`; raw error detail is dev-only.
 

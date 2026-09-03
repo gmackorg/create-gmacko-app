@@ -35,7 +35,7 @@ Or clone this repository to work on the template itself:
 ```bash
 git clone https://github.com/gmackorg/create-gmacko-app.git my-app
 cd my-app
-pnpm setup
+pnpm run setup
 ```
 
 ## About
@@ -302,7 +302,7 @@ Generated apps are set up for current agent-native and platform-native workflows
 - The web lane is Cloudflare-native end to end: TanStack Start and the Effect `HttpApi` run on workerd in development (`vite dev` through `@cloudflare/vite-plugin`), in tests (`@cloudflare/vitest-pool-workers`), and in every deployed stage.
 - Generated repos include `.forgegraph.yaml` aligned to the live `forge` repo contract (`cloudflare-workers` targets, D1 resources, the migrate command) and stronger Expo development-build defaults out of the box.
 - The scaffold can override the ForgeGraph server and domain placeholders directly from the CLI (`--forgegraph-server`, `--forgegraph-preview-domain`, `--forgegraph-production-domain`).
-- `pnpm doctor` warns when `.forgegraph.yaml` still contains scaffold placeholders and checks grouped core, ForgeGraph, and Cloudflare env values in `.env`.
+- `pnpm run doctor` warns when `.forgegraph.yaml` still contains scaffold placeholders and checks grouped core, ForgeGraph, and Cloudflare env values in `.env`.
 
 See [docs/ai/DEVELOPER_EXPERIENCE.md](./docs/ai/DEVELOPER_EXPERIENCE.md) for the current support matrix and recommendations.
 

@@ -13,7 +13,6 @@
       "!**/.claude/**",
       "!**/.git",
       "!**/.jj",
-      "!**/.next",
       "!**/.turbo",
       "!**/coverage",
       "!**/dist",

@@ -10,7 +10,7 @@ import { createOperatorExecutor } from "./core.js";
 
 const operatorExecutor = createOperatorExecutor({
   apiKey: process.env.GMACKO_API_KEY,
-  baseUrl: process.env.GMACKO_API_URL ?? "http://localhost:3000",
+  baseUrl: process.env.GMACKO_API_URL ?? "http://localhost:3001",
 });
 
 const server = new Server(
