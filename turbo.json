@@ -104,7 +104,9 @@
     "ALLOWED_ORIGINS",
     "VITE_POSTHOG_KEY",
     "VITE_POSTHOG_HOST",
-    "VITE_SENTRY_DSN"
+    "VITE_SENTRY_DSN",
+    "CLOUDFLARE_ENV",
+    "SENTRY_AUTH_TOKEN"
   ],
   "globalPassThroughEnv": [
     "NODE_ENV",
