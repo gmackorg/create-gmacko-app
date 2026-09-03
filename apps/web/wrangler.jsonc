@@ -21,6 +21,9 @@
   // `No such module "node:os"`.
   "compatibility_flags": [],
   "observability": { "enabled": true },
+  // Nightly maintenance tick, handled by `scheduled` in src/server/worker.ts.
+  // Locally: `curl http://localhost:3001/cdn-cgi/handler/scheduled?cron=0+3+*+*+*`.
+  "triggers": { "crons": ["0 3 * * *"] },
   "vars": {
     "STAGE": "development"
   },
