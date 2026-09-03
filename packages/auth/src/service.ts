@@ -23,12 +23,21 @@ export interface AuthShape {
   /**
    * The session (record + user) for these request headers, or `null` when
    * anonymous. Served from the signed cookie cache when the browser sent
-   * it; anything that gates on `user.role` must read the row instead
-   * (`RequestContext.role`).
+   * it, as-is: `RequestContext.session` is the validated form (it refuses a
+   * cached session whose user row is gone), and anything that gates on
+   * `user.role` must read the row (`RequestContext.role`).
    */
   readonly session: (headers: Headers) => Effect.Effect<Session | null>;
   /** `session(headers).user`, or `null`. */
   readonly currentUser: (headers: Headers) => Effect.Effect<User | null>;
+  /**
+   * better-auth's sign-out for these headers: revokes the session row the
+   * cookie names (a no-op when it is already gone) and returns the
+   * `Set-Cookie` values that expire every auth cookie — `session_token`,
+   * `session_data` and their `__Secure-` forms over https — for the caller
+   * to put on its own response.
+   */
+  readonly signOut: (headers: Headers) => Effect.Effect<ReadonlyArray<string>>;
 }
 
 export class Auth extends Context.Service<Auth, AuthShape>()(
@@ -43,6 +52,13 @@ export class Auth extends Context.Service<Auth, AuthShape>()(
       session,
       currentUser: (headers) =>
         Effect.map(session(headers), (found) => found?.user ?? null),
+      signOut: (headers) =>
+        Effect.map(
+          Effect.promise(() =>
+            instance.api.signOut({ headers, returnHeaders: true }),
+          ),
+          (result) => result.headers.getSetCookie(),
+        ),
     };
   };
 

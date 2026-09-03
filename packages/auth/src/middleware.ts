@@ -19,7 +19,10 @@
  * 4. The raw `Cookie` header goes to better-auth, which reads whichever name
  *    it set (`__Secure-` prefixed over https).
  * 5. `AdminOnly` / `WorkspaceRole` read the database through `RequestContext`,
- *    never the cookie cache.
+ *    never the cookie cache. The cookie path itself trusts the cache only
+ *    as far as `RequestContext.session` does: it is checked against the
+ *    `user` row, so a deleted user is 401 on the next request, not after
+ *    the cache's maxAge.
  * 6. The credential middleware is declared last in the contract and so runs
  *    outermost; it provides `CurrentUser` (and the `RequestContext`) to the
  *    role middlewares and the handler inside it.
@@ -110,7 +113,7 @@ export const originAllowed = (
 };
 
 /** The raw headers as a web `Headers`, the shape better-auth reads. */
-const toWebHeaders = (request: Request): Headers => {
+export const toWebHeaders = (request: Request): Headers => {
   const source = request.source as { readonly headers?: unknown };
   if (source.headers instanceof Headers) return source.headers;
   const headers = new Headers();

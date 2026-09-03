@@ -979,16 +979,28 @@ describe("settings deleteAccount", () => {
       workspaces: 0,
     });
 
-    // The dead session no longer authenticates. Only the session token is
-    // sent: better-auth's signed cookie cache (`session_data`) would answer
-    // for up to its maxAge without reading the deleted row, which is the
-    // cookie cache's documented trade-off (see packages/auth/src/index.ts).
-    const sessionToken = person.cookie
-      .split("; ")
-      .find((pair) => pair.startsWith("better-auth.session_token="));
+    // The response expires both auth cookies, so the browser stops sending
+    // them (the app is served over http here; over https the names carry
+    // the `__Secure-` prefix, which better-auth's sign-out applies itself).
+    const expired = response.headers
+      .getSetCookie()
+      .filter((value) => /;\s*max-age=0(;|$)/i.test(value))
+      .map((value) => value.split("=")[0]);
+    expect(expired).toEqual(
+      expect.arrayContaining([
+        "better-auth.session_token",
+        "better-auth.session_data",
+      ]),
+    );
+
+    // And the dead session no longer authenticates even when the browser
+    // does send the old cookies, signed cookie cache (`session_data`)
+    // included: `RequestContext.session` checks the cache against the user
+    // row (see packages/auth/src/index.ts), which is gone.
+    expect(person.cookie).toContain("better-auth.session_data=");
     const failure = await api.failure(
       (client) => client.settings.getPreferences(),
-      { cookie: sessionToken },
+      { cookie: person.cookie },
     );
     expect(failure).toMatchObject({ _tag: "Unauthorized" });
   });

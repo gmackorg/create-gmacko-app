@@ -148,6 +148,20 @@ describe("security middlewares", () => {
       }
     });
 
+    it("401 once the user row is deleted, even with the cookie cache sent (rule 5)", async () => {
+      const fresh = await signIn("deleted");
+      expect(fresh.cacheCookie).toBeDefined();
+      await run(
+        Effect.flatMap(Database, ({ db }) =>
+          db.delete(user).where(eq(user.email, fresh.email)),
+        ),
+      );
+      for (const path of ["/me", "/read"] as const) {
+        const response = await call("GET", path, { cookie: fresh.cookie });
+        expect(response.status, path).toBe(401);
+      }
+    });
+
     it("refuses a non-GET request from a foreign Origin with 403 Forbidden(origin)", async () => {
       const response = await call("POST", "/write", {
         cookie: signedIn.cookie,

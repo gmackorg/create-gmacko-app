@@ -1,8 +1,16 @@
 import { ApiKeys } from "@gmacko/auth/api-keys";
+import { toWebHeaders } from "@gmacko/auth/middleware";
+import { Auth } from "@gmacko/auth/service";
 import { platformPrimitives } from "@gmacko/config";
 import { AppApi } from "@gmacko/domain";
 import { PlatformPrimitives } from "@gmacko/domain/settings";
 import { Effect, Layer } from "effect";
+import {
+  Cookies,
+  HttpEffect,
+  HttpServerRequest,
+  HttpServerResponse,
+} from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 
 import { internal, requestContext, withUser } from "../boundary";
@@ -60,6 +68,7 @@ export const SettingsHandlers = HttpApiBuilder.group(
       const preferences = yield* Preferences;
       const keys = yield* ApiKeys;
       const account = yield* Account;
+      const auth = yield* Auth;
       return handlers
         .handle("launchState", () => internal(launch.state))
         .handle("submitWaitlistEntry", ({ payload }) =>
@@ -126,7 +135,29 @@ export const SettingsHandlers = HttpApiBuilder.group(
           withUser((user) => keys.revoke(user.id, params.id)),
         )
         .handle("deleteAccount", () =>
-          withUser((user) => account.deleteAccount(user.id)),
+          withUser((user) =>
+            Effect.gen(function* () {
+              const request = yield* HttpServerRequest.HttpServerRequest;
+              yield* account.deleteAccount(user.id);
+              // With the row gone the session no longer authenticates
+              // (`RequestContext.session` checks the cookie cache against
+              // it), but the browser would keep sending the cookies until
+              // they expired. better-auth's sign-out revokes the session
+              // (already cascaded) and hands back the `Set-Cookie` values
+              // that expire every auth cookie, `__Secure-` names included;
+              // they go on this response through a pre-response handler,
+              // as the router sends the 204 as soon as the handler returns.
+              const cleared = yield* auth.signOut(toWebHeaders(request));
+              yield* HttpEffect.appendPreResponseHandler((_request, response) =>
+                Effect.succeed(
+                  HttpServerResponse.mergeCookies(
+                    response,
+                    Cookies.fromSetCookie(cleared),
+                  ),
+                ),
+              );
+            }),
+          ),
         );
     }),
 ).pipe(Layer.provide(Layer.mergeAll(SettingsServicesLive, Billing.layer)));

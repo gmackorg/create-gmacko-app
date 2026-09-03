@@ -3,7 +3,8 @@
  * dispatch that request makes. The seam is `HttpRouter.toWebHandler`'s
  * `handler(request, context)` argument: an SSR render builds the context
  * once and hands the same `Context` to every in-process dispatch, so six API
- * calls cost one session read, one role read and one membership read.
+ * calls cost one session read, one user read (which validates the session
+ * and answers the role) and one membership read.
  */
 import { Database } from "@gmacko/db";
 import { user, workspace, workspaceMembership } from "@gmacko/db/schema";
@@ -109,14 +110,15 @@ describe("RequestContext", () => {
   });
 
   // better-auth reads through `plain` (session, then its own user lookup);
-  // the role and membership reads are ours, on `db`.
+  // the user (session validation + role) and membership reads are ours, on
+  // `db`.
   const counts = () => ({
     session: log.touching("plain", "session"),
-    role: log.touching("db", "user"),
+    user: log.touching("db", "user"),
     membership: log.touching("db", "workspace_membership"),
   });
 
-  it("performs 1 session, 1 role and 1 membership read for 6 calls sharing one context", async () => {
+  it("performs 1 session, 1 user and 1 membership read for 6 calls sharing one context", async () => {
     // Only the session token: the cookie cache (session_data) would let
     // better-auth skip the read entirely and hide what is being measured.
     const headers = new Headers({ cookie: signedIn.sessionCookie });
@@ -140,7 +142,7 @@ describe("RequestContext", () => {
     expect(responses.map((r) => r.status)).toEqual([
       200, 200, 200, 200, 200, 200,
     ]);
-    expect(counts()).toEqual({ session: 1, role: 1, membership: 1 });
+    expect(counts()).toEqual({ session: 1, user: 1, membership: 1 });
   });
 
   it("without a shared context every request builds its own (the direct-API case)", async () => {
@@ -154,9 +156,10 @@ describe("RequestContext", () => {
       );
       expect(response.status).toBe(200);
     }
-    // Five authenticated calls, one session read each; /admin reads the
-    // role once and /workspace the membership once.
-    expect(counts()).toEqual({ session: 5, role: 1, membership: 1 });
+    // Five authenticated calls, one session read and one user read (the
+    // validation, which /admin's role check shares) each; /workspace reads
+    // the membership once.
+    expect(counts()).toEqual({ session: 5, user: 5, membership: 1 });
   });
 
   it("memoises inside one context: repeated reads of the same user cost one query", async () => {
@@ -188,7 +191,52 @@ describe("RequestContext", () => {
     expect(result.scope?.role).toBe("owner");
     expect(result.again).toBe(result.scope);
     expect(result.memberships).toHaveLength(1);
-    expect(counts()).toEqual({ session: 1, role: 1, membership: 1 });
+    expect(counts()).toEqual({ session: 1, user: 1, membership: 1 });
+  });
+
+  it("refuses a session whose user row is gone, even when the cookie cache still vouches for it", async () => {
+    const gone = await runtime.runPromise(
+      Effect.flatMap(Auth, (auth) =>
+        signInWithMagicLink(
+          auth,
+          baseUrl,
+          links,
+          `gone-${crypto.randomUUID()}@example.com`,
+        ),
+      ),
+    );
+    expect(gone.cacheCookie).toBeDefined();
+    await runtime.runPromise(
+      Effect.flatMap(Database, ({ db }) =>
+        db.delete(user).where(eq(user.email, gone.email)),
+      ),
+    );
+    const headers = new Headers({ cookie: gone.cookie });
+
+    // better-auth alone still answers from the signed cache, without a read...
+    log.reset();
+    const cached = await runtime.runPromise(
+      Effect.flatMap(Auth, (auth) => auth.session(headers)),
+    );
+    expect(cached?.user.email).toBe(gone.email);
+    expect(counts()).toEqual({ session: 0, user: 0, membership: 0 });
+
+    // ...and the context's validated session is null at the cost of one user read.
+    log.reset();
+    const validated = await runtime.runPromise(
+      Effect.flatMap(
+        RequestContext.make(headers),
+        (context) => context.session,
+      ),
+    );
+    expect(validated).toBeNull();
+    expect(counts()).toEqual({ session: 0, user: 1, membership: 0 });
+
+    // So the request is 401, however fresh the cache looks.
+    const response = await handler(
+      new Request("http://localhost/me", { headers: { cookie: gone.cookie } }),
+    );
+    expect(response.status).toBe(401);
   });
 
   it("is absent from the fiber context unless provided", async () => {

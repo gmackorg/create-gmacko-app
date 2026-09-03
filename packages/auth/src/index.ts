@@ -190,9 +190,16 @@ export function makeAuth(options: AuthOptions, db: PlainDatabase) {
     },
     session: {
       // The signed cookie serves `getSession` for up to 5 minutes without a
-      // D1 read. Anything that gates on `user.role` reads the row instead:
-      // `RequestContext.role` (request-context.ts), which `AdminOnlyLive`
-      // (middleware.ts) uses, so a demotion applies on the next request.
+      // D1 read. It is never trusted on its own, though: `RequestContext`
+      // (request-context.ts) checks every session — cached or not — against
+      // the `user` row with one indexed read per request, so a deleted
+      // account (or a banned one, once the row carries such a flag) stops
+      // authenticating on its next request, not when the cache expires; and
+      // `DELETE /api/account` expires the cookies on its response. Anything
+      // that gates on `user.role` reads the row too: `RequestContext.role`,
+      // which `AdminOnlyLive` (middleware.ts) uses, so a demotion applies on
+      // the next request. What the cache still saves is the `session` row
+      // read (and better-auth's own user read) on every request.
       cookieCache: { enabled: true, maxAge: 300 },
     },
     plugins: [

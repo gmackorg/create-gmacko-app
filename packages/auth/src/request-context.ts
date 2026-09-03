@@ -4,10 +4,14 @@
  * dispatches, middlewares or handlers ask.
  *
  * - `session`: better-auth `getSession` on the raw headers (served from the
- *   signed cookie cache when the browser sent it);
+ *   signed cookie cache when the browser sent it), then validated against
+ *   the `user` row through the memoised `user` read below: a cookie whose
+ *   user no longer exists (deleted account, revoked session's cache) is no
+ *   session at all, so it is refused now rather than when the cache expires;
  * - `user` / `role`: the `user` row read from the database, deliberately
  *   bypassing the cookie cache — an admin decision must not trust a cookie
- *   that may be five minutes stale (docs/API_AUTH.md, rule 5);
+ *   that may be five minutes stale (docs/API_AUTH.md, rule 5). One read per
+ *   user per request, shared by the session validation and `role`;
  * - `memberships` / `workspace`: the caller's `workspace_membership` rows and
  *   the "current workspace" resolved from them (see `resolveWorkspace`). A
  *   row whose `role` is outside `WorkspaceMemberRole` (the column is `text`)
@@ -52,7 +56,12 @@ export interface WorkspaceScope {
 }
 
 export interface RequestContextShape {
-  /** better-auth's session for the request's cookies, or `null` when anonymous. */
+  /**
+   * better-auth's session for the request's cookies, or `null` when
+   * anonymous — or when the session's `user` row is gone, whatever the
+   * cookie cache says. A database failure while validating is a defect: an
+   * outage must not read as "not signed in".
+   */
   readonly session: Effect.Effect<AuthSession | null>;
   /** The `user` row, from the database. */
   readonly user: (userId: string) => Effect.Effect<User | null, DatabaseError>;
@@ -112,8 +121,6 @@ export class RequestContext extends Context.Service<
     Effect.gen(function* () {
       const auth = yield* Auth;
       const { db } = yield* Database;
-
-      const session = yield* Effect.cached(auth.session(headers));
 
       const users = yield* Cache.make({
         capacity: CAPACITY,
@@ -185,6 +192,28 @@ export class RequestContext extends Context.Service<
             ([initial, rows]) => resolveWorkspace(initial, rows),
           ),
       });
+
+      // The cookie cache (`session_data`, index.ts) answers `getSession`
+      // for up to its maxAge without a read, so a deleted user's browser
+      // would keep authenticating until it expired. The row read here is the
+      // same memoised one `role` uses: validating costs nothing extra on a
+      // request that gates on the role, and one indexed read otherwise.
+      const session = yield* Effect.cached(
+        Effect.flatMap(auth.session(headers), (found) =>
+          found === null
+            ? Effect.succeed(null)
+            : Cache.get(users, found.user.id).pipe(
+                Effect.map((row) => (row === null ? null : found)),
+                Effect.catchTag("DatabaseError", (error) =>
+                  Effect.die(
+                    new Error("session validation: user read failed", {
+                      cause: error,
+                    }),
+                  ),
+                ),
+              ),
+        ),
+      );
 
       return {
         session,
