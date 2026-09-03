@@ -59,6 +59,7 @@
     "prepare": "git rev-parse --git-dir >/dev/null 2>&1 && lefthook install || true",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "test:workers": "turbo run test:workers",
     "test:watch": "turbo run test:watch",
     "test:coverage": "turbo run test -- --coverage",
     "e2e": "turbo run e2e",

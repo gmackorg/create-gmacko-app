@@ -25,16 +25,63 @@ const migrationsDir = join(
   "migrations",
 );
 
-/** Statements from every `migrations/*.sql`, in file order. */
+const BREAKPOINT = "--> statement-breakpoint";
+
+/**
+ * True when `statement` holds more than one SQL statement: a `;` outside a
+ * string/identifier literal that is followed by anything but whitespace.
+ * `node:sqlite`'s `prepare` compiles only the first statement and silently
+ * drops the rest, so a chunk like that would apply a partial migration.
+ */
+const hasTrailingStatement = (statement: string): boolean => {
+  let quote: string | undefined;
+  for (let i = 0; i < statement.length; i += 1) {
+    const char = statement[i];
+    if (quote !== undefined) {
+      if (char === quote) quote = undefined;
+      continue;
+    }
+    if (char === "'" || char === '"' || char === "`") {
+      quote = char;
+      continue;
+    }
+    if (char === "-" && statement[i + 1] === "-") {
+      const eol = statement.indexOf("\n", i);
+      if (eol === -1) return false;
+      i = eol;
+      continue;
+    }
+    if (char === ";" && statement.slice(i + 1).trim().length > 0) return true;
+  }
+  return false;
+};
+
+/**
+ * Statements from every `migrations/*.sql`, in file order: one per
+ * `--> statement-breakpoint` chunk, exactly as `wrangler d1 migrations apply`
+ * and `readD1Migrations` split them. Throws if a chunk holds more than one
+ * statement (see `hasTrailingStatement`): `@effect/sql-sqlite-node` has no
+ * multi-statement `exec`, so the chunk must be a single statement.
+ */
 export const readMigrationStatements = (): ReadonlyArray<string> =>
   readdirSync(migrationsDir)
     .filter((name) => name.endsWith(".sql"))
     .sort()
     .flatMap((name) =>
       readFileSync(join(migrationsDir, name), "utf8")
-        .split("--> statement-breakpoint")
+        .split(BREAKPOINT)
         .map((statement) => statement.trim())
-        .filter((statement) => statement.length > 0),
+        .filter((statement) => statement.length > 0)
+        .map((statement, index) => {
+          if (hasTrailingStatement(statement)) {
+            throw new Error(
+              `migrations/${name}: chunk ${index + 1} holds more than one statement; ` +
+                `drizzle-kit must separate statements with "${BREAKPOINT}" ` +
+                `(node:sqlite would silently apply only the first).\n${statement}`,
+            );
+          }
+          return statement;
+        }),
     );
 
 const applyMigrations = (sql: SqlClient): Effect.Effect<void, SqlError> =>
@@ -70,6 +117,10 @@ const makePlain = (client: SqliteClient.SqliteClient): PlainDatabase =>
 export const layerTest: Layer.Layer<Database> = Layer.effect(Database)(
   Effect.gen(function* () {
     const client = yield* SqliteClient.make({ filename: ":memory:" });
+    // D1 enforces foreign keys unconditionally; sqlite-node leaves the pragma
+    // off per connection, so set it here rather than rely on a migration
+    // happening to end with `PRAGMA foreign_keys=ON`.
+    yield* client.unsafe("PRAGMA foreign_keys = ON").pipe(Effect.orDie);
     yield* applyMigrations(client).pipe(Effect.orDie);
     const db = yield* SqliteDrizzle.makeWithDefaults({ relations }).pipe(
       Effect.provideService(SqliteClient.SqliteClient, client),

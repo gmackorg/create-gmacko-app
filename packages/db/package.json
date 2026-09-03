@@ -50,9 +50,8 @@
     "@types/node": "catalog:",
     "drizzle-kit": "catalog:",
     "oxlint": "catalog:",
-    "tsx": "^4.21.0",
     "typescript": "catalog:",
-    "vitest": "^4.1.0",
+    "vitest": "catalog:",
     "wrangler": "catalog:"
   }
 }

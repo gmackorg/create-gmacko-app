@@ -142,6 +142,9 @@ export const databaseSuite = (
         if (result._tag === "Failure") {
           expect(result.failure._tag).toBe("DatabaseError");
           expect(result.failure).toBeInstanceOf(DatabaseError);
+          // A missing table is a schema problem (unapplied migration), not
+          // a syntax error, on both drivers.
+          expect(result.failure.reason).toBe("schema");
         }
       });
 

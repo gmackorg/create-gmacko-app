@@ -31,20 +31,21 @@ describe("migrations", () => {
   });
   afterAll(() => runtime.dispose());
 
-  it("creates all 17 tables", async () => {
+  it("creates exactly the 17 expected tables", async () => {
     const names = await runtime.runPromise(
       Effect.gen(function* () {
         const { sql } = yield* Database;
+        // sqlite_* are sqlite's own (sqlite_sequence, sqlite_stat*), never ours.
         const rows = yield* sql<{ name: string }>`
-          select name from sqlite_master where type = 'table' order by name
+          select name from sqlite_master
+          where type = 'table' and name not like 'sqlite\\_%' escape '\\'
+          order by name
         `;
         return rows.map((row) => row.name);
       }),
     );
-    for (const table of expectedTables) {
-      expect(names).toContain(table);
-    }
-    expect(expectedTables).toHaveLength(17);
+    expect(names).toHaveLength(17);
+    expect(names).toEqual([...expectedTables].sort());
   });
 
   it("enforces foreign keys", async () => {

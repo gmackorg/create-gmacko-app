@@ -4,9 +4,10 @@
  * (`drizzle/<timestamp>_<slug>/{migration.sql,snapshot.json}`), while
  * `wrangler d1 migrations apply` and `readD1Migrations` want flat
  * `<name>.sql` files. This copies each migration.sql to
- * `migrations/<timestamp>_<slug>.sql`. Both directories are committed:
- * `drizzle/` is drizzle-kit's source of truth (snapshots for diffing),
- * `migrations/` is what D1 applies.
+ * `migrations/<timestamp>_<slug>.sql`, and removes flat files whose drizzle
+ * folder is gone (a dropped or squashed migration). Both directories are
+ * committed: `drizzle/` is drizzle-kit's source of truth (snapshots for
+ * diffing), `migrations/` is what D1 applies.
  */
 import {
   copyFileSync,
@@ -14,6 +15,7 @@ import {
   readdirSync,
   readFileSync,
   statSync,
+  unlinkSync,
 } from "node:fs";
 import { join } from "node:path";
 
@@ -43,5 +45,16 @@ for (const name of folders) {
   // oxlint-disable-next-line no-console -- build script output
   console.log(`migrations/${name}.sql`);
 }
+let removed = 0;
+const expected = new Set(folders.map((name) => `${name}.sql`));
+for (const name of readdirSync(target)) {
+  if (!name.endsWith(".sql") || expected.has(name)) continue;
+  unlinkSync(join(target, name));
+  removed += 1;
+  // oxlint-disable-next-line no-console -- build script output
+  console.log(`removed migrations/${name} (no drizzle/${name.slice(0, -4)})`);
+}
 // oxlint-disable-next-line no-console -- build script output
-console.log(`flattened ${folders.length} migration(s), ${written} updated`);
+console.log(
+  `flattened ${folders.length} migration(s), ${written} updated, ${removed} removed`,
+);

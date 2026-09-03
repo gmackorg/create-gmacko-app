@@ -87,6 +87,12 @@ jobs:
       - name: Run tests
         run: pnpm test
 
+      # The same Database suite against a real local D1 (Miniflare/workerd via
+      # @cloudflare/vitest-pool-workers); catches D1-only divergence that the
+      # sqlite-node suite cannot.
+      - name: Run Workers tests
+        run: pnpm test:workers
+
       - name: Upload coverage
         if: always()
         uses: actions/upload-artifact@v4

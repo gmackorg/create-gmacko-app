@@ -3,9 +3,20 @@
  * query failing as `DatabaseError` (SqlError is mapped once, here) and the
  * multi-statement primitives D1 actually offers (`batch`, guarded writes)
  * instead of interactive transactions, which D1 does not have.
+ *
+ * Error channel, by surface:
+ * - `db.*`, `first`, `batch`, `updateWhere`, `ping`: fail with `DatabaseError`.
+ * - `sql` (the raw tagged template and `sql.unsafe`): fails with the driver's
+ *   `SqlError`. It is the one escape hatch that bypasses the mapping, so every
+ *   caller must `Effect.mapError(toDatabaseError)` (exported below) before the
+ *   error leaves the data layer.
+ * - Result-mapper failures (drizzle decoding a row, e.g. malformed JSON in a
+ *   `json` column, or a custom `fromDriver`) are thrown inside the mapper, not
+ *   raised through the driver, so they surface as defects, not `DatabaseError`.
  */
 import type { D1Database } from "@cloudflare/workers-types";
 import * as D1Client from "@effect/sql-d1/D1Client";
+import { sql as dsql, type SQL } from "drizzle-orm";
 import { drizzle as drizzlePlain } from "drizzle-orm/d1";
 import {
   type EffectDrizzleQueryError,
@@ -34,10 +45,19 @@ import { type Relations, relations } from "./relations";
 // Errors
 // ---------------------------------------------------------------------------
 
+/**
+ * - `unique`: a UNIQUE constraint (services map it to a domain Conflict).
+ * - `constraint`: any other constraint (FK, CHECK, NOT NULL).
+ * - `syntax`: the statement does not parse.
+ * - `schema`: the statement parses but names a missing table/column/function;
+ *   almost always an unapplied migration, so it is distinguished from `syntax`.
+ * - `other`: anything else (connection, I/O, driver internals).
+ */
 export const DatabaseErrorReason = Schema.Literals([
   "unique",
   "constraint",
   "syntax",
+  "schema",
   "other",
 ]);
 export type DatabaseErrorReason = typeof DatabaseErrorReason.Type;
@@ -92,20 +112,19 @@ const reasonOf = (error: SqlError | undefined): DatabaseErrorReason => {
       return "unique";
     case "ConstraintError":
       return "constraint";
-    case "SqlSyntaxError":
-      return "syntax";
+    case "SqlSyntaxError": {
+      // sqlite-node files "no such table" under SqlSyntaxError too; split it.
+      return /no such (table|column|function)/i.test(messagesOf(error?.reason))
+        ? "schema"
+        : "syntax";
+    }
     default: {
       const text = messagesOf(error?.reason);
       if (/UNIQUE constraint failed/i.test(text)) return "unique";
       if (/constraint failed|SQLITE_CONSTRAINT/i.test(text))
         return "constraint";
-      if (
-        /syntax error|no such (table|column|function)|incomplete input/i.test(
-          text,
-        )
-      ) {
-        return "syntax";
-      }
+      if (/no such (table|column|function)/i.test(text)) return "schema";
+      if (/syntax error|incomplete input/i.test(text)) return "syntax";
       return "other";
     }
   }
@@ -165,12 +184,19 @@ export type BatchResult<Items extends ReadonlyArray<BatchItem>> = {
   readonly [K in keyof Items]: ReadonlyArray<BatchRow>;
 };
 
-/** A write whose WHERE clause carries the precondition (see `updateWhere`). */
+/** The minimal RETURNING projection `updateWhere` asks for: one constant per row. */
+export interface GuardedWriteProjection {
+  readonly n: SQL;
+}
+/**
+ * A write whose WHERE clause carries the precondition (see `updateWhere`):
+ * drizzle's UPDATE/DELETE builder, whose `returning(fields)` overload accepts
+ * the projection above.
+ */
 export interface GuardedWrite {
-  readonly returning: () => Effect.Effect<
-    ReadonlyArray<unknown>,
-    DatabaseError
-  >;
+  readonly returning: (
+    fields: GuardedWriteProjection,
+  ) => Effect.Effect<ReadonlyArray<unknown>, DatabaseError>;
 }
 
 export interface DatabaseShape {
@@ -201,9 +227,9 @@ export interface DatabaseShape {
   ) => Effect.Effect<BatchResult<Items>, DatabaseError>;
   /**
    * Guarded write: runs an UPDATE/DELETE whose WHERE clause encodes the
-   * precondition and returns the changed-row count via RETURNING (identical
-   * on D1 and sqlite-node). 0 means another actor won the race; the caller
-   * raises Conflict.
+   * precondition and returns the changed-row count via `RETURNING 1`
+   * (identical on D1 and sqlite-node; no columns are decoded). 0 means
+   * another actor won the race; the caller raises Conflict.
    */
   readonly updateWhere: (
     write: GuardedWrite,
@@ -222,6 +248,7 @@ export interface DatabaseBackend {
   readonly runBatch: (
     statements: ReadonlyArray<Statement.Statement<BatchRow>>,
   ) => Effect.Effect<ReadonlyArray<ReadonlyArray<BatchRow>>, SqlError>;
+  /** Called once per `makeDatabase`; the instance is memoised as `plain`. */
   readonly plain: () => PlainDatabase;
 }
 
@@ -271,9 +298,19 @@ const rewire = (backend: DatabaseBackend["db"]): DatabaseDrizzle => {
   return backend as unknown as DatabaseDrizzle;
 };
 
+/**
+ * RETURNING projection for guarded writes: a constant per changed row, so the
+ * count costs no column decoding and no result mapping (see `updateWhere`).
+ */
+const guardedWriteProjection: GuardedWriteProjection = { n: dsql`1` };
+
 export const makeDatabase = (backend: DatabaseBackend): DatabaseShape => {
   const db = rewire(backend.db);
   const { sql } = backend;
+  // One promise-flavoured drizzle per service instance: better-auth's adapter
+  // keeps a reference, and a fresh instance per access would defeat drizzle's
+  // per-instance caches (relations, dialect) for no gain.
+  const plain = backend.plain();
   return {
     db,
     sql,
@@ -298,14 +335,15 @@ export const makeDatabase = (backend: DatabaseBackend): DatabaseShape => {
           Effect.mapError(toDatabaseError),
         ),
     updateWhere: (write) =>
-      Effect.map(write.returning(), (rows) => rows.length),
+      Effect.map(
+        write.returning(guardedWriteProjection),
+        (rows) => rows.length,
+      ),
     ping: Effect.timed(sql`select 1`).pipe(
       Effect.map(([duration]) => Duration.toMillis(duration)),
       Effect.mapError(toDatabaseError),
     ),
-    get plain() {
-      return backend.plain();
-    },
+    plain,
   };
 };
 

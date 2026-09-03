@@ -1,4 +1,5 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignore": ["apps/web/src/routeTree.gen.ts"]
+  "ignore": ["apps/web/src/routeTree.gen.ts"],
+  "ignoreDependencies": ["cloudflare"]
 }

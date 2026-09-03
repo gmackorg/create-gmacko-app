@@ -31,6 +31,11 @@
       "outputs": ["coverage/**"],
       "cache": true
     },
+    "test:workers": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "cache": true
+    },
     "test:watch": {
       "dependsOn": ["^build"],
       "cache": false,
