@@ -1,0 +1,36 @@
+{
+  "name": "@gmacko/auth",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./service": "./src/service.ts",
+    "./client": "./src/client.ts"
+  },
+  "license": "MIT",
+  "scripts": {
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "format": "biome check .",
+    "generate": "pnpx auth@1.7.2 generate --config script/auth-cli.ts --output ../db/src/auth-schema.ts -y",
+    "lint": "oxlint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@better-auth/expo": "catalog:",
+    "@gmacko/db": "workspace:*",
+    "better-auth": "catalog:",
+    "drizzle-orm": "catalog:",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
+    "@gmacko/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "oxlint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "^4.1.0"
+  }
+}
