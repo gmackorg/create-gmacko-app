@@ -1,0 +1,14 @@
+@import "tailwindcss";
+@import "@gmacko/tailwind-config/theme";
+
+@source "../src/**/*.{ts,tsx}";
+
+@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant light (&:where(.light, .light *));
+@custom-variant auto (&:where(.auto, .auto *));
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+}

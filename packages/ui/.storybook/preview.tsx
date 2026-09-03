@@ -1,7 +1,10 @@
-import { ThemeProvider } from "@gmacko/ui/theme";
+import type { Preview } from "@storybook/react-vite";
 import type { ReactNode } from "react";
 
-import "../src/app/styles.css";
+import { ThemeProvider } from "../src/theme";
+import { Toaster } from "../src/toast";
+
+import "./styles.css";
 
 function StorybookShell({ children }: { children: ReactNode }) {
   return (
@@ -9,11 +12,12 @@ function StorybookShell({ children }: { children: ReactNode }) {
       <div className="min-h-screen bg-background p-6 text-foreground">
         <div className="mx-auto flex max-w-4xl flex-col gap-6">{children}</div>
       </div>
+      <Toaster />
     </ThemeProvider>
   );
 }
 
-const preview = {
+const preview: Preview = {
   parameters: {
     layout: "fullscreen",
     controls: {
@@ -25,7 +29,7 @@ const preview = {
   },
   tags: ["autodocs"],
   decorators: [
-    (Story: () => ReactNode) => (
+    (Story) => (
       <StorybookShell>
         <Story />
       </StorybookShell>

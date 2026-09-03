@@ -50,7 +50,7 @@ The local dev stack uses [`@gmacko/emulate`](https://www.npmjs.com/package/@gmac
 
 ## UI Workflow
 
-- Use Storybook for isolated UI work with `pnpm --filter @gmacko/nextjs storybook`.
+- Use Storybook for isolated UI work with `pnpm --filter @gmacko/ui storybook`.
 - Add or update stories in `packages/ui/src/**/*.stories.tsx` when shared components change.
 
 ## Skill routing

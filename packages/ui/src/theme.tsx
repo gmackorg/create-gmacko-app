@@ -105,7 +105,13 @@ const ThemeContext = React.createContext<ThemeContextProps | undefined>(
   undefined,
 );
 
-export function ThemeProvider({ children }: React.PropsWithChildren) {
+export function ThemeProvider({
+  children,
+  nonce,
+}: React.PropsWithChildren<{
+  /** CSP nonce for the inline theme-detector script, when the page serves one. */
+  nonce?: string | undefined;
+}>) {
   const [themeMode, setThemeMode] = React.useState(getStoredThemeMode);
 
   React.useEffect(() => {
@@ -135,6 +141,7 @@ export function ThemeProvider({ children }: React.PropsWithChildren) {
       }}
     >
       <script
+        nonce={nonce}
         dangerouslySetInnerHTML={{ __html: themeDetectorScript }}
         suppressHydrationWarning
       />
