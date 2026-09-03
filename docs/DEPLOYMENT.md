@@ -150,6 +150,11 @@ Worker. The workflow needs the `CLOUDFLARE_API_TOKEN` and
 `CLOUDFLARE_ACCOUNT_ID` secrets and posts the URL wrangler prints; without
 the secrets it skips with a warning rather than failing the PR.
 
+`pnpm -F @gmacko/web preview:upload:dry-run` runs the same build and
+`wrangler versions upload --dry-run` locally, needing no Cloudflare
+credentials — it prints the preview environment's bindings, which is how you
+check that `env.preview` resolved before opening a PR.
+
 ## Observability
 
 - **Logs**: one JSON line per event on the console (`@gmacko/logging` over

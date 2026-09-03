@@ -13,6 +13,7 @@
     "deploy:preview": "CLOUDFLARE_ENV=preview vite build && wrangler deploy",
     "deploy:preview:dry-run": "CLOUDFLARE_ENV=preview vite build && wrangler deploy --dry-run --outdir dist/dry-run",
     "preview:upload": "CLOUDFLARE_ENV=preview vite build && wrangler versions upload",
+    "preview:upload:dry-run": "CLOUDFLARE_ENV=preview vite build && wrangler versions upload --dry-run --outdir dist/dry-run-versions",
     "deploy:staging": "CLOUDFLARE_ENV=staging vite build && wrangler deploy",
     "deploy:staging:dry-run": "CLOUDFLARE_ENV=staging vite build && wrangler deploy --dry-run --outdir dist/dry-run",
     "deploy:production": "CLOUDFLARE_ENV=production vite build && wrangler deploy",
