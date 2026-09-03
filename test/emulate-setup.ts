@@ -69,6 +69,10 @@ export async function setup() {
     services.push("postgres");
   }
 
+  // PGlite's data directory: emulate's mkdir is not recursive, so a fresh
+  // clone (no gitignored `data/`) would fail to start Postgres.
+  mkdirSync(resolve(ROOT, "data/pglite"), { recursive: true });
+
   proc = spawn(
     "npx",
     [
@@ -77,7 +81,9 @@ export async function setup() {
       "-s",
       services.join(","),
       "--seed",
-      "emulate.config.yaml",
+      // The legacy lane's seed: the root file plus postgres/redis, which the
+      // web lane no longer starts (see test/emulate.legacy.yaml).
+      "test/emulate.legacy.yaml",
     ],
     {
       stdio: ["ignore", "pipe", "pipe"],
