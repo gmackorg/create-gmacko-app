@@ -56,8 +56,10 @@ export interface LoggingOptions {
   readonly level?: LogLevel | undefined;
   /**
    * Fields whose values are replaced with `[REDACTED]`. A bare name matches
-   * a top-level field; `*.name` matches that field one level down; `a.b`
-   * matches the exact path. Defaults to `defaultRedactPaths`.
+   * a top-level field; `*` in a path matches any one field at that depth
+   * (`*.name` is that field one level down); a dotted path (`a.b.c`) is
+   * followed segment by segment, so it matches at any depth. Defaults to
+   * `defaultRedactPaths`.
    */
   readonly redact?: ReadonlyArray<string> | undefined;
   /** Fields on every line (service, version, stage). */
@@ -77,6 +79,11 @@ export const defaultRedactPaths: ReadonlyArray<string> = [
   "*.secret",
   "*.token",
   "*.apiKey",
+  // A logged `headers` object (request or response) carries credentials
+  // under these names; `*` covers `headers`, `req.headers`... one level down.
+  "*.authorization",
+  "*.cookie",
+  "*.set-cookie",
 ];
 
 const REDACTED = "[REDACTED]";
@@ -123,51 +130,80 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   !(value instanceof Date);
 
 /**
- * A copy of `fields` with the redacted paths replaced. Errors and dates are
- * left as they are; only plain objects are descended into.
+ * A path trie: each node's children are keyed by the field name (or `*`
+ * for any name); `hit` marks the end of a path.
+ */
+interface PathNode {
+  hit: boolean;
+  readonly children: Map<string, PathNode>;
+}
+
+const WILDCARD = "*";
+
+const buildTrie = (paths: ReadonlyArray<string>): PathNode => {
+  const root: PathNode = { hit: false, children: new Map() };
+  for (const path of paths) {
+    if (path.length === 0) continue;
+    let node = root;
+    for (const segment of path.split(".")) {
+      let next = node.children.get(segment);
+      if (next === undefined) {
+        next = { hit: false, children: new Map() };
+        node.children.set(segment, next);
+      }
+      node = next;
+    }
+    node.hit = true;
+  }
+  return root;
+};
+
+/** The trie nodes reached from `nodes` by one field `name` (exact or `*`). */
+const step = (
+  nodes: ReadonlyArray<PathNode>,
+  name: string,
+): ReadonlyArray<PathNode> => {
+  const out: PathNode[] = [];
+  for (const node of nodes) {
+    const exact = node.children.get(name);
+    if (exact !== undefined) out.push(exact);
+    const any = node.children.get(WILDCARD);
+    if (any !== undefined) out.push(any);
+  }
+  return out;
+};
+
+const redactWith = (
+  fields: Readonly<Record<string, unknown>>,
+  nodes: ReadonlyArray<PathNode>,
+): Record<string, unknown> => {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(fields)) {
+    const here = step(nodes, key);
+    if (here.some((node) => node.hit)) {
+      out[key] = REDACTED;
+    } else if (
+      isPlainObject(value) &&
+      here.some((node) => node.children.size > 0)
+    ) {
+      out[key] = redactWith(value, here);
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
+};
+
+/**
+ * A copy of `fields` with the redacted paths replaced. Every dot of a path
+ * is followed (`req.headers.authorization` reaches three levels down); a
+ * prefix that is missing or not a plain object is left as it is. Errors,
+ * dates and arrays are never descended into.
  */
 export const redact = (
   fields: Readonly<Record<string, unknown>>,
   paths: ReadonlyArray<string>,
-): Record<string, unknown> => {
-  const top = new Set<string>();
-  const nested = new Set<string>();
-  const exact = new Map<string, Set<string>>();
-  for (const path of paths) {
-    const dot = path.indexOf(".");
-    if (dot === -1) top.add(path);
-    else if (path.startsWith("*.")) nested.add(path.slice(2));
-    else {
-      const parent = path.slice(0, dot);
-      const child = path.slice(dot + 1);
-      let set = exact.get(parent);
-      if (set === undefined) {
-        set = new Set();
-        exact.set(parent, set);
-      }
-      set.add(child);
-    }
-  }
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(fields)) {
-    if (top.has(key)) {
-      out[key] = REDACTED;
-      continue;
-    }
-    if (isPlainObject(value)) {
-      const copy: Record<string, unknown> = {};
-      const exactHere = exact.get(key);
-      for (const [name, inner] of Object.entries(value)) {
-        copy[name] =
-          nested.has(name) || exactHere?.has(name) ? REDACTED : inner;
-      }
-      out[key] = copy;
-      continue;
-    }
-    out[key] = value;
-  }
-  return out;
-};
+): Record<string, unknown> => redactWith(fields, [buildTrie(paths)]);
 
 // ---------------------------------------------------------------------------
 // Serialisation
@@ -192,20 +228,31 @@ const toJsonValue = (value: unknown): unknown => {
 
 const replacer = (_key: string, value: unknown): unknown => toJsonValue(value);
 
+/** The keys the record itself owns; a field of the same name is dropped, never spoofs them. */
+const CORE_KEYS = new Set([
+  "level",
+  "time",
+  "msg",
+  "traceId",
+  "spanId",
+  "cause",
+]);
+
 /** The JSON line for a record: `{"level","time","msg",...fields,"traceId"?,"spanId"?,"cause"?}`. */
-export const formatJsonLine = (record: LogRecord): string =>
-  JSON.stringify(
-    {
-      level: record.level,
-      time: record.time,
-      msg: record.msg,
-      ...record.fields,
-      ...(record.traceId === undefined ? {} : { traceId: record.traceId }),
-      ...(record.spanId === undefined ? {} : { spanId: record.spanId }),
-      ...(record.cause === undefined ? {} : { cause: record.cause }),
-    },
-    replacer,
-  );
+export const formatJsonLine = (record: LogRecord): string => {
+  const line: Record<string, unknown> = {
+    level: record.level,
+    time: record.time,
+    msg: record.msg,
+  };
+  for (const [key, value] of Object.entries(record.fields)) {
+    if (!CORE_KEYS.has(key)) line[key] = value;
+  }
+  if (record.traceId !== undefined) line.traceId = record.traceId;
+  if (record.spanId !== undefined) line.spanId = record.spanId;
+  if (record.cause !== undefined) line.cause = record.cause;
+  return JSON.stringify(line, replacer);
+};
 
 const formatValue = (value: unknown): string => {
   if (typeof value === "string") return /\s/.test(value) ? `"${value}"` : value;

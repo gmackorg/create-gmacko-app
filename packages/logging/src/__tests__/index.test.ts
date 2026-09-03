@@ -12,6 +12,7 @@ import {
   configureLogging,
   createLogger,
   createRequestLogger,
+  formatJsonLine,
   formatPrettyLine,
   generateRequestId,
   Logging,
@@ -88,8 +89,27 @@ describe("createLogger", () => {
     expect(line.password).toBe("[REDACTED]");
     expect(line.token).toBe("[REDACTED]");
     expect(line.user).toEqual({ apiKey: "[REDACTED]", name: "ann" });
-    // `authorization` is a top-level path only; nested it stays.
-    expect(line.headers).toEqual({ authorization: "Bearer x" });
+    // `*.authorization` (and `*.cookie`, `*.set-cookie`) are defaults: a
+    // logged headers object never carries a credential one level down.
+    expect(line.headers).toEqual({ authorization: "[REDACTED]" });
+  });
+
+  it("redacts cookies and set-cookie one level down by default", () => {
+    const { lines, sink } = capture();
+    configureLogging({ sink });
+    createLogger().info(
+      {
+        headers: { cookie: "session=abc", "set-cookie": "s=1", host: "x" },
+        cookie: "top",
+      },
+      "cookies",
+    );
+    expect(lines[0]?.headers).toEqual({
+      cookie: "[REDACTED]",
+      "set-cookie": "[REDACTED]",
+      host: "x",
+    });
+    expect(lines[0]?.cookie).toBe("[REDACTED]");
   });
 
   it("child loggers merge bindings; bindings() reports them", () => {
@@ -228,5 +248,48 @@ describe("formats", () => {
     expect(
       redact({ auth: { secret: "x", other: 1 }, b: 2 }, ["auth.secret"]),
     ).toEqual({ auth: { secret: "[REDACTED]", other: 1 }, b: 2 });
+  });
+
+  it("redact descends every dot of a deep path, and `*` matches one level", () => {
+    expect(
+      redact(
+        {
+          req: { headers: { authorization: "Bearer x", host: "h" }, id: 1 },
+          other: { headers: { authorization: "keep" } },
+          deep: { a: { b: { c: "x", d: "y" } } },
+        },
+        ["req.headers.authorization", "*.a.b.c"],
+      ),
+    ).toEqual({
+      req: { headers: { authorization: "[REDACTED]", host: "h" }, id: 1 },
+      other: { headers: { authorization: "keep" } },
+      deep: { a: { b: { c: "[REDACTED]", d: "y" } } },
+    });
+  });
+
+  it("redact leaves a missing or non-object prefix alone", () => {
+    expect(
+      redact({ a: "flat", b: null, c: [1] }, ["a.b.c", "b.x", "c.0"]),
+    ).toEqual({ a: "flat", b: null, c: [1] });
+  });
+
+  it("the core keys win over a field of the same name", () => {
+    const line = JSON.parse(
+      formatJsonLine({
+        level: "info",
+        time: "2026-09-03T10:11:12.000Z",
+        msg: "real",
+        fields: { level: "spoofed", time: "never", msg: "fake", extra: 1 },
+        traceId: "t",
+      }),
+    ) as Record<string, unknown>;
+    expect(line).toEqual({
+      level: "info",
+      time: "2026-09-03T10:11:12.000Z",
+      msg: "real",
+      extra: 1,
+      traceId: "t",
+    });
+    expect(Object.keys(line).slice(0, 3)).toEqual(["level", "time", "msg"]);
   });
 });
