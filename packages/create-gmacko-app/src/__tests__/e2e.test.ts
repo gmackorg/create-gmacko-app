@@ -234,7 +234,9 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
       }
 
       expect(dbGenerateResult.success).toBe(true);
-      expect(fileExists(appPath, "packages/db/src/auth-schema.ts")).toBe(true);
+      expect(fileExists(appPath, "packages/legacy-db/src/auth-schema.ts")).toBe(
+        true,
+      );
     }, 600000);
 
     it("should keep the Next.js health route scaffolded", () => {
@@ -454,7 +456,7 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
     it("should have full structure", () => {
       expect(fileExists(appPath, "apps/nextjs")).toBe(true);
       expect(fileExists(appPath, "apps/expo")).toBe(true);
-      expect(fileExists(appPath, "apps/tanstack-start")).toBe(true);
+      expect(fileExists(appPath, "apps/web")).toBe(true);
       expect(fileExists(appPath, "packages/monitoring")).toBe(true);
       expect(fileExists(appPath, "packages/analytics")).toBe(true);
       expect(fileExists(appPath, "packages/payments")).toBe(true);
@@ -497,13 +499,9 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
       console.log("[E2E] Running TanStack Start build (full)...");
       createMockEnv(appPath);
 
-      const result = runInApp(
-        appPath,
-        "pnpm --filter @gmacko/tanstack-start build",
-        {
-          timeout: 600000,
-        },
-      );
+      const result = runInApp(appPath, "pnpm --filter @gmacko/web build", {
+        timeout: 600000,
+      });
 
       if (!result.success) {
         console.error("[E2E] TanStack Start build failed:");
@@ -608,9 +606,12 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
         }
       };
 
-      checkPackage("packages/api/package.json", "@mycompany/api");
-      checkPackage("packages/db/package.json", "@mycompany/db");
-      checkPackage("packages/auth/package.json", "@mycompany/auth");
+      checkPackage("packages/legacy-api/package.json", "@mycompany/legacy-api");
+      checkPackage("packages/legacy-db/package.json", "@mycompany/legacy-db");
+      checkPackage(
+        "packages/legacy-auth/package.json",
+        "@mycompany/legacy-auth",
+      );
       checkPackage("apps/nextjs/package.json", "@mycompany/nextjs");
     });
 

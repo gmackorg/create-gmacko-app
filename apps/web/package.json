@@ -16,9 +16,9 @@
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.8",
     "@fontsource-variable/geist-mono": "^5.2.7",
-    "@gmacko/api": "workspace:*",
-    "@gmacko/auth": "workspace:*",
-    "@gmacko/db": "workspace:*",
+    "@gmacko/legacy-api": "workspace:*",
+    "@gmacko/legacy-auth": "workspace:*",
+    "@gmacko/legacy-db": "workspace:*",
     "@gmacko/logging": "workspace:*",
     "@gmacko/ui": "workspace:*",
     "@opentelemetry/api": "^1.9.1",

@@ -5,10 +5,10 @@ FROM base AS deps
 WORKDIR /app
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/nextjs/package.json ./apps/nextjs/
-COPY packages/api/package.json ./packages/api/
-COPY packages/auth/package.json ./packages/auth/
+COPY packages/legacy-api/package.json ./packages/legacy-api/
+COPY packages/legacy-auth/package.json ./packages/legacy-auth/
 COPY packages/config/package.json ./packages/config/
-COPY packages/db/package.json ./packages/db/
+COPY packages/legacy-db/package.json ./packages/legacy-db/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/validators/package.json ./packages/validators/
 COPY packages/analytics/package.json ./packages/analytics/

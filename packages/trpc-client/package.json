@@ -28,7 +28,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
-    "@gmacko/api": "workspace:*",
+    "@gmacko/legacy-api": "workspace:*",
     "@gmacko/tsconfig": "workspace:*",
     "@types/node": "catalog:",
     "oxlint": "catalog:",
@@ -36,10 +36,10 @@
     "typescript": "catalog:"
   },
   "peerDependencies": {
-    "@gmacko/api": "workspace:*"
+    "@gmacko/legacy-api": "workspace:*"
   },
   "peerDependenciesMeta": {
-    "@gmacko/api": {
+    "@gmacko/legacy-api": {
       "optional": true
     }
   }

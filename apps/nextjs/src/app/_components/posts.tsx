@@ -1,7 +1,7 @@
 "use client";
 
-import type { RouterOutputs } from "@gmacko/api";
-import { CreatePostSchema } from "@gmacko/db/schema";
+import type { RouterOutputs } from "@gmacko/legacy-api";
+import { CreatePostSchema } from "@gmacko/legacy-db/schema";
 import { cn } from "@gmacko/ui";
 import { Button } from "@gmacko/ui/button";
 import {

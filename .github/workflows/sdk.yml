@@ -4,14 +4,14 @@ on:
   push:
     branches: [main]
     paths:
-      - "packages/api/**"
+      - "packages/legacy-api/**"
       - "sdks/openapi/**"
       - "tooling/openapi-generator/**"
       - ".github/workflows/sdk.yml"
   pull_request:
     branches: [main]
     paths:
-      - "packages/api/**"
+      - "packages/legacy-api/**"
       - "sdks/openapi/**"
       - "tooling/openapi-generator/**"
       - ".github/workflows/sdk.yml"
@@ -49,7 +49,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate OpenAPI spec
-        # @gmacko/config is the only dist-based package; packages/api/src/openapi
+        # @gmacko/config is the only dist-based package; packages/legacy-api/src/openapi
         # imports its built output, so build it first or the generate script
         # fails ERR_MODULE_NOT_FOUND on @gmacko/config/dist/index.js.
         run: |

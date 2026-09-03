@@ -144,7 +144,7 @@ jobs:
         run: |
           pnpm auth:generate
           pnpm db:generate
-          test -f packages/db/src/auth-schema.ts || (echo "Auth schema output missing after bootstrap commands" && exit 1)
+          test -f packages/legacy-db/src/auth-schema.ts || (echo "Auth schema output missing after bootstrap commands" && exit 1)
         working-directory: /tmp/e2e-test/test-app-default
 
       - name: Validate health route scaffold
@@ -372,8 +372,8 @@ jobs:
 
       - name: Verify package scope
         run: |
-          grep '"name": "@mycompany/api"' packages/api/package.json || (echo "Wrong scope in api" && exit 1)
-          grep '"name": "@mycompany/db"' packages/db/package.json || (echo "Wrong scope in db" && exit 1)
+          grep '"name": "@mycompany/legacy-api"' packages/legacy-api/package.json || (echo "Wrong scope in api" && exit 1)
+          grep '"name": "@mycompany/legacy-db"' packages/legacy-db/package.json || (echo "Wrong scope in db" && exit 1)
           echo "Package scope verified!"
         working-directory: /tmp/e2e-test/test-app-scope
 
@@ -458,7 +458,7 @@ jobs:
         run: |
           test -d apps/nextjs || (echo "Missing apps/nextjs" && exit 1)
           test -d apps/expo || (echo "Missing apps/expo" && exit 1)
-          test -d apps/tanstack-start || (echo "Missing apps/tanstack-start" && exit 1)
+          test -d apps/web || (echo "Missing apps/web" && exit 1)
           test -d packages/monitoring || (echo "Missing packages/monitoring" && exit 1)
           test -d packages/analytics || (echo "Missing packages/analytics" && exit 1)
           test -d packages/payments || (echo "Missing packages/payments" && exit 1)
@@ -479,7 +479,7 @@ jobs:
         working-directory: /tmp/e2e-test/test-app-full
 
       - name: Run TanStack Start build
-        run: pnpm --filter @gmacko/tanstack-start build
+        run: pnpm --filter @gmacko/web build
         working-directory: /tmp/e2e-test/test-app-full
 
       - name: Run Expo typecheck

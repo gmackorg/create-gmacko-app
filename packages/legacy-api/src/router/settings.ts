@@ -1,6 +1,6 @@
-import { canManageWorkspace, isPlatformAdminRole } from "@gmacko/auth";
 import { integrations, platformPrimitives, saasFeatures } from "@gmacko/config";
-import { and, eq, isNull } from "@gmacko/db";
+import { canManageWorkspace, isPlatformAdminRole } from "@gmacko/legacy-auth";
+import { and, eq, isNull } from "@gmacko/legacy-db";
 import {
   apiKeys,
   billingPlanLimit,
@@ -13,7 +13,7 @@ import {
   workspaceMembership,
   workspaceSubscription,
   workspaceUsageRollup,
-} from "@gmacko/db/schema";
+} from "@gmacko/legacy-db/schema";
 import type { TRPCRouterRecord } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 import { createHash, randomBytes } from "crypto";

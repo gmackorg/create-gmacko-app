@@ -1,4 +1,4 @@
-import { appRouter, createTRPCContext } from "@gmacko/api";
+import { appRouter, createTRPCContext } from "@gmacko/legacy-api";
 import { createLogger } from "@gmacko/logging";
 import { createFileRoute } from "@tanstack/react-router";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";

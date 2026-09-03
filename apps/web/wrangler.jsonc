@@ -13,8 +13,8 @@
   //   - @tanstack/start-server-core: `node:async_hooks` (AsyncLocalStorage for
   //     the request context) - stays after the migration.
   //   - better-auth: `node:async_hooks` - stays after the migration.
-  //   - legacy tRPC/pino/postgres chain (@gmacko/logging, @gmacko/api,
-  //     @gmacko/db/client): node:fs, node:os, node:path, node:stream,
+  //   - legacy tRPC/pino/postgres chain (@gmacko/logging, @gmacko/legacy-api,
+  //     @gmacko/legacy-db/client): node:fs, node:os, node:path, node:stream,
   //     node:events, node:buffer, node:url, node:diagnostics_channel - goes
   //     away with Phases 2-6.
   // Verified: with `no_nodejs_compat` the Worker fails at load with
@@ -30,7 +30,7 @@
       "database_name": "gmacko-web",
       // Placeholder until Spike B provisions the real database.
       "database_id": "00000000-0000-0000-0000-000000000000",
-      "migrations_dir": "../../packages/db/migrations"
+      "migrations_dir": "../../packages/legacy-db/migrations"
     }
   ]
 }

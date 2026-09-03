@@ -1,5 +1,5 @@
 {
-  "name": "@gmacko/auth",
+  "name": "@gmacko/legacy-auth",
   "private": true,
   "type": "module",
   "exports": {
@@ -13,12 +13,12 @@
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "format": "biome check .",
     "lint": "oxlint .",
-    "generate": "dotenv -e ../../.env -- pnpx @better-auth/cli generate --config script/auth-cli.ts --output ../db/src/auth-schema.ts",
+    "generate": "dotenv -e ../../.env -- pnpx @better-auth/cli generate --config script/auth-cli.ts --output ../legacy-db/src/auth-schema.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@better-auth/expo": "catalog:",
-    "@gmacko/db": "workspace:*",
+    "@gmacko/legacy-db": "workspace:*",
     "@gmacko/logging": "workspace:*",
     "@t3-oss/env-core": "^0.13.10",
     "better-auth": "catalog:",

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { initAuth } from "@gmacko/auth";
+import { initAuth } from "@gmacko/legacy-auth";
 import { nextCookies } from "better-auth/next-js";
 import { headers } from "next/headers";
 import { cache } from "react";

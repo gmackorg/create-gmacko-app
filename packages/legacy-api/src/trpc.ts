@@ -1,6 +1,6 @@
-import { and, eq, isNull } from "@gmacko/db";
-import { db } from "@gmacko/db/client";
-import { apiKeys, user } from "@gmacko/db/schema";
+import { and, eq, isNull } from "@gmacko/legacy-db";
+import { db } from "@gmacko/legacy-db/client";
+import { apiKeys, user } from "@gmacko/legacy-db/schema";
 import { getMetrics, SpanStatusCode, trace } from "@gmacko/telemetry";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { createHash } from "crypto";
@@ -155,7 +155,7 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
  */
 export const createTRPCRouter = t.router;
 
-const tracer = trace.getTracer("@gmacko/api");
+const tracer = trace.getTracer("@gmacko/legacy-api");
 
 const timingMiddleware = t.middleware(async ({ next, path, type }) => {
   if (t._config.isDev) {

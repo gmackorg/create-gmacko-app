@@ -1,6 +1,6 @@
 "use client";
 
-import type { AppRouter } from "@gmacko/api";
+import type { AppRouter } from "@gmacko/legacy-api";
 import type { QueryClient } from "@tanstack/react-query";
 import { QueryClientProvider } from "@tanstack/react-query";
 import {

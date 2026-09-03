@@ -40,7 +40,7 @@ ARG AUTH_SECRET
 ARG SKIP_ENV_VALIDATION=true
 ARG DOCKER_BUILD=true
 
-# Set environment for build. DATABASE_URL is a placeholder so @gmacko/db/client
+# Set environment for build. DATABASE_URL is a placeholder so @gmacko/legacy-db/client
 # (which throws at import if unset) can instantiate during `next build` page-data
 # collection — postgres-js connects lazily, so no DB is contacted at build time.
 ENV DATABASE_URL=${DATABASE_URL}

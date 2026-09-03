@@ -206,8 +206,11 @@ describe("create-gmacko-app scaffold", () => {
 
       const dbPackage = readJson<{
         dependencies?: Record<string, string>;
-      }>(result.appPath, "packages/db/package.json");
-      const dbClient = readFile(result.appPath, "packages/db/src/client.ts");
+      }>(result.appPath, "packages/legacy-db/package.json");
+      const dbClient = readFile(
+        result.appPath,
+        "packages/legacy-db/src/client.ts",
+      );
 
       expect(dbPackage.dependencies?.postgres).toBeDefined();
       expect(dbPackage.dependencies?.["@neondatabase/serverless"]).toBeFalsy();
@@ -469,10 +472,13 @@ describe("create-gmacko-app scaffold", () => {
       );
       const settingsRouter = readFile(
         result.appPath,
-        "packages/api/src/router/settings.ts",
+        "packages/legacy-api/src/router/settings.ts",
       );
-      const authEnv = readFile(result.appPath, "packages/auth/env.ts");
-      const authIndex = readFile(result.appPath, "packages/auth/src/index.ts");
+      const authEnv = readFile(result.appPath, "packages/legacy-auth/env.ts");
+      const authIndex = readFile(
+        result.appPath,
+        "packages/legacy-auth/src/index.ts",
+      );
       const mobileQa = readFile(result.appPath, "apps/expo/docs/mobile-qa.md");
       const rootReadme = readFile(result.appPath, "README.md");
       const expectedDisplayName = appName
@@ -587,10 +593,7 @@ describe("create-gmacko-app scaffold", () => {
       expect(result.exitCode).toBe(0);
 
       const nextEnv = readFile(result.appPath, "apps/nextjs/src/env.ts");
-      const tanstackEnv = readFile(
-        result.appPath,
-        "apps/tanstack-start/src/env.ts",
-      );
+      const tanstackEnv = readFile(result.appPath, "apps/web/src/env.ts");
 
       expect(nextEnv).not.toContain("presets-zod");
       expect(nextEnv).not.toContain("vercel()");
@@ -965,7 +968,7 @@ describe("create-gmacko-app scaffold", () => {
       );
       const adminRouter = readFile(
         result.appPath,
-        "packages/api/src/router/admin.ts",
+        "packages/legacy-api/src/router/admin.ts",
       );
 
       expect(publicHome).toContain("Maintenance mode");
@@ -1144,8 +1147,7 @@ describe("create-gmacko-app scaffold", () => {
       const sourceFiles = [
         "apps/nextjs/src/trpc/react.tsx",
         "apps/nextjs/src/trpc/server.tsx",
-        "apps/tanstack-start/src/lib/url.ts",
-        "apps/tanstack-start/src/routeTree.gen.ts",
+        "apps/web/src/lib/url.ts",
         "packages/trpc-client/src/client.ts",
         "packages/ui/src/theme.tsx",
       ].map((file) => readFile(result.appPath, file));
@@ -1425,9 +1427,9 @@ describe("create-gmacko-app scaffold", () => {
       expect(fileExists(result.appPath, "apps/nextjs/eslint.config.ts")).toBe(
         false,
       );
-      expect(fileExists(result.appPath, "packages/db/eslint.config.ts")).toBe(
-        false,
-      );
+      expect(
+        fileExists(result.appPath, "packages/legacy-db/eslint.config.ts"),
+      ).toBe(false);
 
       const rootPkg = readJson<{
         scripts?: Record<string, string>;
@@ -1499,7 +1501,7 @@ describe("create-gmacko-app scaffold", () => {
       'EXPO_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"',
     );
     expect(e2eWorkflow).toContain("pnpm --filter @gmacko/nextjs build");
-    expect(e2eWorkflow).toContain("pnpm --filter @gmacko/tanstack-start build");
+    expect(e2eWorkflow).toContain("pnpm --filter @gmacko/web build");
     expect(e2eWorkflow).toContain("pnpm --filter @gmacko/expo typecheck");
     expect(e2eWorkflow).toContain(
       "pnpm --filter @gmacko/expo exec expo start --dev-client --help",
@@ -1785,15 +1787,15 @@ describe("create-gmacko-app scaffold", () => {
       // Check that @gmacko was replaced with @myorg
       const apiPkg = readJson<{ name: string }>(
         result.appPath,
-        "packages/api/package.json",
+        "packages/legacy-api/package.json",
       );
-      expect(apiPkg.name).toBe("@myorg/api");
+      expect(apiPkg.name).toBe("@myorg/legacy-api");
 
       const dbPkg = readJson<{ name: string }>(
         result.appPath,
-        "packages/db/package.json",
+        "packages/legacy-db/package.json",
       );
-      expect(dbPkg.name).toBe("@myorg/db");
+      expect(dbPkg.name).toBe("@myorg/legacy-db");
     }, 120000);
   });
 

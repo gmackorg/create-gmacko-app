@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import type { AppRouter } from "@gmacko/api";
+import type { AppRouter } from "@gmacko/legacy-api";
 import { ThemeProvider, ThemeToggle } from "@gmacko/ui/theme";
 import { Toaster } from "@gmacko/ui/toast";
 import type { QueryClient } from "@tanstack/react-query";

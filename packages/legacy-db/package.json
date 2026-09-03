@@ -1,5 +1,5 @@
 {
-  "name": "@gmacko/db",
+  "name": "@gmacko/legacy-db",
   "private": true,
   "type": "module",
   "exports": {

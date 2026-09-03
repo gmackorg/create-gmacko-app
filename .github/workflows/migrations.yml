@@ -4,11 +4,11 @@ on:
   push:
     branches: [main]
     paths:
-      - "packages/db/**"
+      - "packages/legacy-db/**"
   pull_request:
     branches: [main]
     paths:
-      - "packages/db/**"
+      - "packages/legacy-db/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -39,7 +39,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate migrations (dry run)
-        working-directory: packages/db
+        working-directory: packages/legacy-db
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
@@ -47,7 +47,7 @@ jobs:
           pnpm with-env drizzle-kit generate --name ci_check 2>&1 || true
 
       - name: Check for uncommitted migration changes
-        working-directory: packages/db
+        working-directory: packages/legacy-db
         run: |
           # Check if there are any new SQL files that should have been committed
           if git status --porcelain drizzle/ | grep -q "^?"; then
@@ -55,7 +55,7 @@ jobs:
             echo "New migration files found that should be committed:"
             git status --porcelain drizzle/
             echo ""
-            echo "Please run 'pnpm --filter @gmacko/db generate' and commit the generated files."
+            echo "Please run 'pnpm --filter @gmacko/legacy-db generate' and commit the generated files."
             exit 1
           fi
           echo "✓ All migrations are in sync with schema"
@@ -80,7 +80,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Validate migration integrity
-        working-directory: packages/db
+        working-directory: packages/legacy-db
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |

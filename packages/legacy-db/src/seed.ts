@@ -2,7 +2,7 @@
  * Database Seeding Script
  *
  * Seeds the database with sample data for development/testing.
- * Run with: pnpm --filter @gmacko/db seed
+ * Run with: pnpm --filter @gmacko/legacy-db seed
  *
  * This script is idempotent - it clears existing seed data before inserting.
  */

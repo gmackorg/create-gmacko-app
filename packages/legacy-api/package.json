@@ -1,5 +1,5 @@
 {
-  "name": "@gmacko/api",
+  "name": "@gmacko/legacy-api",
   "private": true,
   "type": "module",
   "exports": {
@@ -32,9 +32,9 @@
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
-    "@gmacko/auth": "workspace:*",
     "@gmacko/config": "workspace:*",
-    "@gmacko/db": "workspace:*",
+    "@gmacko/legacy-auth": "workspace:*",
+    "@gmacko/legacy-db": "workspace:*",
     "@gmacko/telemetry": "workspace:*",
     "@gmacko/validators": "workspace:*",
     "@trpc/server": "catalog:",

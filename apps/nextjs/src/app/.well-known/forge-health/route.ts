@@ -1,4 +1,4 @@
-import { db } from "@gmacko/db/client";
+import { db } from "@gmacko/legacy-db/client";
 import { NextResponse } from "next/server";
 
 interface ForgeHealthCheck {

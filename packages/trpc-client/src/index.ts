@@ -27,6 +27,6 @@
 export type { TRPCClient } from "./client";
 export { type CreateClientOptions, createClient } from "./client";
 
-// Re-export types from @gmacko/api for convenience
-// Users can import these directly if they have @gmacko/api installed
+// Re-export types from @gmacko/legacy-api for convenience
+// Users can import these directly if they have @gmacko/legacy-api installed
 export type { AppRouter, RouterInputs, RouterOutputs } from "./types";

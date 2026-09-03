@@ -7,6 +7,6 @@ Dockerfile @gmackie
 docker-compose.yml @gmackie
 
 # Core packages
-packages/db/ @gmackie
-packages/auth/ @gmackie
-packages/api/ @gmackie
+packages/legacy-db/ @gmackie
+packages/legacy-auth/ @gmackie
+packages/legacy-api/ @gmackie

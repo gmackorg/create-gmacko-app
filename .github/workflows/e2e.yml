@@ -8,9 +8,9 @@ on:
     paths:
       - "apps/nextjs/**"
       - "apps/expo/**"
-      - "packages/api/**"
-      - "packages/auth/**"
-      - "packages/db/**"
+      - "packages/legacy-api/**"
+      - "packages/legacy-auth/**"
+      - "packages/legacy-db/**"
       - "packages/ui/**"
       - ".github/workflows/e2e.yml"
   workflow_dispatch:
@@ -75,7 +75,7 @@ jobs:
       # Create the schema in the service Postgres so the app's session/auth
       # queries succeed when Playwright drives it (pages otherwise 500).
       - name: Push database schema
-        run: pnpm -F @gmacko/db push --force
+        run: pnpm -F @gmacko/legacy-db push --force
         env:
           DATABASE_URL: "postgresql://test:test@localhost:5432/test"
 

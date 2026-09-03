@@ -72,7 +72,7 @@ export async function scaffold(options: CliOptions): Promise<void> {
     fs.removeSync(path.join(targetDir, "apps/expo"));
   }
   if (!options.platforms.tanstackStart) {
-    fs.removeSync(path.join(targetDir, "apps/tanstack-start"));
+    fs.removeSync(path.join(targetDir, "apps/web"));
   }
 
   if (options.platforms.web && options.vinext) {
@@ -468,25 +468,25 @@ function getBootstrapRecommendations(options: CliOptions): {
 
   if (options.saasCollaboration) {
     selectedLayerLines.push(
-      "- Collaboration: use `packages/db/src/schema.ts` and `packages/api/src/router/settings.ts` for workspace membership and invites.",
+      "- Collaboration: use `packages/legacy-db/src/schema.ts` and `packages/legacy-api/src/router/settings.ts` for workspace membership and invites.",
     );
     codexLines.push(
-      "- Collaboration: inspect `packages/db/src/schema.ts` and `packages/api/src/router/settings.ts` for workspace membership and invites.",
+      "- Collaboration: inspect `packages/legacy-db/src/schema.ts` and `packages/legacy-api/src/router/settings.ts` for workspace membership and invites.",
     );
     opencodeLines.push(
-      "- Collaboration: inspect `packages/db/src/schema.ts` and `packages/api/src/router/settings.ts` for workspace membership and invites.",
+      "- Collaboration: inspect `packages/legacy-db/src/schema.ts` and `packages/legacy-api/src/router/settings.ts` for workspace membership and invites.",
     );
   }
 
   if (options.saasBilling || options.saasMetering) {
     selectedLayerLines.push(
-      "- Billing and metering: use `packages/billing` and `packages/api/src/router/settings.ts` for plan shape, limits, and usage rollups.",
+      "- Billing and metering: use `packages/billing` and `packages/legacy-api/src/router/settings.ts` for plan shape, limits, and usage rollups.",
     );
     codexLines.push(
-      "- Billing and metering: use `packages/billing` and `packages/api/src/router/settings.ts` for plans, limits, and usage rollups.",
+      "- Billing and metering: use `packages/billing` and `packages/legacy-api/src/router/settings.ts` for plans, limits, and usage rollups.",
     );
     opencodeLines.push(
-      "- Billing and metering: use `packages/billing` and `packages/api/src/router/settings.ts` for plans, limits, and usage rollups.",
+      "- Billing and metering: use `packages/billing` and `packages/legacy-api/src/router/settings.ts` for plans, limits, and usage rollups.",
     );
     claudeLines.push(
       "- Claude-only: run `/setup-stripe-billing` once the workspace, plan, and usage model are clear.",
@@ -495,13 +495,13 @@ function getBootstrapRecommendations(options: CliOptions): {
 
   if (options.saasSupport || options.saasLaunch) {
     selectedLayerLines.push(
-      "- Support and launch: use `apps/nextjs/src/app`, `packages/api/src/router/admin.ts`, and `packages/api/src/router/settings.ts` for landing, contact, FAQ, changelog, maintenance mode, signup toggles, and waitlist review.",
+      "- Support and launch: use `apps/nextjs/src/app`, `packages/legacy-api/src/router/admin.ts`, and `packages/legacy-api/src/router/settings.ts` for landing, contact, FAQ, changelog, maintenance mode, signup toggles, and waitlist review.",
     );
     codexLines.push(
-      "- Support and launch: use `apps/nextjs/src/app`, `packages/api/src/router/admin.ts`, and `packages/api/src/router/settings.ts` for landing, contact, FAQ, changelog, maintenance mode, signup toggles, and waitlist review.",
+      "- Support and launch: use `apps/nextjs/src/app`, `packages/legacy-api/src/router/admin.ts`, and `packages/legacy-api/src/router/settings.ts` for landing, contact, FAQ, changelog, maintenance mode, signup toggles, and waitlist review.",
     );
     opencodeLines.push(
-      "- Support and launch: use `apps/nextjs/src/app`, `packages/api/src/router/admin.ts`, and `packages/api/src/router/settings.ts` for landing, contact, FAQ, changelog, maintenance mode, signup toggles, and waitlist review.",
+      "- Support and launch: use `apps/nextjs/src/app`, `packages/legacy-api/src/router/admin.ts`, and `packages/legacy-api/src/router/settings.ts` for landing, contact, FAQ, changelog, maintenance mode, signup toggles, and waitlist review.",
     );
     claudeLines.push(
       "- Claude-only: run `/launch-landing-page` once the public shell and support flow are ready to shape.",
@@ -513,10 +513,10 @@ function getBootstrapRecommendations(options: CliOptions): {
       "- Referrals: keep referral capture and invite growth tied to the landing page and admin review tools.",
     );
     codexLines.push(
-      "- Referrals: keep referral capture and invite growth tied to the landing page and admin review tools in `packages/api/src/router/admin.ts`.",
+      "- Referrals: keep referral capture and invite growth tied to the landing page and admin review tools in `packages/legacy-api/src/router/admin.ts`.",
     );
     opencodeLines.push(
-      "- Referrals: keep referral capture and invite growth tied to the landing page and admin review tools in `packages/api/src/router/admin.ts`.",
+      "- Referrals: keep referral capture and invite growth tied to the landing page and admin review tools in `packages/legacy-api/src/router/admin.ts`.",
     );
   }
 
@@ -620,7 +620,7 @@ function buildScaffoldProfileBlock(options: CliOptions): string {
       ? "- `pnpm --filter @gmacko/expo dev:client`"
       : null,
     options.platforms.tanstackStart
-      ? "- `pnpm --filter @gmacko/tanstack-start dev`"
+      ? "- `pnpm --filter @gmacko/web dev`"
       : null,
     options.trpcOperators ? "- `pnpm trpc:ops -- --help`" : null,
   ]
@@ -644,7 +644,7 @@ ${preferredDevCommands}
 
 function getPrimaryServicePath(options: CliOptions): string {
   if (options.platforms.web) return "apps/nextjs";
-  if (options.platforms.tanstackStart) return "apps/tanstack-start";
+  if (options.platforms.tanstackStart) return "apps/web";
   if (options.platforms.mobile) return "apps/expo";
   return ".";
 }

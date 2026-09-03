@@ -6,7 +6,7 @@ import {
   workspace,
   workspaceInviteAllowlist,
   workspaceMembership,
-} from "@gmacko/db/schema";
+} from "@gmacko/legacy-db/schema";
 import { describe, expect, it, vi } from "vitest";
 
 process.env.DATABASE_URL ??=

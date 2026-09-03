@@ -1,11 +1,11 @@
 #!/usr/bin/env tsx
 
-import type { OpenApiConfig } from "@gmacko/api/openapi";
+import type { OpenApiConfig } from "@gmacko/legacy-api/openapi";
 import {
   generateAllVersionedSpecs,
   generateApiDocument,
   getAvailableApiVersions,
-} from "@gmacko/api/openapi";
+} from "@gmacko/legacy-api/openapi";
 /**
  * OpenAPI spec generation script
  *
@@ -19,7 +19,7 @@ import {
 import { writeFileSync } from "fs";
 import { resolve } from "path";
 
-import type { ApiVersion } from "../../packages/api/src/versioning";
+import type { ApiVersion } from "../../packages/legacy-api/src/versioning";
 
 const baseConfig: Partial<OpenApiConfig> = {
   title: process.env.API_TITLE ?? "Gmacko API",

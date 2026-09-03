@@ -1,4 +1,4 @@
-import { appRouter, createTRPCContext } from "@gmacko/api";
+import { appRouter, createTRPCContext } from "@gmacko/legacy-api";
 import { Button } from "@gmacko/ui/button";
 import { Input } from "@gmacko/ui/input";
 import { headers } from "next/headers";

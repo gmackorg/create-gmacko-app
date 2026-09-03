@@ -14,10 +14,10 @@ const config = {
   output: process.env.DOCKER_BUILD ? "standalone" : undefined,
 
   transpilePackages: [
-    "@gmacko/api",
-    "@gmacko/auth",
+    "@gmacko/legacy-api",
+    "@gmacko/legacy-auth",
     "@gmacko/config",
-    "@gmacko/db",
+    "@gmacko/legacy-db",
     "@gmacko/i18n",
     "@gmacko/logging",
     "@gmacko/monitoring",
