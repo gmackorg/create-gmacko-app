@@ -86,11 +86,20 @@ const SRC_SCOPE = /^(apps|packages)\/[^/]+\/src\//;
 // read there is a value that is silently `undefined` in production (plan
 // principle 04: env is a service; `AppConfig` is the only reader). The bundle
 // is the set of workspace packages reachable from apps/web's package.json
-// (`dependencies`, transitively), computed here so a new dependency joins
-// the scope on its own. Node-only packages (the CLI, the MCP server,
-// realtime) are not reachable from apps/web and keep their typed env
-// modules. The env-definition layer stays exempt in both scopes (env.ts /
-// src/config / src/env / instrumentation / *.config.* / tests).
+// (`dependencies`, `peerDependencies` and `optionalDependencies`,
+// transitively — a peer or optional workspace package is bundled just the
+// same once installed), computed here so a new dependency joins the scope
+// on its own. Node-only packages (the CLI, the MCP server, realtime) are not
+// reachable from apps/web and keep their typed env modules. The
+// env-definition layer stays exempt in both scopes (env.ts / src/config /
+// src/env / instrumentation / *.config.* / tests).
+//
+// apps/web/src itself is checked with the *app* pattern (NODE_ENV and PORT
+// allowed) rather than the bundle pattern, although it too ships in the
+// Worker: Vite statically replaces `process.env.NODE_ENV` at build time
+// (Rollup/Vite `define`), so that one read is a compile-time constant, not
+// a runtime lookup of a process that does not exist. Every other
+// `process.env.X` in apps/web/src is still a violation.
 const WEB_APP_DIR = "apps/web";
 const ENV_RULE_APP_SCOPE = /^apps\/[^/]+\/src\//;
 const ENV_RULE_EXEMPT =
@@ -123,24 +132,34 @@ function workspacePackages() {
   return byName;
 }
 
+/** The dependency fields that ship: devDependencies build a package, they do not. */
+const SHIPPED_DEP_FIELDS = [
+  "dependencies",
+  "peerDependencies",
+  "optionalDependencies",
+];
+
+const shippedDeps = (pkg) =>
+  SHIPPED_DEP_FIELDS.flatMap((field) => Object.keys(pkg?.[field] ?? {}));
+
 /**
- * The workspace packages the web app bundles: its `dependencies` and,
- * transitively, theirs (devDependencies build the app, they do not ship).
- * Sorted directories, relative to the repo root.
+ * The workspace packages the web app bundles: its `dependencies`,
+ * `peerDependencies` and `optionalDependencies` and, transitively, theirs
+ * (devDependencies build the app, they do not ship). Sorted directories,
+ * relative to the repo root.
  */
 export function webBundlePackages(root = ROOT) {
   const byName = workspacePackages();
   const app = readJson(join(root, WEB_APP_DIR, "package.json"));
   if (!app) return [];
   const seen = new Set();
-  const queue = Object.keys(app.dependencies ?? {});
+  const queue = shippedDeps(app);
   while (queue.length > 0) {
     const name = queue.shift();
     const dir = byName.get(name);
     if (!dir || seen.has(dir)) continue;
     seen.add(dir);
-    const pkg = readJson(join(root, dir, "package.json"));
-    queue.push(...Object.keys(pkg?.dependencies ?? {}));
+    queue.push(...shippedDeps(readJson(join(root, dir, "package.json"))));
   }
   return [...seen].sort();
 }

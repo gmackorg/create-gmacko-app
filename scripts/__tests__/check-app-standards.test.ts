@@ -95,6 +95,34 @@ describe("no-raw-process-env", () => {
     expect(graph(workspace)).toEqual(["packages/api", "packages/db"]);
   });
 
+  it("follows workspace refs declared as peer or optional dependencies too", () => {
+    expect(
+      graph({
+        ...workspace,
+        "apps/web/package.json": JSON.stringify({
+          name: "@gmacko/web",
+          dependencies: { "@gmacko/api": "workspace:*" },
+          peerDependencies: { "@gmacko/ui": "workspace:*" },
+          optionalDependencies: { "@gmacko/monitoring": "workspace:*" },
+          devDependencies: { "@gmacko/tsconfig": "workspace:*" },
+        }),
+        "packages/ui/package.json": JSON.stringify({
+          name: "@gmacko/ui",
+          peerDependencies: { "@gmacko/config": "workspace:*" },
+        }),
+        "packages/monitoring/package.json": pkg("@gmacko/monitoring"),
+        "packages/config/package.json": pkg("@gmacko/config"),
+        "packages/tsconfig/package.json": pkg("@gmacko/tsconfig"),
+      }),
+    ).toEqual([
+      "packages/api",
+      "packages/config",
+      "packages/db",
+      "packages/monitoring",
+      "packages/ui",
+    ]);
+  });
+
   it("flags any process.env read in a bundled package, and typed-env misses in app code", () => {
     const violations = check({
       ...workspace,
