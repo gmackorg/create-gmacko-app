@@ -1,7 +1,31 @@
-import { integrations } from "@gmacko/config";
-import pino from "pino";
-
-import { getOtelMixin } from "./otel";
+/**
+ * `@gmacko/logging`: one JSON line per event on the console, which Workers
+ * Logs and Logpush ingest, over Effect's logger.
+ *
+ * Two ways in, one sink:
+ *
+ * - Effect code logs with `Effect.logInfo(...)` and friends; `Logging.layer`
+ *   installs the sink and the minimum level, and `Effect.annotateLogs`
+ *   (request id, user id, endpoint) lands on every line the fiber writes.
+ * - Plain code (a package with no Effect boundary, a legacy Node app) keeps
+ *   the pino-style surface: `createLogger({ module }).info(fields, msg)`.
+ *   Each call runs through the same Effect logger on a private runtime, so
+ *   the line shape and the redaction are identical; what it cannot see is
+ *   the annotations of an enclosing Effect fiber.
+ *
+ * Nothing here reads `process.env`: the format and level are options,
+ * chosen by the runtime that installs the layer (the Worker uses JSON; a
+ * Node dev server may pick `pretty`). No worker threads, no transports.
+ */
+import {
+  Cause,
+  Effect,
+  type LogLevel as EffectLogLevel,
+  Layer,
+  Logger,
+  ManagedRuntime,
+  References,
+} from "effect";
 
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
 
@@ -12,668 +36,352 @@ export interface LogContext {
   [key: string]: unknown;
 }
 
-// ============================================================================
-// Sentry Integration (Lazy Loading)
-// ============================================================================
-
-/**
- * Minimal Sentry interface for type safety without hard dependency
- * This allows the logging package to work without @sentry/nextjs installed
- */
-interface SentryLike {
-  addBreadcrumb: (breadcrumb: {
-    message?: string;
-    category?: string;
-    level?: string;
-    data?: Record<string, unknown>;
-    timestamp?: number;
-  }) => void;
-  setUser: (user: Record<string, unknown> | null) => void;
-  setContext: (name: string, context: Record<string, unknown> | null) => void;
-  setTag: (key: string, value: string) => void;
-  captureException: (error: unknown) => void;
-  captureMessage: (message: string) => void;
-  withScope: (callback: (scope: SentryScope) => void) => void;
+/** One emitted event, before serialisation. */
+export interface LogRecord {
+  readonly level: LogLevel;
+  readonly time: string;
+  readonly msg: string;
+  readonly fields: Readonly<Record<string, unknown>>;
+  /** Present when the event was logged under a span. */
+  readonly traceId?: string | undefined;
+  readonly spanId?: string | undefined;
+  /** Effect's pretty-printed cause, when one was attached. */
+  readonly cause?: string | undefined;
 }
 
-interface SentryScope {
-  setExtra: (key: string, value: unknown) => void;
-  setLevel: (level: string) => void;
-  setFingerprint: (fingerprint: string[]) => void;
-  setTag: (key: string, value: string) => void;
+export interface LoggingOptions {
+  /** `json` (default): one JSON object per line. `pretty`: a plain readable line for a terminal. */
+  readonly format?: "json" | "pretty" | undefined;
+  /** Events below this level are dropped. Default `info`. */
+  readonly level?: LogLevel | undefined;
+  /**
+   * Fields whose values are replaced with `[REDACTED]`. A bare name matches
+   * a top-level field; `*.name` matches that field one level down; `a.b`
+   * matches the exact path. Defaults to `defaultRedactPaths`.
+   */
+  readonly redact?: ReadonlyArray<string> | undefined;
+  /** Fields on every line (service, version, stage). */
+  readonly base?: Readonly<Record<string, unknown>> | undefined;
+  /** Where lines go; defaults to the console, split by level. */
+  readonly sink?: ((line: string, record: LogRecord) => void) | undefined;
 }
 
-/**
- * Sentry integration state - lazily loaded
- */
-let sentryModule: SentryLike | null = null;
-let sentryLoadAttempted = false;
+export const defaultRedactPaths: ReadonlyArray<string> = [
+  "password",
+  "secret",
+  "token",
+  "apiKey",
+  "authorization",
+  "cookie",
+  "*.password",
+  "*.secret",
+  "*.token",
+  "*.apiKey",
+];
 
-/**
- * Lazily load Sentry module
- * Tries @sentry/nextjs first (web), falls back gracefully
- */
-async function getSentry(): Promise<SentryLike | null> {
-  if (!integrations.sentry) return null;
-  if (sentryLoadAttempted) return sentryModule;
+const REDACTED = "[REDACTED]";
 
-  sentryLoadAttempted = true;
-  try {
-    // Try to load @sentry/nextjs (web environment)
-    // Using dynamic import to avoid bundling if not available
-    const sentry = await import("@sentry/nextjs");
-    sentryModule = sentry as unknown as SentryLike;
-    return sentryModule;
-  } catch {
-    // Sentry not available in this environment
-    return null;
-  }
-}
+// ---------------------------------------------------------------------------
+// Levels
+// ---------------------------------------------------------------------------
 
-// ============================================================================
-// Base Logger Setup
-// ============================================================================
+const toSeverity: Record<LogLevel, EffectLogLevel.Severity> = {
+  trace: "Trace",
+  debug: "Debug",
+  info: "Info",
+  warn: "Warn",
+  error: "Error",
+  fatal: "Fatal",
+};
 
-const isDev = process.env.NODE_ENV !== "production";
-
-/**
- * Create the base pino logger instance
- */
-function forgeContext(): Record<string, string> {
-  const ctx: Record<string, string> = {};
-  if (process.env.FG_APP) ctx.app = process.env.FG_APP;
-  if (process.env.FG_STAGE) ctx.stage = process.env.FG_STAGE;
-  if (process.env.FG_NODE) ctx.node = process.env.FG_NODE;
-  if (process.env.FG_COMMIT_HASH) ctx.commitHash = process.env.FG_COMMIT_HASH;
-  return ctx;
-}
-
-function createBaseLogger() {
-  return pino({
-    level: process.env.LOG_LEVEL ?? (isDev ? "debug" : "info"),
-
-    base: {
-      env: process.env.NODE_ENV ?? "development",
-      service: process.env.SERVICE_NAME ?? "gmacko-app",
-      version: process.env.npm_package_version ?? "0.0.0",
-      ...forgeContext(),
-    },
-
-    timestamp: pino.stdTimeFunctions.isoTime,
-
-    // Inject OTel trace context (traceId, spanId) into every log line
-    mixin: getOtelMixin,
-
-    // Pretty print in development
-    transport: isDev
-      ? {
-          target: "pino-pretty",
-          options: {
-            colorize: true,
-            translateTime: "HH:MM:ss",
-            ignore: "pid,hostname",
-          },
-        }
-      : undefined,
-
-    // Redact sensitive fields
-    redact: {
-      paths: [
-        "password",
-        "secret",
-        "token",
-        "apiKey",
-        "authorization",
-        "cookie",
-        "*.password",
-        "*.secret",
-        "*.token",
-        "*.apiKey",
-      ],
-      censor: "[REDACTED]",
-    },
-  });
-}
-
-const baseLogger = createBaseLogger();
-
-/**
- * Create a child logger with additional context
- */
-export function createLogger(context: LogContext = {}) {
-  return baseLogger.child(context);
-}
-
-/**
- * Default logger instance
- */
-export const logger = baseLogger;
-
-// ============================================================================
-// Sentry Integration Utilities
-// ============================================================================
-
-/**
- * Breadcrumb category types for better organization in Sentry
- */
-export type BreadcrumbCategory =
-  | "http"
-  | "navigation"
-  | "user"
-  | "query"
-  | "ui"
-  | "console"
-  | "default";
-
-/**
- * Sentry severity level mapping
- */
-type SentrySeverity = "fatal" | "error" | "warning" | "info" | "debug";
-
-function mapLogLevelToSentry(level: LogLevel): SentrySeverity {
+const fromEffectLevel = (level: EffectLogLevel.LogLevel): LogLevel => {
   switch (level) {
-    case "fatal":
-      return "fatal";
-    case "error":
-      return "error";
-    case "warn":
-      return "warning";
-    case "info":
-      return "info";
-    case "trace":
-    case "debug":
-    default:
+    case "Trace":
+      return "trace";
+    case "Debug":
       return "debug";
+    case "Warn":
+      return "warn";
+    case "Error":
+      return "error";
+    case "Fatal":
+      return "fatal";
+    default:
+      return "info";
   }
-}
+};
+
+// ---------------------------------------------------------------------------
+// Redaction
+// ---------------------------------------------------------------------------
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" &&
+  value !== null &&
+  !Array.isArray(value) &&
+  !(value instanceof Error) &&
+  !(value instanceof Date);
 
 /**
- * Add a breadcrumb to Sentry for context building
- * Breadcrumbs help trace the path to an error
+ * A copy of `fields` with the redacted paths replaced. Errors and dates are
+ * left as they are; only plain objects are descended into.
  */
-export async function addBreadcrumb(
-  message: string,
-  options: {
-    category?: BreadcrumbCategory;
-    level?: LogLevel;
-    data?: Record<string, unknown>;
-  } = {},
-): Promise<void> {
-  const sentry = await getSentry();
-  if (!sentry) return;
+export const redact = (
+  fields: Readonly<Record<string, unknown>>,
+  paths: ReadonlyArray<string>,
+): Record<string, unknown> => {
+  const top = new Set<string>();
+  const nested = new Set<string>();
+  const exact = new Map<string, Set<string>>();
+  for (const path of paths) {
+    const dot = path.indexOf(".");
+    if (dot === -1) top.add(path);
+    else if (path.startsWith("*.")) nested.add(path.slice(2));
+    else {
+      const parent = path.slice(0, dot);
+      const child = path.slice(dot + 1);
+      let set = exact.get(parent);
+      if (set === undefined) {
+        set = new Set();
+        exact.set(parent, set);
+      }
+      set.add(child);
+    }
+  }
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (top.has(key)) {
+      out[key] = REDACTED;
+      continue;
+    }
+    if (isPlainObject(value)) {
+      const copy: Record<string, unknown> = {};
+      const exactHere = exact.get(key);
+      for (const [name, inner] of Object.entries(value)) {
+        copy[name] =
+          nested.has(name) || exactHere?.has(name) ? REDACTED : inner;
+      }
+      out[key] = copy;
+      continue;
+    }
+    out[key] = value;
+  }
+  return out;
+};
 
-  sentry.addBreadcrumb({
-    message,
-    category: options.category ?? "default",
-    level: mapLogLevelToSentry(options.level ?? "info"),
-    data: options.data,
-    timestamp: Date.now() / 1000,
+// ---------------------------------------------------------------------------
+// Serialisation
+// ---------------------------------------------------------------------------
+
+const errorToJson = (error: Error): Record<string, unknown> => ({
+  name: error.name,
+  message: error.message,
+  ...(error.stack === undefined ? {} : { stack: error.stack }),
+  ...("cause" in error && error.cause !== undefined
+    ? { cause: toJsonValue(error.cause) }
+    : {}),
+});
+
+const toJsonValue = (value: unknown): unknown => {
+  if (value instanceof Error) return errorToJson(value);
+  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "symbol" || typeof value === "function")
+    return String(value);
+  return value;
+};
+
+const replacer = (_key: string, value: unknown): unknown => toJsonValue(value);
+
+/** The JSON line for a record: `{"level","time","msg",...fields,"traceId"?,"spanId"?,"cause"?}`. */
+export const formatJsonLine = (record: LogRecord): string =>
+  JSON.stringify(
+    {
+      level: record.level,
+      time: record.time,
+      msg: record.msg,
+      ...record.fields,
+      ...(record.traceId === undefined ? {} : { traceId: record.traceId }),
+      ...(record.spanId === undefined ? {} : { spanId: record.spanId }),
+      ...(record.cause === undefined ? {} : { cause: record.cause }),
+    },
+    replacer,
+  );
+
+const formatValue = (value: unknown): string => {
+  if (typeof value === "string") return /\s/.test(value) ? `"${value}"` : value;
+  if (value instanceof Error)
+    return value.stack ?? `${value.name}: ${value.message}`;
+  return JSON.stringify(value, replacer) ?? String(value);
+};
+
+/** `HH:MM:ss LEVEL [module] msg key=value ...` — plain text, no colours. */
+export const formatPrettyLine = (record: LogRecord): string => {
+  const { module: moduleName, ...rest } = record.fields;
+  const clock = record.time.slice(11, 19);
+  const head = `${clock} ${record.level.toUpperCase().padEnd(5)}`;
+  const scope = typeof moduleName === "string" ? ` [${moduleName}]` : "";
+  const pairs = Object.entries(rest)
+    .map(([key, value]) => ` ${key}=${formatValue(value)}`)
+    .join("");
+  const cause = record.cause === undefined ? "" : `\n${record.cause}`;
+  return `${head}${scope} ${record.msg}${pairs}${cause}`;
+};
+
+/* oxlint-disable no-console -- this sink is the console */
+const consoleSink = (line: string, record: LogRecord): void => {
+  switch (record.level) {
+    case "error":
+    case "fatal":
+      console.error(line);
+      return;
+    case "warn":
+      console.warn(line);
+      return;
+    default:
+      console.info(line);
+  }
+};
+/* oxlint-enable no-console */
+
+// ---------------------------------------------------------------------------
+// The Effect logger
+// ---------------------------------------------------------------------------
+
+/**
+ * Splits Effect's message list: the first string is the message, every
+ * plain object contributes fields, anything else is collected under `data`.
+ */
+const splitMessage = (
+  message: unknown,
+): { readonly msg: string; readonly fields: Record<string, unknown> } => {
+  const parts = Array.isArray(message) ? message : [message];
+  let msg: string | undefined;
+  const fields: Record<string, unknown> = {};
+  const rest: unknown[] = [];
+  for (const part of parts) {
+    if (typeof part === "string" && msg === undefined) msg = part;
+    else if (isPlainObject(part)) Object.assign(fields, part);
+    else if (part instanceof Error && !("err" in fields)) fields.err = part;
+    else rest.push(part);
+  }
+  if (rest.length > 0) fields.data = rest.length === 1 ? rest[0] : rest;
+  return { msg: msg ?? "", fields };
+};
+
+/** The sink as an Effect `Logger`, for `Logger.layer`. */
+export const makeLogger = (
+  options: LoggingOptions = {},
+): Logger.Logger<unknown, void> => {
+  const format = options.format ?? "json";
+  const paths = options.redact ?? defaultRedactPaths;
+  const base = options.base ?? {};
+  const sink = options.sink ?? consoleSink;
+  const render = format === "pretty" ? formatPrettyLine : formatJsonLine;
+  return Logger.make(({ message, logLevel, cause, fiber, date }) => {
+    const { msg, fields } = splitMessage(message);
+    const annotations = fiber.getRef(References.CurrentLogAnnotations);
+    const span = fiber.currentSpan;
+    const record: LogRecord = {
+      level: fromEffectLevel(logLevel),
+      time: date.toISOString(),
+      msg,
+      fields: redact({ ...base, ...annotations, ...fields }, paths),
+      traceId: span?.traceId,
+      spanId: span?.spanId,
+      cause: cause.reasons.length > 0 ? Cause.pretty(cause) : undefined,
+    };
+    sink(render(record), record);
   });
-}
+};
 
 /**
- * Set user context for Sentry events
+ * `Logging.layer(options)`: replaces the default loggers with this sink and
+ * sets the minimum level. An exporter that should also receive the lines
+ * (the OTLP logger) is layered on top with `mergeWithExisting`.
  */
-export async function setUserContext(user: {
-  id: string;
-  email?: string;
-  username?: string;
-  [key: string]: unknown;
-}): Promise<void> {
-  const sentry = await getSentry();
-  if (!sentry) return;
+export const Logging = {
+  layer: (options: LoggingOptions = {}): Layer.Layer<never> =>
+    Layer.mergeAll(
+      Logger.layer([makeLogger(options)], { mergeWithExisting: false }),
+      Layer.succeed(References.MinimumLogLevel)(
+        toSeverity[options.level ?? "info"],
+      ),
+    ),
+  /** Request/user context for every line the effect logs. */
+  withContext:
+    (context: LogContext) =>
+    <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+      Effect.annotateLogs(effect, context),
+};
 
-  const { id, email, username, ...rest } = user;
-  sentry.setUser({
-    id,
-    email,
-    username,
-    ...rest,
-  });
+// ---------------------------------------------------------------------------
+// The plain (non-Effect) surface
+// ---------------------------------------------------------------------------
+
+type LogMethod = (objOrMsg: unknown, msg?: string) => void;
+
+export interface Logger extends Record<LogLevel, LogMethod> {
+  /** A logger with more bound fields. */
+  child(bindings: LogContext): Logger;
+  /** The fields bound to this logger. */
+  bindings(): Readonly<Record<string, unknown>>;
 }
 
-/**
- * Clear user context (e.g., on logout)
- */
-export async function clearUserContext(): Promise<void> {
-  const sentry = await getSentry();
-  if (!sentry) return;
-
-  sentry.setUser(null);
-}
+let runtime = ManagedRuntime.make(Logging.layer());
 
 /**
- * Set custom context/tags for Sentry events
+ * Chooses the format, level and redaction for every `createLogger` logger
+ * (the Effect path is configured by providing `Logging.layer` instead).
+ * Node entry points that want readable output call
+ * `configureLogging({ format: "pretty", level: "debug" })` once at start.
  */
-export async function setSentryContext(
-  name: string,
-  context: Record<string, unknown>,
-): Promise<void> {
-  const sentry = await getSentry();
-  if (!sentry) return;
+export const configureLogging = (options: LoggingOptions): void => {
+  const previous = runtime;
+  runtime = ManagedRuntime.make(Logging.layer(options));
+  void previous.dispose();
+};
 
-  sentry.setContext(name, context);
-}
+const makePlainLogger = (
+  bindings: Readonly<Record<string, unknown>>,
+): Logger => {
+  const method =
+    (level: LogLevel): LogMethod =>
+    (objOrMsg, msg) => {
+      const [fields, message] =
+        typeof objOrMsg === "string"
+          ? [{}, objOrMsg]
+          : [(objOrMsg ?? {}) as Record<string, unknown>, msg ?? ""];
+      runtime.runSync(
+        Effect.logWithLevel(toSeverity[level])(message, fields).pipe(
+          Effect.annotateLogs(bindings),
+        ),
+      );
+    };
+  return {
+    trace: method("trace"),
+    debug: method("debug"),
+    info: method("info"),
+    warn: method("warn"),
+    error: method("error"),
+    fatal: method("fatal"),
+    child: (more) => makePlainLogger({ ...bindings, ...more }),
+    bindings: () => bindings,
+  };
+};
 
-/**
- * Set a tag on all future Sentry events
- */
-export async function setSentryTag(
-  key: string,
-  value: string | number | boolean,
-): Promise<void> {
-  const sentry = await getSentry();
-  if (!sentry) return;
+/** A logger with `context` bound to every line (`{ module: "payments" }`). */
+export const createLogger = (context: LogContext = {}): Logger =>
+  makePlainLogger(context);
 
-  sentry.setTag(key, String(value));
-}
+/** The root logger, no bound fields. */
+export const logger: Logger = makePlainLogger({});
 
-// ============================================================================
-// Enhanced Logging Functions with Sentry Integration
-// ============================================================================
-
-/**
- * Request logger middleware context
- */
-export function createRequestLogger(
+/** A logger bound to a request id (plus anything else known about the request). */
+export const createRequestLogger = (
   requestId: string,
   additionalContext: LogContext = {},
-) {
-  return createLogger({
-    requestId,
-    ...additionalContext,
-  });
-}
+): Logger => createLogger({ requestId, ...additionalContext });
 
-/**
- * Log and capture error to Sentry if enabled
- * Automatically sends error/fatal level logs to Sentry
- */
-export async function logError(
-  error: Error,
-  context: LogContext = {},
-  options: {
-    captureToSentry?: boolean;
-    level?: "error" | "fatal";
-    fingerprint?: string[];
-  } = {},
-): Promise<void> {
-  const { captureToSentry = true, level = "error", fingerprint } = options;
-  const errorLogger = createLogger(context);
-
-  errorLogger[level](
-    {
-      err: error,
-      errorName: error.name,
-      errorMessage: error.message,
-      stack: error.stack,
-    },
-    error.message,
-  );
-
-  // Capture to Sentry if enabled
-  if (captureToSentry) {
-    const sentry = await getSentry();
-    if (sentry) {
-      sentry.withScope((scope) => {
-        // Add context as extra data
-        for (const [key, value] of Object.entries(context)) {
-          scope.setExtra(key, value);
-        }
-
-        // Set level
-        scope.setLevel(level);
-
-        // Custom fingerprint for grouping
-        if (fingerprint) {
-          scope.setFingerprint(fingerprint);
-        }
-
-        // Add request ID as tag if present
-        if (context.requestId) {
-          scope.setTag("requestId", String(context.requestId));
-        }
-
-        // Add user ID as tag if present
-        if (context.userId) {
-          scope.setTag("userId", String(context.userId));
-        }
-
-        sentry.captureException(error);
-      });
-    }
-  }
-}
-
-/**
- * Log a warning with optional Sentry breadcrumb
- */
-export async function logWarning(
-  message: string,
-  context: LogContext = {},
-  addAsBreadcrumb = true,
-): Promise<void> {
-  const warnLogger = createLogger(context);
-  warnLogger.warn(context, message);
-
-  if (addAsBreadcrumb) {
-    await addBreadcrumb(message, {
-      category: "console",
-      level: "warn",
-      data: context,
-    });
-  }
-}
-
-/**
- * Log info with optional Sentry breadcrumb
- */
-export async function logInfo(
-  message: string,
-  context: LogContext = {},
-  addAsBreadcrumb = true,
-): Promise<void> {
-  const infoLogger = createLogger(context);
-  infoLogger.info(context, message);
-
-  if (addAsBreadcrumb) {
-    await addBreadcrumb(message, {
-      category: "console",
-      level: "info",
-      data: context,
-    });
-  }
-}
-
-/**
- * Log debug (no Sentry breadcrumb by default to reduce noise)
- */
-export function logDebug(message: string, context: LogContext = {}): void {
-  const debugLogger = createLogger(context);
-  debugLogger.debug(context, message);
-}
-
-/**
- * Log API request/response with Sentry breadcrumb
- */
-export async function logApiRequest(
-  method: string,
-  path: string,
-  statusCode: number,
-  durationMs: number,
-  context: LogContext = {},
-): Promise<void> {
-  const requestLogger = createLogger(context);
-
-  const level: LogLevel =
-    statusCode >= 500 ? "error" : statusCode >= 400 ? "warn" : "info";
-
-  const logData = {
-    method,
-    path,
-    statusCode,
-    durationMs,
-  };
-
-  requestLogger[level](
-    logData,
-    `${method} ${path} ${statusCode} ${durationMs}ms`,
-  );
-
-  // Add HTTP breadcrumb for non-successful requests
-  if (statusCode >= 400) {
-    await addBreadcrumb(`${method} ${path} - ${statusCode}`, {
-      category: "http",
-      level,
-      data: {
-        ...logData,
-        ...context,
-      },
-    });
-  }
-
-  // Capture 5xx errors to Sentry
-  if (statusCode >= 500) {
-    const sentry = await getSentry();
-    if (sentry) {
-      sentry.withScope((scope) => {
-        scope.setLevel("error");
-        scope.setTag("http.method", method);
-        scope.setTag("http.path", path);
-        scope.setTag("http.status_code", statusCode.toString());
-        scope.setExtra("durationMs", durationMs);
-        scope.setExtra("context", context);
-
-        sentry.captureMessage(`HTTP ${statusCode}: ${method} ${path}`);
-      });
-    }
-  }
-}
-
-/**
- * Log database query with breadcrumb
- */
-export async function logDbQuery(
-  query: string,
-  durationMs: number,
-  context: LogContext = {},
-  options: {
-    slow_threshold_ms?: number;
-  } = {},
-): Promise<void> {
-  const { slow_threshold_ms = 1000 } = options;
-  const dbLogger = createLogger({ ...context, component: "database" });
-
-  const truncatedQuery = query.substring(0, 200);
-  const isSlow = durationMs > slow_threshold_ms;
-
-  if (isSlow) {
-    dbLogger.warn(
-      {
-        query: truncatedQuery,
-        durationMs,
-        slow: true,
-      },
-      `Slow DB query: ${durationMs}ms`,
-    );
-
-    // Add breadcrumb for slow queries
-    await addBreadcrumb(`Slow query: ${durationMs}ms`, {
-      category: "query",
-      level: "warn",
-      data: {
-        query: truncatedQuery,
-        durationMs,
-      },
-    });
-  } else {
-    dbLogger.debug(
-      {
-        query: truncatedQuery,
-        durationMs,
-      },
-      `DB query: ${durationMs}ms`,
-    );
-  }
-}
-
-// ============================================================================
-// Request Logging Middleware Helpers
-// ============================================================================
-
-/**
- * Options for request logging middleware
- */
-export interface RequestLoggingOptions {
-  /** Skip logging for certain paths (e.g., health checks) */
-  ignorePaths?: string[];
-  /** Include request headers in logs (be careful with sensitive data) */
-  logHeaders?: boolean;
-  /** Include response body size */
-  logBodySize?: boolean;
-  /** Slow request threshold in ms */
-  slowRequestThresholdMs?: number;
-}
-
-/**
- * Request context type for middleware
- */
-export interface RequestInfo {
-  method: string;
-  path: string;
-  url: string;
-  headers?: Record<string, string>;
-  userAgent?: string;
-  ip?: string;
-}
-
-/**
- * Response context type for middleware
- */
-export interface ResponseInfo {
-  statusCode: number;
-  durationMs: number;
-  bodySize?: number;
-}
-
-/**
- * Create a request logging handler for middleware
- * Returns functions to call at request start and end
- */
-export function createRequestLoggingHandler(
-  options: RequestLoggingOptions = {},
-) {
-  const {
-    ignorePaths = [
-      "/health",
-      "/healthz",
-      "/_health",
-      "/api/health",
-      "/.well-known/forge-health",
-    ],
-    slowRequestThresholdMs = 3000,
-  } = options;
-
-  return {
-    /**
-     * Call at request start - sets up context and adds navigation breadcrumb
-     */
-    onRequestStart: async (
-      requestId: string,
-      request: RequestInfo,
-      context: LogContext = {},
-    ) => {
-      // Skip ignored paths
-      const shouldIgnore = ignorePaths.some((p) => request.path.startsWith(p));
-      if (shouldIgnore) {
-        return null;
-      }
-
-      const requestLogger = createRequestLogger(requestId, {
-        ...context,
-        method: request.method,
-        path: request.path,
-        userAgent: request.userAgent,
-        ip: request.ip,
-      });
-
-      requestLogger.debug(
-        {
-          url: request.url,
-          headers: options.logHeaders ? request.headers : undefined,
-        },
-        `-> ${request.method} ${request.path}`,
-      );
-
-      // Add navigation breadcrumb
-      await addBreadcrumb(`${request.method} ${request.path}`, {
-        category: "navigation",
-        level: "info",
-        data: {
-          url: request.url,
-          method: request.method,
-        },
-      });
-
-      return {
-        requestLogger,
-        startTime: Date.now(),
-      };
-    },
-
-    /**
-     * Call at request end - logs response and captures errors
-     */
-    onRequestEnd: async (
-      requestId: string,
-      request: RequestInfo,
-      response: ResponseInfo,
-      context: LogContext = {},
-    ) => {
-      // Skip ignored paths
-      const shouldIgnore = ignorePaths.some((p) => request.path.startsWith(p));
-      if (shouldIgnore) {
-        return;
-      }
-
-      await logApiRequest(
-        request.method,
-        request.path,
-        response.statusCode,
-        response.durationMs,
-        {
-          requestId,
-          ...context,
-          bodySize: response.bodySize,
-        },
-      );
-
-      // Warn about slow requests
-      if (response.durationMs > slowRequestThresholdMs) {
-        const sentry = await getSentry();
-        if (sentry) {
-          sentry.withScope((scope) => {
-            scope.setLevel("warning");
-            scope.setTag("slow_request", "true");
-            scope.setTag("http.method", request.method);
-            scope.setTag("http.path", request.path);
-            scope.setExtra("durationMs", response.durationMs);
-            scope.setExtra("threshold", slowRequestThresholdMs);
-
-            sentry.captureMessage(
-              `Slow request: ${request.method} ${request.path} took ${response.durationMs}ms`,
-            );
-          });
-        }
-      }
-    },
-
-    /**
-     * Call when request errors
-     */
-    onRequestError: async (
-      requestId: string,
-      request: RequestInfo,
-      error: Error,
-      context: LogContext = {},
-    ) => {
-      await logError(error, {
-        requestId,
-        method: request.method,
-        path: request.path,
-        url: request.url,
-        ...context,
-      });
-    },
-  };
-}
-
-/**
- * Generate a unique request ID
- */
-export function generateRequestId(): string {
-  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 9)}`;
-}
-
-export type { Logger } from "pino";
-export { pino };
+/** A unique request id: `req_<time36>_<random>`. */
+export const generateRequestId = (): string =>
+  `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 9)}`;
