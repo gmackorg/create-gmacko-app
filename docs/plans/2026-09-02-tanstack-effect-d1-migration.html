@@ -126,7 +126,7 @@
   </div>
 
   <div class="progress" aria-label="Phase progress">
-    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    <i class="done"></i><i class="active"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
   </div>
 
   <h2>Overview</h2>
@@ -713,8 +713,8 @@ packages/
     <strong>Branching.</strong> All phases through 8 land on one long-lived branch, <code>migrate/tanstack-effect-d1</code>, rebased on <code>main</code> weekly. The scaffolder clones <code>main</code> at HEAD and only knows how to prune <code>apps/nextjs</code>, <code>apps/expo</code>, and <code>apps/tanstack-start</code>, so any intermediate state on <code>main</code> would ship both web apps to every <code>npx create-gmacko-app</code> run. Preview deploys come from the branch. Phase 8 is a single reviewed merge; Phase 9 lands as normal PRs afterwards.
   </div>
   <ul class="timeline">
-    <li><b>Phase 0 — Spike &amp; pin</b> · ~3 days · proves the stack on workerd and freezes versions.</li>
-    <li><b>Phase 1 — Domain contract</b> · ~4 days · <code>packages/domain</code>, all endpoints declared.</li>
+    <li class="done"><b>Phase 0 — Spike &amp; pin</b> · ~3 days · proves the stack on workerd and freezes versions.</li>
+    <li class="active"><b>Phase 1 — Domain contract</b> · ~4 days · <code>packages/domain</code>, all endpoints declared.</li>
     <li><b>Phase 2 — D1 data layer</b> · ~4 days · schema port, migrations, <code>Database</code> service.</li>
     <li><b>Phase 3 — Auth on D1</b> · ~3 days · better-auth sqlite, middleware, API keys.</li>
     <li><b>Phase 4 — API services</b> · ~6 days · port 26 procedures and ~2,000 lines of tests.</li>
@@ -725,21 +725,21 @@ packages/
     <li><b>Phase 9 — Post-cutover hardening</b> · ~5 days · Model.Class, rate-limit binding, preview databases, storage, data-migration recipe; ships as 0.2.1.</li>
   </ul>
 
-  <h2>Phase 0 — Spike &amp; pin <span class="badge todo">Todo</span></h2>
+  <h2>Phase 0 — Spike &amp; pin <span class="badge done">Done</span></h2>
   <p>De-risk every assumption this design makes about the RC and the Workers runtime before writing production code. Output is a throwaway branch plus pinned catalog entries and an ADR.</p>
   <table>
     <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
     <tbody>
-      <tr><td>Hello-world <code>HttpApi</code> on Effect 4 RC mounted in TanStack Start via <code>@cloudflare/vite-plugin</code>; confirm <code>toWebHandler</code>, module paths, and bundle size under the Worker limit</td><td>scratch branch <code>spike/effect-workers</code></td><td><code>wrangler dev</code> serves <code>/api/ping</code>; built worker &lt; 1 MB gzipped</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td>Drizzle 1.0 rc Effect API on <code>@effect/sql-d1</code>: confirm the subpath, <code>.returning()</code>, <code>batch</code>, relational <code>db.query.*</code>, and that <code>withTransaction</code> is unreachable; <code>drizzle-kit generate</code> + <code>wrangler d1 migrations apply --local</code> round trip</td><td>spike</td><td>Insert/select/batch/relational tests pass on local D1 with typed <code>SqlError</code>; go/no-go on the fallback (pure <code>@effect/sql-d1</code>) recorded in the ADR</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td>In-process transport + <code>Database.first</code>/wrapped <code>db</code> typing: prove the Drizzle Effect instance can be wrapped so every call fails with <code>DatabaseError</code> without losing inferred row types</td><td>spike</td><td>tsc infers the same types through the wrapper; SqlError never appears in a handler's error union</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td><code>waitUntil</code> reachability from an HttpApi handler inside a TanStack Start server route; compat flags needed by Stripe, Resend, better-auth</td><td>spike</td><td>Background effect completes after the response; flag list recorded in <code>wrangler.jsonc</code> comments</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td>better-auth with <code>drizzleAdapter(provider: "sqlite")</code> on D1: magic link + GitHub OAuth through emulate</td><td>spike</td><td>Sign-in round trip completes; session cookie readable in a loader</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td><code>@effect/opentelemetry</code> OTLP export from a Worker with <code>waitUntil</code> flush</td><td>spike</td><td>Span visible in a local collector</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td>In-process <code>HttpClient</code> transport over the web handler (the SSR path)</td><td>spike</td><td>Loader fetches through the client without a network hop; cookies forwarded</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td>Custom Worker entry: <code>src/server/worker.ts</code> re-exporting Start's <code>fetch</code> plus <code>scheduled</code>, wrapped in <code>withSentry</code>; <code>wrangler.jsonc</code> <code>main</code> points at it</td><td>spike</td><td><code>wrangler dev --test-scheduled</code> fires the cron; a thrown error reaches Sentry; pages still render</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td>Move better-auth off the <code>pkg.pr.new</code> commit pin (a snapshot already expired once, commit <code>1d39689</code>) onto a published release that includes the fix it was pinned for; if none exists, vendor a patch via <code>pnpm patch</code></td><td><code>pnpm-workspace.yaml</code></td><td>Fresh <code>pnpm install --frozen-lockfile</code> on CI with no network access to <code>pkg.pr.new</code></td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td>Pin versions in <code>pnpm-workspace.yaml</code> catalog; write ADR including the kill criteria below and their outcome</td><td><code>pnpm-workspace.yaml</code>, <code>docs/adr/0001-tanstack-effect-d1.md</code></td><td>Catalog has exact <code>effect</code>, <code>@effect/*</code>, <code>@tanstack/react-start</code>, <code>@cloudflare/vite-plugin</code>, <code>wrangler</code>, <code>drizzle-orm</code>, <code>better-auth</code> pins</td><td><span class="badge todo">Todo</span></td></tr>
+      <tr><td>Hello-world <code>HttpApi</code> on Effect 4 RC mounted in TanStack Start via <code>@cloudflare/vite-plugin</code>; confirm <code>toWebHandler</code>, module paths, and bundle size under the Worker limit</td><td>scratch branch <code>spike/effect-workers</code></td><td><code>wrangler dev</code> serves <code>/api/ping</code>; built worker &lt; 1 MB gzipped</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td>Drizzle 1.0 rc Effect API on <code>@effect/sql-d1</code>: confirm the subpath, <code>.returning()</code>, <code>batch</code>, relational <code>db.query.*</code>, and that <code>withTransaction</code> is unreachable; <code>drizzle-kit generate</code> + <code>wrangler d1 migrations apply --local</code> round trip</td><td>spike</td><td>Insert/select/batch/relational tests pass on local D1 with typed <code>SqlError</code>; go/no-go on the fallback (pure <code>@effect/sql-d1</code>) recorded in the ADR</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td>In-process transport + <code>Database.first</code>/wrapped <code>db</code> typing: prove the Drizzle Effect instance can be wrapped so every call fails with <code>DatabaseError</code> without losing inferred row types</td><td>spike</td><td>tsc infers the same types through the wrapper; SqlError never appears in a handler's error union</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td><code>waitUntil</code> reachability from an HttpApi handler inside a TanStack Start server route; compat flags needed by Stripe, Resend, better-auth</td><td>spike</td><td>Background effect completes after the response; flag list recorded in <code>wrangler.jsonc</code> comments</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td>better-auth with <code>drizzleAdapter(provider: "sqlite")</code> on D1: magic link + GitHub OAuth through emulate</td><td>spike</td><td>Sign-in round trip completes; session cookie readable in a loader</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td><code>@effect/opentelemetry</code> OTLP export from a Worker with <code>waitUntil</code> flush</td><td>spike</td><td>Span visible in a local collector</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td>In-process <code>HttpClient</code> transport over the web handler (the SSR path)</td><td>spike</td><td>Loader fetches through the client without a network hop; cookies forwarded</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td>Custom Worker entry: <code>src/server/worker.ts</code> re-exporting Start's <code>fetch</code> plus <code>scheduled</code>, wrapped in <code>withSentry</code>; <code>wrangler.jsonc</code> <code>main</code> points at it</td><td>spike</td><td><code>wrangler dev --test-scheduled</code> fires the cron; a thrown error reaches Sentry; pages still render</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td>Move better-auth off the <code>pkg.pr.new</code> commit pin (a snapshot already expired once, commit <code>1d39689</code>) onto a published release that includes the fix it was pinned for; if none exists, vendor a patch via <code>pnpm patch</code></td><td><code>pnpm-workspace.yaml</code></td><td>Fresh <code>pnpm install --frozen-lockfile</code> on CI with no network access to <code>pkg.pr.new</code></td><td><span class="badge done">Done</span></td></tr>
+      <tr><td>Pin versions in <code>pnpm-workspace.yaml</code> catalog; write ADR including the kill criteria below and their outcome</td><td><code>pnpm-workspace.yaml</code>, <code>docs/adr/0001-tanstack-effect-d1.md</code></td><td>Catalog has exact <code>effect</code>, <code>@effect/*</code>, <code>@tanstack/react-start</code>, <code>@cloudflare/vite-plugin</code>, <code>wrangler</code>, <code>drizzle-orm</code>, <code>better-auth</code> pins</td><td><span class="badge done">Done</span></td></tr>
     </tbody>
   </table>
   <div class="callout">
@@ -751,7 +751,7 @@ packages/
       <li><strong>better-auth:</strong> installs from a published version with the Expo, magic link, and TanStack cookie plugins working. Fail → stop; this blocks every phase.</li>
       <li><strong>Custom Worker entry:</strong> the Vite plugin honours <code>main</code> with Start. Fail → cron and Sentry wrapping move to a separate tiny Worker with a service binding.</li>
     </ul>
-    If any criterion fails in a way that isn't fixable in a day, take its named fallback. Do not carry a workaround into Phase 1.
+    If any criterion fails in a way that isn't fixable in a day, take its named fallback. Do not carry a workaround into Phase 1.<br><strong>Outcome (2026-09-03):</strong> all criteria passed; no fallback in use. Evidence, pins, and deviations are in <code>docs/adr/0001-tanstack-effect-d1.md</code>. Notable: drizzle-orm must be rc5 (rc.4 fails on effect rc.112); no <code>db.batch</code> on the Effect flavour (statements via <code>D1Client.batch</code>); better-auth 1.7.2 via <code>genericOAuth</code> replaces the open-PR pin; OTLP comes from <code>effect/unstable/observability</code>; Wrangler reads <code>.env</code> from the app dir only.
   </div>
 
   <h2>Phase 1 — Domain contract <span class="badge todo">Todo</span></h2>
