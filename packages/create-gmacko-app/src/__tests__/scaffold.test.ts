@@ -1311,6 +1311,10 @@ describe("create-gmacko-app scaffold", () => {
       expect(bootstrapScript).toContain("pnpm auth:generate");
       expect(bootstrapScript).toContain("pnpm db:generate");
       expect(bootstrapScript).toContain("pnpm db:migrate:local");
+      expect(bootstrapScript).toContain(
+        'if [ -f apps/web/wrangler.jsonc ]; then\n  echo "Applying D1 migrations to the local database..."\n  pnpm db:migrate:local\n  pnpm db:seed',
+      );
+      expect(bootstrapScript).toContain("Skipping D1 migrate/seed");
       expect(bootstrapScript).toContain("pnpm db:legacy:push");
       expect(bootstrapScript).toContain("pnpm check:fast");
       expect(bootstrapScript).toContain("pnpm dev:emulate");

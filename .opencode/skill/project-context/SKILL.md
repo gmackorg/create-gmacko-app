@@ -75,8 +75,8 @@ if (integrations.posthog) {
 ### Modifying database schema
 
 1. Edit `packages/db/src/schema.ts`
-2. Run `pnpm db:generate` to generate migration
-3. Run `pnpm db:push` to apply to database
+2. Run `pnpm db:generate` to generate the migration, then review the SQL (expand/contract only; see `docs/drizzle-migrations.md`)
+3. Run `pnpm db:migrate:local` to apply it to the local D1 (`pnpm db:legacy:push` for the legacy Postgres schema behind apps/nextjs, until Phase 8)
 
 ### Adding a new API endpoint
 

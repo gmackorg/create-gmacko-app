@@ -1,5 +1,13 @@
 # Deployment Guide
 
+> **Legacy lane.** This guide describes the Postgres-backed Next.js app
+> (`apps/nextjs`, `packages/legacy-*`), which stays in the repo until Phase 8 of
+> the TanStack Start + Effect + D1 migration. The D1-backed Worker (`apps/web`,
+> `@gmacko/db`) is covered by [`drizzle-migrations.md`](./drizzle-migrations.md)
+> and [`RUNBOOK.md`](./RUNBOOK.md); its root scripts are `pnpm db:generate`,
+> `pnpm db:migrate:local|remote`, and `pnpm db:seed`. The legacy Postgres schema
+> is pushed with `pnpm db:legacy:push` (`pnpm -F @gmacko/legacy-db push|seed`).
+
 Simplified deployment patterns for local development, staging, and production.
 
 ## Overview
@@ -24,9 +32,9 @@ docker compose up postgres redis -d
 cp .env.example .env
 # Edit .env: DATABASE_URL=postgresql://postgres:postgres@localhost:5432/gmacko_dev
 
-# Push schema and seed
-pnpm db:push
-pnpm db:seed
+# Push the legacy Postgres schema and seed it
+pnpm db:legacy:push
+pnpm -F @gmacko/legacy-db seed
 
 # Start development server
 pnpm dev
@@ -173,19 +181,20 @@ function Providers({ children, session }) {
 
 ## Database Migrations in Production
 
-See [Drizzle Migrations Guide](./drizzle-migrations.md) for detailed instructions.
+For the D1-backed app see the [Drizzle Migrations Guide](./drizzle-migrations.md)
+(`pnpm db:generate`, `pnpm db:migrate:remote` before `wrangler deploy`).
 
-Quick summary:
+Legacy Postgres quick summary:
 
 ```bash
 # Generate migration from schema changes
-pnpm --filter @gmacko/db generate
+pnpm --filter @gmacko/legacy-db generate
 
 # Apply to staging
-DATABASE_URL=$STAGING_DATABASE_URL pnpm --filter @gmacko/db migrate
+DATABASE_URL=$STAGING_DATABASE_URL pnpm --filter @gmacko/legacy-db migrate
 
 # Apply to production
-DATABASE_URL=$PRODUCTION_DATABASE_URL pnpm --filter @gmacko/db migrate
+DATABASE_URL=$PRODUCTION_DATABASE_URL pnpm --filter @gmacko/legacy-db migrate
 ```
 
 ## MCP Server for AI Agents

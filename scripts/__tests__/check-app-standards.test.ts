@@ -140,10 +140,26 @@ describe("no-d1-table-rebuild", () => {
     ]);
   });
 
+  it("also scans drizzle-kit's per-migration folders before flattening", () => {
+    const violations = check({
+      "packages/db/drizzle/20260904120000_add_author/migration.sql": rebuild,
+      "packages/db/drizzle/20260904120000_add_author/snapshot.json":
+        '{"__new_": "not a migration"}',
+    });
+    expect(rules(violations)).toEqual([
+      "no-d1-table-rebuild packages/db/drizzle/20260904120000_add_author/migration.sql:1",
+      "no-d1-table-rebuild packages/db/drizzle/20260904120000_add_author/migration.sql:2",
+      "no-d1-table-rebuild packages/db/drizzle/20260904120000_add_author/migration.sql:4",
+    ]);
+  });
+
   it("exempts the two pre-provisioning migrations and expand-only SQL", () => {
     const violations = check({
       "packages/db/migrations/20260903030938_init.sql": rebuild,
       "packages/db/migrations/20260903035551_auth_1_7_issuer.sql": rebuild,
+      "packages/db/drizzle/20260903030938_init/migration.sql": rebuild,
+      "packages/db/drizzle/20260903035551_auth_1_7_issuer/migration.sql":
+        rebuild,
       "packages/db/migrations/20260904120000_add_author.sql":
         "ALTER TABLE `post` ADD `author_id` text REFERENCES `user`(`id`);\n",
       "packages/legacy-db/drizzle/0001_x.sql": rebuild,

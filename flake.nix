@@ -34,8 +34,8 @@
             shellHook = ''
               echo "ForgeGraph-oriented development shell"
               echo "Run: pnpm install"
-              echo "Run: docker compose up -d postgres"
-              echo "Run: pnpm db:push"
+              echo "Run: pnpm db:migrate:local && pnpm db:seed   # local D1 (apps/web)"
+              echo "Run: docker compose up -d postgres && pnpm db:legacy:push   # legacy Postgres (apps/nextjs, until Phase 8)"
             '';
           };
         });

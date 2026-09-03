@@ -71,9 +71,13 @@ export type CreateYourFeatureInput = z.infer<typeof CreateYourFeatureSchema>;
 After schema changes:
 
 ```bash
-pnpm db:push       # Apply to remote/Docker database
-pnpm db:push:local # Apply to local PGlite database
+pnpm db:generate       # drizzle-kit generate + flatten into packages/db/migrations
+pnpm db:migrate:local  # apply to the local D1 (wrangler d1 migrations apply --local)
+pnpm db:legacy:push    # legacy Postgres schema (apps/nextjs, until Phase 8)
 ```
+
+Review the generated SQL before applying it: D1 migrations must be
+expand/contract only (no `__new_` table rebuilds); see `docs/drizzle-migrations.md`.
 
 ### Phase 3: API Layer (→ api-first-development)
 

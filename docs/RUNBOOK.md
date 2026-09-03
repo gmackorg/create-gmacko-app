@@ -187,8 +187,11 @@ pnpm exec wrangler d1 execute DB --local --config $CFG --file ../../.artifacts/d
 pnpm exec wrangler d1 execute DB --remote --env <stage> --config $CFG --file ../../.artifacts/d1-<stamp>.sql
 ```
 
-`execute --file` runs the file as one batch; a failing statement rolls back the
-whole file.
+`execute --file --local` runs the file as one batch, so a failing statement
+rolls back the whole file. For `--remote`, take an export first and treat the
+file as re-runnable: D1's import path is not documented as all-or-nothing, so a
+partial apply must be recoverable by restoring the export or by running the
+file again.
 
 ### Copy production to staging
 
@@ -204,6 +207,13 @@ Scrub personal data before loading it anywhere less protected than production.
 `pnpm db:seed` (local) or `pnpm exec wrangler d1 execute DB --remote --config $CFG --file seed/seed.sql`
 restores the default plans, limits, and meters without touching user data or an
 existing `application_settings` row; it is idempotent.
+
+**Warning:** reseeding is an upsert keyed on `key`, so it overwrites operator
+edits to the seeded plans' `amount_in_cents`, `is_default`, `active`, and
+`updated_at` (plus `name`, `description`, `interval`, `currency`, and the seeded
+limits' `value` and `period`). That is intended — the seed is
+the source of truth for defaults — but if a stage has hand-edited pricing, take
+an export first or change the seed instead of the row.
 
 ### Size
 

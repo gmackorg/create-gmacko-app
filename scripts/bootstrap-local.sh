@@ -67,10 +67,17 @@ echo "Generating database artifacts..."
 pnpm db:generate
 echo ""
 
-echo "Applying D1 migrations to the local database..."
-pnpm db:migrate:local
-pnpm db:seed
-echo ""
+# The D1 steps need apps/web's wrangler config; the scaffolder prunes apps/web
+# unless --tanstack-start was chosen (until Phase 8 makes it the only app).
+if [ -f apps/web/wrangler.jsonc ]; then
+  echo "Applying D1 migrations to the local database..."
+  pnpm db:migrate:local
+  pnpm db:seed
+  echo ""
+else
+  echo "Skipping D1 migrate/seed — apps/web/wrangler.jsonc not present (no TanStack Start app)."
+  echo ""
+fi
 
 # The legacy Next.js app (apps/nextjs) still runs on Postgres until Phase 8.
 if command -v pg_isready >/dev/null 2>&1 && pg_isready -h localhost -p 5432 -q 2>/dev/null; then

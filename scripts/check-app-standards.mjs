@@ -273,7 +273,7 @@ function checkDbTransaction() {
           f,
           i + 1,
           "Interactive transaction in D1-backed code (dies at runtime on D1).",
-          "Use `Database.batch([...])` for atomic multi-statement writes or a guarded write (`Database.updateWhere`, precondition in the WHERE clause) for read-check-write.",
+          "Use `Database.batch([...])` for atomic multi-statement writes or a guarded write (`Database.updateWhere`, precondition in the WHERE clause) for read-check-write. (Line-based: a match inside a trailing `//` comment or a string literal is also flagged; silence with `// gmacko-standards-disable-next-line no-db-transaction`.)",
         );
       }
     });
@@ -304,7 +304,7 @@ function checkPlainDrizzle() {
           f,
           i + 1,
           "`Database.plain` (promise drizzle) used outside packages/auth.",
-          "Go through `Database.db` (the Effect query API) so failures are `DatabaseError` and the call is traced; `plain` exists for better-auth's adapter only.",
+          "Go through `Database.db` (the Effect query API) so failures are `DatabaseError` and the call is traced; `plain` exists for better-auth's adapter only. (Line-based: a match inside a trailing `//` comment or a string literal is also flagged; silence with `// gmacko-standards-disable-next-line no-plain-drizzle-in-api`.)",
         );
       }
     });
@@ -317,16 +317,23 @@ function checkPlainDrizzle() {
 // test.ts` pins this), so drizzle-kit's rebuild recipe (`CREATE TABLE
 // __new_x`, copy, `DROP TABLE x`, rename) runs the DROP with foreign keys ON
 // and cascade-deletes every referencing row. Every migration after the two
-// pre-provisioning ones must be expand/contract only.
-const D1_MIGRATION = /^packages\/db\/migrations\/[^/]+\.sql$/;
+// pre-provisioning ones must be expand/contract only. Both copies are scanned:
+// drizzle-kit's `drizzle/<name>/migration.sql` (the source of truth) and the
+// flattened `migrations/<name>.sql` that D1 applies, so a freshly generated
+// migration is caught before `flatten-migrations` runs.
+const D1_MIGRATION =
+  /^packages\/db\/(migrations\/([^/]+)\.sql|drizzle\/([^/]+)\/migration\.sql)$/;
 const D1_REBUILD_EXEMPT = new Set([
-  "packages/db/migrations/20260903030938_init.sql",
-  "packages/db/migrations/20260903035551_auth_1_7_issuer.sql",
+  "20260903030938_init",
+  "20260903035551_auth_1_7_issuer",
 ]);
 function checkD1TableRebuild() {
   for (const f of allFiles) {
     const r = rel(f);
-    if (!D1_MIGRATION.test(r) || D1_REBUILD_EXEMPT.has(r)) continue;
+    const m = D1_MIGRATION.exec(r);
+    if (!m) continue;
+    const name = m[2] ?? m[3];
+    if (D1_REBUILD_EXEMPT.has(name)) continue;
     const lines = linesOf(read(f));
     lines.forEach((ln, i) => {
       const rebuild = /__new_/.test(ln);
