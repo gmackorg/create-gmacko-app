@@ -11,6 +11,7 @@
 import type { Context } from "effect";
 import { Effect, Layer } from "effect";
 import {
+  HttpEffect,
   HttpMiddleware,
   HttpRouter,
   HttpServerRequest,
@@ -53,8 +54,12 @@ const corsByConfig = new WeakMap<
 const corsFor = (config: AppConfigShape) => {
   let cors = corsByConfig.get(config);
   if (cors === undefined) {
+    const allowed = new Set(config.allowedOrigins);
     cors = HttpMiddleware.cors({
-      allowedOrigins: config.allowedOrigins,
+      // A predicate, not the list: with one allowed origin the list form
+      // echoes it unconditionally, and an unknown origin must get no
+      // allow-origin header at all.
+      allowedOrigins: (origin) => allowed.has(origin),
       credentials: true,
       allowedHeaders: ["authorization", "content-type", REQUEST_ID_HEADER],
       exposedHeaders: [REQUEST_ID_HEADER, TRACE_ID_HEADER],
@@ -100,11 +105,16 @@ export const makeWebHandler = (
               request.headers[REQUEST_ID_HEADER] ?? crypto.randomUUID(),
             traceId: undefined,
           };
-          const response = yield* corsFor(config)(app).pipe(
+          // The response is sent as soon as the router produces it, so the
+          // headers go on through a pre-response handler (as CORS's do),
+          // not by mapping the returned value.
+          yield* HttpEffect.appendPreResponseHandler((_request, response) =>
+            Effect.succeed(traceHeaders(response, trace)),
+          );
+          return yield* corsFor(config)(app).pipe(
             Effect.provideService(RequestTrace, trace),
             Effect.annotateLogs("request.id", trace.requestId),
           );
-          return traceHeaders(response, trace);
         }),
     },
   );

@@ -7,6 +7,8 @@
  * exercised the way the app exercises them. Node only: never part of the
  * Worker bundle.
  */
+import { inspect } from "node:util";
+
 import type { MagicLink } from "@gmacko/auth";
 import { ApiKeys } from "@gmacko/auth/api-keys";
 import { Auth } from "@gmacko/auth/service";
@@ -442,10 +444,10 @@ export const rootSpans = (api: TestApi) =>
       Option.isNone(span.parent) || span.parent.value._tag === "ExternalSpan",
   );
 
-/** Log entries whose cause or message mentions `text`. */
+/** Log entries whose message (rendered to depth, errors included) or cause mentions `text`. */
 export const logsMentioning = (api: TestApi, text: string) =>
   api.logs.filter(
     (entry) =>
-      JSON.stringify(entry.message).includes(text) ||
+      inspect(entry.message, { depth: 8 }).includes(text) ||
       Cause.pretty(entry.cause).includes(text),
   );
