@@ -31,5 +31,3 @@ export const baseConfig = defineConfig({
     hookTimeout: 10000,
   },
 });
-
-export default baseConfig;

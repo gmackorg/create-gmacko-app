@@ -1,11 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "rules": {
-    "exports": "off",
-    "types": "off",
-    "duplicates": "off",
-    "optionalPeerDependencies": "off"
-  },
+  "ignoreExportsUsedInFile": true,
   "ignore": [".claude/**", "sdks/generated/**"],
   "ignoreDependencies": ["cloudflare"],
   "ignoreBinaries": ["expo", "eas", "maestro", "generate"],
@@ -42,10 +37,16 @@
       "ignoreDependencies": ["@tailwindcss/postcss", "postcss", "tailwindcss"]
     },
     "tooling/vitest": {
-      "ignoreDependencies": ["@vitest/coverage-v8"]
+      "ignoreDependencies": ["@vitest/coverage-v8", "@vitejs/plugin-react"]
     },
     "tooling/openapi-generator": {
       "ignoreDependencies": ["@openapitools/openapi-generator-cli"]
+    },
+    "packages/notifications": {
+      "ignoreDependencies": ["expo"]
+    },
+    "packages/purchases": {
+      "ignoreDependencies": ["react-native"]
     }
   }
 }

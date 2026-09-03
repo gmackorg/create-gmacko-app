@@ -157,5 +157,3 @@ export function ErrorScreen({ error, onRetry, onReport }: ErrorScreenProps) {
     </SafeAreaView>
   );
 }
-
-export default ErrorBoundary;

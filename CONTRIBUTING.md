@@ -175,3 +175,25 @@ Add or update stories in `packages/ui/src/**/*.stories.tsx`; run `pnpm --filter 
 - Formatting and import sorting are handled by biome (runs via the lefthook pre-commit hook)
 - Linting uses oxlint
 - TypeScript strict mode is enabled across all packages
+
+### Dead code (`pnpm knip`)
+
+`knip.json` runs with every rule on (unused files, dependencies, exports,
+types, duplicate exports) plus `ignoreExportsUsedInFile`, so a helper that a
+module uses itself may stay exported. What is switched off, and why:
+
+- `ignoreDependencies: ["cloudflare"]` at the root — the `cloudflare` SDK is
+  used through `wrangler`'s bundling, not imported.
+- `ignoreBinaries: expo, eas, maestro, generate` — invoked from scripts via
+  `npx`/`pnpx`, not installed as workspace bins.
+- Per-workspace `ignoreDependencies` for optional peers that a package only
+  references behind an integration flag: `expo` (`packages/notifications`),
+  `react-native` (`packages/purchases`), `@vitejs/plugin-react`
+  (`tooling/vitest`), plus `tsx` in the operator packages (run through
+  `pnpm exec tsx`) and the tailwind/coverage tooling deps.
+- `apps/expo` ignores `src/components/locale-switcher.tsx` (kept as a drop-in
+  example) and a handful of Metro/i18n deps that Expo resolves at bundle time.
+
+A generic rule is never turned off to silence one finding: add a targeted
+per-workspace ignore next to the ones above, with the reason, or delete the
+dead code.

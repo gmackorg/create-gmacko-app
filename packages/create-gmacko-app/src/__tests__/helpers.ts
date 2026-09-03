@@ -209,53 +209,6 @@ export function readJson<T = unknown>(
 }
 
 /**
- * Check package.json structure
- */
-export function validatePackageJson(
-  appPath: string,
-  checks: {
-    name?: string;
-    hasScript?: string;
-    hasDependency?: string;
-    hasDevDependency?: string;
-  },
-): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-
-  try {
-    const pkg = readJson<{
-      name?: string;
-      scripts?: Record<string, string>;
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-    }>(appPath, "package.json");
-
-    if (checks.name && pkg.name !== checks.name) {
-      errors.push(`Expected name "${checks.name}", got "${pkg.name}"`);
-    }
-
-    if (checks.hasScript && !pkg.scripts?.[checks.hasScript]) {
-      errors.push(`Missing script "${checks.hasScript}"`);
-    }
-
-    if (checks.hasDependency && !pkg.dependencies?.[checks.hasDependency]) {
-      errors.push(`Missing dependency "${checks.hasDependency}"`);
-    }
-
-    if (
-      checks.hasDevDependency &&
-      !pkg.devDependencies?.[checks.hasDevDependency]
-    ) {
-      errors.push(`Missing devDependency "${checks.hasDevDependency}"`);
-    }
-  } catch (err) {
-    errors.push(`Failed to read package.json: ${err}`);
-  }
-
-  return { valid: errors.length === 0, errors };
-}
-
-/**
  * Create a mock .env for a generated app. Mirrors the keys `.env.example`
  * documents: the web lane reads these as Worker bindings (no DATABASE_URL,
  * the database is a local D1), Expo reads the EXPO_PUBLIC_* values, and the
@@ -287,23 +240,6 @@ GMACKO_API_KEY="test-gmacko-api-key"
 `;
 
   fs.writeFileSync(path.join(appPath, ".env"), envContent.trim());
-}
-
-export function createFakeCliBin(
-  appPath: string,
-  commands: Record<string, string>,
-): string {
-  const binDir = path.join(appPath, ".test-bin");
-  fs.ensureDirSync(binDir);
-
-  for (const [command, body] of Object.entries(commands)) {
-    const scriptPath = path.join(binDir, command);
-    fs.writeFileSync(scriptPath, `#!/bin/sh\n${body}\n`, {
-      mode: 0o755,
-    });
-  }
-
-  return binDir;
 }
 
 /**

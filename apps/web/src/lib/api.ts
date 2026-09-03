@@ -13,7 +13,6 @@
  * side's real client at call time, never at module scope.
  */
 import {
-  type ApiClientMethods,
   type ApiClient as Client,
   forwardedHeaders,
   makeApiClient,
@@ -21,14 +20,14 @@ import {
 import { makeMutations, makeQueries } from "@gmacko/api-client/queries";
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import type { Context, Effect } from "effect";
+import type { Context } from "effect";
 
 import { apiHandler, renderContext, runtime } from "~/server/runtime";
 
 /**
  * One client, and one `RequestContext`, per page request, keyed on TanStack
- * Start's request object (stable for the whole render), so every `api()`
- * call a loader makes shares the same session/role/membership reads.
+ * Start's request object (stable for the whole render), so every call a
+ * loader makes shares the same session/role/membership reads.
  */
 const renderClients = new WeakMap<Request, Client>();
 
@@ -60,13 +59,6 @@ const client = createIsomorphicFn()
     browserClient ??= makeApiClient({ baseUrl: window.location.origin });
     return browserClient;
   });
-
-export type ApiClient = ApiClientMethods;
-
-/** Runs one call against the API; rejects with the endpoint's typed error. */
-export const api = <A, E>(
-  call: (client: ApiClient) => Effect.Effect<A, E>,
-): Promise<A> => client().run(call);
 
 /**
  * A client that resolves the side's real client on every use, so the query

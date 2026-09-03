@@ -13,5 +13,3 @@ export const reactConfig = mergeConfig(
     },
   }),
 );
-
-export default reactConfig;

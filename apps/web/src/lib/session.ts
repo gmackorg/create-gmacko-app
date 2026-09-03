@@ -10,6 +10,3 @@ import { queries } from "~/lib/api";
 
 export const useSession = (): SessionState =>
   useSuspenseQuery(queries.auth.session()).data;
-
-export const isAdmin = (session: SessionState): boolean =>
-  session.user?.role === "admin";
