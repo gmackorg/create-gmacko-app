@@ -85,7 +85,8 @@ const LANGUAGES: Record<string, LanguageConfig> = {
     generator: "typescript-fetch",
     outputDir: "sdks/generated/typescript",
     additionalProperties: {
-      npmName: "@gmacko/api-client",
+      // Not "@gmacko/api-client": that is the workspace's typed Effect client.
+      npmName: "@gmacko/openapi-client",
       supportsES6: "true",
       typescriptThreePlus: "true",
     },

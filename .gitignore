@@ -68,3 +68,6 @@ session-ses_*.md
 
 # Generated OpenAPI spec (produced by the SDK Generation workflow)
 sdks/openapi/openapi.json
+# Generated SDKs are CI artifacts (sdk.yml); only the placeholder is tracked.
+sdks/generated/*
+!sdks/generated/.gitkeep

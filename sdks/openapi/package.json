@@ -7,7 +7,8 @@
     "clean": "rm -f openapi.json"
   },
   "dependencies": {
-    "@gmacko/legacy-api": "workspace:*"
+    "@gmacko/domain": "workspace:*",
+    "effect": "catalog:"
   },
   "devDependencies": {
     "tsx": "^4.21.0"
