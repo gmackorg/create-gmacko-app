@@ -82,6 +82,9 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
     console.log(`E2E tests using temp directory: ${tempDir}`);
   });
 
+  // Each cell leaves ~1 GB of installed node_modules behind, so deleting
+  // them all takes far longer than the 30s `hookTimeout` in vitest.config.ts
+  // — a timed-out cleanup fails the suite even when every test passed.
   afterAll(() => {
     // Clean up all test apps (comment out for debugging)
     if (process.env.KEEP_TEST_APPS !== "true") {
@@ -89,7 +92,7 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
         cleanupApp(appPath);
       }
     }
-  });
+  }, 900000);
 
   describe("default configuration (web + mobile)", () => {
     let appPath: string;
