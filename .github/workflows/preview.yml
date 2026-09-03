@@ -1,4 +1,12 @@
-name: ForgeGraph Preview Handoff
+name: Preview Deploy
+
+# A Workers preview per pull request: `gmacko-web-pr-<n>`, deployed with
+# wrangler's `preview` environment (apps/web/wrangler.jsonc) against the
+# shared preview D1 `gmacko-web-preview`. Pending migrations are applied to
+# that database first (expand/contract keeps it compatible with every open
+# PR); per-PR databases arrive in Phase 9. The Worker is deleted when the
+# PR closes. Needs the CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID secrets
+# and, for the comment's URL, the CLOUDFLARE_WORKERS_SUBDOMAIN variable.
 
 on:
   pull_request:
@@ -6,74 +14,102 @@ on:
     branches: [main]
 
 concurrency:
-  group: forgegraph-preview-${{ github.event.pull_request.number }}
+  group: preview-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+env:
+  WORKER_NAME: gmacko-web-pr-${{ github.event.pull_request.number }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
 jobs:
-  preview-handoff:
-    name: Publish ForgeGraph Preview Context
+  deploy:
+    name: Deploy preview Worker
     if: github.event.action != 'closed'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       pull-requests: write
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build preview handoff summary
-        id: summary
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Skip without Cloudflare credentials
+        id: creds
         run: |
-          PREVIEW_REF="pr-${{ github.event.pull_request.number }}"
-          PREVIEW_DOMAIN="${PREVIEW_REF}.${{ vars.PREVIEW_BASE_DOMAIN || 'preview.gmacko.io' }}"
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN is not set; skipping the preview deploy"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
 
-          {
-            echo "preview_ref=${PREVIEW_REF}"
-            echo "preview_domain=${PREVIEW_DOMAIN}"
-            echo "preview_url=https://${PREVIEW_DOMAIN}"
-          } >> "$GITHUB_OUTPUT"
+      - name: Apply pending migrations to the shared preview D1
+        if: steps.creds.outputs.ok == 'true'
+        run: pnpm -F @gmacko/db migrate:remote --env preview
 
-      - name: Comment PR with ForgeGraph handoff
+      - name: Build for the preview environment
+        if: steps.creds.outputs.ok == 'true'
+        run: pnpm -F @gmacko/web build
+        env:
+          CLOUDFLARE_ENV: preview
+          VITE_POSTHOG_KEY: ${{ vars.PREVIEW_POSTHOG_KEY }}
+          VITE_SENTRY_DSN: ${{ vars.PREVIEW_SENTRY_DSN }}
+
+      - name: Deploy the PR's Worker
+        if: steps.creds.outputs.ok == 'true'
+        # `--name` gives each PR its own Worker on the preview environment's
+        # bindings (the shared D1, STAGE=preview).
+        run: pnpm -F @gmacko/web exec wrangler deploy --env preview --name "$WORKER_NAME"
+
+      - name: Comment the preview URL
+        if: steps.creds.outputs.ok == 'true'
         uses: actions/github-script@v7
+        env:
+          SUBDOMAIN: ${{ vars.CLOUDFLARE_WORKERS_SUBDOMAIN }}
         with:
           script: |
-            const previewUrl = '${{ steps.summary.outputs.preview_url }}';
-            const previewRef = '${{ steps.summary.outputs.preview_ref }}';
-            const sha = '${{ github.event.pull_request.head.sha }}';
-            const shortSha = sha.substring(0, 7);
-
-            const body = `## ForgeGraph Preview Handoff
-
-            This template no longer performs preview deploys from GitHub Actions directly.
-            Preview environments should be created and managed in ForgeGraph.
+            const name = process.env.WORKER_NAME;
+            const subdomain = process.env.SUBDOMAIN;
+            const url = subdomain ? `https://${name}.${subdomain}.workers.dev` : `(set the CLOUDFLARE_WORKERS_SUBDOMAIN variable to link the Worker ${name})`;
+            const sha = '${{ github.event.pull_request.head.sha }}'.slice(0, 7);
+            const body = `## Preview deploy
 
             | Field | Value |
             |------|-------|
-            | Preview ref | \`${previewRef}\` |
-            | Suggested URL | ${previewUrl} |
-            | Commit | \`${shortSha}\` |
+            | Worker | \`${name}\` |
+            | URL | ${url} |
+            | Commit | \`${sha}\` |
+            | Database | shared \`gmacko-web-preview\` D1 (per-PR databases: Phase 9) |
 
-            Use the ForgeGraph deployment model described in \`deploy/README.md\` and \`deploy/forgegraph/README.md\`.
-            Configure the preview stack in ForgeGraph with colocated Postgres unless stronger isolation is warranted.
+            Health: ${subdomain ? `${url}/.well-known/forge-health` : "n/a"}
             `;
-
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-
-            const botComment = comments.find((comment) =>
-              comment.user.type === 'Bot' &&
-              comment.body.includes('## ForgeGraph Preview Handoff')
+            const existing = comments.find(
+              (c) => c.user.type === 'Bot' && c.body.includes('## Preview deploy'),
             );
-
-            if (botComment) {
+            if (existing) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                comment_id: botComment.id,
+                comment_id: existing.id,
                 body,
               });
             } else {
@@ -85,47 +121,55 @@ jobs:
               });
             }
 
-  preview-closeout:
-    name: Close ForgeGraph Preview Handoff
+  cleanup:
+    name: Delete preview Worker
     if: github.event.action == 'closed'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: write
-
     steps:
-      - name: Comment PR with closeout status
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Delete the PR's Worker
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: pnpm -F @gmacko/web exec wrangler delete --env preview --name "$WORKER_NAME" --force || true
+
+      - name: Comment the closeout
         uses: actions/github-script@v7
         with:
           script: |
-            const body = `## ForgeGraph Preview Handoff
+            const body = `## Preview deploy
 
-            PR closed. If this branch has a ForgeGraph preview environment, retire it from ForgeGraph using the repo's preview ref.
+            PR closed; the Worker \`${process.env.WORKER_NAME}\` has been deleted.
             `;
-
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-
-            const botComment = comments.find((comment) =>
-              comment.user.type === 'Bot' &&
-              comment.body.includes('## ForgeGraph Preview Handoff')
+            const existing = comments.find(
+              (c) => c.user.type === 'Bot' && c.body.includes('## Preview deploy'),
             );
-
-            if (botComment) {
+            if (existing) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                comment_id: botComment.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
+                comment_id: existing.id,
                 body,
               });
             }

@@ -68,6 +68,12 @@ jobs:
       - name: Type check
         run: pnpm typecheck
 
+      # `wrangler types` needs no Cloudflare auth; the committed
+      # apps/web/worker-configuration.d.ts must match wrangler.jsonc so the
+      # Env type the runtime is compiled against is the one deployed.
+      - name: Worker types are current
+        run: pnpm check:cf-types
+
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -129,8 +135,8 @@ jobs:
         run: pnpm build
         env:
           SKIP_ENV_VALIDATION: true
-          # Placeholder so @gmacko/legacy-db/client (which throws at import if unset)
-          # can instantiate during `next build` page-data collection. postgres-js
-          # is lazy — no connection is made at build time, and route handlers are
-          # not prerendered. Real DATABASE_URL is injected at deploy/runtime.
+          # TODO(Phase 8): remove with apps/nextjs. Placeholder so
+          # @gmacko/legacy-db/client (which throws at import if unset) can
+          # instantiate during `next build` page-data collection. apps/web
+          # (Workers + D1) reads no DATABASE_URL.
           DATABASE_URL: postgresql://build:build@localhost:5432/build
