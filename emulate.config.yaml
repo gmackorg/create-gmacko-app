@@ -16,6 +16,8 @@ github:
       name: gmacko (dev)
       redirect_uris:
         - https://gmacko.localhost/api/auth/callback/github
+        # apps/web without portless (see apps/web/README.md)
+        - http://localhost:3001/api/auth/callback/github
 
 google:
   users:
@@ -28,6 +30,8 @@ google:
       name: gmacko (dev)
       redirect_uris:
         - https://gmacko.localhost/api/auth/callback/google
+        # apps/web without portless (see apps/web/README.md)
+        - http://localhost:3001/api/auth/callback/google
 
 apple:
   users:

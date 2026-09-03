@@ -114,11 +114,24 @@ const origins = (...urls: ReadonlyArray<string | undefined>) =>
 export class AppConfig extends Context.Service<AppConfig, AppConfigShape>()(
   "@gmacko/web/AppConfig",
 ) {
-  /** Decodes bindings; throws on an invalid STAGE so a misconfigured Worker fails at load. */
+  /**
+   * Decodes bindings; throws on an invalid STAGE, or on a magic-link bypass
+   * outside development, so a misconfigured Worker fails at load rather than
+   * on its first request.
+   */
   static fromBindings = (bindings: unknown): AppConfigShape => {
     const env = Schema.decodeUnknownSync(Bindings)(bindings);
     const baseUrl = env.PORTLESS_URL ?? env.APP_URL ?? "http://localhost:3001";
     const productionUrl = env.APP_URL ?? baseUrl;
+    const bypassMagicLink = truthy(env.BYPASS_MAGIC_LINK);
+    if (bypassMagicLink && env.STAGE !== "development") {
+      // The bypass prints sign-in links to the log instead of emailing them,
+      // which is a full auth bypass for anyone who can read the log. Never
+      // outside development.
+      throw new Error(
+        `BYPASS_MAGIC_LINK is set but STAGE is "${env.STAGE}": the magic-link bypass is allowed only when STAGE=development. Unset BYPASS_MAGIC_LINK for this stage.`,
+      );
+    }
     return {
       stage: env.STAGE,
       appUrl: productionUrl,
@@ -127,7 +140,7 @@ export class AppConfig extends Context.Service<AppConfig, AppConfigShape>()(
         secret: env.AUTH_SECRET,
         baseUrl,
         productionUrl,
-        bypassMagicLink: truthy(env.BYPASS_MAGIC_LINK),
+        bypassMagicLink,
         github: {
           clientId: env.AUTH_GITHUB_ID ?? "",
           clientSecret: env.AUTH_GITHUB_SECRET ?? "",

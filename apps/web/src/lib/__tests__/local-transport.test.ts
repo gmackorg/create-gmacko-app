@@ -10,7 +10,7 @@ import { HttpClient } from "effect/unstable/http";
 import { HttpApiClient } from "effect/unstable/httpapi";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { localTransport } from "~/lib/local-transport";
+import { FORWARDED_HEADERS, localTransport } from "~/lib/local-transport";
 import { AppConfig, GmackoApi, makeApiHandler } from "~/server/api";
 import { makeAuthOptions } from "~/server/auth";
 import { Background } from "~/server/background";
@@ -120,5 +120,35 @@ describe("localTransport", () => {
       Effect.flatMap(client(new Headers()), (api) => api.session.me()),
     );
     expect(anonymous.user).toBeNull();
+  });
+
+  it("forwards only the cookie: authorization never crosses into the API", async () => {
+    expect(FORWARDED_HEADERS).toEqual(["cookie"]);
+
+    let seen: Headers | undefined;
+    const capturing = async (request: Request): Promise<Response> => {
+      seen = new Headers(request.headers);
+      return Response.json({ status: "ok", stage: "development" });
+    };
+    const incoming = new Headers({
+      cookie: "better-auth.session_token=abc",
+      authorization: "Bearer gmk_should_not_leak",
+      "x-forwarded-for": "203.0.113.9",
+    });
+
+    const live = await Effect.runPromise(
+      HttpApiClient.make(GmackoApi, { baseUrl: "http://localhost" }).pipe(
+        Effect.provideService(
+          HttpClient.HttpClient,
+          localTransport(capturing, incoming),
+        ),
+        Effect.flatMap((api) => api.health.live()),
+      ),
+    );
+    expect(live.status).toBe("ok");
+    expect(seen).toBeDefined();
+    expect(seen?.get("cookie")).toBe("better-auth.session_token=abc");
+    expect(seen?.has("authorization")).toBe(false);
+    expect(seen?.has("x-forwarded-for")).toBe(false);
   });
 });

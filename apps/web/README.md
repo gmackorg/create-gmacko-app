@@ -37,9 +37,49 @@ bindings; in development they come from the repo-root `.env` through the
 | `AUTH_SECRET` | better-auth secret. |
 | `AUTH_GITHUB_ID` / `AUTH_GITHUB_SECRET`, `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`, `AUTH_APPLE_*` | OAuth clients (GitHub/Google are generic OAuth providers, Apple is built in). |
 | `AUTH_GITHUB_URL`, `AUTH_GITHUB_API_URL`, `AUTH_GOOGLE_URL`, `AUTH_GOOGLE_TOKEN_URL`, `AUTH_APPLE_URL` | Point the providers at `npx @gmacko/emulate` locally. |
-| `BYPASS_MAGIC_LINK=true` | Print magic links to the server log instead of emailing them. |
+| `BYPASS_MAGIC_LINK=true` | Print magic links to the server log instead of emailing them. **Development only**: `AppConfig.fromBindings` throws at load when it is set on any other `STAGE`. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` (+ `OTEL_EXPORTER_OTLP_HEADERS`) | OTLP/HTTP export of traces, logs and metrics (`src/server/observability.ts`); flushed on `waitUntil` after every request. Unset → off. |
 | `SENTRY_DSN` | Enables `@sentry/cloudflare`'s `withSentry` wrapper in `src/server/worker.ts`. Unset → no-op. |
 
 `/api/auth/*` is better-auth (`@gmacko/auth`); `/api/*` is the Effect HttpApi.
-SSR loaders call the API in-process through `src/lib/local-transport.ts`.
+SSR loaders call the API in-process through `src/lib/local-transport.ts`,
+which forwards only the incoming `cookie` header.
+
+## Running against emulate without portless
+
+`portless.json` still points `gmacko.localhost` at `apps/nextjs` (until Phase
+8), so this app runs on plain `http://localhost:3001`. The emulated OAuth
+providers accept that origin: `emulate.config.yaml` lists
+`http://localhost:3001/api/auth/callback/{github,google}` next to the
+`https://gmacko.localhost` redirect URIs.
+
+1. `npx @gmacko/emulate` (no `--portless`). With the default base port 4000
+   the services come up on `http://localhost:4001` (GitHub) and
+   `http://localhost:4002` (Google); `emulate` prints the actual ports at
+   start-up, and `--port` / `EMULATE_PORT` shifts them.
+2. In the repo-root `.env` (read by the `dev` script through `with-env`):
+
+   ```sh
+   STAGE=development
+   APP_URL=http://localhost:3001
+   # leave PORTLESS_URL unset
+   AUTH_SECRET=<any 32+ chars>
+   AUTH_GITHUB_ID=dev-github-client
+   AUTH_GITHUB_SECRET=dev-github-secret
+   AUTH_GITHUB_URL=http://localhost:4001
+   AUTH_GITHUB_API_URL=http://localhost:4001
+   AUTH_GOOGLE_ID=dev-google-client
+   AUTH_GOOGLE_SECRET=dev-google-secret
+   AUTH_GOOGLE_URL=http://localhost:4002
+   AUTH_GOOGLE_TOKEN_URL=http://localhost:4002/oauth2/token
+   BYPASS_MAGIC_LINK=true
+   ```
+
+   The client ids/secrets are the seeds in `emulate.config.yaml`. The GitHub
+   emulator serves both `github.com` and `api.github.com` paths from one
+   origin, hence the same value for `AUTH_GITHUB_URL` and
+   `AUTH_GITHUB_API_URL`; `AUTH_GOOGLE_TOKEN_URL` replaces
+   `https://oauth2.googleapis.com/token` (the emulator serves it at
+   `/oauth2/token`), and the authorization endpoint
+   `/o/oauth2/v2/auth` hangs off `AUTH_GOOGLE_URL`.
+3. `pnpm -F @gmacko/web dev`, then sign in at `http://localhost:3001`.

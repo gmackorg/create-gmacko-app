@@ -121,8 +121,10 @@ interface GithubEmail {
  */
 const githubUserInfo =
   (apiUrl: string) => async (tokens: { accessToken?: string | undefined }) => {
+    // No token, no identity: never call the API with an empty bearer.
+    if (!tokens.accessToken) return null;
     const headers = {
-      authorization: `Bearer ${tokens.accessToken ?? ""}`,
+      authorization: `Bearer ${tokens.accessToken}`,
       "user-agent": "gmacko-auth",
     };
     const profileResponse = await fetch(`${apiUrl}/user`, { headers });
@@ -187,6 +189,11 @@ export function makeAuth(options: AuthOptions, db: PlainDatabase) {
       },
     },
     session: {
+      // The signed cookie serves `getSession` for up to 5 minutes without a
+      // D1 read. Anything that gates on `user.role` (admin routes, the
+      // AdminOnly middleware) or on a revoked session must read fresh:
+      // `getSession({ headers, query: { disableCookieCache: true } })`.
+      // TODO(Phase 3): the Authentication/AdminOnly middlewares do this.
       cookieCache: { enabled: true, maxAge: 300 },
     },
     plugins: [

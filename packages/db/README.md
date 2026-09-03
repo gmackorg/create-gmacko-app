@@ -23,6 +23,27 @@ The `Database` Effect service over Cloudflare D1 (drizzle's Effect API,
 - `pnpm generate`: drizzle-kit generate + flatten.
 - `pnpm migrate:local` / `pnpm migrate:remote`: `wrangler d1 migrations apply`.
 
+## Migrations
+
+- Forward-only, applied by `wrangler d1 migrations apply`, which runs each
+  file as **one D1 batch, i.e. one transaction** (`applyD1Migrations` in the
+  Workers suite does the same).
+- `20260903035551_auth_1_7_issuer.sql` is **safe only on an empty database**.
+  It adds `account.issuer text NOT NULL` without a default (any existing
+  account row makes the ALTER fail) and rebuilds `user` and `verification`
+  with drizzle-kit's `PRAGMA foreign_keys=OFF` + `DROP TABLE` + rename
+  recipe. SQLite ignores `PRAGMA foreign_keys` while a transaction is open,
+  so inside the D1 batch the pragma is a no-op and `DROP TABLE user`
+  cascades into `session`, `account`, `api_keys` and every other table with
+  `ON DELETE CASCADE` to `user` (the rows are gone after the rename).
+  `src/__tests__/migrations.workers.test.ts` proves both facts on a Miniflare
+  D1. Do not reuse or copy that recipe once a stage database exists.
+- From the first stage database on, every change is **expand/contract**: add
+  a nullable or defaulted column, backfill in the app or a follow-up
+  migration, then tighten; add a new table and copy, never drop-and-recreate
+  a table that other rows reference. Review every drizzle-kit output for a
+  `__new_` table or a `PRAGMA foreign_keys=OFF` line before committing it.
+
 ## Conventions
 
 - Every query surface fails with `DatabaseError` except the raw `sql` tag,

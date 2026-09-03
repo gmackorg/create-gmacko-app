@@ -3,6 +3,11 @@
  * handler in-process through `localTransport`, forwarding the request's
  * cookie; in the browser it uses fetch against the page's origin. Same
  * `HttpApiClient`, same types, either way.
+ *
+ * TODO(Phase 4): run the client through the app's ManagedRuntime instead of
+ * `Effect.runPromise`, so calls inherit its logger, tracer (one trace per
+ * SSR render) and the request-scoped session cache rather than a bare
+ * runtime per call.
  */
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { getRequestHeaders } from "@tanstack/react-start/server";

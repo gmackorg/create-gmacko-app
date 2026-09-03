@@ -12,6 +12,10 @@ import { Effect } from "effect";
 
 import { runtime } from "./runtime";
 
+// TODO(Phase 7): cover `withSentry` (error capture + flush on waitUntil) and
+// `scheduled` (runs on the shared runtime) with pool-workers tests; Spike C
+// verified both by hand only.
+
 const handler = {
   fetch: (request) => startEntry.fetch(request),
   // Runs on the shared ManagedRuntime, so cron work gets the same services

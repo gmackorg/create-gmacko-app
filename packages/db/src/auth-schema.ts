@@ -10,6 +10,19 @@
  *   - relations live in relations.ts (drizzle v2 `defineRelations`), not the
  *     v1 `relations()` blocks the CLI appends.
  * Everything else (columns, NOT NULLs, indexes) must match the CLI output.
+ *
+ * Migration safety. `migrations/20260903035551_auth_1_7_issuer.sql` was
+ * generated against an EMPTY database: it does `ALTER TABLE account ADD
+ * issuer text NOT NULL` with no default (fails on any existing account row)
+ * and rebuilds `user` and `verification` with drizzle-kit's `PRAGMA
+ * foreign_keys=OFF` + `DROP TABLE` + rename recipe. D1 applies a migration as
+ * one batch (a transaction) and SQLite ignores `PRAGMA foreign_keys` inside a
+ * transaction, so the DROP cascades into `session`, `account`, `api_keys`,
+ * ... (see `__tests__/migrations.workers.test.ts` for the proof). It must not
+ * be reused or copied once a stage database exists. From then on every
+ * schema change is expand/contract: add nullable or defaulted columns,
+ * backfill, then tighten; never drop-and-recreate a table with rows behind
+ * foreign keys. See packages/db/README.md, "Migrations".
  */
 import { index, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 

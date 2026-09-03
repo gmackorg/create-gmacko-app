@@ -3,8 +3,11 @@
  * instead of the network: tRPC's `unstable_localLink`, typed. Used by SSR
  * loaders, which run in the same isolate as the API.
  *
- * Only the credential headers of the incoming request are forwarded, so the
- * API sees the same session the page was rendered for and nothing else.
+ * Only the incoming request's `cookie` header is forwarded (see
+ * `FORWARDED_HEADERS`), so the API sees the same session the page was
+ * rendered for and nothing else. `authorization` is deliberately not in the
+ * set: a bearer token on the page request (an API key, a proxy credential)
+ * must not be replayed against every endpoint a loader happens to call.
  */
 import { Effect } from "effect";
 import {
@@ -14,7 +17,8 @@ import {
   HttpClientResponse,
 } from "effect/unstable/http";
 
-const forwardedHeaders = ["cookie", "authorization"] as const;
+/** The only incoming headers the in-process dispatch carries over. */
+export const FORWARDED_HEADERS: ReadonlyArray<string> = ["cookie"];
 
 export const localTransport = (
   handler: (request: Request) => Promise<Response>,
@@ -30,7 +34,7 @@ export const localTransport = (
       ),
       Effect.flatMap((web) => {
         const headers = new Headers(web.headers);
-        for (const name of forwardedHeaders) {
+        for (const name of FORWARDED_HEADERS) {
           const value = incoming.get(name);
           if (value !== null && !headers.has(name)) headers.set(name, value);
         }

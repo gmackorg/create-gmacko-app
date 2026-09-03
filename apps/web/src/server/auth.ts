@@ -11,10 +11,22 @@ import { Effect, Layer } from "effect";
 
 import { AppConfig, type AppConfigShape } from "./config";
 
-/** TODO(Phase 6): deliver through the Resend-backed email service. */
+/**
+ * TODO(Phase 6): deliver through the Resend-backed email service. Until then
+ * a magic-link request outside development fails. The recipient is logged as
+ * a structured field, never put in the error message: better-auth reports the
+ * message to its error sink and it may end up in a response.
+ */
 const emailNotWired = async (link: MagicLink): Promise<void> => {
+  // oxlint-disable-next-line no-console -- TODO(Phase 6): route through the Effect logger once the auth instance is built inside the runtime
+  console.error(
+    JSON.stringify({
+      msg: "magic link not sent: email delivery is not configured",
+      email: link.email,
+    }),
+  );
   throw new Error(
-    `magic link email delivery is not configured (would send to ${link.email}); set BYPASS_MAGIC_LINK=true in development`,
+    "magic link email delivery is not configured; set BYPASS_MAGIC_LINK=true in development",
   );
 };
 
