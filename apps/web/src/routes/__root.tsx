@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
 
+import { captureException, SentryErrorBoundary } from "@gmacko/monitoring/web";
 import { Button } from "@gmacko/ui/button";
 import { ThemeProvider, ThemeToggle } from "@gmacko/ui/theme";
 import { Toaster } from "@gmacko/ui/toast";
-import * as Sentry from "@sentry/react";
 import type { QueryClient } from "@tanstack/react-query";
 import {
   createRootRouteWithContext,
@@ -81,13 +81,13 @@ export const Route = createRootRouteWithContext<{
 function RootComponent() {
   return (
     <RootDocument>
-      <Sentry.ErrorBoundary
+      <SentryErrorBoundary
         fallback={({ error, resetError }) => (
           <ErrorView error={error} reset={resetError} />
         )}
       >
         <Outlet />
-      </Sentry.ErrorBoundary>
+      </SentryErrorBoundary>
     </RootDocument>
   );
 }
@@ -124,7 +124,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 /** Route-level failures (a loader that threw) render the same view as render errors. */
 function RootErrorComponent({ error, reset }: ErrorComponentProps) {
   React.useEffect(() => {
-    Sentry.captureException(error);
+    captureException(error);
   }, [error]);
   return (
     <RootDocument>

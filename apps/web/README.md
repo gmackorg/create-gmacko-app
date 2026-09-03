@@ -94,10 +94,10 @@ PR previews boot without them.
 | `AUTH_GITHUB_URL`, `AUTH_GITHUB_API_URL`, `AUTH_GOOGLE_URL`, `AUTH_GOOGLE_TOKEN_URL`, `AUTH_APPLE_URL` | Point the providers at `npx @gmacko/emulate` locally. |
 | `BYPASS_MAGIC_LINK=true` | Print magic links to the server log instead of emailing them. **Development only**: `AppConfig.fromBindings` throws at load when it is set on any other `STAGE`. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` (+ `OTEL_EXPORTER_OTLP_HEADERS`) | OTLP/HTTP export of traces, logs and metrics (`@gmacko/telemetry`'s `Observability.layer`, wired in `src/server/runtime.ts`); flushed on `waitUntil` after every request. Unset → off; JSON console logging stays on either way. |
-| `SENTRY_DSN` | Enables `@sentry/cloudflare`'s `withSentry` wrapper in `src/server/worker.ts`. Unset → no-op. |
+| `SENTRY_DSN` | Enables the Worker Sentry wrapper (`@gmacko/monitoring/web/server`'s `withSentry`, composed in `src/server/worker.ts` via `make-worker.ts`). Unset → no-op. |
 | `STRIPE_SECRET_KEY` | Stripe API key; required in staging/production when the Stripe feature is on. |
 | `STRIPE_WEBHOOK_SECRET` | Signing secret for `POST /api/webhooks/stripe`; unset → the route answers 503. |
-| `VITE_SENTRY_DSN`, `VITE_POSTHOG_KEY`, `VITE_POSTHOG_HOST` | Browser Sentry (`src/client.tsx`) and PostHog (`src/providers.tsx`); both off when unset. |
+| `VITE_SENTRY_DSN`, `VITE_POSTHOG_KEY`, `VITE_POSTHOG_HOST` | Browser Sentry (`@gmacko/monitoring/web`'s `initSentryWeb` in `src/client.tsx`; the Workers SDK never enters the browser bundle, `src/__tests__/client-bundle.test.ts` checks) and PostHog (`src/providers.tsx`); both off when unset. |
 
 Build-time only: `SENTRY_AUTH_TOKEN` (+ `SENTRY_ORG`, `SENTRY_PROJECT`) turns
 on the Sentry Vite plugin, which uploads hidden source maps for the

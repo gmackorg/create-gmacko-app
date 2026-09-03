@@ -64,6 +64,13 @@ const ServicesLive = Layer.mergeAll(
 export const runtime = ManagedRuntime.make(ServicesLive);
 
 /**
+ * Drains the telemetry exporters now (always settles: `flushTelemetry` is
+ * bounded and never fails). The Worker entry hands this to `waitUntil`
+ * after a cron tick; HTTP handlers go through `Background` below instead.
+ */
+export const flush = (): Promise<void> => runtime.runPromise(flushTelemetry);
+
+/**
  * Ends every request by handing the telemetry flush to `waitUntil` (through
  * `Background`), so a span is exported even though the isolate idles right
  * after the response.
