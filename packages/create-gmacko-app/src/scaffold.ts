@@ -445,8 +445,8 @@ function customizeGeneratedReadme(
     options.includeAi && options.saasBootstrap
       ? `\n\n${buildSaasBootstrapBlock(options)}`
       : "";
-  const trpcOperatorsBlock = options.trpcOperators
-    ? `\n\n${buildTrpcOperatorsBlock()}`
+  const operatorLaneBlock = options.operatorLane
+    ? `\n\n${buildOperatorLaneBlock()}`
     : "";
   const startIndex = readme.indexOf(startMarker);
   const endIndex = readme.indexOf(endMarker);
@@ -460,7 +460,7 @@ function customizeGeneratedReadme(
     profileBlock +
     agentQuickstartBlock +
     saasBootstrapBlock +
-    trpcOperatorsBlock +
+    operatorLaneBlock +
     readme.slice(endIndex + endMarker.length);
 
   fs.writeFileSync(readmePath, updatedReadme);
@@ -602,9 +602,9 @@ function getBootstrapRecommendations(options: CliOptions): {
     );
   }
 
-  if (options.saasOperatorApis || options.trpcOperators) {
+  if (options.saasOperatorApis || options.operatorLane) {
     selectedLayerLines.push(
-      "- Operator APIs: use `pnpm trpc:ops -- --help` and `pnpm mcp:app` for the shared CLI and MCP wrapper lane (an API key with the `admin` scope).",
+      "- Operator APIs: use `pnpm api:ops -- --help` and `pnpm mcp:app` for the shared CLI and MCP wrapper lane (an API key with the `admin` scope).",
     );
     codexLines.push(
       "- Operator APIs: use `packages/operator-core`, `packages/api-cli`, and `packages/mcp-server` for the shared CLI and MCP wrapper lane.",
@@ -645,15 +645,15 @@ function customizeBootstrapPlaybook(
   fs.writeFileSync(playbookPath, buildSaasBootstrapContent(options, false));
 }
 
-function buildTrpcOperatorsBlock(): string {
+function buildOperatorLaneBlock(): string {
   return `## Operator lane
 
 - This scaffold includes CLI + MCP wrappers over the same HTTP API (\`@gmacko/api-client\`).
-- Use \`pnpm trpc:ops -- --help\` for the terminal operator surface.
-- Start with \`pnpm trpc:ops -- auth_help\` for login guidance.
-- Use \`pnpm trpc:ops -- get_workspace_context\` to inspect the current workspace.
-- Use \`pnpm trpc:ops -- list_api_keys\` and \`pnpm trpc:ops -- create_api_key --name automation\` for automation credentials.
-- Use \`pnpm trpc:ops -- get_billing_overview\` for usage and limits.
+- Use \`pnpm api:ops -- --help\` for the terminal operator surface.
+- Start with \`pnpm api:ops -- auth_help\` for login guidance.
+- Use \`pnpm api:ops -- get_workspace_context\` to inspect the current workspace.
+- Use \`pnpm api:ops -- list_api_keys\` and \`pnpm api:ops -- create_api_key --name automation\` for automation credentials.
+- Use \`pnpm api:ops -- get_billing_overview\` for usage and limits.
 - Use \`pnpm mcp:app\` to run the local MCP server. \`auth_help\` works without an API key; protected tools require \`GMACKO_API_KEY\` (a key holding the \`admin\` scope).
 `;
 }
@@ -702,7 +702,7 @@ function buildScaffoldProfileBlock(options: CliOptions): string {
     options.platforms.mobile
       ? "- `pnpm --filter @gmacko/expo dev:client`"
       : null,
-    options.trpcOperators ? "- `pnpm trpc:ops -- --help`" : null,
+    options.operatorLane ? "- `pnpm api:ops -- --help`" : null,
   ]
     .filter(Boolean)
     .join("\n");
@@ -718,7 +718,7 @@ function buildScaffoldProfileBlock(options: CliOptions): string {
 > - SaaS layers: ${saasLayers.join(", ") || "none selected"}
 > - Default deploy path: ${deployPath}
 > - Claude SaaS bootstrap pack: ${options.saasBootstrap ? "enabled" : "not scaffolded"}
-> - Operator lane: ${options.trpcOperators ? "CLI + MCP wrappers over the same HTTP API" : "not scaffolded"}
+> - Operator lane: ${options.operatorLane ? "CLI + MCP wrappers over the same HTTP API" : "not scaffolded"}
 >
 > **Recommended first commands**
 ${preferredDevCommands}
@@ -844,7 +844,7 @@ function addOptionalOperatorScripts(
   targetDir: string,
   options: CliOptions,
 ): void {
-  if (!options.trpcOperators) {
+  if (!options.operatorLane) {
     return;
   }
 
@@ -857,7 +857,7 @@ function addOptionalOperatorScripts(
   // Run the operator CLI / MCP server source via tsx. pnpm never links a
   // workspace package's OWN declared bin into node_modules/.bin, so the
   // `exec gmacko-ops` / `exec gmacko-mcp` bin forms fail EACCES.
-  rootPackage.scripts["trpc:ops"] =
+  rootPackage.scripts["api:ops"] =
     "pnpm --filter @gmacko/api-cli exec tsx src/index.ts";
   rootPackage.scripts["mcp:app"] =
     "pnpm --filter @gmacko/mcp-server exec tsx src/index.ts";
@@ -870,7 +870,7 @@ function addOptionalOperatorScripts(
  * (packages/mcp-server over the HTTP API) when AI files are kept.
  */
 function customizeMcpConfig(targetDir: string, options: CliOptions): void {
-  if (!options.includeAi || !options.trpcOperators) {
+  if (!options.includeAi || !options.operatorLane) {
     return;
   }
 
@@ -982,7 +982,10 @@ function configureExpoApp(
   appName: string,
   displayName: string,
 ): void {
-  const expoConfigPath = path.join(targetDir, `${MOBILE_APP_DIR}/app.config.ts`);
+  const expoConfigPath = path.join(
+    targetDir,
+    `${MOBILE_APP_DIR}/app.config.ts`,
+  );
   const sanitizedId = appName.replace(/[^a-z0-9-]/gi, "").toLowerCase();
   const bundleSegment = sanitizedId.replace(/-/g, "");
 
@@ -1103,10 +1106,21 @@ function pruneOptionalLanes(targetDir: string, options: CliOptions): void {
     );
   }
 
-  if (!options.trpcOperators) {
+  if (!options.operatorLane) {
     fs.removeSync(path.join(targetDir, "packages/operator-core"));
     fs.removeSync(path.join(targetDir, "packages/api-cli"));
     fs.removeSync(path.join(targetDir, "packages/mcp-server"));
+    // The template root carries the lane's scripts; without the packages
+    // they would point at nothing.
+    const rootPackagePath = path.join(targetDir, "package.json");
+    const rootPackage = fs.readJsonSync(rootPackagePath) as {
+      scripts?: Record<string, string>;
+    };
+    if (rootPackage.scripts) {
+      delete rootPackage.scripts["api:ops"];
+      delete rootPackage.scripts["mcp:app"];
+      fs.writeJsonSync(rootPackagePath, rootPackage, { spaces: 2 });
+    }
   }
 }
 
@@ -1117,7 +1131,10 @@ function pruneOptionalLanes(targetDir: string, options: CliOptions): void {
  * so pruning `packages/monitoring` touches nothing there.)
  */
 function pruneWebAnalyticsFiles(targetDir: string): void {
-  const providersPath = path.join(targetDir, `${WEB_APP_DIR}/src/providers.tsx`);
+  const providersPath = path.join(
+    targetDir,
+    `${WEB_APP_DIR}/src/providers.tsx`,
+  );
   if (!fs.existsSync(providersPath)) return;
 
   fs.writeFileSync(
@@ -1176,7 +1193,10 @@ export const handleStripeWebhook = async (
 `,
   );
   fs.removeSync(
-    path.join(targetDir, `${WEB_APP_DIR}/src/server/__tests__/stripe-webhook.test.ts`),
+    path.join(
+      targetDir,
+      `${WEB_APP_DIR}/src/server/__tests__/stripe-webhook.test.ts`,
+    ),
   );
 }
 

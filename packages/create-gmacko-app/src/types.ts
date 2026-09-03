@@ -37,7 +37,7 @@ export interface CliOptions {
   saasReferrals: boolean;
   saasOperatorApis: boolean;
   saasBootstrap: boolean;
-  trpcOperators: boolean;
+  operatorLane: boolean;
   forgegraphServer: string;
   forgegraphPreviewDomain: string;
   forgegraphProductionDomain: string;

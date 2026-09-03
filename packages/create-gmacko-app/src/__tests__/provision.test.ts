@@ -35,7 +35,7 @@ describe("provisioning guidance", () => {
     promptMocks.multiselect.mockResolvedValue([]);
   });
 
-  it("offers ForgeGraph and colocated Postgres instead of Neon and Vercel", async () => {
+  it("offers the local D1 and ForgeGraph + Cloudflare instead of Neon, Vercel or Postgres", async () => {
     const { runProvisioning } = await import("../provision.js");
 
     await runProvisioning({
@@ -54,9 +54,11 @@ describe("provisioning guidance", () => {
       (option: { label: string }) => option.label,
     );
 
-    expect(labels).toContain("ForgeGraph Deployment");
-    expect(labels).toContain("Postgres Setup");
+    expect(labels).toContain("ForgeGraph + Cloudflare deployment");
+    expect(labels).toContain("Local D1 database (migrate + seed)");
+    expect(labels).toContain("EAS Build (Expo)");
     expect(labels).not.toContain("Neon Database");
     expect(labels).not.toContain("Vercel Deployment");
+    expect(labels).not.toContain("Postgres Setup");
   });
 });

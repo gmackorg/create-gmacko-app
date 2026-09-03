@@ -46,13 +46,17 @@ describe("create-gmacko-app scaffold", () => {
       expect(fileExists(result.appPath, "package.json")).toBe(true);
 
       // Check root package.json
-      const pkg = readJson<{ name: string }>(result.appPath, "package.json");
+      const pkg = readJson<{ name: string; scripts?: Record<string, string> }>(
+        result.appPath,
+        "package.json",
+      );
       expect(pkg.name).toBe(appName);
 
       // Check core files exist
       for (const file of EXPECTED_FILES.core) {
         expect(fileExists(result.appPath, file)).toBe(true);
       }
+      // The operator lane is opt-in: no packages and no root scripts for it.
       expect(
         fileExists(result.appPath, "packages/operator-core/package.json"),
       ).toBe(false);
@@ -62,9 +66,38 @@ describe("create-gmacko-app scaffold", () => {
       expect(
         fileExists(result.appPath, "packages/mcp-server/package.json"),
       ).toBe(false);
+      expect(pkg.scripts?.["api:ops"]).toBeUndefined();
+      expect(pkg.scripts?.["mcp:app"]).toBeUndefined();
     }, 120000);
 
-    it("should include web app by default", async () => {
+    it("should never ship the pre-migration stack", async () => {
+      const appName = generateAppName("no-legacy");
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-install", "--no-git"],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+      for (const file of EXPECTED_FILES.legacy) {
+        expect(fileExists(result.appPath, file)).toBe(false);
+      }
+
+      const workspace = readFile(result.appPath, "pnpm-workspace.yaml");
+      const rootPkg = readJson<{ scripts?: Record<string, string> }>(
+        result.appPath,
+        "package.json",
+      );
+      expect(workspace).not.toContain("next");
+      expect(workspace).not.toContain("postgres");
+      expect(rootPkg.scripts?.["dev:next"]).toBeUndefined();
+      expect(rootPkg.scripts?.["db:legacy:push"]).toBeUndefined();
+      expect(rootPkg.scripts?.["trpc:ops"]).toBeUndefined();
+    }, 120000);
+
+    it("should include the web app by default", async () => {
       const appName = generateAppName("with-web");
       const result = await runCli({
         appName,
@@ -79,9 +112,71 @@ describe("create-gmacko-app scaffold", () => {
       for (const file of EXPECTED_FILES.withWeb) {
         expect(fileExists(result.appPath, file)).toBe(true);
       }
+
+      const webPkg = readJson<{
+        name: string;
+        scripts?: Record<string, string>;
+        dependencies?: Record<string, string>;
+      }>(result.appPath, "apps/web/package.json");
+      expect(webPkg.name).toBe("@gmacko/web");
+      expect(webPkg.scripts?.dev).toBe("vite dev");
+      expect(webPkg.scripts?.build).toBe("vite build");
+      expect(webPkg.dependencies?.["@gmacko/api"]).toBeDefined();
+      expect(webPkg.dependencies?.["@gmacko/api-client"]).toBeDefined();
+      expect(webPkg.dependencies?.["@gmacko/domain"]).toBeDefined();
+      expect(webPkg.dependencies?.["@tanstack/react-start"]).toBeDefined();
+      expect(webPkg.dependencies?.effect).toBeDefined();
     }, 120000);
 
-    it("should include Storybook for the web app by default", async () => {
+    it("should scaffold the D1 data layer and name the Worker after the app", async () => {
+      const appName = generateAppName("d1-lane");
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-install", "--no-git"],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+
+      const dbPackage = readJson<{
+        dependencies?: Record<string, string>;
+        scripts?: Record<string, string>;
+      }>(result.appPath, "packages/db/package.json");
+      const wranglerConfig = readFile(
+        result.appPath,
+        "apps/web/wrangler.jsonc",
+      );
+      const migrations = fs.readdirSync(
+        path.join(result.appPath, "packages/db/migrations"),
+      );
+
+      expect(dbPackage.dependencies?.["drizzle-orm"]).toBeDefined();
+      expect(dbPackage.dependencies?.["@effect/sql-d1"]).toBeDefined();
+      expect(dbPackage.dependencies?.postgres).toBeUndefined();
+      expect(dbPackage.scripts?.["migrate:local"]).toContain(
+        "wrangler d1 migrations apply DB --local",
+      );
+      expect(migrations.some((file) => file.endsWith(".sql"))).toBe(true);
+
+      // The template's `gmacko-web` Worker/D1 names become `<app>-web`.
+      expect(wranglerConfig).toContain(`"name": "${appName}-web"`);
+      expect(wranglerConfig).toContain(`"${appName}-web-staging"`);
+      expect(wranglerConfig).toContain(`"${appName}-web-preview"`);
+      expect(wranglerConfig).not.toContain("gmacko-web");
+      expect(wranglerConfig).toContain('"binding": "DB"');
+      expect(wranglerConfig).toContain('"d1_databases"');
+
+      // Next steps point at the D1 workflow, not a database URL.
+      expect(result.stdout).toContain(
+        `wrangler d1 create ${appName}-web-staging`,
+      );
+      expect(result.stdout).toContain("migrate:local");
+      expect(result.stdout).not.toContain("DATABASE_URL=");
+    }, 120000);
+
+    it("should include Storybook in packages/ui by default", async () => {
       const appName = generateAppName("with-storybook");
       const result = await runCli({
         appName,
@@ -96,6 +191,12 @@ describe("create-gmacko-app scaffold", () => {
       for (const file of EXPECTED_FILES.withStorybook) {
         expect(fileExists(result.appPath, file)).toBe(true);
       }
+
+      const uiPkg = readJson<{ scripts?: Record<string, string> }>(
+        result.appPath,
+        "packages/ui/package.json",
+      );
+      expect(uiPkg.scripts?.storybook).toContain("storybook dev");
     }, 120000);
 
     it("should include mobile app by default", async () => {
@@ -159,6 +260,9 @@ describe("create-gmacko-app scaffold", () => {
       expect(claudeInstructions).toContain("/plan-eng-review");
       expect(claudeInstructions).toContain("/design-consultation");
       expect(claudeInstructions).toContain("DESIGN.md");
+      expect(claudeInstructions).toContain(
+        "pnpm --filter @gmacko/ui storybook",
+      );
 
       expect(initialProposal).toContain("superpowers:brainstorming");
       expect(initialProposal).toContain("/plan-ceo-review");
@@ -185,42 +289,16 @@ describe("create-gmacko-app scaffold", () => {
       );
 
       expect(claudeInstructions).toContain("create-gmacko-app-workflow");
-      expect(repoSkill).toContain("apps/nextjs");
+      expect(repoSkill).toContain("apps/web");
+      expect(repoSkill).toContain("packages/domain");
+      expect(repoSkill).toContain("packages/api-client");
       expect(repoSkill).toContain("packages/ui");
       expect(repoSkill).toContain("docs/ai");
       expect(repoSkill).toContain("Storybook");
+      expect(repoSkill).not.toContain("apps/nextjs");
     }, 120000);
 
-    it("should scaffold postgres-first runtime files with nix support", async () => {
-      const appName = generateAppName("postgres-nix");
-      const result = await runCli({
-        appName,
-        flags: ["--yes", "--no-install", "--no-git"],
-        cwd: tempDir,
-      });
-
-      appsToClean.push(result.appPath);
-
-      expect(result.exitCode).toBe(0);
-      expect(fileExists(result.appPath, "flake.nix")).toBe(true);
-
-      const dbPackage = readJson<{
-        dependencies?: Record<string, string>;
-      }>(result.appPath, "packages/legacy-db/package.json");
-      const dbClient = readFile(
-        result.appPath,
-        "packages/legacy-db/src/client.ts",
-      );
-
-      expect(dbPackage.dependencies?.postgres).toBeDefined();
-      expect(dbPackage.dependencies?.["@neondatabase/serverless"]).toBeFalsy();
-      expect(dbClient).toContain('from "postgres"');
-      expect(dbClient).toContain('from "drizzle-orm/postgres-js"');
-      expect(dbClient).not.toContain("@neondatabase/serverless");
-      expect(dbClient).not.toContain("drizzle-orm/neon-http");
-    }, 120000);
-
-    it("should scaffold ForgeGraph repo metadata by default", async () => {
+    it("should scaffold ForgeGraph repo metadata for the Workers + D1 lane by default", async () => {
       const appName = generateAppName("forgegraph-bootstrap");
       const result = await runCli({
         appName,
@@ -236,32 +314,42 @@ describe("create-gmacko-app scaffold", () => {
 
       expect(forgeGraphConfig).toContain(`app: ${appName}`);
       expect(forgeGraphConfig).toContain("server: https://forge.example.com");
+      expect(forgeGraphConfig).toContain("db:");
+      expect(forgeGraphConfig).toContain("type: d1");
+      expect(forgeGraphConfig).toContain(
+        "migrate: node scripts/deploy-stage.mjs --migrate-only",
+      );
       expect(forgeGraphConfig).toContain("stages:");
       expect(forgeGraphConfig).toContain("- name: staging");
       expect(forgeGraphConfig).toContain("- name: production");
-      expect(forgeGraphConfig).toContain("nodeId: change-me-staging-node");
-      expect(forgeGraphConfig).toContain("nodeId: change-me-production-node");
       expect(forgeGraphConfig).toContain("sortOrder: 10");
       expect(forgeGraphConfig).toContain("sortOrder: 20");
+      expect(forgeGraphConfig).toContain("platform: cloudflare-workers");
+      expect(forgeGraphConfig).toContain(`workerName: ${appName}-web-staging`);
+      expect(forgeGraphConfig).toContain(`workerName: ${appName}-web\n`);
+      expect(forgeGraphConfig).toContain("configPath: apps/web/wrangler.jsonc");
+      expect(forgeGraphConfig).toContain("deploy: pnpm deploy:staging");
+      expect(forgeGraphConfig).toContain("deploy: pnpm deploy:production");
+      expect(forgeGraphConfig).toContain("resources:");
+      expect(forgeGraphConfig).toContain("d1:");
+      expect(forgeGraphConfig).toContain(`- name: ${appName}-web-preview`);
       expect(forgeGraphConfig).toContain("# ForgeGraph operator notes:");
-      expect(forgeGraphConfig).toContain("# flakeRef: .");
       expect(forgeGraphConfig).toContain(
-        "# primary web service path: apps/nextjs",
+        "# primary web service path: apps/web",
       );
       expect(forgeGraphConfig).toContain(
         "# healthcheck path: /.well-known/forge-health",
       );
-      expect(forgeGraphConfig).toContain("resources:");
-      expect(forgeGraphConfig).toContain("- type: postgres");
-      expect(forgeGraphConfig).toContain(
-        "# database strategy: colocated-postgres",
-      );
+      expect(forgeGraphConfig).toContain("# database strategy: cloudflare-d1");
       expect(forgeGraphConfig).toContain(
         "# preview domain: change-me.preview.example.com",
       );
       expect(forgeGraphConfig).toContain(
         "# production domain: change-me.example.com",
       );
+      expect(forgeGraphConfig).not.toContain("postgres");
+      expect(forgeGraphConfig).not.toContain("nodeId");
+      expect(forgeGraphConfig).not.toContain("flakeRef");
     }, 120000);
 
     it("should allow ForgeGraph config to be customized from CLI flags", async () => {
@@ -274,10 +362,6 @@ describe("create-gmacko-app scaffold", () => {
           "--no-git",
           "--forgegraph-server",
           "https://forge.gmac.io",
-          "--forgegraph-staging-node",
-          "node-staging-1",
-          "--forgegraph-production-node",
-          "node-production-1",
           "--forgegraph-preview-domain",
           "pr.preview.gmac.io",
           "--forgegraph-production-domain",
@@ -293,8 +377,6 @@ describe("create-gmacko-app scaffold", () => {
       const forgeGraphConfig = readFile(result.appPath, ".forgegraph.yaml");
 
       expect(forgeGraphConfig).toContain("server: https://forge.gmac.io");
-      expect(forgeGraphConfig).toContain("nodeId: node-staging-1");
-      expect(forgeGraphConfig).toContain("nodeId: node-production-1");
       expect(forgeGraphConfig).toContain(
         "# preview domain: pr.preview.gmac.io",
       );
@@ -322,128 +404,24 @@ describe("create-gmacko-app scaffold", () => {
       expect(forgeGraphConfig).toContain(
         "# healthcheck path: /.well-known/forge-health",
       );
-      expect(forgeGraphConfig).toContain("resources:");
-      expect(forgeGraphConfig).toContain("- type: postgres");
+      expect(forgeGraphConfig).toContain("type: d1");
     }, 120000);
 
-    it("should scaffold vinext support when requested", async () => {
-      const appName = generateAppName("vinext");
-      const result = await runCli({
-        appName,
-        flags: ["--yes", "--no-install", "--no-git", "--vinext"],
-        cwd: tempDir,
-      });
+    it("should reject the removed --tanstack-start and --vinext flags", async () => {
+      for (const flag of ["--tanstack-start", "--vinext"]) {
+        const appName = generateAppName("removed-flag");
+        const result = await runCli({
+          appName,
+          flags: ["--yes", "--no-install", "--no-git", flag],
+          cwd: tempDir,
+        });
 
-      appsToClean.push(result.appPath);
+        appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
-      expect(fileExists(result.appPath, "apps/nextjs/vite.config.ts")).toBe(
-        true,
-      );
-      expect(fileExists(result.appPath, "apps/nextjs/wrangler.jsonc")).toBe(
-        true,
-      );
-      expect(
-        fileExists(result.appPath, "apps/nextjs/README.cloudflare.md"),
-      ).toBe(true);
-      expect(fileExists(result.appPath, "apps/nextjs/worker/index.ts")).toBe(
-        true,
-      );
-
-      const nextPkg = readJson<{
-        scripts?: Record<string, string>;
-        devDependencies?: Record<string, string>;
-      }>(result.appPath, "apps/nextjs/package.json");
-      const viteConfig = readFile(result.appPath, "apps/nextjs/vite.config.ts");
-      const wranglerConfig = readFile(
-        result.appPath,
-        "apps/nextjs/wrangler.jsonc",
-      );
-      const cloudflareEnv = readFile(
-        result.appPath,
-        "apps/nextjs/src/cloudflare-env.ts",
-      );
-      const envExample = readFile(result.appPath, ".env.example");
-      const cloudflareReadme = readFile(
-        result.appPath,
-        "deploy/cloudflare/README.md",
-      );
-      const appLocalCloudflareReadme = readFile(
-        result.appPath,
-        "apps/nextjs/README.cloudflare.md",
-      );
-
-      expect(nextPkg.scripts?.["dev:vinext"]).toBeDefined();
-      expect(nextPkg.scripts?.["build:vinext"]).toBeDefined();
-      expect(nextPkg.scripts?.["deploy:cloudflare"]).toBeDefined();
-      expect(nextPkg.scripts?.["deploy:cloudflare:staging"]).toBeDefined();
-      expect(nextPkg.scripts?.["deploy:cloudflare:production"]).toBeDefined();
-      expect(nextPkg.scripts?.["prebuild:vinext"]).toBe(
-        "pnpm --dir ../.. --filter @gmacko/nextjs^... build",
-      );
-      expect(nextPkg.scripts?.["build:vinext"]).toContain(
-        "pnpm prebuild:vinext",
-      );
-      expect(nextPkg.scripts?.["build:vinext"]).toContain(
-        "pnpm with-env vinext build",
-      );
-      expect(nextPkg.scripts?.["deploy:cloudflare:staging"]).toContain(
-        "pnpm with-env wrangler deploy --env staging",
-      );
-      expect(nextPkg.scripts?.["deploy:cloudflare:production"]).toContain(
-        "pnpm with-env wrangler deploy",
-      );
-      const nextDevDependencyNames = Object.keys(nextPkg.devDependencies ?? {});
-      expect(nextDevDependencyNames).toEqual(
-        [...nextDevDependencyNames].sort((left, right) =>
-          left.localeCompare(right),
-        ),
-      );
-      expect(nextPkg.devDependencies?.vinext).toBeDefined();
-      expect(nextPkg.devDependencies?.vite).toBeDefined();
-      expect(nextPkg.devDependencies?.wrangler).toBeDefined();
-      expect(nextPkg.devDependencies?.["@vitejs/plugin-rsc"]).toBeDefined();
-      expect(viteConfig).toContain("@cloudflare/vite-plugin");
-      expect(viteConfig).toContain("cloudflare({");
-      expect(wranglerConfig).toContain(`"name": "${appName}"`);
-      expect(wranglerConfig).toContain('"compatibility_date"');
-      expect(wranglerConfig).toContain('"compatibility_flags"');
-      expect(wranglerConfig).toContain('"nodejs_compat"');
-      expect(wranglerConfig).toContain('"main": "./worker/index.ts"');
-      expect(wranglerConfig).toContain('"assets"');
-      expect(wranglerConfig).toContain('"binding": "ASSETS"');
-      expect(wranglerConfig).toContain('"images"');
-      expect(wranglerConfig).toContain('"binding": "IMAGES"');
-      expect(wranglerConfig).toContain('"vars"');
-      expect(wranglerConfig).toContain('"APP_ENV": "production"');
-      expect(wranglerConfig).toContain('"env"');
-      expect(wranglerConfig).toContain('"staging"');
-      expect(cloudflareEnv).toContain("CLOUDFLARE_ACCOUNT_ID");
-      expect(cloudflareEnv).toContain("CLOUDFLARE_API_TOKEN");
-      expect(envExample).toContain("CLOUDFLARE_ACCOUNT_ID");
-      expect(envExample).toContain("CLOUDFLARE_API_TOKEN");
-      expect(cloudflareReadme).toContain(
-        "pnpm --filter @gmacko/nextjs build:vinext",
-      );
-      expect(cloudflareReadme).toContain(
-        "pnpm --filter @gmacko/nextjs deploy:cloudflare:staging",
-      );
-      expect(cloudflareReadme).toContain(
-        "pnpm --filter @gmacko/nextjs deploy:cloudflare:production",
-      );
-      expect(appLocalCloudflareReadme).toContain("vinext");
-      expect(appLocalCloudflareReadme).toContain("experimental");
-      expect(appLocalCloudflareReadme).toContain(
-        "pnpm --filter @gmacko/nextjs dev:vinext",
-      );
-      expect(appLocalCloudflareReadme).toContain(
-        "pnpm --filter @gmacko/nextjs build:vinext",
-      );
-      expect(appLocalCloudflareReadme).toContain(
-        "pnpm --filter @gmacko/nextjs deploy:cloudflare:staging",
-      );
-      expect(appLocalCloudflareReadme).toContain("CLOUDFLARE_ACCOUNT_ID");
-      expect(appLocalCloudflareReadme).toContain("CLOUDFLARE_API_TOKEN");
+        expect(result.exitCode).not.toBe(0);
+        expect(result.stderr).toContain(`unknown option '${flag}'`);
+        expect(fileExists(result.appPath, "package.json")).toBe(false);
+      }
     }, 120000);
 
     it("should scaffold stronger Expo development-build defaults", async () => {
@@ -470,15 +448,11 @@ describe("create-gmacko-app scaffold", () => {
         result.appPath,
         "apps/expo/src/app/settings.tsx",
       );
-      const settingsRouter = readFile(
+      const settingsService = readFile(
         result.appPath,
-        "packages/legacy-api/src/router/settings.ts",
+        "packages/api/src/settings/service.ts",
       );
-      const authEnv = readFile(result.appPath, "packages/legacy-auth/env.ts");
-      const authIndex = readFile(
-        result.appPath,
-        "packages/legacy-auth/src/index.ts",
-      );
+      const authIndex = readFile(result.appPath, "packages/auth/src/index.ts");
       const mobileQa = readFile(result.appPath, "apps/expo/docs/mobile-qa.md");
       const rootReadme = readFile(result.appPath, "README.md");
       const expectedDisplayName = appName
@@ -493,6 +467,7 @@ describe("create-gmacko-app scaffold", () => {
         "node ./scripts/check-app-store-readiness.mjs",
       );
       expect(expoPkg.dependencies?.["expo-apple-authentication"]).toBeDefined();
+      expect(expoPkg.dependencies?.["@gmacko/api-client"]).toBeDefined();
       expect(expoReadme).toContain("Expo Orbit");
       expect(expoReadme).toContain("development build");
       expect(expoReadme).toContain("EXPO_PUBLIC_APP_DOMAIN");
@@ -526,20 +501,17 @@ describe("create-gmacko-app scaffold", () => {
       expect(expoIndex).toContain('provider: "apple"');
       expect(expoSettings).toContain("Delete Account");
       expect(expoSettings).toContain("deleteAccount");
-      expect(settingsRouter).toContain("deleteAccount:");
-      expect(settingsRouter).toContain(".delete(user)");
-      expect(authEnv).toContain("AUTH_APPLE_ID");
-      expect(authEnv).toContain("AUTH_APPLE_SECRET");
-      expect(authEnv).toContain("AUTH_APPLE_BUNDLE_ID");
-      expect(authIndex).toContain("apple:");
-      expect(authIndex).toContain("appBundleIdentifier");
+      expect(settingsService).toContain("deleteAccount");
+      expect(authIndex).toContain("apple");
       expect(authIndex).toContain("https://appleid.apple.com");
       expect(mobileQa).toContain("Sign in with Apple");
       expect(mobileQa).toContain("account deletion");
       expect(rootReadme).toContain("Scaffold profile");
-      expect(rootReadme).toContain("Platforms: Next.js, Expo");
       expect(rootReadme).toContain(
-        "Default deploy path: ForgeGraph + Nix + colocated Postgres",
+        "Platforms: Web (TanStack Start + Effect on Cloudflare Workers, D1), Expo",
+      );
+      expect(rootReadme).toContain(
+        "Default deploy path: ForgeGraph → one Cloudflare Worker + one D1 per stage (migrate, then deploy)",
       );
       expect(rootReadme).toContain("pnpm bootstrap:local");
       expect(rootReadme).not.toContain(
@@ -584,7 +556,7 @@ describe("create-gmacko-app scaffold", () => {
       const appName = generateAppName("no-vercel-env");
       const result = await runCli({
         appName,
-        flags: ["--yes", "--no-install", "--no-git", "--tanstack-start"],
+        flags: ["--yes", "--no-install", "--no-git"],
         cwd: tempDir,
       });
 
@@ -592,20 +564,17 @@ describe("create-gmacko-app scaffold", () => {
 
       expect(result.exitCode).toBe(0);
 
-      const nextEnv = readFile(result.appPath, "apps/nextjs/src/env.ts");
-      const tanstackEnv = readFile(result.appPath, "apps/web/src/env.ts");
+      const webEnv = readFile(result.appPath, "apps/web/src/env.ts");
 
-      expect(nextEnv).not.toContain("presets-zod");
-      expect(nextEnv).not.toContain("vercel()");
-      expect(tanstackEnv).not.toContain("presets-zod");
-      expect(tanstackEnv).not.toContain("vercel()");
+      expect(webEnv).not.toContain("presets-zod");
+      expect(webEnv).not.toContain("vercel()");
     }, 120000);
 
     it("should scaffold without vercel-specific runtime env hooks", async () => {
       const appName = generateAppName("no-vercel-runtime");
       const result = await runCli({
         appName,
-        flags: ["--yes", "--no-install", "--no-git", "--tanstack-start"],
+        flags: ["--yes", "--no-install", "--no-git"],
         cwd: tempDir,
       });
 
@@ -651,7 +620,7 @@ describe("create-gmacko-app scaffold", () => {
       expect(fileExists(result.appPath, "deploy/sst")).toBe(false);
     }, 120000);
 
-    it("should scaffold a Workers preview workflow", async () => {
+    it("should scaffold a Workers preview workflow named after the app", async () => {
       const appName = generateAppName("forgegraph-preview");
       const result = await runCli({
         appName,
@@ -669,7 +638,8 @@ describe("create-gmacko-app scaffold", () => {
       );
 
       expect(previewWorkflow).toContain("wrangler deploy --env preview");
-      expect(previewWorkflow).toContain("gmacko-web-preview");
+      expect(previewWorkflow).toContain(`${appName}-web-preview`);
+      expect(previewWorkflow).not.toContain("gmacko-web");
       expect(previewWorkflow).not.toContain("DEPLOY_TARGET");
       expect(previewWorkflow).not.toContain("Deploy to Vercel");
       expect(previewWorkflow).not.toContain("Deploy to Kubernetes");
@@ -712,10 +682,13 @@ describe("create-gmacko-app scaffold", () => {
       expect(agentsInstructions).toContain("Codex");
       expect(agentsInstructions).toContain("Claude Code");
       expect(agentsInstructions).toContain("OpenCode");
+      expect(agentsInstructions).toContain("apps/web");
+      expect(agentsInstructions).not.toContain("dev:next");
       expect(claudeInstructions).toContain("AGENTS.md");
       expect(developerExperience).toContain("ForgeGraph");
-      expect(developerExperience).toContain("vinext");
+      expect(developerExperience).toContain("TanStack Start");
       expect(developerExperience).toContain("Expo Orbit");
+      expect(developerExperience).not.toContain("vinext");
       expect(claudeSettings.permissions?.additionalDirectories).toContain(
         "../ForgeGraph",
       );
@@ -723,10 +696,8 @@ describe("create-gmacko-app scaffold", () => {
       expect(openCodeConfig.instructions).toContain(
         "docs/ai/DEVELOPER_EXPERIENCE.md",
       );
-      expect(mcpConfig.mcpServers?.["next-devtools"]?.command).toBe("npx");
-      expect(mcpConfig.mcpServers?.["next-devtools"]?.args).toContain(
-        "next-devtools-mcp@latest",
-      );
+      // `.mcp.json` ships empty; only the operator lane adds a server.
+      expect(mcpConfig.mcpServers).toEqual({});
 
       const rootReadme = readFile(result.appPath, "README.md");
       expect(rootReadme).toContain("Agent quickstart");
@@ -852,8 +823,11 @@ describe("create-gmacko-app scaffold", () => {
       expect(bootstrapPlaybook).toContain("Operator APIs");
       expect(bootstrapPlaybook).toContain("/setup-stripe-billing");
       expect(bootstrapPlaybook).toContain("/launch-landing-page");
-      expect(bootstrapPlaybook).toContain("pnpm trpc:ops -- --help");
+      expect(bootstrapPlaybook).toContain("pnpm api:ops -- --help");
       expect(bootstrapPlaybook).toContain("pnpm mcp:app");
+      expect(bootstrapPlaybook).toContain(
+        "packages/domain/src/settings/api.ts",
+      );
       expect(bootstrapPlaybook).toContain("Claude-only");
       const selectedLayersStart = bootstrapPlaybook.indexOf(
         "## Selected SaaS layers",
@@ -933,7 +907,7 @@ describe("create-gmacko-app scaffold", () => {
       expect(integrationsConfig).toContain("operatorApis: true");
     }, 120000);
 
-    it("should scaffold launch-control pages and public-shell copy", async () => {
+    it("should scaffold launch-control routes, public-shell copy and the admin contract", async () => {
       const appName = generateAppName("launch-shell");
       const result = await runCli({
         appName,
@@ -944,50 +918,49 @@ describe("create-gmacko-app scaffold", () => {
       appsToClean.push(result.appPath);
 
       expect(result.exitCode).toBe(0);
-      expect(
-        fileExists(result.appPath, "apps/nextjs/src/app/pricing/page.tsx"),
-      ).toBe(true);
-      expect(
-        fileExists(result.appPath, "apps/nextjs/src/app/faq/page.tsx"),
-      ).toBe(true);
-      expect(
-        fileExists(result.appPath, "apps/nextjs/src/app/changelog/page.tsx"),
-      ).toBe(true);
-      expect(
-        fileExists(result.appPath, "apps/nextjs/src/app/contact/page.tsx"),
-      ).toBe(true);
-      expect(
-        fileExists(result.appPath, "apps/nextjs/src/app/privacy/page.tsx"),
-      ).toBe(true);
-      expect(
-        fileExists(result.appPath, "apps/nextjs/src/app/terms/page.tsx"),
-      ).toBe(true);
+      for (const route of [
+        "pricing",
+        "faq",
+        "changelog",
+        "contact",
+        "privacy",
+        "terms",
+      ]) {
+        expect(
+          fileExists(result.appPath, `apps/web/src/routes/${route}.tsx`),
+        ).toBe(true);
+      }
 
       const publicHome = readFile(
         result.appPath,
-        "apps/nextjs/src/app/page.tsx",
+        "apps/web/src/routes/index.tsx",
       );
-      const adminRouter = readFile(
+      const adminModels = readFile(
         result.appPath,
-        "packages/legacy-api/src/router/admin.ts",
+        "packages/domain/src/admin/models.ts",
+      );
+      const adminApi = readFile(
+        result.appPath,
+        "packages/domain/src/admin/api.ts",
       );
 
-      expect(publicHome).toContain("Maintenance mode");
+      expect(publicHome).toContain("LaunchBanner");
       expect(publicHome).toContain("Request access");
       expect(publicHome).toContain("waitlist");
       expect(publicHome).toContain("See pricing");
       expect(publicHome).toContain("/contact");
-      expect(adminRouter).toContain("maintenanceMode");
-      expect(adminRouter).toContain("signupEnabled");
-      expect(adminRouter).toContain("allowedEmailDomains");
-      expect(adminRouter).toContain("waitlist");
+      expect(adminModels).toContain("maintenanceMode");
+      expect(adminModels).toContain("signupEnabled");
+      expect(adminModels).toContain("allowedEmailDomains");
+      expect(adminApi).toContain("waitlist");
+      expect(adminApi).toContain("AdminOnly");
     }, 120000);
 
-    it("should scaffold a tRPC-backed operator CLI and MCP lane when requested", async () => {
-      const appName = generateAppName("trpc-operators");
+    it("should scaffold the operator CLI and MCP lane over the HTTP API when requested", async () => {
+      const appName = generateAppName("operator-lane");
       const result = await runCli({
         appName,
-        flags: ["--yes", "--no-install", "--no-git", "--trpc-operators"],
+        flags: ["--yes", "--no-install", "--no-git", "--operator-lane"],
         cwd: tempDir,
       });
 
@@ -1018,6 +991,7 @@ describe("create-gmacko-app scaffold", () => {
       }>(result.appPath, ".mcp.json");
       const operatorCorePackage = readJson<{
         name?: string;
+        dependencies?: Record<string, string>;
       }>(result.appPath, "packages/operator-core/package.json");
       const integrationsConfig = readFile(
         result.appPath,
@@ -1041,12 +1015,17 @@ describe("create-gmacko-app scaffold", () => {
       );
       const rootReadme = readFile(result.appPath, "README.md");
 
-      expect(rootPackage.scripts?.["trpc:ops"]).toContain("@gmacko/api-cli");
+      expect(rootPackage.scripts?.["api:ops"]).toContain("@gmacko/api-cli");
       expect(rootPackage.scripts?.["mcp:app"]).toContain("@gmacko/mcp-server");
+      expect(rootPackage.scripts?.["trpc:ops"]).toBeUndefined();
       expect(operatorCorePackage.name).toBe("@gmacko/operator-core");
+      expect(
+        operatorCorePackage.dependencies?.["@gmacko/api-client"],
+      ).toBeDefined();
       expect(apiCliPackage.name).toBe("@gmacko/api-cli");
       expect(Object.keys(apiCliPackage.bin ?? {})).toContain("gmacko-ops");
       expect(apiCliSource).toContain("@gmacko/operator-core");
+      expect(apiCliSource).toContain("HTTP API");
       expect(mcpServerCoreSource).toContain("@gmacko/operator-core");
       expect(mcpServerSource).toContain('name: "gmacko-app"');
       expect(mcpServerSource).not.toContain(
@@ -1057,15 +1036,17 @@ describe("create-gmacko-app scaffold", () => {
         "@gmacko/mcp-server",
       );
       expect(mcpConfig.mcpServers?.["gmacko-app"]?.env).toMatchObject({
-        GMACKO_API_URL: "http://localhost:3000",
+        GMACKO_API_URL: "http://localhost:3001",
         GMACKO_API_KEY: "change-me",
       });
-      expect(rootReadme).toContain("CLI + MCP wrappers over the same tRPC API");
-      expect(rootReadme).toContain("pnpm trpc:ops -- --help");
-      expect(rootReadme).toContain("pnpm trpc:ops -- auth_help");
-      expect(rootReadme).toContain("pnpm trpc:ops -- get_workspace_context");
-      expect(rootReadme).toContain("pnpm trpc:ops -- list_api_keys");
+      expect(mcpConfig.mcpServers?.["next-devtools"]).toBeUndefined();
+      expect(rootReadme).toContain("CLI + MCP wrappers over the same HTTP API");
+      expect(rootReadme).toContain("pnpm api:ops -- --help");
+      expect(rootReadme).toContain("pnpm api:ops -- auth_help");
+      expect(rootReadme).toContain("pnpm api:ops -- get_workspace_context");
+      expect(rootReadme).toContain("pnpm api:ops -- list_api_keys");
       expect(rootReadme).toContain("pnpm mcp:app");
+      expect(rootReadme).toContain("`admin` scope");
       expect(integrationsConfig).toContain("operatorApis: false");
 
       const doctorScript = readFile(result.appPath, "scripts/doctor.sh");
@@ -1137,7 +1118,7 @@ describe("create-gmacko-app scaffold", () => {
       const appName = generateAppName("no-eslint-suppressions");
       const result = await runCli({
         appName,
-        flags: ["--yes", "--no-install", "--no-git", "--tanstack-start"],
+        flags: ["--yes", "--no-install", "--no-git"],
         cwd: tempDir,
       });
 
@@ -1146,9 +1127,8 @@ describe("create-gmacko-app scaffold", () => {
       expect(result.exitCode).toBe(0);
 
       const sourceFiles = [
-        "apps/nextjs/src/trpc/react.tsx",
-        "apps/nextjs/src/trpc/server.tsx",
         "apps/web/src/lib/api.ts",
+        "apps/web/src/server/runtime.ts",
         "packages/api-client/src/client.ts",
         "packages/ui/src/theme.tsx",
       ].map((file) => readFile(result.appPath, file));
@@ -1163,8 +1143,8 @@ describe("create-gmacko-app scaffold", () => {
         "../../../../deploy/README.md",
         "../../../../packages/create-gmacko-app/README.md",
         "../../../../docs/ai/IMPLEMENTATION_PLAN.md",
-        "../../../../docs/plans/2026-01-14-e2e-implementation.md",
-        "../../../../docs/plans/2026-01-14-e2e-testing-plan.md",
+        "../../../../docs/ai/DEVELOPER_EXPERIENCE.md",
+        "../../../../docs/ai/SCAFFOLD_SPEC.md",
       ].map((relativePath) =>
         fs.readFileSync(new URL(relativePath, import.meta.url), "utf8"),
       );
@@ -1172,41 +1152,24 @@ describe("create-gmacko-app scaffold", () => {
       for (const doc of activeDocs) {
         expect(doc).not.toContain("Neon");
         expect(doc).not.toContain("Vercel");
+        expect(doc).not.toContain("vinext");
+        expect(doc).not.toContain("apps/nextjs");
+        expect(doc).not.toContain("trpc:ops");
       }
     });
 
-    it("should provide substantive current-era implementation plans", () => {
-      const activePlans = [
-        fs.readFileSync(
-          new URL(
-            "../../../../docs/ai/IMPLEMENTATION_PLAN.md",
-            import.meta.url,
-          ),
-          "utf8",
-        ),
-        fs.readFileSync(
-          new URL(
-            "../../../../docs/plans/2026-01-14-e2e-implementation.md",
-            import.meta.url,
-          ),
-          "utf8",
-        ),
-        fs.readFileSync(
-          new URL(
-            "../../../../docs/plans/2026-01-14-e2e-testing-plan.md",
-            import.meta.url,
-          ),
-          "utf8",
-        ),
-      ];
+    it("should provide a substantive current-era implementation plan", () => {
+      const plan = fs.readFileSync(
+        new URL("../../../../docs/ai/IMPLEMENTATION_PLAN.md", import.meta.url),
+        "utf8",
+      );
 
-      for (const plan of activePlans) {
-        expect(plan).toContain("**Goal:**");
-        expect(plan).toContain("**Architecture:**");
-        expect(plan).toContain("**Tech Stack:**");
-        expect(plan).toContain("ForgeGraph");
-        expect(plan).toContain("Postgres");
-      }
+      expect(plan).toContain("**Goal:**");
+      expect(plan).toContain("**Architecture:**");
+      expect(plan).toContain("**Tech Stack:**");
+      expect(plan).toContain("ForgeGraph");
+      expect(plan).toContain("D1");
+      expect(plan).not.toContain("Postgres");
     });
 
     it("should keep the workers support matrix explicit about maturity by integration", () => {
@@ -1244,6 +1207,10 @@ describe("create-gmacko-app scaffold", () => {
       expect(fileExists(result.appPath, "scripts/bootstrap-local.sh")).toBe(
         true,
       );
+      expect(fileExists(result.appPath, "scripts/deploy-stage.mjs")).toBe(true);
+      expect(
+        fileExists(result.appPath, "scripts/check-app-standards.mjs"),
+      ).toBe(true);
 
       const pkg = readJson<{
         scripts?: Record<string, string>;
@@ -1266,6 +1233,7 @@ describe("create-gmacko-app scaffold", () => {
         pkg.devDependencies?.["@commitlint/config-conventional"],
       ).toBeDefined();
       expect(pkg.devDependencies?.["@forgegraph/cli"]).toBe("^0.3.0");
+      expect(pkg.devDependencies?.["@gmacko/emulate"]).toBeDefined();
       expect(pkg.devDependencies?.knip).toBeDefined();
       expect(pkg.scripts?.["lint:ox"]).toBeDefined();
       expect(pkg.scripts?.["format:check"]).toBeDefined();
@@ -1280,12 +1248,36 @@ describe("create-gmacko-app scaffold", () => {
       expect(pkg.scripts?.check).toBe(
         "pnpm check:fast && pnpm test && pnpm build",
       );
+      expect(pkg.scripts?.["check:standards"]).toBe(
+        "node scripts/check-app-standards.mjs",
+      );
+      expect(pkg.scripts?.["test:workers"]).toBe("turbo run test:workers");
       expect(pkg.scripts?.["e2e:cli:full"]).toBe(
         "RUN_E2E=true pnpm --dir packages/create-gmacko-app exec vitest run src/__tests__/e2e.test.ts",
       );
       expect(pkg.scripts?.["release:cli:dry-run"]).toBeDefined();
       expect(pkg.scripts?.["check:release"]).toBe(
         "pnpm --dir packages/create-gmacko-app test && pnpm --dir packages/create-gmacko-app build && pnpm release:cli:dry-run",
+      );
+      expect(pkg.scripts?.dev).toContain("dev:emulate");
+      expect(pkg.scripts?.dev).toContain("dev:web");
+      expect(pkg.scripts?.["dev:web"]).toBe("pnpm -F @gmacko/web dev:portless");
+      expect(pkg.scripts?.["db:generate"]).toBe("pnpm -F @gmacko/db generate");
+      expect(pkg.scripts?.["db:migrate:local"]).toBe(
+        "pnpm -F @gmacko/db migrate:local",
+      );
+      expect(pkg.scripts?.["db:migrate:remote"]).toBe(
+        "pnpm -F @gmacko/db migrate:remote",
+      );
+      expect(pkg.scripts?.["db:seed"]).toBe("pnpm -F @gmacko/db seed:local");
+      expect(pkg.scripts?.["deploy:staging"]).toBe(
+        "node scripts/deploy-stage.mjs --stage staging",
+      );
+      expect(pkg.scripts?.["deploy:production"]).toBe(
+        "node scripts/deploy-stage.mjs --stage production",
+      );
+      expect(pkg.scripts?.["secrets:push"]).toBe(
+        "node scripts/secrets-push.mjs",
       );
       expect(pkg.scripts?.["forge:init"]).toBe("forge init --full");
       expect(pkg.scripts?.["forge:doctor"]).toBe("forge doctor");
@@ -1316,7 +1308,8 @@ describe("create-gmacko-app scaffold", () => {
         'if [ -f apps/web/wrangler.jsonc ]; then\n  echo "Applying D1 migrations to the local database..."\n  pnpm db:migrate:local\n  pnpm db:seed',
       );
       expect(bootstrapScript).toContain("Skipping D1 migrate/seed");
-      expect(bootstrapScript).toContain("pnpm db:legacy:push");
+      expect(bootstrapScript).not.toContain("db:legacy:push");
+      expect(bootstrapScript).not.toContain("docker");
       expect(bootstrapScript).toContain("pnpm check:fast");
       expect(bootstrapScript).toContain("pnpm dev:emulate");
       expect(bootstrapScript).toContain(
@@ -1334,23 +1327,22 @@ describe("create-gmacko-app scaffold", () => {
       expect(doctorScript).toContain("Background jobs");
       expect(doctorScript).toContain("Rate limits");
       expect(doctorScript).toContain("Compliance export hooks");
-      expect(doctorScript).toContain("Cloudflare Workers env values");
       expect(doctorScript).toContain(
         ".forgegraph.yaml still has placeholder ForgeGraph values; update server, domains, and stage node IDs before deploying",
       );
       expect(doctorScript).toContain("Cloudflare Workers lane detected");
       expect(doctorScript).toContain("Wrangler CLI available");
       expect(doctorScript).toContain("Cloudflare Workers env values");
+      expect(doctorScript).toContain(".dev.vars");
+      expect(doctorScript).not.toContain("Docker");
+      expect(doctorScript).not.toContain("DATABASE_URL");
       expect(envExample).toContain("# WEB APP (apps/web)");
       expect(envExample).toContain("# MOBILE APP ENV");
       expect(envExample).toContain("# CLOUDFLARE (deploys");
-      expect(envExample).toContain("# LEGACY (apps/nextjs");
-      // The web lane needs no DATABASE_URL; the legacy lane's stays commented out.
-      expect(envExample).toContain(
-        '# DATABASE_URL="postgresql://postgres:postgres@localhost:5432/gmacko_dev"',
-      );
       expect(envExample).toContain('STAGE="development"');
       expect(envExample).toContain("pnpm secrets:push --stage");
+      expect(envExample).not.toContain("# LEGACY");
+      expect(envExample).not.toContain("postgresql://");
       expect(rootReadme).toContain("@forgegraph/cli");
       expect(
         fs.statSync(path.join(result.appPath, "scripts/setup.sh")).mode & 0o111,
@@ -1396,6 +1388,39 @@ describe("create-gmacko-app scaffold", () => {
       expect(doctorScript).toContain("RESEND_API_KEY");
     }, 120000);
 
+    it("should warn that realtime is Node-only when it is enabled", async () => {
+      const appName = generateAppName("realtime-warning");
+      const result = await runCli({
+        appName,
+        flags: [
+          "--yes",
+          "--no-install",
+          "--no-git",
+          "--integrations",
+          "realtime",
+        ],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+      expect(fileExists(result.appPath, "packages/realtime/package.json")).toBe(
+        true,
+      );
+      expect(result.stdout).toContain("Node-only");
+
+      const integrationsConfig = readFile(
+        result.appPath,
+        "packages/config/src/integrations.ts",
+      );
+      expect(integrationsConfig).toContain('provider: "redis"');
+      expect(integrationsConfig).toContain("Node-only");
+
+      const rootReadme = readFile(result.appPath, "README.md");
+      expect(rootReadme).toContain("Node services only");
+    }, 120000);
+
     it("should initialize a jj repo by default", async () => {
       const appName = generateAppName("jj-repo");
       const result = await runCli({
@@ -1431,33 +1456,33 @@ describe("create-gmacko-app scaffold", () => {
       expect(result.exitCode).toBe(0);
       expect(fileExists(result.appPath, "tooling/eslint")).toBe(false);
       expect(fileExists(result.appPath, "tooling/prettier")).toBe(false);
-      expect(fileExists(result.appPath, "apps/nextjs/eslint.config.ts")).toBe(
+      expect(fileExists(result.appPath, "apps/web/eslint.config.ts")).toBe(
         false,
       );
-      expect(
-        fileExists(result.appPath, "packages/legacy-db/eslint.config.ts"),
-      ).toBe(false);
+      expect(fileExists(result.appPath, "packages/db/eslint.config.ts")).toBe(
+        false,
+      );
 
       const rootPkg = readJson<{
         scripts?: Record<string, string>;
         devDependencies?: Record<string, string>;
       }>(result.appPath, "package.json");
-      const nextPkg = readJson<{
+      const webPkg = readJson<{
         scripts?: Record<string, string>;
         devDependencies?: Record<string, string>;
-      }>(result.appPath, "apps/nextjs/package.json");
+      }>(result.appPath, "apps/web/package.json");
 
       expect(rootPkg.devDependencies?.prettier).toBeFalsy();
       expect(rootPkg.devDependencies?.["@gmacko/prettier-config"]).toBeFalsy();
       expect(rootPkg.scripts?.format).not.toContain("prettier");
       expect(rootPkg.scripts?.lint).not.toContain("eslint");
 
-      expect(nextPkg.devDependencies?.eslint).toBeFalsy();
-      expect(nextPkg.devDependencies?.prettier).toBeFalsy();
-      expect(nextPkg.devDependencies?.["@gmacko/eslint-config"]).toBeFalsy();
-      expect(nextPkg.devDependencies?.["@gmacko/prettier-config"]).toBeFalsy();
-      expect(nextPkg.scripts?.format).toContain("biome");
-      expect(nextPkg.scripts?.lint).toContain("oxlint");
+      expect(webPkg.devDependencies?.eslint).toBeFalsy();
+      expect(webPkg.devDependencies?.prettier).toBeFalsy();
+      expect(webPkg.devDependencies?.["@gmacko/eslint-config"]).toBeFalsy();
+      expect(webPkg.devDependencies?.["@gmacko/prettier-config"]).toBeFalsy();
+      expect(webPkg.scripts?.format).toContain("biome");
+      expect(webPkg.scripts?.lint).toContain("oxlint");
     }, 120000);
   });
 
@@ -1494,6 +1519,8 @@ describe("create-gmacko-app scaffold", () => {
     expect(e2eWorkflow).toContain(
       "pnpm --dir packages/create-gmacko-app build",
     );
+    // The mock .env mirrors .env.example: Worker bindings, no DATABASE_URL.
+    expect(e2eWorkflow).toContain('STAGE="development"');
     expect(e2eWorkflow).toContain('AUTH_GITHUB_ID="test-github-client-id"');
     expect(e2eWorkflow).toContain(
       'AUTH_GITHUB_SECRET="test-github-client-secret"',
@@ -1507,8 +1534,11 @@ describe("create-gmacko-app scaffold", () => {
     expect(e2eWorkflow).toContain(
       'EXPO_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"',
     );
-    expect(e2eWorkflow).toContain("pnpm --filter @gmacko/nextjs build");
+    expect(e2eWorkflow).not.toContain("DATABASE_URL");
+    expect(e2eWorkflow).not.toContain("NEXT_PUBLIC_");
+    // The matrix: default, operators, minimal (web only), custom scope, full, mobile only.
     expect(e2eWorkflow).toContain("pnpm --filter @gmacko/web build");
+    expect(e2eWorkflow).toContain("pnpm --filter @mycompany/web build");
     expect(e2eWorkflow).toContain("pnpm --filter @gmacko/expo typecheck");
     expect(e2eWorkflow).toContain(
       "pnpm --filter @gmacko/expo exec expo start --dev-client --help",
@@ -1516,28 +1546,32 @@ describe("create-gmacko-app scaffold", () => {
     expect(e2eWorkflow).toContain(
       "pnpm --filter @gmacko/expo exec expo config --json",
     );
-    expect(e2eWorkflow).toContain(
-      "pnpm --filter @gmacko/nextjs deploy:cloudflare:staging",
-    );
-    expect(e2eWorkflow).toContain("--trpc-operators");
-    expect(e2eWorkflow).toContain("pnpm trpc:ops -- --help");
+    expect(e2eWorkflow).toContain("--operator-lane");
+    expect(e2eWorkflow).toContain("pnpm api:ops -- --help");
     expect(e2eWorkflow).toContain("Operator API env values");
-    expect(e2eWorkflow).toContain('GMACKO_API_URL="http://localhost:3000"');
+    expect(e2eWorkflow).toContain('GMACKO_API_URL="http://localhost:3001"');
     expect(e2eWorkflow).toContain('GMACKO_API_KEY="test-gmacko-api-key"');
     expect(e2eWorkflow).toContain("pnpm exec forge version");
     expect(e2eWorkflow).toContain("forge stage list");
     expect(e2eWorkflow).toContain("forge deploy create staging --wait");
     expect(e2eWorkflow).toContain("pnpm auth:generate");
     expect(e2eWorkflow).toContain("pnpm db:generate");
-    expect(e2eWorkflow).toContain(
-      "grep 'return \"healthy\"' apps/nextjs/src/app/api/health/route.ts",
-    );
+    expect(e2eWorkflow).toContain("pnpm db:migrate:local");
+    expect(e2eWorkflow).toContain("pnpm db:seed");
+    expect(e2eWorkflow).toContain("pnpm test:workers");
+    expect(e2eWorkflow).toContain("Cloudflare Workers lane detected");
     expect(e2eWorkflow).toContain("Cloudflare Workers env values");
-    expect(e2eWorkflow).toContain("fake-wrangler deploy --env staging");
+    expect(e2eWorkflow).toContain("--no-web");
+    expect(e2eWorkflow).toContain("test ! -d apps/web");
+    expect(e2eWorkflow).toContain("fake-wrangler");
     expect(e2eWorkflow).toContain('RUN_E2E: "true"');
     expect(e2eWorkflow).toContain(
       "pnpm --dir packages/create-gmacko-app exec vitest run src/__tests__/e2e.test.ts",
     );
+    expect(e2eWorkflow).not.toContain("nextjs");
+    expect(e2eWorkflow).not.toContain("vinext");
+    expect(e2eWorkflow).not.toContain("trpc");
+    expect(e2eWorkflow).not.toContain("legacy-");
   });
 
   it("keeps repo formatting focused on first-party files", () => {
@@ -1610,8 +1644,30 @@ describe("create-gmacko-app scaffold", () => {
     expect(testImportBlock).not.toContain("beforeEach");
   });
 
+  it("keeps the scaffolder sources free of the pre-migration stack", () => {
+    const sources = [
+      "index.ts",
+      "prompts.ts",
+      "scaffold.ts",
+      "types.ts",
+      "provision.ts",
+    ]
+      .map((file) => path.resolve(process.cwd(), "src", file))
+      .map((file) => fs.readFileSync(file, "utf8"));
+
+    for (const source of sources) {
+      expect(source).not.toContain("tanstackStart");
+      expect(source).not.toContain("vinext");
+      expect(source).not.toContain("apps/nextjs");
+      expect(source).not.toContain("@gmacko/nextjs");
+      expect(source).not.toContain("legacy-");
+      expect(source).not.toContain("trpc");
+      expect(source).not.toContain("postgres");
+    }
+  });
+
   describe("platform options", () => {
-    it("should exclude web app when --no-web is passed", async () => {
+    it("should exclude the web app and its root wiring when --no-web is passed", async () => {
       const appName = generateAppName("no-web");
       const result = await runCli({
         appName,
@@ -1622,7 +1678,44 @@ describe("create-gmacko-app scaffold", () => {
       appsToClean.push(result.appPath);
 
       expect(result.exitCode).toBe(0);
-      expect(fileExists(result.appPath, "apps/nextjs")).toBe(false);
+      expect(fileExists(result.appPath, "apps/web")).toBe(false);
+      expect(fileExists(result.appPath, "apps/expo")).toBe(true);
+      expect(fileExists(result.appPath, ".github/workflows/preview.yml")).toBe(
+        false,
+      );
+
+      const rootPkg = readJson<{ scripts?: Record<string, string> }>(
+        result.appPath,
+        "package.json",
+      );
+      const portless = readJson<{ apps?: Record<string, unknown> }>(
+        result.appPath,
+        "portless.json",
+      );
+      const forgeGraphConfig = readFile(result.appPath, ".forgegraph.yaml");
+
+      expect(rootPkg.scripts?.dev).toBe("pnpm dev:emulate");
+      for (const script of [
+        "dev:web",
+        "dev:app",
+        "e2e:web",
+        "cf-typegen",
+        "check:cf-types",
+        "deploy:migrate",
+        "deploy:staging",
+        "deploy:production",
+        "secrets:push",
+      ]) {
+        expect(rootPkg.scripts?.[script]).toBeUndefined();
+      }
+      expect(portless.apps?.["apps/web"]).toBeUndefined();
+      expect(forgeGraphConfig).toContain(`app: ${appName}`);
+      expect(forgeGraphConfig).not.toContain("stages:");
+      expect(forgeGraphConfig).toContain(
+        "# primary web service path: apps/expo",
+      );
+      expect(forgeGraphConfig).toContain("mobile-only scaffold");
+      expect(result.stdout).toContain("EXPO_PUBLIC_API_URL");
     }, 120000);
 
     it("should exclude mobile app when --no-mobile is passed", async () => {
@@ -1637,23 +1730,22 @@ describe("create-gmacko-app scaffold", () => {
 
       expect(result.exitCode).toBe(0);
       expect(fileExists(result.appPath, "apps/expo")).toBe(false);
+      expect(fileExists(result.appPath, "apps/web")).toBe(true);
     }, 120000);
 
-    it("should include tanstack-start when --tanstack-start is passed", async () => {
-      const appName = generateAppName("with-tanstack");
+    it("should refuse to scaffold nothing when both platforms are excluded", async () => {
+      const appName = generateAppName("no-platforms");
       const result = await runCli({
         appName,
-        flags: ["--yes", "--no-install", "--no-git", "--tanstack-start"],
+        flags: ["--yes", "--no-install", "--no-git", "--no-web", "--no-mobile"],
         cwd: tempDir,
       });
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
-
-      for (const file of EXPECTED_FILES.withTanstackStart) {
-        expect(fileExists(result.appPath, file)).toBe(true);
-      }
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain("Nothing to scaffold");
+      expect(fileExists(result.appPath, "package.json")).toBe(false);
     }, 120000);
 
     it("should exclude AI when --no-ai is passed", async () => {
@@ -1706,7 +1798,7 @@ describe("create-gmacko-app scaffold", () => {
       expect(integrationsContent).toContain("stripe: true");
     }, 120000);
 
-    it("should prune unused packages when --prune is passed", async () => {
+    it("should prune unused packages and their web wiring when --prune is passed", async () => {
       const appName = generateAppName("pruned");
       const result = await runCli({
         appName,
@@ -1716,7 +1808,6 @@ describe("create-gmacko-app scaffold", () => {
           "--no-git",
           "--no-mobile",
           "--no-ai",
-          "--vinext",
           "--prune",
           "--integrations",
           "", // No integrations = prune all optional packages
@@ -1729,46 +1820,70 @@ describe("create-gmacko-app scaffold", () => {
       expect(result.exitCode).toBe(0);
 
       // These packages should be removed when their integrations are disabled
-      expect(fileExists(result.appPath, "packages/monitoring")).toBe(false);
-      expect(fileExists(result.appPath, "packages/analytics")).toBe(false);
-      expect(fileExists(result.appPath, "packages/payments")).toBe(false);
-      expect(
-        fileExists(result.appPath, "apps/nextjs/sentry.client.config.ts"),
-      ).toBe(false);
-      expect(
-        fileExists(result.appPath, "apps/nextjs/sentry.edge.config.ts"),
-      ).toBe(false);
-      expect(
-        fileExists(result.appPath, "apps/nextjs/sentry.server.config.ts"),
-      ).toBe(false);
+      for (const pkg of [
+        "monitoring",
+        "analytics",
+        "payments",
+        "purchases",
+        "notifications",
+        "email",
+        "realtime",
+        "storage",
+      ]) {
+        expect(fileExists(result.appPath, `packages/${pkg}`)).toBe(false);
+      }
 
-      const nextProviders = readFile(
+      const webPkg = readJson<{
+        dependencies?: Record<string, string>;
+        devDependencies?: Record<string, string>;
+      }>(result.appPath, "apps/web/package.json");
+      const webProviders = readFile(
         result.appPath,
-        "apps/nextjs/src/app/providers.tsx",
+        "apps/web/src/providers.tsx",
       );
-      const nextErrorPage = readFile(
+      const stripeWebhook = readFile(
         result.appPath,
-        "apps/nextjs/src/app/error.tsx",
-      );
-      const nextGlobalError = readFile(
-        result.appPath,
-        "apps/nextjs/src/app/global-error.tsx",
-      );
-      const nextErrorBoundary = readFile(
-        result.appPath,
-        "apps/nextjs/src/components/error-boundary.tsx",
-      );
-      const nextInstrumentation = readFile(
-        result.appPath,
-        "apps/nextjs/src/instrumentation.ts",
+        "apps/web/src/server/stripe-webhook.ts",
       );
 
-      expect(nextProviders).not.toContain("@gmacko/analytics/web");
-      expect(nextErrorPage).not.toContain("@gmacko/monitoring/web");
-      expect(nextGlobalError).not.toContain("@gmacko/monitoring/web");
-      expect(nextErrorBoundary).not.toContain("@gmacko/monitoring/web");
-      expect(nextInstrumentation).not.toContain("sentry.server.config");
-      expect(nextInstrumentation).not.toContain("sentry.edge.config");
+      expect(webPkg.dependencies?.["@gmacko/analytics"]).toBeUndefined();
+      expect(webPkg.dependencies?.["@gmacko/payments"]).toBeUndefined();
+      expect(webPkg.dependencies?.["@gmacko/monitoring"]).toBeUndefined();
+      expect(webPkg.dependencies?.["@gmacko/api"]).toBeDefined();
+      expect(webProviders).not.toContain("@gmacko/analytics/web");
+      expect(stripeWebhook).not.toContain("@gmacko/payments");
+      expect(stripeWebhook).toContain("webhook not configured");
+      expect(
+        fileExists(
+          result.appPath,
+          "apps/web/src/server/__tests__/stripe-webhook.test.ts",
+        ),
+      ).toBe(false);
+
+      // No remaining workspace package may still declare a pruned dependency.
+      for (const dir of ["apps", "packages", "tooling"]) {
+        const base = path.join(result.appPath, dir);
+        if (!fs.existsSync(base)) continue;
+        for (const entry of fs.readdirSync(base)) {
+          const pkgPath = path.join(base, entry, "package.json");
+          if (!fs.existsSync(pkgPath)) continue;
+          const pkg = fs.readJsonSync(pkgPath) as {
+            dependencies?: Record<string, string>;
+            devDependencies?: Record<string, string>;
+          };
+          for (const dep of [
+            "@gmacko/monitoring",
+            "@gmacko/analytics",
+            "@gmacko/payments",
+            "@gmacko/email",
+            "@gmacko/realtime",
+            "@gmacko/storage",
+          ]) {
+            expect(pkg.dependencies?.[dep]).toBeUndefined();
+            expect(pkg.devDependencies?.[dep]).toBeUndefined();
+          }
+        }
+      }
     }, 120000);
   });
 
@@ -1792,17 +1907,32 @@ describe("create-gmacko-app scaffold", () => {
       expect(result.exitCode).toBe(0);
 
       // Check that @gmacko was replaced with @myorg
-      const apiPkg = readJson<{ name: string }>(
-        result.appPath,
-        "packages/legacy-api/package.json",
-      );
-      expect(apiPkg.name).toBe("@myorg/legacy-api");
+      for (const [pkgPath, expected] of [
+        ["packages/api/package.json", "@myorg/api"],
+        ["packages/domain/package.json", "@myorg/domain"],
+        ["packages/api-client/package.json", "@myorg/api-client"],
+        ["packages/db/package.json", "@myorg/db"],
+        ["packages/auth/package.json", "@myorg/auth"],
+        ["apps/web/package.json", "@myorg/web"],
+        ["apps/expo/package.json", "@myorg/expo"],
+      ] as const) {
+        const pkg = readJson<{ name: string }>(result.appPath, pkgPath);
+        expect(pkg.name).toBe(expected);
+      }
 
-      const dbPkg = readJson<{ name: string }>(
+      const webPkg = readJson<{ dependencies?: Record<string, string> }>(
         result.appPath,
-        "packages/legacy-db/package.json",
+        "apps/web/package.json",
       );
-      expect(dbPkg.name).toBe("@myorg/legacy-db");
+      expect(webPkg.dependencies?.["@myorg/api"]).toBe("workspace:*");
+
+      // @gmacko/emulate is an external dev dependency and must keep its name.
+      const rootPkg = readJson<{ devDependencies?: Record<string, string> }>(
+        result.appPath,
+        "package.json",
+      );
+      expect(rootPkg.devDependencies?.["@gmacko/emulate"]).toBeDefined();
+      expect(rootPkg.devDependencies?.["@myorg/emulate"]).toBeUndefined();
     }, 120000);
   });
 
@@ -1830,7 +1960,7 @@ describe("create-gmacko-app scaffold", () => {
 
       expect(manifest.preset).toBeDefined();
       expect(manifest.integrations).toBeDefined();
-      expect(manifest.platforms).toBeDefined();
+      expect(manifest.platforms).toEqual({ web: true, mobile: true });
       expect(manifest.scaffoldedAt).toBeDefined();
       expect(manifest.packageScope).toBe("@gmacko");
     }, 120000);

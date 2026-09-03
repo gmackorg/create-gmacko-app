@@ -256,20 +256,23 @@ export function validatePackageJson(
 }
 
 /**
- * Create a mock .env file for testing
+ * Create a mock .env for a generated app. Mirrors the keys `.env.example`
+ * documents: the web lane reads these as Worker bindings (no DATABASE_URL,
+ * the database is a local D1), Expo reads the EXPO_PUBLIC_* values, and the
+ * operator lane reads GMACKO_API_*.
  */
 export function createMockEnv(appPath: string): void {
   const envContent = `
 # Mock environment for testing
-DATABASE_URL="postgresql://test:test@localhost:5432/test"
-AUTH_SECRET="test-secret-key-for-testing-only"
+STAGE="development"
+APP_URL="http://localhost:3001"
+AUTH_SECRET="test-secret-key-for-testing-only-32-chars"
 AUTH_GITHUB_ID="test-github-client-id"
 AUTH_GITHUB_SECRET="test-github-client-secret"
 AUTH_GOOGLE_ID="test-google-client-id"
 AUTH_GOOGLE_SECRET="test-google-client-secret"
-AUTH_URL="http://localhost:3000"
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
-NEXT_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
+BYPASS_MAGIC_LINK="true"
+VITE_POSTHOG_HOST="https://us.i.posthog.com"
 EXPO_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
 EXPO_PUBLIC_POSTHOG_KEY_DEV="phc_test_dev"
 EXPO_PUBLIC_POSTHOG_KEY_STAGING="phc_test_staging"
@@ -279,7 +282,7 @@ EXPO_PUBLIC_SENTRY_DSN_STAGING="https://test@example.ingest.sentry.io/456"
 EXPO_PUBLIC_SENTRY_DSN_PROD="https://test@example.ingest.sentry.io/789"
 CLOUDFLARE_ACCOUNT_ID="test-cloudflare-account"
 CLOUDFLARE_API_TOKEN="test-cloudflare-token"
-GMACKO_API_URL="http://localhost:3000"
+GMACKO_API_URL="http://localhost:3001"
 GMACKO_API_KEY="test-gmacko-api-key"
 `;
 
@@ -312,20 +315,30 @@ export const EXPECTED_FILES = {
     "pnpm-workspace.yaml",
     "turbo.json",
     ".env.example",
-    "packages/legacy-api/package.json",
-    "packages/legacy-db/package.json",
-    "packages/legacy-auth/package.json",
+    "packages/domain/package.json",
+    "packages/api/package.json",
+    "packages/api-client/package.json",
+    "packages/db/package.json",
+    "packages/db/migrations",
+    "packages/auth/package.json",
     "packages/config/package.json",
     "packages/ui/package.json",
   ],
-  withWeb: ["apps/nextjs/package.json", "apps/nextjs/next.config.js"],
+  withWeb: [
+    "apps/web/package.json",
+    "apps/web/vite.config.ts",
+    "apps/web/wrangler.jsonc",
+    "apps/web/src/server/worker.ts",
+    "apps/web/src/server/runtime.ts",
+    "apps/web/src/routes/__root.tsx",
+    "apps/web/e2e",
+  ],
   withStorybook: [
     "packages/ui/.storybook/main.ts",
     "packages/ui/.storybook/preview.tsx",
     "packages/ui/src/button.stories.tsx",
   ],
   withMobile: ["apps/expo/package.json", "apps/expo/app.config.ts"],
-  withTanstackStart: ["apps/web/package.json"],
   withSentry: ["packages/monitoring/package.json"],
   withPosthog: ["packages/analytics/package.json"],
   withAi: [
@@ -335,5 +348,15 @@ export const EXPECTED_FILES = {
     ".claude/skills/gstack/setup",
     ".claude/skills/create-gmacko-app-workflow/SKILL.md",
     "docs/ai/INITIAL_PROPOSAL.md",
+  ],
+  /** Never present in a scaffold: the pre-migration stack. */
+  legacy: [
+    "apps/nextjs",
+    "packages/legacy-api",
+    "packages/legacy-db",
+    "packages/legacy-auth",
+    "docker-compose.yml",
+    "Dockerfile",
+    ".dockerignore",
   ],
 } as const;

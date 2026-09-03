@@ -1,9 +1,16 @@
+import { createRequire } from "node:module";
 import { Command } from "commander";
 import pc from "picocolors";
 import validateNpmPackageName from "validate-npm-package-name";
 import { getDefaultOptions, runPrompts } from "./prompts.js";
 import { scaffold } from "./scaffold.js";
 import type { CliOptions, IntegrationConfig } from "./types.js";
+
+// dist/index.js sits one level below package.json; the CLI reports the version
+// changesets publish rather than a hand-maintained string.
+const { version } = createRequire(import.meta.url)("../package.json") as {
+  version: string;
+};
 
 const program = new Command();
 
@@ -12,7 +19,7 @@ program
   .description(
     "Create a new Gmacko app: TanStack Start + Effect on Cloudflare Workers with D1, Expo, and agent-native DX defaults",
   )
-  .version("0.2.0")
+  .version(version)
   .argument("<app-name>", "Name of the app to create")
   .option("--yes, -y", "Accept all defaults without prompting")
   .option("--prune", "Remove unused integration packages")
@@ -42,7 +49,7 @@ program
     "Add optional Claude SaaS bootstrap skills and post-setup playbook",
   )
   .option(
-    "--trpc-operators",
+    "--operator-lane",
     "Add the optional operator lane: CLI + MCP wrappers over the app's HTTP API (admin-scoped API keys)",
   )
   .option(
@@ -126,7 +133,9 @@ program
 
     if (!options.platforms.web && !options.platforms.mobile) {
       console.error(
-        pc.red("Nothing to scaffold: pass at most one of --no-web / --no-mobile."),
+        pc.red(
+          "Nothing to scaffold: pass at most one of --no-web / --no-mobile.",
+        ),
       );
       process.exit(1);
     }
@@ -201,12 +210,12 @@ function applyOperatorLaneFlags(
     const requested = opts.saasOperatorApis === true;
     options.saasOperatorApis = requested;
     if (requested) {
-      options.trpcOperators = true;
+      options.operatorLane = true;
     }
   }
 
-  if (opts.trpcOperators !== undefined) {
-    options.trpcOperators = opts.trpcOperators === true;
+  if (opts.operatorLane !== undefined) {
+    options.operatorLane = opts.operatorLane === true;
   }
 }
 
