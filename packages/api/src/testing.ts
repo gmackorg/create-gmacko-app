@@ -58,6 +58,14 @@ import { defaultRateLimits, RateLimiter, type RateLimits } from "./rate-limit";
 
 export const TEST_BASE_URL = "http://localhost:3001";
 
+/** The five scopes with a limit no suite reaches; a test passes its own to hit 429. */
+export const generousRateLimits: RateLimits = Object.fromEntries(
+  Object.entries(defaultRateLimits).map(([scope, policy]) => [
+    scope,
+    { ...policy, limit: 1_000_000 },
+  ]),
+) as RateLimits;
+
 /** A fixed config; tests override the stage or a feature switch. */
 export const testAppConfig = (overrides?: {
   readonly stage?: Stage;
@@ -237,7 +245,11 @@ export const makeTestApi = (options: TestApiOptions = {}): TestApi => {
   const logs: Array<RecordedLog> = [];
   const config = testAppConfig(options);
   const database = options.database ?? layerTest;
-  const limits: RateLimits = { ...defaultRateLimits, ...options.rateLimits };
+  // Generous by default: every call in a suite shares one client key.
+  const limits: RateLimits = {
+    ...generousRateLimits,
+    ...options.rateLimits,
+  };
 
   const tracer = Tracer.make({
     span: (spanOptions) => {
@@ -286,10 +298,15 @@ export const makeTestApi = (options: TestApiOptions = {}): TestApi => {
       Effect.result(Effect.flatMap(makeApiClient(web.handler, credentials), f)),
     );
 
+  // better-auth stores the address lower-cased.
   const userByEmail = (email: string) =>
     run(
       Effect.flatMap(Database, ({ db }) =>
-        db.select().from(user).where(eq(user.email, email)).limit(1),
+        db
+          .select()
+          .from(user)
+          .where(eq(user.email, email.toLowerCase()))
+          .limit(1),
       ),
     ).then((rows) => {
       const row = rows[0];
@@ -320,12 +337,18 @@ export const makeTestApi = (options: TestApiOptions = {}): TestApi => {
               ...(options.role === undefined ? {} : { role: options.role }),
               ...(options.name === undefined ? {} : { name: options.name }),
             })
-            .where(eq(user.email, email)),
+            .where(eq(user.email, email.toLowerCase())),
         ),
       );
     }
     const row = await userByEmail(email);
-    return { id: row.id, email, name: row.name, role: row.role, cookie };
+    return {
+      id: row.id,
+      email: row.email,
+      name: row.name,
+      role: row.role,
+      cookie,
+    };
   };
 
   const createWorkspace: TestApi["createWorkspace"] = ({
