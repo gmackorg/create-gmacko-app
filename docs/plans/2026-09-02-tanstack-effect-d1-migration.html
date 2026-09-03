@@ -126,7 +126,7 @@
   </div>
 
   <div class="progress" aria-label="Phase progress">
-    <i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="active"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    <i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="active"></i><i class="active"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
   </div>
 
   <h2>Overview</h2>
@@ -717,9 +717,9 @@ packages/
     <li class="done"><b>Phase 1 — Domain contract</b> · ~4 days · <code>packages/domain</code>, all endpoints declared.</li>
     <li class="done"><b>Phase 2 — D1 data layer</b> · ~4 days · schema port, migrations, <code>Database</code> service.</li>
     <li class="done"><b>Phase 3 — Auth on D1</b> · ~3 days · better-auth sqlite, middleware, API keys.</li>
-    <li class="active"><b>Phase 4 — API services</b> · ~6 days · port 26 procedures and ~2,000 lines of tests.</li>
-    <li><b>Phase 5 — Web app</b> · ~6 days · <code>apps/web</code> to page parity.</li>
-    <li><b>Phase 6 — Clients</b> · ~3 days · api-client, Expo, CLI, MCP, OpenAPI SDK.</li>
+    <li class="done"><b>Phase 4 — API services</b> · ~6 days · port 26 procedures and ~2,000 lines of tests.</li>
+    <li class="active"><b>Phase 5 — Web app</b> · ~6 days · <code>apps/web</code> to page parity.</li>
+    <li class="active"><b>Phase 6 — Clients</b> · ~3 days · api-client, Expo, CLI, MCP, OpenAPI SDK.</li>
     <li><b>Phase 7 — Platform &amp; CI</b> · ~7 days · observability, wrangler, secrets bridge, rate limiting, preview databases, workflows, emulate, deploy lane.</li>
     <li><b>Phase 8 — Scaffolder, docs, delete Next</b> · ~4 days · the flag day: one merge of the migration branch.</li>
     <li><b>Phase 9 — Post-cutover hardening</b> · ~5 days · Model.Class, rate-limit binding, preview databases, storage, data-migration recipe; ships as 0.2.1.</li>
@@ -812,23 +812,23 @@ packages/
     </tbody>
   </table>
 
-  <h2>Phase 4 — API services <span class="badge todo">Todo</span></h2>
+  <h2>Phase 4 — API services <span class="badge done">Done</span></h2>
   <p>Port the four routers into services plus handler groups. Business logic moves verbatim where possible; the only semantic change is <code>transaction</code> → <code>batch</code>.</p>
   <table>
     <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
     <tbody>
-      <tr><td><code>AppConfig</code> service: Schema-validated env (auth, URLs, <code>stage</code>, allowed origins, feature flags from <code>@gmacko/config</code>); <code>Background</code> service interface</td><td><code>packages/api/src/config.ts</code>, <code>src/background.ts</code></td><td>Missing required var fails layer construction with a readable error; no <code>NODE_ENV</code> reads remain in packages</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td><code>RateLimiter</code> service interface with the five config scopes; in-memory test layer; applied as an <code>HttpApiMiddleware</code> on auth, contact, signup, api-keys, and operator endpoints</td><td><code>src/rate-limit.ts</code>, endpoint annotations in <code>packages/domain</code></td><td>429 <code>RateLimited</code> after N calls in tests</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td>CORS middleware on <code>AppApi</code> using <code>AppConfig.allowedOrigins</code></td><td><code>src/layer.ts</code></td><td>Preflight from the Expo dev origin succeeds; unknown origin rejected</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td><code>Posts</code> service + handlers</td><td><code>src/posts/</code></td><td>Tests ported</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td><code>Workspaces</code> service (context, invites, allowlist, bootstrap) + <code>LaunchControls</code> service (settings, waitlist)</td><td><code>src/settings/</code>, <code>src/admin/</code></td><td>Non-branching multi-write paths (<code>acceptInvite</code>, <code>deleteAccount</code>) use <code>batch</code>; read-check-write paths (<code>completeBootstrap</code>, <code>reviewWaitlistEntry</code>) use <code>updateWhere</code> guards and fail with <code>Conflict</code> on zero rows; tests ported; <strong>regression tests: the batch paths leave no partial rows when their last statement fails, and two concurrent <code>completeBootstrap</code> / <code>reviewWaitlistEntry</code> calls on real D1 (pool-workers suite) yield exactly one success and one <code>Conflict</code></strong></td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td><code>Health</code> service: live, ready, full, forge checks over <code>Database.ping</code>, one 5-second cache, redaction by <code>AppConfig.stage</code>; <code>HealthHandlers</code> group</td><td><code>src/health/</code></td><td><strong>Regression: JSON shape snapshots of today's four responses</strong> (dev and production variants) pass unchanged</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td><strong>Failure test:</strong> a <code>DatabaseError</code> reaching any endpoint yields 500 with the generic <code>InternalError</code> body and a trace id header; the driver message appears only in the log line</td><td><code>src/__tests__/errors.test.ts</code></td><td>Test uses a <code>Database</code> layer that fails every query</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td><code>Billing</code> read model (overview, limits, usage rollups)</td><td><code>src/settings/billing.ts</code></td><td>Tests ported</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td><code>Preferences</code>, <code>Account</code> (delete account through <code>user</code> row cascade, satisfying <code>no-partial-account-deletion</code>)</td><td><code>src/settings/</code>, <code>src/account/</code></td><td>Delete test asserts sessions/accounts/api keys gone</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td>Admin: stats, users, roles, waitlist review</td><td><code>src/admin/</code></td><td>Tests ported (727 lines today)</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td><code>ApiLive</code> layer, <code>makeWebHandler</code>, one span per endpoint named <code>group.endpoint</code> with duration histogram, request-scoped log annotations (request id, user id)</td><td><code>src/layer.ts</code>, <code>src/handler.ts</code></td><td>Handler test through <code>HttpApiClient</code> over the in-process handler; span test asserts one root span per call with the endpoint name</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td>Delete <code>trpc.ts</code>, <code>root.ts</code>, <code>openapi.ts</code>, <code>versioning.ts</code>, <code>middleware/*</code>, <code>router/*</code>; drop <code>@trpc/server</code>, <code>superjson</code>, <code>zod</code> from the package</td><td><code>packages/api</code></td><td>knip clean; typecheck passes</td><td><span class="badge todo">Todo</span></td></tr>
+      <tr><td><code>AppConfig</code> service: Schema-validated env (auth, URLs, <code>stage</code>, allowed origins, feature flags from <code>@gmacko/config</code>); <code>Background</code> service interface</td><td><code>packages/api/src/config.ts</code>, <code>src/background.ts</code></td><td>Missing required var fails layer construction with a readable error; no <code>NODE_ENV</code> reads remain in packages</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td><code>RateLimiter</code> service interface with the five config scopes; in-memory test layer; applied as an <code>HttpApiMiddleware</code> on auth, contact, signup, api-keys, and operator endpoints</td><td><code>src/rate-limit.ts</code>, endpoint annotations in <code>packages/domain</code></td><td>429 <code>RateLimited</code> after N calls in tests</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td>CORS middleware on <code>AppApi</code> using <code>AppConfig.allowedOrigins</code></td><td><code>src/layer.ts</code></td><td>Preflight from the Expo dev origin succeeds; unknown origin rejected</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td><code>Posts</code> service + handlers</td><td><code>src/posts/</code></td><td>Tests ported</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td><code>Workspaces</code> service (context, invites, allowlist, bootstrap) + <code>LaunchControls</code> service (settings, waitlist)</td><td><code>src/settings/</code>, <code>src/admin/</code></td><td>Non-branching multi-write paths (<code>acceptInvite</code>, <code>deleteAccount</code>) use <code>batch</code>; read-check-write paths (<code>completeBootstrap</code>, <code>reviewWaitlistEntry</code>) use <code>updateWhere</code> guards and fail with <code>Conflict</code> on zero rows; tests ported; <strong>regression tests: the batch paths leave no partial rows when their last statement fails, and two concurrent <code>completeBootstrap</code> / <code>reviewWaitlistEntry</code> calls on real D1 (pool-workers suite) yield exactly one success and one <code>Conflict</code></strong></td><td><span class="badge done">Done</span></td></tr>
+      <tr><td><code>Health</code> service: live, ready, full, forge checks over <code>Database.ping</code>, one 5-second cache, redaction by <code>AppConfig.stage</code>; <code>HealthHandlers</code> group</td><td><code>src/health/</code></td><td><strong>Regression: JSON shape snapshots of today's four responses</strong> (dev and production variants) pass unchanged</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td><strong>Failure test:</strong> a <code>DatabaseError</code> reaching any endpoint yields 500 with the generic <code>InternalError</code> body and a trace id header; the driver message appears only in the log line</td><td><code>src/__tests__/errors.test.ts</code></td><td>Test uses a <code>Database</code> layer that fails every query</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td><code>Billing</code> read model (overview, limits, usage rollups)</td><td><code>src/settings/billing.ts</code></td><td>Tests ported</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td><code>Preferences</code>, <code>Account</code> (delete account through <code>user</code> row cascade, satisfying <code>no-partial-account-deletion</code>)</td><td><code>src/settings/</code>, <code>src/account/</code></td><td>Delete test asserts sessions/accounts/api keys gone</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td>Admin: stats, users, roles, waitlist review</td><td><code>src/admin/</code></td><td>Tests ported (727 lines today)</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td><code>ApiLive</code> layer, <code>makeWebHandler</code>, one span per endpoint named <code>group.endpoint</code> with duration histogram, request-scoped log annotations (request id, user id)</td><td><code>src/layer.ts</code>, <code>src/handler.ts</code></td><td>Handler test through <code>HttpApiClient</code> over the in-process handler; span test asserts one root span per call with the endpoint name</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td>Delete <code>trpc.ts</code>, <code>root.ts</code>, <code>openapi.ts</code>, <code>versioning.ts</code>, <code>middleware/*</code>, <code>router/*</code>; drop <code>@trpc/server</code>, <code>superjson</code>, <code>zod</code> from the package</td><td><code>packages/api</code></td><td>knip clean; typecheck passes</td><td><span class="badge done">Done</span></td></tr>
     </tbody>
   </table>
   <details>
