@@ -2,8 +2,8 @@
 
 This repo is designed around a few stable assumptions:
 
-- ForgeGraph + Nix is the default owned-infrastructure path.
-- Postgres should start colocated with the app and move hosted later only when operating pressure justifies it.
+- The web app is one Cloudflare Worker per stage (TanStack Start + Effect `HttpApi`) with a D1 database per stage; ForgeGraph is the deployment control plane.
+- There is no database server to run: development uses a local D1 under `apps/web/.wrangler/state`, and the service emulators come from `@gmacko/emulate`.
 - `jj` is the default local VCS, with Git compatibility kept for GitHub and external tooling.
 - Shared repo instructions belong in `AGENTS.md`, not split across tool-specific files.
 
@@ -11,7 +11,7 @@ This repo is designed around a few stable assumptions:
 
 Use this layout for agent-native development:
 
-- `AGENTS.md`: canonical repo instructions for Codex, Claude Code, and OpenCode.
+- `AGENTS.md`: canonical repo instructions for Codex, Claude Code, and OpenCode, including the "App Invariants" that `pnpm check:standards` enforces.
 - `CLAUDE.md`: Claude-specific entrypoint for gstack and slash-command workflows.
 - `.claude/settings.json`: Claude project permissions, including `../ForgeGraph` as an additional working directory for deployment workflows.
 - `opencode.json`: loads shared repo docs into OpenCode without duplicating them in `AGENTS.md`.
@@ -41,50 +41,44 @@ Use this layout for agent-native development:
 
 ## MCP
 
-The repo currently ships the official Next.js MCP server in `.mcp.json` for Next.js 16+:
-
-- `next-devtools-mcp` connects to the running Next.js dev server automatically.
-- It gives agents access to current errors, logs, routes, runtime state, and upgrade/debugging help.
-- Keep this enabled for the Next.js app unless the repo intentionally drops Next.js.
+`.mcp.json` ships empty (`{ "mcpServers": {} }`). The optional operator lane
+(`--operator-lane`) adds a `gmacko-app` entry pointing at the app's own MCP
+server (`packages/mcp-server`, `pnpm mcp:app`), which wraps the same `HttpApi`
+the web app serves and authenticates with an API key holding the `admin`
+scope. Debugging the running app goes through its own surfaces: Workers Logs
+(`wrangler tail`), the OTLP trace per endpoint, and the health routes.
 
 ## Web Stack
 
-Current default recommendations:
+The only web lane:
 
-- Stable owned path: Next.js 16 + ForgeGraph + Nix + colocated Postgres.
-- Workers-native alternative: TanStack Start on Cloudflare Workers.
-- Experimental Workers path for Next.js DX parity: `vinext`.
-- UI isolation: Storybook 10.
-- Lint/format/check baseline: `oxlint`, `biome`, `tsc --noEmit`, `knip`.
-
-### Cloudflare Support Matrix
-
-- Next.js on Workers via the OpenNext adapter is viable, but still adapter-shaped.
-- `vinext` is the experimental path if we want Next.js semantics on a Vite/Workers runtime.
-- TanStack Start is the cleaner default when we want Cloudflare-native runtime behavior from day one.
+- `apps/web`: TanStack Start (React 19, Vite 8) rendered on workerd through `@cloudflare/vite-plugin`, with the Effect 4 `HttpApi` (`packages/domain` contract, `packages/api` handlers) mounted at `/api/*` in the same Worker.
+- Database: Cloudflare D1 through Drizzle's Effect API (`packages/db`); migrations in `packages/db/migrations`, applied with `wrangler d1 migrations apply` before every deploy.
+- Auth: better-auth 1.7 (`packages/auth`).
+- Deploy: one Worker + one D1 per stage, `scripts/deploy-stage.mjs` (migrate, then `wrangler deploy`), orchestrated by ForgeGraph (`docs/DEPLOYMENT.md`).
+- Local: `pnpm dev` = `@gmacko/emulate` + `apps/web` under `portless` at `https://gmacko.localhost`.
+- UI isolation: Storybook in `packages/ui` (`pnpm --filter @gmacko/ui storybook`).
+- Lint/format/check baseline: `oxlint`, `biome`, `tsc --noEmit`, `knip`, `pnpm check:standards`.
 
 ### Workers Integration Matrix
 
-Use these labels literally when describing the `vinext` lane:
+Use these labels literally when describing an integration on the web lane:
 
-- `stable`: works well enough to recommend without caveats for the Workers lane
-- `experimental`: plausible, but not a lane we should oversell yet
-- `unsupported`: do not position this as part of the current `vinext` contract
+- `stable`: works on the Worker and is wired in the template; recommend without caveats
+- `experimental`: plausible on the Worker, but the wiring is thin or unverified in a deployed stage
+- `unsupported`: does not run on the Worker; do not position it as part of the web lane
 
-Current direction:
-
-| Integration | TanStack Start on Workers | Next.js via `vinext` |
+| Integration | Web lane (TanStack Start + Effect on Workers) | How |
 | --- | --- | --- |
-| Sentry | experimental | experimental |
-| PostHog | stable | experimental |
-| Stripe | unsupported | unsupported |
-| Email | stable | experimental |
-| Realtime | experimental | experimental |
-| Storage | experimental | experimental |
+| Sentry | stable | `@sentry/cloudflare` `withSentry` around the Worker (`SENTRY_DSN`); `@sentry/react` in the browser (`VITE_SENTRY_DSN`) |
+| PostHog | stable | browser SDK via `@gmacko/analytics` (`VITE_POSTHOG_KEY`) |
+| Stripe | stable | `POST /api/webhooks/stripe` through `@gmacko/payments` (SubtleCrypto signature check, fetch HTTP client) |
+| Email | stable | Resend through `@gmacko/email` (`RESEND_BASE_URL` overridable for emulate) |
+| OTLP telemetry | stable | `@gmacko/telemetry` over `effect/unstable/observability`, flushed on `waitUntil` |
+| Storage | experimental | `@gmacko/storage` wrapper; no Worker-side route in the template |
+| Realtime | unsupported | `@gmacko/realtime` is ioredis + BullMQ, Node-only; use it only from a separately deployed Node service |
 
-If a lane is not clearly `stable`, call out the risk in docs and generated guidance instead of implying parity with the ForgeGraph path.
-
-Treat ForgeGraph/Nix and Cloudflare Workers as separate deployment lanes. Do not force one runtime model to satisfy both.
+If an integration is not clearly `stable`, call out the risk in docs and generated guidance instead of implying parity.
 
 ## SaaS Scaffold Maturity
 
@@ -101,7 +95,8 @@ Keep generated guidance honest. If a capability is only scaffolded as a hook or 
 
 Current mobile DX recommendations:
 
-- Expo SDK 55 / React Native 0.84 in the repo should be kept current with Expo's stable line.
+- Expo SDK 56 / React Native 0.85 in the repo should be kept current with Expo's stable line.
+- The Expo app talks to the Worker's API through `@gmacko/api-client` with the better-auth Expo client; `apps/expo/src/config/env.ts` refuses to boot a preview or production build without a real API URL, Sentry DSN, and PostHog key.
 - Prefer development builds over long-term Expo Go usage for production-grade apps.
 - Use Expo Orbit for one-click simulator/device launches and build installs.
 - Keep React Native New Architecture assumptions in mind when evaluating third-party libraries.
@@ -110,7 +105,7 @@ Current mobile DX recommendations:
 
 - Use `jj` locally and keep Git interop intact.
 - Use `forge` from `../ForgeGraph` for real deployment workflows.
-- Keep `.forgegraph.yaml` checked in as the per-repo ForgeGraph metadata surface.
-- Expose the common ForgeGraph workflow through repo scripts such as `pnpm forge:init`, `pnpm forge:doctor`, and `pnpm forge:status`.
+- Keep `.forgegraph.yaml` checked in as the per-repo ForgeGraph metadata surface (`cloudflare-workers` targets, D1 resources, the migrate command).
+- Expose the common ForgeGraph workflow through repo scripts such as `pnpm forge:init`, `pnpm forge:doctor`, `pnpm forge:status`, and `pnpm forge:deploy:<stage>`.
 - Keep docs current when framework, deployment, or agent conventions change.
 - Favor shared standards over vendor-specific sprawl.

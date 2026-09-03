@@ -37,7 +37,7 @@ The public side should also feel product-ready from day one. A generated app sho
 - Optional billing layer with per-workspace plans, limits, and optional metering.
 - Optional support/content layer with contact, tickets, FAQ, changelog, and pricing.
 - Optional launch/growth layer with waitlist, referral tracking, admin waitlist review, maintenance mode, signup toggle, and allowlists.
-- Optional operator lane with CLI and MCP wrappers around the same tRPC API.
+- Optional operator lane with CLI and MCP wrappers around the same HTTP API (`@gmacko/api-client`).
 - Feature flags, background jobs, rate limiting, and bot protection as shared platform primitives where relevant.
 - Email-driven flows when `Resend` is enabled.
 - Admin settings as the home for global app settings and provider configuration.
@@ -58,11 +58,11 @@ The public side should also feel product-ready from day one. A generated app sho
 
 ## Constraints
 
-- Preserve the repo’s stable direction: ForgeGraph + Nix + colocated Postgres + `jj`.
-- Keep Cloudflare and `vinext` as separate lanes rather than polluting the default runtime assumptions.
+- Preserve the repo’s stable direction: one Cloudflare Worker (TanStack Start + Effect `HttpApi`) per stage on D1, deployed through ForgeGraph, with `jj` locally.
+- Keep Node-only services (realtime, the operator tools) out of the Worker bundle rather than polluting the default runtime assumptions.
 - Keep generated behavior opt-in and modular; do not force every SaaS feature into every app.
 - Keep the schema explicit and understandable even while staying future-friendly.
-- Align with Better Auth, tRPC, Drizzle, and the existing monorepo package boundaries where possible.
+- Align with Better Auth, the Effect `HttpApi` contract in `packages/domain`, Drizzle on D1, and the existing monorepo package boundaries where possible.
 - Keep the generated app portable across Claude, Codex, and OpenCode.
 - Avoid touching unrelated in-progress `create-site` work unless explicitly requested.
 

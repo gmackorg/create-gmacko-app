@@ -21,7 +21,7 @@ This repository is set up to work well with `Codex`, `Claude Code`, and `OpenCod
 
 ## Local Development (emulate + portless + wrangler)
 
-`pnpm dev` runs two things: [`@gmacko/emulate`](https://www.npmjs.com/package/@gmacko/emulate) (GitHub/Google/Apple/Stripe/Resend service emulators, no Postgres, no Redis) and the web app (`apps/web`, TanStack Start on workerd via the Cloudflare Vite plugin) under `portless`, at `https://gmacko.localhost`. The database is a local D1 in `apps/web/.wrangler/state`: `pnpm db:migrate:local && pnpm db:seed` once, then sign in with the emulated GitHub. `pnpm dev:next` runs the legacy Next.js app instead (`legacy.gmacko.localhost`, Postgres via `pnpm test:emulate`'s PGlite; Phase 8 deletes it).
+`pnpm dev` runs two things: [`@gmacko/emulate`](https://www.npmjs.com/package/@gmacko/emulate) (GitHub/Google/Apple/Stripe/Resend service emulators, no Postgres, no Redis) and the web app (`apps/web`, TanStack Start on workerd via the Cloudflare Vite plugin) under `portless`, at `https://gmacko.localhost`. The database is a local D1 in `apps/web/.wrangler/state`: `pnpm db:migrate:local && pnpm db:seed` once, then sign in with the emulated GitHub.
 
 **How the Worker gets its variables:** Wrangler and the Vite plugin load `.env` from the directory of `wrangler.jsonc` and never from the repo root, and `process.env` is not copied into the Worker. So `apps/web/.env` is a symlink to the repo-root `.env` (created by the app's `predev`), `.env.example` documents the keys, and `AppConfig.fromBindings` (`apps/web/src/server/config.ts`) is the only reader. Under `pnpm dev`, `apps/web/scripts/dev-portless.mjs` also writes `PORTLESS_URL` into `apps/web/.env.local` so the Worker knows its public origin. **Never create `apps/web/.dev.vars`**: its presence disables `.env` loading; `pnpm check:standards` (`no-dev-vars`) fails on one.
 
@@ -90,7 +90,19 @@ line with `// gmacko-standards-disable-next-line <rule>` and a reason.
   and `withTransaction` die at runtime on D1 (`@effect/sql-d1` has none). Use
   `Database.batch([...])` for atomic multi-statement writes and a guarded write
   (`Database.updateWhere`, precondition in the WHERE clause, 0 rows = Conflict)
-  for read-check-write. The legacy Postgres stack is exempt until Phase 8.
+  for read-check-write.
+- **Only `runtime.ts` touches `cloudflare:workers`** (`no-cloudflare-env-outside-runtime`).
+  `apps/web/src/server/runtime.ts` turns the Worker's ambient `env` and `waitUntil`
+  into the Effect services (`AppConfig`, `Database`, `Background`); everything
+  else takes those services, so it stays testable on the sqlite-node layer.
+- **Data goes through the contract, not server functions** (`no-server-fn-for-data`).
+  Reads and writes use `/api-client` (the `HttpApi` in `packages/domain`);
+  `createServerFn` exists only for setting a cookie or redirecting and lives in
+  `apps/web/src/server/actions.ts`.
+- **Every endpoint names its credential** (`endpoint-declares-credential`). In
+  `packages/domain/src/**/api.ts` a non-public endpoint declares exactly one of
+  `Session` or `SessionOrKey(scope)`, after any role check (`AdminOnly`,
+  `WorkspaceRole`) so the credential runs outermost (`docs/API_AUTH.md`, rule 6).
 - **`Database.plain` is for better-auth only** (`no-plain-drizzle-in-api`). The
   promise-based drizzle bypasses the `DatabaseError` mapping and tracing; only
   `packages/auth` (the adapter) may use it. Everything else goes through

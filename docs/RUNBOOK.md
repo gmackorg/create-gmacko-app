@@ -7,43 +7,32 @@ response, and troubleshooting for products built from create-gmacko-app.
 
 | Scenario | Action |
 |----------|--------|
-| Site is down | Check health endpoint, review Sentry, check Vercel status |
-| Slow API responses | Check tRPC timing logs, review DB query logs, check rate limits |
-| Database issues | Check connection pool, review slow query log, check Neon dashboard |
-| Auth failures | Check session cookies, verify OAuth credentials, review auth logs |
-| Deploy rollback | Revert via Vercel dashboard or `git revert` + push |
-| Enable maintenance | Set `MAINTENANCE_MODE=true` env var, redeploy |
+| Site is down | `curl /api/health/ready`, check Sentry, `wrangler tail --env <stage>`, Cloudflare status |
+| Slow API responses | Filter OTLP traces by `http.server.duration` per `group.endpoint`; check D1 Insights (`rows_read`) and rate-limit 429s |
+| Database issues | `wrangler d1 info DB --remote`, D1 dashboard Insights, `pnpm -F @gmacko/db migrate:list` |
+| Auth failures | Check session cookies (`__Secure-` over https), verify OAuth credentials and `ALLOWED_ORIGINS`, review `auth` logs |
+| Deploy rollback | `wrangler rollback --env <stage>` or redeploy the previous commit with `pnpm deploy:<stage>` |
+| Enable maintenance | Admin launch controls (`PATCH /api/admin/launch-controls`, `pnpm api:ops` in the operator lane) |
 
 ## Health Checks
 
 ```bash
-# Main health check (includes DB, memory)
+# Main health check (includes the D1 ping)
 curl https://yourapp.com/api/health
 
-# Liveness probe (is the process running?)
+# Liveness probe (is the Worker serving?)
 curl https://yourapp.com/api/health/live
 
-# Readiness probe (can it serve traffic?)
+# Readiness probe (can it reach D1?)
 curl https://yourapp.com/api/health/ready
+
+# ForgeGraph health
+curl https://yourapp.com/.well-known/forge-health
 ```
 
-**Response format:**
-```json
-{
-  "status": "healthy|degraded|unhealthy",
-  "version": "1.0.0",
-  "uptime": 3600,
-  "checks": {
-    "database": { "status": "pass", "responseTime": 12 },
-    "memory": { "status": "pass", "heapUsed": "45MB", "percentage": 32 }
-  }
-}
-```
-
-**Thresholds:**
-- Memory warning: >75% heap usage → `degraded`
-- Memory critical: >90% heap usage → `unhealthy`
-- DB timeout: >5s response → `unhealthy`
+Outside development the responses are generic (status and version only); raw
+check detail is dev-only. `api/health/ready` answers 503 `Unhealthy` when the
+D1 ping fails.
 
 ## Incident Response
 
@@ -51,7 +40,7 @@ curl https://yourapp.com/api/health/ready
 
 | Level | Description | Response Time | Example |
 |-------|-------------|---------------|---------|
-| SEV-1 | Service outage, data loss risk | Immediate | Site down, DB unreachable |
+| SEV-1 | Service outage, data loss risk | Immediate | Site down, D1 unreachable |
 | SEV-2 | Major feature broken | <1 hour | Auth not working, payments failing |
 | SEV-3 | Minor feature degraded | <4 hours | Slow queries, non-critical errors |
 | SEV-4 | Cosmetic / minor | Next business day | UI glitch, typo |
@@ -59,33 +48,36 @@ curl https://yourapp.com/api/health/ready
 ### Response Procedure
 
 1. **Acknowledge** — Confirm the issue, assign an owner
-2. **Assess** — Determine severity, check monitoring dashboards
+2. **Assess** — Determine severity, check Sentry, Workers Logs, and traces
 3. **Communicate** — Update status page, notify stakeholders
-4. **Mitigate** — Apply immediate fix (rollback, feature flag, maintenance mode)
+4. **Mitigate** — Apply immediate fix (rollback, launch controls, feature flag)
 5. **Resolve** — Deploy permanent fix
 6. **Postmortem** — Document root cause, timeline, prevention measures
 
 ### Rollback Procedure
 
-**Vercel (primary deployment):**
-1. Go to Vercel Dashboard → Deployments
-2. Find the last known good deployment
-3. Click "..." → "Promote to Production"
+**Worker version (primary):**
+```bash
+# Workers keep previous versions; roll the stage back in place
+pnpm -F @gmacko/web exec wrangler rollback --env staging
+```
 
 **Git-based rollback:**
 ```bash
-# Revert the problematic commit
+# Revert the problematic commit, then deploy the stage (migrate, then wrangler deploy)
 git revert <commit-sha>
 git push origin main
-# Vercel will auto-deploy the revert
+pnpm deploy:staging
 ```
 
-**Emergency: Enable maintenance mode:**
-```bash
-# In Vercel Environment Variables, set:
-MAINTENANCE_MODE=true
-# Trigger redeploy — all traffic redirected to /maintenance
-```
+Because releases only expand the schema, the previous Worker version keeps
+working against the newer schema; a code rollback alone is usually enough.
+Never roll a migration back; see "D1 operations" for Time Travel.
+
+**Emergency: maintenance / launch controls:**
+Use the admin launch controls (`/admin`, or `PATCH /api/admin/launch-controls`
+with an `admin`-scoped key) to close sign-ups or put up the waitlist without a
+deploy.
 
 ## Database Operations
 
@@ -123,13 +115,6 @@ what it links to.
 
 There is no `push` and no down migration. To undo, ship a forward migration or
 use Time Travel (below).
-
-### Legacy Postgres (apps/nextjs, until Phase 8)
-```bash
-psql $DATABASE_URL -c "SELECT 1"          # connection check
-pnpm db:legacy:push                        # push the legacy schema
-pg_dump $DATABASE_URL > backup_$(date +%Y%m%d_%H%M%S).sql
-```
 
 ## D1 operations
 
@@ -230,16 +215,21 @@ moving cold tables out) well before that — D1 has no online resize.
 ## Monitoring & Alerting
 
 ### Logging
-- **Where**: Structured JSON logs via `@gmacko/logging` (Pino)
-- **Context**: Request ID, user ID, organization ID propagated via AsyncLocalStorage
-- **Levels**: `debug` (dev only), `info` (request lifecycle), `warn` (slow queries >3s), `error` (failures)
+- **Where**: one JSON line per event via `@gmacko/logging` (Effect logger) on the console, ingested by Workers Logs (`observability.enabled` in `wrangler.jsonc`); `wrangler tail --env <stage>` streams them
+- **Context**: request id, trace id, user id, and workspace id from the request's Effect context
+- **Levels**: `debug` (development only), `info` (request lifecycle), `warn`, `error` (failures)
+
+### Traces and metrics (OTLP)
+- `@gmacko/telemetry` exports traces, logs, and metrics over OTLP/HTTP when `OTEL_EXPORTER_OTLP_ENDPOINT` (+ `_HEADERS`) is set, flushed on `waitUntil` after each request
+- One span per API call named `group.endpoint`; `http.server.duration` histogram per endpoint; `sql.execute` spans under the D1 client
+- `x-trace-id` on every API response (health probes excepted) links a user report to its trace
 
 ### Error Tracking (Sentry)
-- **Dashboard**: https://sentry.io → Your Org → Your Project
+- **Worker**: `@sentry/cloudflare` (`SENTRY_DSN`); **browser**: `@sentry/react` (`VITE_SENTRY_DSN`)
 - **Alerts**: Configure in Sentry → Alerts → Create Rule
 - **Recommended alerts**:
   - New issue spike (>10 events in 5 minutes)
-  - Error rate threshold (>1% of transactions)
+  - Error rate threshold (>1% of requests)
   - Performance regression (p95 latency >2x baseline)
 
 ### Analytics (PostHog)
@@ -248,26 +238,29 @@ moving cold tables out) well before that — D1 has no online resize.
 - Feature flags integration for gradual rollouts
 
 ### Uptime Monitoring
-- Health endpoint: `/api/health`
+- Health endpoint: `/api/health/ready`; ForgeGraph polls `/.well-known/forge-health` (`.forgegraph.yaml`)
 - Recommended: Configure external uptime monitor (e.g., BetterUptime, Pingdom)
 - Alert if health check fails for >2 consecutive minutes
 
 ## Common Troubleshooting
 
-### "Error: Environment variable X is missing"
-- Check `.env` file exists and has the variable
-- For Vercel: check Environment Variables in project settings
-- The `@t3-oss/env-nextjs` validation runs at build time
+### "AppConfig: missing X" at Worker start
+- The Worker reads bindings once at module load and fails fast; check `wrangler.jsonc` vars for the stage and `pnpm secrets:push --stage <stage> --dry-run`
+- Locally: `apps/web/.env` must link to the repo-root `.env` (`predev` creates it), and `apps/web/.dev.vars` must not exist (its presence disables `.env` loading)
 
-### "TRPCError: UNAUTHORIZED"
-- Session cookie may have expired — try logging out and back in
-- Check that `AUTH_SECRET` matches between environments
-- Verify OAuth provider credentials haven't rotated
+### 401 `Unauthorized` / 403 `Forbidden`
+- 401: no or expired session, or an invalid, expired, or revoked API key; sign out and back in, or mint a new key
+- 403 `origin`: a non-GET request with a session cookie from an origin not in `ALLOWED_ORIGINS`
+- 403 `scope`: the API key lacks the scope the endpoint declares (`docs/API_AUTH.md`), or an `Authorization` header reached a `Session`-only endpoint
+- Check that `AUTH_SECRET` matches between deploys; rotating it invalidates sessions
 
-### "Database connection timeout"
-- Check `DATABASE_URL` is correct
-- Neon: check if the compute endpoint is scaled to zero (cold start)
-- Docker: check if the postgres container is running
+### 503 `Unhealthy` from `/api/health/ready`
+- The D1 ping failed: check the Cloudflare status page and `wrangler d1 info DB --remote --env <stage>`
+- Verify `env.<stage>.d1_databases[0].database_id` in `wrangler.jsonc` is the stage's database
+
+### Migration failed during deploy
+- `scripts/deploy-stage.mjs` stops before `wrangler deploy`; the previous Worker keeps serving
+- `pnpm -F @gmacko/db migrate:list --env <stage>` shows what applied; fix forward with a new migration (never edit an applied file)
 
 ### Build Failures
 ```bash
@@ -277,8 +270,8 @@ pnpm install
 pnpm build
 ```
 
-### "Module not found" in monorepo
-- Ensure the package is listed in `transpilePackages` in `next.config.js`
+### "Module not found" or Node built-ins in the Worker bundle
+- A package reachable from `apps/web`'s `dependencies` ships in the Worker: it must not import `node:*` modules or read `process.env` (`pnpm check:standards --graph` lists the set)
 - Ensure the package has the correct `exports` field in its `package.json`
 - Run `pnpm install` to update workspace links
 
@@ -286,16 +279,16 @@ pnpm build
 
 ### Pre-maintenance Checklist
 - [ ] Notify users via email/banner at least 24h in advance
-- [ ] Set `MAINTENANCE_MODE=true` at scheduled time
-- [ ] Verify maintenance page is showing (check /maintenance)
+- [ ] Take a D1 export (`D1 operations` → Export)
+- [ ] Close sign-ups or enable the waitlist through the admin launch controls
 - [ ] Perform maintenance tasks
 - [ ] Run health checks
-- [ ] Set `MAINTENANCE_MODE=false`
+- [ ] Reopen through the launch controls
 - [ ] Verify all services are operational
 - [ ] Send "all clear" notification
 
 ### Dependency Updates
 - Renovate creates PRs automatically for dependency updates
 - Review and merge weekly for non-breaking updates
-- For major version bumps: test in preview environment first
+- For major version bumps: test in a preview deployment first
 - Run `pnpm audit` monthly for vulnerability check

@@ -28,9 +28,9 @@ When a user describes a feature, immediately check for these gaps:
 | **Data** | What data does this feature create/read/update/delete? |
 | **Behavior** | What happens when the user performs the action? |
 | **Validation** | What are the constraints? (min/max lengths, required fields, formats) |
-| **Permissions** | Who can do what? (owner only, any authenticated user, admin) |
+| **Permissions** | Who can do what? (owner only, any authenticated user, admin, workspace role, which API-key scope) |
 | **Platforms** | Web only, mobile only, or both? (default: both) |
-| **Error handling** | What happens when things go wrong? (not found, unauthorized, invalid) |
+| **Error handling** | What happens when things go wrong? (not found, unauthorized, invalid, conflict) |
 | **Edge cases** | Empty states, pagination, concurrent access? |
 
 ### Optional Information
@@ -38,7 +38,7 @@ When a user describes a feature, immediately check for these gaps:
 | Category | Questions to Ask |
 |----------|-----------------|
 | **Performance** | Expected data volume? Need pagination or infinite scroll? |
-| **Realtime** | Should changes appear in real-time for other users? |
+| **Realtime** | Should changes appear in real-time for other users? (Node-only service; not the Worker) |
 | **Notifications** | Should users be notified? (email, push, in-app) |
 | **Analytics** | What events should we track? |
 | **i18n** | Any strings that need translation? |
@@ -59,48 +59,49 @@ Create a spec document with this structure:
 
 ## Data Model
 
-### New Tables
+### New Tables (D1 / SQLite)
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| id | uuid | PK, default random | |
-| userId | text | FK → user.id, cascade | Owner |
-| title | varchar(256) | NOT NULL | |
-| status | varchar(20) | NOT NULL, default 'active' | active, archived |
-| createdAt | timestamp | NOT NULL, default now() | |
+| id | text | PK, app-generated | |
+| user_id | text | FK → user.id, cascade | Owner |
+| title | text | NOT NULL | |
+| status | text | NOT NULL, default 'active' | active, archived |
+| created_at | integer (ms) | NOT NULL, app-supplied | |
 
 ### Modified Tables
-- None
+- None (additions only; expand/contract migrations)
 
-## API Endpoints
+## API Endpoints (HttpApi group `feature`)
 
-### `feature.list`
-- **Auth:** Public
-- **Input:** `{ status?: "active" | "archived", limit?: number, cursor?: string }`
-- **Output:** `Feature[]`
+### `feature.list` — GET /api/features
+- **Credential:** public
+- **Params/query:** `{ status?: "active" | "archived", limit?: number, cursor?: string }`
+- **Success:** `Feature[]`
 - **Behavior:** Returns features ordered by createdAt desc, paginated
 
-### `feature.create`
-- **Auth:** Protected (authenticated users)
-- **Input:** `{ title: string, description?: string }`
-- **Output:** `Feature`
-- **Validation:** title required, min 1, max 256
+### `feature.create` — POST /api/features
+- **Credential:** `SessionOrKey("write")`
+- **Payload:** `{ title: string, description?: string }`
+- **Success:** `Feature` (201)
+- **Validation:** title required, min 1, max 256 (domain `Schema`)
 - **Side effects:** PostHog event `feature_created`
 
-### `feature.delete`
-- **Auth:** Protected (owner or admin)
-- **Input:** `{ id: string }`
+### `feature.remove` — DELETE /api/features/:id
+- **Credential:** `SessionOrKey("delete")`; owner or admin
+- **Params:** `{ id: FeatureId }`
+- **Errors:** `NotFound`, `Forbidden`
 - **Behavior:** Soft delete (set status to 'archived') or hard delete?
 
 ## UI Specifications
 
-### Web (Next.js)
+### Web (TanStack Start)
 - **Route:** `/features`
 - **Components:**
   - Feature list with cards
   - Create form (title, description)
   - Empty state when no features
   - Pagination or infinite scroll
-- **Prefetching:** Prefetch `feature.list` on server
+- **Prefetching:** loader `ensureQueryData(queries.feature.list())`
 
 ### Mobile (Expo)
 - **Route:** `/features`
@@ -134,14 +135,14 @@ I need a few more details before I can build this:
 
 **Data:**
 1. What fields does [entity] need? (I'm assuming: title, description, status — anything else?)
-2. Should [entity] belong to a user, or is it global?
+2. Should [entity] belong to a user or a workspace, or is it global?
 
 **Behavior:**
 3. When a user [action], should [consequence]?
 4. Should this support pagination? What's the expected volume?
 
 **Permissions:**
-5. Can any authenticated user [action], or only the owner?
+5. Can any authenticated user [action], or only the owner? Which API-key scope?
 6. Should admins be able to [action] on behalf of users?
 
 **Platforms:**
@@ -158,19 +159,22 @@ Once the spec is approved, map it directly to implementation tasks:
 ```
 Spec Section              → Implementation
 ─────────────────────────────────────────────────
-Data Model                → packages/db/src/schema.ts
-  + Zod schemas           → packages/validators/src/feature.ts
-API Endpoints             → packages/api/src/router/feature.ts
-  + Add to root           → packages/api/src/root.ts
-Web UI                    → apps/nextjs/src/app/features/
-  + Page                  → page.tsx (with prefetch)
-  + Components            → _components/*.tsx
+Data Model                → packages/db/src/schema.ts (+ pnpm db:generate, review SQL)
+  + Models                → packages/domain/src/feature/models.ts
+API Endpoints             → packages/domain/src/feature/api.ts (contract)
+  + Add to AppApi         → packages/domain/src/api.ts
+  + Service + handlers    → packages/api/src/feature/{service,handlers}.ts
+  + Register              → packages/api/src/layer.ts
+  + Query layer           → packages/api-client/src/queries/feature.ts (+ keys, invalidation)
+  + Auth matrix           → pnpm -F @gmacko/domain docs:api-auth
+Web UI                    → apps/web/src/routes/features.tsx (loader prefetch)
+  + Components            → apps/web/src/components/*.tsx, packages/ui for shared
 Mobile UI                 → apps/expo/src/app/features/
   + Screen                → index.tsx
   + Components            → _components/*.tsx
-Acceptance Criteria       → apps/nextjs/e2e/features.spec.ts
-  + Unit tests            → packages/api/src/router/__tests__/feature.test.ts
-  + Integration tests     → packages/api/src/router/__tests__/feature.integration.test.ts
+Acceptance Criteria       → apps/web/e2e/features.spec.ts
+  + Unit tests            → packages/domain/src/__tests__/ (schemas)
+  + API tests             → packages/api/src/feature/feature.test.ts (makeTestApi)
 ```
 
 ## Step 5: Verification Checklist
@@ -179,16 +183,15 @@ Before marking a feature as complete, verify against the spec:
 
 ```
 □ Every acceptance criterion has a passing test
-□ Every API endpoint works as specified
-□ Every validation rule is enforced
-□ Every error case is handled
+□ Every API endpoint works as specified and declares its credential
+□ Every validation rule is enforced by the domain Schema
+□ Every error case is a declared typed error
 □ Web UI matches the spec
 □ Mobile UI matches the spec (unless web-only)
 □ Analytics events are firing
 □ Error tracking is wired
-□ Types pass (pnpm typecheck)
-□ Lint passes (pnpm lint)
-□ All tests pass (pnpm test && pnpm e2e)
+□ Types, lint, and standards pass (pnpm check:fast)
+□ All tests pass (pnpm test && pnpm e2e:web)
 ```
 
 ## Example: Turning a Vague Request into a Spec
@@ -201,7 +204,7 @@ Before marking a feature as complete, verify against the spec:
 >
 > 1. **What can be commented on?** Posts only, or other entities too?
 > 2. **Nesting?** Flat comments, or threaded/nested replies?
-> 3. **Who can comment?** Authenticated users only?
+> 3. **Who can comment?** Authenticated users only? Should API keys with `write` be allowed?
 > 4. **Editing/deletion?** Can users edit their own comments? Can admins delete any?
 > 5. **Notifications?** Should the post author be notified of new comments?
 > 6. **Moderation?** Any need for flagging/reporting?

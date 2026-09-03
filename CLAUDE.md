@@ -27,7 +27,7 @@ If the repo was scaffolded with the optional SaaS bootstrap pack, run that flow 
 
 ## Local Development (emulate + portless)
 
-The local dev stack uses [`@gmacko/emulate`](https://www.npmjs.com/package/@gmacko/emulate) for service emulation and `portless` for HTTPS `.localhost` URLs. Run `npx @gmacko/emulate init` to generate an `emulate.config.yaml`, then `pnpm dev` to start both. Use `--slug <name>` to namespace services (e.g. `gmacko.emulate.localhost`) so multiple projects can run concurrently.
+The local dev stack uses [`@gmacko/emulate`](https://www.npmjs.com/package/@gmacko/emulate) for service emulation and `portless` for HTTPS `.localhost` URLs. Run `npx @gmacko/emulate init` to generate an `emulate.config.yaml`, then `pnpm dev` to start both (the emulators and `apps/web`, TanStack Start on workerd). Use `--slug <name>` to namespace services (e.g. `gmacko.emulate.localhost`) so multiple projects can run concurrently.
 
 **Service URLs** (available when running with `--portless`):
 - App: `https://gmacko.localhost`
@@ -36,8 +36,8 @@ The local dev stack uses [`@gmacko/emulate`](https://www.npmjs.com/package/@gmac
 - Apple OAuth: `https://apple.emulate.localhost`
 - Stripe: `https://stripe.emulate.localhost`
 - Resend (email): `https://resend.emulate.localhost`
-- Postgres: `localhost:5432` (PGlite over wire protocol)
-- Redis: `localhost:6379` (redis-memory-server)
+
+There is no Postgres and no Redis: the web app runs on a local Cloudflare D1 (`apps/web/.wrangler/state`), applied with `pnpm db:migrate:local && pnpm db:seed`.
 
 **SDK wiring for emulate** (set in `.env`):
 - `AUTH_GITHUB_URL`, `AUTH_GITHUB_API_URL`, `AUTH_GOOGLE_URL`, `AUTH_GOOGLE_TOKEN_URL`, `AUTH_APPLE_URL` — override OAuth provider base URLs (defaults to real provider URLs when unset)

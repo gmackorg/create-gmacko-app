@@ -1,6 +1,6 @@
 # `create-gmacko-app` Scaffold Spec
 
-**Purpose:** Deterministically scaffold a new monorepo app from the Gmacko fork of `create-t3-turbo`, with a single-source-of-truth integration toggle model (Option A), smart defaults, and optional pruning (`--prune`).
+**Purpose:** Deterministically scaffold a new monorepo app from the Gmacko fork of `create-t3-turbo`, with a single-source-of-truth integration toggle model (Option A), smart defaults, and optional pruning (`--prune`). The web lane is `apps/web`: TanStack Start + Effect `HttpApi` on Cloudflare Workers with a D1 database. Version 0.2.0 is a breaking release: there is no web framework choice and no database choice.
 
 **Non-goals:**
 - No "integration branches".
@@ -22,26 +22,27 @@
 **Required positional argument**
 - `create-gmacko-app <app-name>`
 
-**Supported flags (minimum spec)**
-- `--yes` (accept defaults, no prompts)
+**Supported flags**
+- `--yes` / `-y` (accept defaults, no prompts)
 - `--prune` (remove unused integration packages + references)
 - `--no-install` (skip `pnpm install`)
 - `--no-git` (skip repository init)
 - `--no-ai` (do not include AI skill system + docs)
 - `--no-provision` (do not include `scripts/provision.sh`)
-- `--web / --no-web` (default: `--web`)
-- `--mobile / --no-mobile` (default: `--mobile`)
-- `--tanstack-start / --no-tanstack-start` (default: `--no-tanstack-start`)
+- `--web / --no-web` (default: `--web`; `apps/web`)
+- `--mobile / --no-mobile` (default: `--mobile`; `apps/expo`)
+- `--saas-collaboration`, `--saas-billing`, `--saas-metering`, `--saas-support`, `--saas-launch`, `--saas-referrals`, `--saas-operator-apis` (SaaS layers)
 - `--saas-bootstrap` (add the optional Claude SaaS bootstrap pack)
-- `--trpc-operators` (add the optional CLI + MCP operator lane over tRPC)
+- `--operator-lane` (keep the CLI + MCP operator lane over the HTTP API: `packages/operator-core`, `packages/api-cli`, `packages/mcp-server`; adds root scripts `api:ops` and `mcp:app`)
 - `--integrations <comma-list>` overrides integration toggles entirely
-  - accepted keys: `sentry,posthog,stripe,email,realtime,storage`
-- `--email-provider <resend|sendgrid|none>` (default: `none`)
-- `--realtime-provider <pusher|ably|none>` (default: `none`)
+  - accepted keys: `sentry,posthog,stripe,revenuecat,notifications,email,realtime,storage`
+- `--email-provider <resend|none>` (default: `none`)
 - `--storage-provider <uploadthing|none>` (default: `none`)
-- `--package-scope <@your-scope>` (default: `@gmacko` for upstream parity OR `@repo` if you standardize; choose one and keep stable)
-- `--db <postgres>` (only `postgres` supported; no prompt)
-- `--auth <better-auth>` (only `better-auth` supported; no prompt)
+- `--forgegraph` (emit `.forgegraph.yaml` and the ForgeGraph scripts; default on)
+- `--forgegraph-server <url>`, `--forgegraph-preview-domain <host>`, `--forgegraph-production-domain <host>` (replace the ForgeGraph placeholders)
+- `--package-scope <@your-scope>` (default: `@gmacko`)
+
+There is no `--db`, no `--auth`, and no `--tanstack-start` (the pre-migration Cloudflare-lane flag is gone too): the database is D1 and the auth is better-auth in every generated repo.
 
 **Determinism rule:** if a flag explicitly sets a choice, it wins over prompt defaults.
 
@@ -59,14 +60,13 @@
 #### Prompt 2 — Platforms
 - **Question:** "Which platforms?"
 - **Choices (multi-select):**
-  - Web (Next.js) **[default ON]**
-  - Mobile (Expo) **[default ON]**
-  - TanStack Start **[default OFF]**
+  - Web (`apps/web`, TanStack Start + Effect on Workers) **[default ON]**
+  - Mobile (`apps/expo`) **[default ON]**
 - **Validation:** at least one selected
 
 #### Prompt 3 — Package scope
 - **Question:** "Package scope for workspace packages?"
-- **Default:** `@gmacko` (upstream-compatible) OR `@repo` (gmacko standard)
+- **Default:** `@gmacko`
 - **Validation:** must start with `@` and contain no spaces
 
 #### Prompt 4 — Integration presets
@@ -84,38 +84,39 @@
   - Sentry (monitoring) **[default ON]**
   - PostHog (analytics) **[default ON]**
   - Stripe (payments) **[default OFF]**
+  - RevenueCat (purchases) **[default OFF]**
+  - Notifications (Expo push) **[default OFF]**
   - Email **[default OFF]**
-  - Realtime **[default OFF]**
+  - Realtime **[default OFF]** — enabling prints a warning: `@gmacko/realtime` is Node-only (ioredis + BullMQ) and does not run on the Worker
   - Storage **[default OFF]**
 
 #### Prompt 6 — Email provider (only if Email enabled)
 - **Question:** "Email provider?"
-- **Choices:** Resend, SendGrid
+- **Choices:** Resend
 - **Default:** Resend
-- **Validation:** must pick one
 
-#### Prompt 7 — Realtime provider (only if Realtime enabled)
-- **Question:** "Realtime provider?"
-- **Choices:** Pusher, Ably
-- **Default:** Pusher
-
-#### Prompt 8 — Storage provider (only if Storage enabled)
+#### Prompt 7 — Storage provider (only if Storage enabled)
 - **Question:** "Storage provider?"
 - **Choices:** UploadThing
 - **Default:** UploadThing
 
-#### Prompt 9 — Include AI workflow system?
+#### Prompt 8 — ForgeGraph
+- **Question:** "Emit ForgeGraph repo metadata (.forgegraph.yaml + forge scripts)?"
+- **Default:** Yes
+- **Validation:** boolean
+
+#### Prompt 9 — SaaS layers
+- **Question:** "Which SaaS layers?"
+- **Choices (multi-select):** collaboration, billing, metering, support, launch controls, referrals, operator APIs
+- **Default:** none
+
+#### Prompt 10 — Include AI workflow system?
 - **Question:** "Include Gmacko AI workflow system (shared AGENTS docs + agent configs + planning docs)?"
 - **Default:** Yes
 - **Validation:** boolean
 
-#### Prompt 10 — Add Claude SaaS bootstrap pack? (only if AI enabled)
+#### Prompt 11 — Add Claude SaaS bootstrap pack? (only if AI enabled)
 - **Question:** "Add the optional Claude SaaS bootstrap pack (office-hours -> autoplan -> design-consultation + local follow-up skills)?"
-- **Default:** No
-- **Validation:** boolean
-
-#### Prompt 11 — Add tRPC operator lane?
-- **Question:** "Add the optional tRPC operator lane (shared CLI + MCP wrappers over the API)?"
 - **Default:** No
 - **Validation:** boolean
 
@@ -137,6 +138,8 @@
 - **Question:** "Initialize a git repository?"
 - **Default:** Yes
 
+The operator lane (`--operator-lane`) has no prompt of its own; it is a flag, and `--saas-operator-apis` enables the operator API group in the contract.
+
 ---
 
 ## 2) File Outputs (Generated/Modified by Answers)
@@ -149,15 +152,15 @@
   - Ensure package manager is `pnpm`
   - Update scripts (see below)
 - Modify: `pnpm-workspace.yaml`
-  - Ensure `apps/*` and `packages/*` included (unchanged if already)
+  - Ensure `apps/*`, `packages/*`, `tooling/*`, and `sdks/*` included (unchanged if already)
 - Modify: `README.md`
   - Replace template branding + quick start
-  - Include "Integrations toggles" section (generated based on chosen integrations)
+  - Replace the `SCAFFOLD_PROFILE` block with the scaffold profile summary
 - Create: `.env.example`
   - Includes only required sections for enabled integrations (even without prune)
-  - Always includes DB + auth required variables
+  - Always includes the auth variables and the emulate provider URLs; never a `DATABASE_URL` (the database is the `DB` D1 binding)
 - Create: `.gitignore` (if missing)
-- Create: `gmacko.integrations.json` (optional but recommended for determinism)
+- Create: `gmacko.integrations.json`
   - Captures the choices used at scaffold-time (not used at runtime)
   - Example:
     ```json
@@ -175,10 +178,7 @@
     ```
 
 #### B) Runtime integration config (single source of truth for code)
-- Create: `packages/config/package.json`
-- Create: `packages/config/src/index.ts`
-- Create: `packages/config/src/integrations.ts`
-- Create: `packages/config/src/app.ts` (optional; recommended if you want displayName/appName centralized)
+- Keep: `packages/config/src/integrations.ts`, written from the answers
 
 **`packages/config/src/integrations.ts` must be deterministic**
 ```ts
@@ -194,39 +194,32 @@ export const integrations = {
 export type Integrations = typeof integrations;
 ```
 
-> Note: If you refuse to add `packages/config`, then instead write identical `integrations.ts` into `apps/nextjs/src/config/integrations.ts` and `apps/expo/src/config/integrations.ts`. The spec above assumes the shared package approach.
+#### C) ForgeGraph (unless `--no-forgegraph`)
+- Create: `.forgegraph.yaml` with `db: { type: d1, migrate: node scripts/deploy-stage.mjs --migrate-only }`, stages `staging` and `production` as `cloudflare-workers` targets (`workerName`, `configPath: apps/web/wrangler.jsonc`, `environment`, `deploy: pnpm deploy:<stage>`), `resources.d1` for `<app>-web-staging`, `<app>-web`, `<app>-web-preview`, and the `/.well-known/forge-health` health URL.
+- Keep: `scripts/deploy-stage.mjs`, `scripts/secrets-push.mjs`, `deploy/forgegraph/deploy.yml`, and the root `forge:*`, `deploy:*`, `secrets:push` scripts.
 
 ---
 
 ### 2.2 Platform-dependent outputs
 
-#### Web selected (Next.js)
-- Modify: `apps/nextjs/package.json`
-  - Ensure deps for enabled integrations are present (or always present if not pruning)
-- Create: `apps/nextjs/.storybook/main.ts`
-- Create: `apps/nextjs/.storybook/preview.ts`
-- Modify: `apps/nextjs/src/env.ts`
-  - Zod validation must only require env vars for enabled integrations
-- Modify: `apps/nextjs/src/app/layout.tsx` (or the upstream equivalent)
-  - Add conditional provider wiring based on `integrations`
-- Modify: `apps/nextjs/src/instrumentation.ts` / `sentry.*` (only if Sentry enabled)
-- Modify: `apps/nextjs/next.config.*` (only if Sentry enabled and you use Sentry plugin)
-- Create: `packages/ui/src/**/*.stories.tsx` for shared component documentation
+#### Web selected (`apps/web`)
+- Modify: `apps/web/package.json` (deps for enabled integrations; always present if not pruning)
+- Modify: `apps/web/wrangler.jsonc` — Worker names `<app>-web`, `<app>-web-staging`, `<app>-web-preview`; D1 binding `DB` per environment with placeholder ids
+- Modify: `apps/web/src/env.ts` — browser `VITE_*` validation (`@t3-oss/env-core`) requires vars only for enabled integrations
+- Modify: `apps/web/src/server/config.ts` — `AppConfig.fromBindings` reads the bindings for enabled integrations only
+- Modify: `apps/web/src/providers.tsx` / `src/client.tsx` — conditional PostHog / Sentry wiring
+- Keep: `apps/web/src/routes/api.webhooks.stripe.ts` only if Stripe is enabled
+- Keep: `packages/ui/src/**/*.stories.tsx` and the `packages/ui` Storybook config
 
 #### Mobile selected (Expo)
 - Modify: `apps/expo/package.json`
-- Modify: `apps/expo/app.json` (or `app.config.ts`)
+- Modify: `apps/expo/app.config.ts`
   - Ensure `scheme` is set deterministically:
     - default: `<app-name>` (kebab-case) truncated to safe length
-- Modify: `apps/expo/src/env.ts` (if present)
-- Modify: `apps/expo/App.tsx` (or upstream root)
+- Modify: `apps/expo/src/config/env.ts` (boot validation of the API URL, Sentry, PostHog)
+- Modify: `apps/expo/src/providers.tsx`
   - Conditional provider wiring based on `integrations`
-- Modify: `apps/expo/src/utils/auth.ts` (keep better-auth expo client wiring; ensure base URL env key matches)
-
-#### TanStack Start selected (if supported)
-- Modify: `apps/tanstack-start/**` similarly:
-  - env validation
-  - provider wiring (if applicable)
+- Modify: `apps/expo/src/utils/auth.ts` (better-auth Expo client; base URL from `src/utils/base-url.ts`)
 
 ---
 
@@ -236,19 +229,16 @@ export type Integrations = typeof integrations;
 - Create: `docs/ai/DEVELOPER_EXPERIENCE.md`
 - Create: `AGENTS.md`
 - Create: `CLAUDE.md`
-- Create: `.mcp.json`
+- Create: `.mcp.json` (empty `mcpServers`)
 - Copy/Create: `.claude/skills/gstack/**`
 - Copy/Create: `.opencode/skill/**`
 - Copy/Create: `.opencode/agent/**` (if used)
 - Copy/Create: `opencode.json`
 - Create: `DESIGN.md` as the target file for `/design-consultation`
-- Create (optional): `PROJECT_MANIFEST.json` **only if you want it generated immediately**
-  - If you don't want to generate it at scaffold time, you still include examples in `docs/ai/examples/`.
 
 **Recommended behavior**
-- If AI system enabled: generate a minimal `PROJECT_MANIFEST.json` that matches scaffold answers (platforms + integrations), so the AI workflow is "ready to run".
 - Keep `AGENTS.md` as the canonical repo instruction file and make `CLAUDE.md` a thin Claude-specific shim.
-- Ship `.mcp.json` with the official Next.js MCP server when the Next.js app is enabled.
+- Ship `.mcp.json` empty; only the operator lane adds a server to it.
 - Prefer `opencode.json` for loading supplemental instruction docs instead of duplicating them into `AGENTS.md`.
 - The default planning path is:
   1. `superpowers:brainstorming` writes the initial proposal to `docs/ai/INITIAL_PROPOSAL.md`
@@ -265,11 +255,11 @@ export type Integrations = typeof integrations;
   - `.claude/skills/test-mobile-with-maestro/**`
 - Append Claude guidance that the post-setup order is `/office-hours`, optional user-level `/autoplan`, then `/design-consultation`
 
-**If tRPC operator lane enabled**
-- Create/keep: `packages/operator-core/**`
-- Create/keep: `packages/trpc-cli/**`
-- Modify: root `package.json` with `trpc:ops` and `mcp:app`
+**If operator lane enabled (`--operator-lane`)**
+- Keep: `packages/operator-core/**`, `packages/api-cli/**`, `packages/mcp-server/**`
+- Modify: root `package.json` with `api:ops` and `mcp:app`
 - Modify: `.mcp.json` to include a local `gmacko-app` server entry when AI files are present
+- Without the flag, the three packages are removed.
 
 ---
 
@@ -278,6 +268,17 @@ export type Integrations = typeof integrations;
   - Must provision only enabled services
 - Modify: `package.json`
   - Add `provision` script: `./scripts/provision.sh`
+
+### 2.5 Next steps printed after scaffolding
+
+```bash
+cd <app-name>
+pnpm bootstrap:local
+pnpm db:generate && pnpm -F @gmacko/db migrate:local
+pnpm dev
+# when ready to deploy:
+pnpm -F @gmacko/web exec wrangler d1 create <app>-web-staging   # and <app>-web, <app>-web-preview
+```
 
 ---
 
@@ -291,50 +292,39 @@ Each integration must follow these invariants:
    - No provider mounted.
    - No env vars required.
 2. **Explicit enable check in a single place**
-   - Providers are assembled in one root file per app (`layout.tsx`, `App.tsx`).
+   - Providers are assembled in one root file per app (`apps/web/src/providers.tsx`, `apps/expo/src/providers.tsx`).
 3. **Typed config**
    - All code branches off `integrations` from `@<scope>/config`.
 4. **Deterministic env validation**
-   - Zod schemas require vars only when integration enabled.
+   - The browser `VITE_*` schema and `AppConfig.fromBindings` require values only when the integration is enabled.
+5. **Worker-safe**
+   - A package `apps/web` depends on ships in the Worker bundle: no `process.env`, no `node:` imports.
 
 ---
 
 ### 3.2 Monitoring — Sentry (`integrations.sentry`)
 **When ON**
 - Web:
-  - Add Sentry initialization via `packages/monitoring/web` (or direct Sentry SDK)
-  - Hook into Next.js instrumentation as required by your approach
-  - Env required:
-    - `SENTRY_DSN` (or `NEXT_PUBLIC_SENTRY_DSN` depending on your model)
+  - `@sentry/cloudflare` `withSentry` around the Worker export (`apps/web/src/server/worker.ts`); binding `SENTRY_DSN`
+  - `@sentry/react` in `apps/web/src/client.tsx`; `VITE_SENTRY_DSN`
+  - Build-time `SENTRY_AUTH_TOKEN` (+ `SENTRY_ORG`, `SENTRY_PROJECT`) uploads source maps
 - Mobile:
-  - Initialize Sentry in Expo entrypoint
-  - Env required:
-    - `SENTRY_DSN` (or `EXPO_PUBLIC_SENTRY_DSN`)
+  - Initialize Sentry in the Expo entrypoint; `EXPO_PUBLIC_SENTRY_DSN` (boot validation fails a preview/production build without it)
 
 **When OFF**
-- No Sentry init files referenced from app entrypoints
+- `withSentry` is a no-op without a DSN; the browser SDK is not imported
 - Env schema does not mention Sentry vars
-
-**Deterministic wiring pattern**
-- `apps/nextjs/src/app/layout.tsx`:
-  - wrap app with `<SentryBoundary>` only if enabled
-- `apps/expo/App.tsx`:
-  - call `initSentry()` only if enabled
 
 ---
 
 ### 3.3 Analytics — PostHog (`integrations.posthog`)
 **When ON**
 - Web:
-  - Mount PostHog provider early (after auth, before API calls if you want user identification)
-  - Env required:
-    - `NEXT_PUBLIC_POSTHOG_KEY`
-    - `NEXT_PUBLIC_POSTHOG_HOST` (optional if default)
+  - Mount the PostHog provider in `apps/web/src/providers.tsx`
+  - `VITE_POSTHOG_KEY`, `VITE_POSTHOG_HOST` (optional)
 - Mobile:
-  - Initialize PostHog native wrapper/provider
-  - Env required:
-    - `EXPO_PUBLIC_POSTHOG_KEY`
-    - `EXPO_PUBLIC_POSTHOG_HOST` (optional)
+  - Initialize the PostHog native wrapper/provider
+  - `EXPO_PUBLIC_POSTHOG_KEY`, `EXPO_PUBLIC_POSTHOG_HOST` (optional)
 
 **When OFF**
 - No provider mounted
@@ -345,16 +335,11 @@ Each integration must follow these invariants:
 
 ### 3.4 Payments — Stripe (`integrations.stripe`)
 **When ON**
-- Server/web:
-  - Add `packages/payments` and wire Stripe client/server helpers
-  - Add webhook route:
-    - Next.js: `apps/nextjs/src/app/api/stripe/webhook/route.ts` (or equivalent)
-  - Env required:
-    - `STRIPE_SECRET_KEY`
-    - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
-    - `STRIPE_WEBHOOK_SECRET`
-- Optional DB tables:
-  - If your payments package expects DB tables, add them deterministically (or document that they are optional)
+- Web:
+  - `packages/payments` (Stripe client with a fetch HTTP client and SubtleCrypto signature verification)
+  - Webhook route: `apps/web/src/routes/api.webhooks.stripe.ts` → `src/server/stripe-webhook.ts`
+  - Bindings: the Stripe secret key and `STRIPE_WEBHOOK_SECRET` (see `.env.example`); a publishable key on the browser side only if the app renders Stripe elements
+- Billing tables are part of the base schema (`packages/db/src/schema.ts`); Stripe only fills them
 
 **When OFF**
 - No webhook route generated
@@ -367,35 +352,22 @@ Each integration must follow these invariants:
 Email is two-dimensional: enabled + provider.
 
 **When ON**
-- Add `packages/email`
-- Provider-specific wiring:
-  - Resend:
-    - Env required: `RESEND_API_KEY`, `EMAIL_FROM`
-  - SendGrid:
-    - Env required: `SENDGRID_API_KEY`, `EMAIL_FROM`
-- Add an example transactional email function:
-  - `packages/email/src/send.ts`
-- Optional: add a "test email" route for dev:
-  - `apps/nextjs/src/app/api/email/test/route.ts` (dev-only guarded)
+- `packages/email` with Resend
+- Bindings: `RESEND_API_KEY`, `EMAIL_FROM`; `RESEND_BASE_URL` points the SDK at emulate locally
+- Magic links are sent through it; `BYPASS_MAGIC_LINK=true` logs them instead (development only)
 
 **When OFF**
 - No email package referenced
 - No email env keys required
-- No routes created
+- Magic links are logged (development) or the flow is unavailable
 
 ---
 
 ### 3.6 Realtime (`integrations.realtime.enabled`)
-Enabled + provider.
 
 **When ON**
-- Add `packages/realtime`
-- Provider-specific:
-  - Pusher env: `PUSHER_APP_ID`, `PUSHER_KEY`, `PUSHER_SECRET`, `PUSHER_CLUSTER`
-  - Ably env: `ABLY_API_KEY`
-- Add example event channel usage:
-  - server emitter helper
-  - client subscription helper (web + mobile if needed)
+- `packages/realtime` (ioredis + BullMQ). Node-only: it is not a dependency of `apps/web` and must not become one. The scaffolder prints a warning.
+- Env: `REDIS_URL` for the Node service that uses it
 
 **When OFF**
 - No realtime package referenced
@@ -404,14 +376,11 @@ Enabled + provider.
 ---
 
 ### 3.7 Storage (`integrations.storage.enabled`)
-Enabled + provider.
 
 **When ON**
-- Add `packages/storage`
-- UploadThing:
-  - Add Next.js route handler for UploadThing
-  - Env required: `UPLOADTHING_SECRET`, `UPLOADTHING_APP_ID` (names depend on chosen SDK)
-- Add example upload UI component (web) and optional mobile helper.
+- `packages/storage`
+- UploadThing: the provider token (see `.env.example`)
+- Wiring into the Worker is left to the app (experimental on the web lane)
 
 **When OFF**
 - No storage package referenced
@@ -431,7 +400,7 @@ When `--prune` is enabled:
 - Remove env example sections for disabled integrations
 - Remove any "integration wiring" code branches that only exist for the disabled integration (simplify to straight-line code)
 
-**Important:** Prune must not remove shared infrastructure (`packages/config`, core DB/auth/api/ui) even if it contains flags for integrations.
+**Important:** Prune must not remove shared infrastructure (`packages/config`, `domain`, `db`, `auth`, `api`, `api-client`, `ui`, `logging`, `telemetry`) even if it contains flags for integrations.
 
 ---
 
@@ -439,59 +408,54 @@ When `--prune` is enabled:
 
 #### If `integrations.sentry === false`
 Remove:
-- `packages/monitoring/**` (if dedicated)
-- `apps/nextjs/src/instrumentation.ts` *only if it exists solely for Sentry*
-- `apps/nextjs/sentry.*` files (e.g., `sentry.client.config.ts`, `sentry.server.config.ts`)
-- Any Sentry-specific Next.js config plugin wiring
+- `packages/monitoring/**`
+- The Sentry Vite plugin wiring in `apps/web/vite.config.ts`
 - Sentry env keys from `.env.example`
 
 Modify:
-- `apps/nextjs/src/app/layout.tsx`: remove Sentry wrapper branch entirely
+- `apps/web/src/server/worker.ts`: export the handler without `withSentry`
+- `apps/web/src/client.tsx`: remove the browser init
 
 #### If `integrations.posthog === false`
 Remove:
-- `packages/analytics/**` (if dedicated)
-- Any PostHog provider/component files
+- `packages/analytics/**`
 - PostHog env keys from `.env.example`
 
 Modify:
-- app entrypoints: remove provider branches
+- app providers: remove provider branches
 
 #### If `integrations.stripe === false`
 Remove:
 - `packages/payments/**`
-- `apps/nextjs/src/app/api/stripe/**` (webhook routes)
-- Any Stripe UI components or server helpers
+- `apps/web/src/routes/api.webhooks.stripe.ts`, `apps/web/src/server/stripe-webhook.ts`
 - Stripe env keys from `.env.example`
-
-Modify:
-- Remove any mention of webhooks from docs
 
 #### If `integrations.email.enabled === false`
 Remove:
 - `packages/email/**`
-- Optional email test routes
 - Email env keys from `.env.example`
 
 #### If `integrations.realtime.enabled === false`
 Remove:
 - `packages/realtime/**`
-- Example subscription/emitter files
 - Realtime env keys from `.env.example`
 
 #### If `integrations.storage.enabled === false`
 Remove:
 - `packages/storage/**`
-- Upload routes + UI components
 - Storage env keys from `.env.example`
+
+#### If the operator lane is not enabled
+Remove:
+- `packages/operator-core/**`, `packages/api-cli/**`, `packages/mcp-server/**`
+- root scripts `api:ops`, `mcp:app`
 
 ---
 
 ### 4.3 Dependency pruning rules
 For each removed package:
-- Remove it from `pnpm-workspace.yaml` only if your workspace list is explicit (most are globbed, so usually no change).
 - Remove any `@<scope>/<package>` dependency from:
-  - `apps/nextjs/package.json`
+  - `apps/web/package.json`
   - `apps/expo/package.json`
   - `packages/api/package.json` (if any)
   - root `package.json` (if any)
@@ -504,7 +468,7 @@ After file deletions:
 - Remove unused exports and re-exports.
 - Remove dead env validation branches.
 
-**Determinism requirement:** the prune step must end with a repo that typechecks with no conditional compilation.
+**Determinism requirement:** the prune step must end with a repo that typechecks with no conditional compilation, and `pnpm check:standards` passes.
 
 ---
 
@@ -516,113 +480,78 @@ After scaffolding:
   - Without prune: present but not wired, no required env vars.
   - With prune: removed entirely, no references remain.
 - Defaults produce a working app with:
-  - better-auth + Postgres + tRPC + shadcn UI
-  - Sentry + PostHog enabled but not blocking local dev if env vars missing (you choose whether "enabled requires env" vs "enabled but optional in dev"; pick one and enforce consistently).
+  - TanStack Start + Effect `HttpApi` on Workers, D1, better-auth, shadcn UI
+  - Sentry + PostHog enabled but not blocking local dev when their values are unset (both are no-ops without a DSN/key in development; the Expo boot check enforces them for preview/production builds)
+- `pnpm check:fast` passes on the generated repo.
 
 ---
 
-## 6) Recommended Consistency Decisions (Lock these before coding)
+## 6) Consistency Decisions (locked)
 
-To keep implementation deterministic, pick and document these constants:
-
-1. **Env var naming**
-   - Recommended: `DATABASE_URL` (not `POSTGRES_URL`)
-2. **Expo scheme rule**
-   - Recommended: `scheme = <app-name>` (kebab-case) and stable
-3. **Default integration behavior in dev**
-   - Recommended: if integration enabled, env vars are required (fail fast) — simplest to reason about.
-   - Alternative: allow missing env in dev (more DX-friendly, more branching). If you choose this, define exact behavior per integration.
+1. **Database**: the `DB` D1 binding; no `DATABASE_URL` anywhere in the web lane.
+2. **Env**: the Worker reads bindings once (`AppConfig.fromBindings`); locally they come from the repo-root `.env` through the `apps/web/.env` link; never `.dev.vars`.
+3. **Expo scheme rule**: `scheme = <app-name>` (kebab-case) and stable.
+4. **Integration behavior in dev**: enabled integrations are optional in development (no-op without values) and required in preview/production builds of the Expo app.
 
 ---
 
 ## Appendix: Reference Implementation Skeleton
 
-### Provider Assembly — Next.js (`apps/nextjs/src/app/layout.tsx`)
+### Provider Assembly — Web (`apps/web/src/providers.tsx`)
 
 ```tsx
 import { integrations } from "@gmacko/config";
+import { QueryClientProvider } from "@tanstack/react-query";
 
-// Conditional imports (tree-shaken when disabled)
-const SentryProvider = integrations.sentry 
-  ? (await import("@gmacko/monitoring/web")).SentryProvider 
-  : ({ children }: { children: React.ReactNode }) => children;
+import { PostHogProvider } from "@gmacko/analytics/web";
 
-const PostHogProvider = integrations.posthog
-  ? (await import("@gmacko/analytics/web")).PostHogProvider
-  : ({ children }: { children: React.ReactNode }) => children;
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html>
-      <body>
-        <SentryProvider>
-          <PostHogProvider>
-            <TRPCProvider>
-              {children}
-            </TRPCProvider>
-          </PostHogProvider>
-        </SentryProvider>
-      </body>
-    </html>
-  );
+export function Providers({ children, queryClient }) {
+  const app = <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return integrations.posthog ? <PostHogProvider>{app}</PostHogProvider> : app;
 }
 ```
 
-### Provider Assembly — Expo (`apps/expo/App.tsx`)
+### Provider Assembly — Expo (`apps/expo/src/providers.tsx`)
 
 ```tsx
 import { integrations } from "@gmacko/config";
 
-export default function App() {
+export function Providers({ children }) {
   useEffect(() => {
-    if (integrations.sentry) {
-      initSentry();
-    }
-    if (integrations.posthog) {
-      initPostHog();
-    }
+    if (integrations.sentry) initSentry();
+    if (integrations.posthog) initPostHog();
   }, []);
 
-  return (
-    <QueryClientProvider client={queryClient}>
-      <Stack />
-    </QueryClientProvider>
-  );
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }
 ```
 
-### Env Validation Pattern (`apps/nextjs/src/env.ts`)
+### Env Validation Pattern — browser (`apps/web/src/env.ts`)
 
 ```ts
-import { createEnv } from "@t3-oss/env-nextjs";
-import { z } from "zod";
+import { createEnv } from "@t3-oss/env-core";
 import { integrations } from "@gmacko/config";
+import { z } from "zod";
 
 export const env = createEnv({
-  server: {
-    DATABASE_URL: z.string().url(),
-    AUTH_SECRET: z.string().min(32),
-    // Conditional validation
-    ...(integrations.sentry && {
-      SENTRY_DSN: z.string().url(),
-    }),
-    ...(integrations.stripe && {
-      STRIPE_SECRET_KEY: z.string().startsWith("sk_"),
-      STRIPE_WEBHOOK_SECRET: z.string().startsWith("whsec_"),
-    }),
-  },
+  clientPrefix: "VITE_",
   client: {
-    ...(integrations.posthog && {
-      NEXT_PUBLIC_POSTHOG_KEY: z.string(),
-    }),
-    ...(integrations.stripe && {
-      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().startsWith("pk_"),
-    }),
+    ...(integrations.posthog && { VITE_POSTHOG_KEY: z.string() }),
+    ...(integrations.sentry && { VITE_SENTRY_DSN: z.string().url().optional() }),
   },
-  runtimeEnv: {
-    DATABASE_URL: process.env.DATABASE_URL,
-    AUTH_SECRET: process.env.AUTH_SECRET,
-    // ... rest
-  },
+  runtimeEnv: import.meta.env,
+});
+```
+
+### Env Validation Pattern — Worker (`apps/web/src/server/config.ts`)
+
+```ts
+// The only reader of bindings. Fails at module load on a bad STAGE.
+export const fromBindings = (env: Bindings, { version }): AppConfigShape => ({
+  stage: parseStage(env.STAGE),
+  baseUrl: env.PORTLESS_URL ?? env.APP_URL ?? "http://localhost:3001",
+  auth: { secret: required(env, "AUTH_SECRET"), github: oauth(env, "GITHUB"), ... },
+  otlp: { endpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT },
+  version,
 });
 ```

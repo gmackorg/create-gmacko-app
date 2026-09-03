@@ -3,7 +3,7 @@
 The web lane of this template — `apps/web`, TanStack Start + Effect — deploys
 as a Cloudflare Worker with a D1 database, one of each per stage, orchestrated
 by ForgeGraph. That is the only production path for the web app: Workers is
-the standing rule for Next.js/web apps, and the VPS nodes (`hetzner-*`) are
+the standing rule for web apps, and the VPS nodes (`hetzner-*`) are
 for non-web services (Go services, bots, queue workers).
 
 The full guide is [`docs/DEPLOYMENT.md`](../docs/DEPLOYMENT.md). In short:

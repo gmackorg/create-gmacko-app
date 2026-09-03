@@ -15,7 +15,7 @@ Run this after `pnpm bootstrap:local`.
 - Run `pnpm bootstrap:local`, then `pnpm doctor` and `pnpm check:fast`.
 - If collaboration or invites are enabled, inspect `packages/db/src/schema.ts` and `packages/api/src/router/settings.ts`.
 - If billing or metering are enabled, inspect `packages/billing` and `packages/api/src/router/settings.ts`.
-- If support or launch controls are enabled, inspect `apps/nextjs/src/app`, `packages/api/src/router/admin.ts`, and `packages/api/src/router/settings.ts`.
+- If support or launch controls are enabled, inspect `apps/web/src/routes`, `packages/domain/src/admin/api.ts`, and `packages/api/src/admin/service.ts`.
 
 ## OpenCode
 
@@ -23,7 +23,7 @@ Run this after `pnpm bootstrap:local`.
 - Run `pnpm bootstrap:local`, then `pnpm doctor` and `pnpm check:fast`.
 - If collaboration or invites are enabled, inspect `packages/db/src/schema.ts` and `packages/api/src/router/settings.ts`.
 - If billing or metering are enabled, inspect `packages/billing` and `packages/api/src/router/settings.ts`.
-- If support or launch controls are enabled, inspect `apps/nextjs/src/app`, `packages/api/src/router/admin.ts`, and `packages/api/src/router/settings.ts`.
+- If support or launch controls are enabled, inspect `apps/web/src/routes`, `packages/domain/src/admin/api.ts`, and `packages/api/src/admin/service.ts`.
 
 ## Selected SaaS layers
 

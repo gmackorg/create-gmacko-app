@@ -7,9 +7,8 @@ the operating guide for that lane; the D1 procedures (export, Time Travel,
 copy, size) are in [`RUNBOOK.md`](./RUNBOOK.md) and the migration rules in
 [`drizzle-migrations.md`](./drizzle-migrations.md).
 
-> The legacy Next.js app (`apps/nextjs`, Postgres on a VPS node) keeps its
-> ForgeGraph + Nix path until Phase 8 deletes it; nothing on this page applies
-> to it. See `docs/legacy/` for that lane.
+> The previous web lane (a Node app with Postgres on a VPS node) was removed
+> in Phase 8 of the migration; its notes live in `docs/legacy/`.
 
 ## The shape
 
