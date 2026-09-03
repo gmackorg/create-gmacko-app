@@ -1,0 +1,42 @@
+{
+  "name": "@gmacko/api",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./config": "./src/config.ts",
+    "./background": "./src/background.ts",
+    "./rate-limit": "./src/rate-limit.ts",
+    "./layer": "./src/layer.ts",
+    "./handler": "./src/handler.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "license": "MIT",
+  "scripts": {
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "format": "biome check .",
+    "lint": "oxlint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:workers": "vitest run --config vitest.workers.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gmacko/auth": "workspace:*",
+    "@gmacko/config": "workspace:*",
+    "@gmacko/db": "workspace:*",
+    "@gmacko/domain": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog:",
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
+    "@gmacko/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "oxlint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
