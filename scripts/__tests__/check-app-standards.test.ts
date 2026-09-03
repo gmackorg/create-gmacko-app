@@ -56,6 +56,103 @@ const check = (files: Record<string, string>): ReadonlyArray<Violation> => {
 const rules = (violations: ReadonlyArray<Violation>) =>
   violations.map((v) => `${v.rule} ${v.file}:${v.line}`).sort();
 
+/** `--graph --json`: the packages the rule scopes to, from a fixture tree. */
+const graph = (files: Record<string, string>): ReadonlyArray<string> => {
+  const root = mkdtempSync(join(tmpdir(), "gmacko-standards-"));
+  created.push(root);
+  for (const [path, contents] of Object.entries(files)) {
+    const full = join(root, path);
+    mkdirSync(dirname(full), { recursive: true });
+    writeFileSync(full, contents);
+  }
+  const result = spawnSync(process.execPath, [script, "--graph", "--json"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  expect(result.status).toBe(0);
+  return (JSON.parse(result.stdout) as { webBundle: string[] }).webBundle;
+};
+
+const pkg = (name: string, deps: Record<string, string> = {}) =>
+  JSON.stringify({ name, dependencies: deps });
+
+/** A workspace where apps/web depends on api, which depends on db; flags is Node-only. */
+const workspace = {
+  "apps/web/package.json": pkg("@gmacko/web", {
+    "@gmacko/api": "workspace:*",
+    effect: "catalog:",
+  }),
+  "packages/api/package.json": pkg("@gmacko/api", {
+    "@gmacko/db": "workspace:*",
+    "@gmacko/legacy-db": "workspace:*",
+  }),
+  "packages/db/package.json": pkg("@gmacko/db"),
+  "packages/legacy-db/package.json": pkg("@gmacko/legacy-db"),
+  "packages/mcp-server/package.json": pkg("@gmacko/mcp-server", {
+    "@gmacko/api": "workspace:*",
+  }),
+};
+
+describe("no-raw-process-env", () => {
+  it("computes the web bundle from apps/web's workspace dependencies, transitively", () => {
+    expect(graph(workspace)).toEqual([
+      "packages/api",
+      "packages/db",
+      "packages/legacy-db",
+    ]);
+  });
+
+  it("flags any process.env read in a bundled package, and typed-env misses in app code", () => {
+    const violations = check({
+      ...workspace,
+      "packages/api/src/config.ts":
+        'const stage = process.env.STAGE ?? "development";\n',
+      "packages/db/src/client.ts": "const url = process.env.NODE_ENV;\n",
+      "apps/web/src/lib/x.ts": "const a = process.env.API_URL;\n",
+      "apps/web/src/lib/y.ts": "const b = process.env.NODE_ENV;\n",
+    });
+    expect(rules(violations)).toEqual([
+      "no-raw-process-env apps/web/src/lib/x.ts:1",
+      "no-raw-process-env packages/api/src/config.ts:1",
+      "no-raw-process-env packages/db/src/client.ts:1",
+    ]);
+  });
+
+  it("exempts env modules, tests, comments, Node-only packages, legacy packages and disabled lines", () => {
+    const violations = check({
+      ...workspace,
+      "packages/api/src/env.ts": "export const env = process.env;\n",
+      "packages/api/src/config/index.ts": "process.env.X;\n",
+      "packages/api/src/x.test.ts": "process.env.X;\n",
+      "packages/api/src/y.ts": [
+        "// process.env is never read here",
+        " * nor in a docblock mentioning process.env",
+        "// gmacko-standards-disable-next-line no-raw-process-env",
+        "const z = process.env.Z;",
+      ].join("\n"),
+      "packages/mcp-server/src/index.ts": "process.env.GMACKO_API_KEY;\n",
+      "packages/legacy-db/src/client.ts": "process.env.DATABASE_URL;\n",
+      "apps/nextjs/src/lib/legacy.ts": "process.env.NODE_ENV;\n",
+    });
+    expect(rules(violations)).toEqual([]);
+  });
+});
+
+describe("no-dev-vars", () => {
+  it("flags any .dev.vars file", () => {
+    const violations = check({
+      ...workspace,
+      "apps/web/.dev.vars": "AUTH_SECRET=x\n",
+      "apps/web/.dev.vars.staging": "",
+      "apps/web/src/index.ts": "export {};\n",
+    });
+    expect(rules(violations)).toEqual([
+      "no-dev-vars apps/web/.dev.vars.staging:1",
+      "no-dev-vars apps/web/.dev.vars:1",
+    ]);
+  });
+});
+
 describe("no-db-transaction", () => {
   it("flags db.transaction and withTransaction in the Effect packages and apps/web", () => {
     const violations = check({

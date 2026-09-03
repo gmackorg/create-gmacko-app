@@ -10,7 +10,7 @@
  * Exit non-zero if any violation is found. `--fix` is intentionally NOT offered;
  * these need human judgement, not codemods.
  *
- * Usage: node scripts/check-app-standards.mjs [--json]
+ * Usage: node scripts/check-app-standards.mjs [--json] [--graph]
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, extname, join, relative } from "node:path";
@@ -64,6 +64,9 @@ const rel = (f) => relative(ROOT, f);
 const add = (rule, file, line, message, hint) =>
   violations.push({ rule, file: rel(file), line, message, hint });
 
+// A line that is only a comment: `//`, `*` (docblock body), or `/*`.
+const isCommentLine = (ln) => /^\s*(\/\/|\*|\/\*)/.test(ln);
+
 // A file may opt out of a specific rule for a justified reason with a line
 // comment: `// gmacko-standards-disable-next-line <rule>`.
 const isDisabled = (lines, idx, rule) => {
@@ -72,38 +75,133 @@ const isDisabled = (lines, idx, rule) => {
 };
 
 // ── Rule: no-raw-process-env ─────────────────────────────────────────────────
-// App feature code must read config from the validated `env` object (t3-oss/env),
-// not `process.env` directly — otherwise vars are unvalidated and untyped. This
-// rule is scoped to the app feature layer (apps/*/src/**), where feature work is
-// added, and exempts the env-definition layer (env.ts / src/config / src/env /
-// instrumentation / *.config.* / tests), which legitimately reads process.env to
-// build that validated object. Shared `packages/**` are exempt here — they are
-// infrastructure and several must read process.env directly (logging, telemetry,
-// db client, etc.).
-const ENV_RULE_SCOPE = /^apps\/[^/]+\/src\//;
+// Config enters once, validated: the app feature layer (apps/*/src/**) reads
+// the typed `env` object, and nothing that ships inside the Worker bundle
+// reads `process.env` at all — the Worker has no process environment, so a
+// read there is a value that is silently `undefined` in production (plan
+// principle 04: env is a service; `AppConfig` is the only reader). The bundle
+// is the set of workspace packages reachable from apps/web's package.json
+// (`dependencies`, transitively), computed here so a new dependency joins
+// the scope on its own. Node-only packages (the CLI, the MCP server,
+// realtime) are not reachable from apps/web and keep their typed env
+// modules; `packages/legacy-*` and `apps/nextjs` are excluded until Phase 8
+// deletes them. The env-definition layer stays exempt in both scopes
+// (env.ts / src/config / src/env / instrumentation / *.config.* / tests).
+const WEB_APP_DIR = "apps/web";
+const ENV_RULE_APP_SCOPE = /^apps\/[^/]+\/src\//;
 const ENV_RULE_EXEMPT =
   /(^|\/)(env\.ts|env\.mjs|env\.js|instrumentation\.[tj]sx?|.*\.config\.(ts|js|mjs|cjs)|.*\.(test|spec)\.[tj]sx?)|(^|\/)(src\/config|src\/env)\//;
+const ENV_RULE_PACKAGE_EXCLUDED = /^packages\/legacy-/;
+
+const readJson = (file) => {
+  try {
+    return JSON.parse(readFileSync(file, "utf8"));
+  } catch {
+    return null;
+  }
+};
+
+/** Workspace package name → directory (relative), from packages/* and apps/*. */
+function workspacePackages() {
+  const byName = new Map();
+  for (const scope of SCAN_DIRS) {
+    let entries;
+    try {
+      entries = readdirSync(join(ROOT, scope));
+    } catch {
+      continue;
+    }
+    for (const name of entries) {
+      const dir = join(scope, name);
+      const pkg = readJson(join(ROOT, dir, "package.json"));
+      if (pkg?.name) byName.set(pkg.name, dir);
+    }
+  }
+  return byName;
+}
+
+/**
+ * The workspace packages the web app bundles: its `dependencies` and,
+ * transitively, theirs (devDependencies build the app, they do not ship).
+ * Sorted directories, relative to the repo root.
+ */
+export function webBundlePackages(root = ROOT) {
+  const byName = workspacePackages();
+  const app = readJson(join(root, WEB_APP_DIR, "package.json"));
+  if (!app) return [];
+  const seen = new Set();
+  const queue = Object.keys(app.dependencies ?? {});
+  while (queue.length > 0) {
+    const name = queue.shift();
+    const dir = byName.get(name);
+    if (!dir || seen.has(dir)) continue;
+    seen.add(dir);
+    const pkg = readJson(join(root, dir, "package.json"));
+    queue.push(...Object.keys(pkg?.dependencies ?? {}));
+  }
+  return [...seen].sort();
+}
+
 function checkRawProcessEnv() {
+  const bundle = webBundlePackages().filter(
+    (dir) => !ENV_RULE_PACKAGE_EXCLUDED.test(dir),
+  );
+  const bundleSrc = bundle.map((dir) => `${dir}/src/`);
+  const inScope = (r) =>
+    (ENV_RULE_APP_SCOPE.test(r) && !r.startsWith("apps/nextjs/")) ||
+    bundleSrc.some((prefix) => r.startsWith(prefix)) ||
+    // apps/nextjs keeps the app-layer rule it always had (legacy, Phase 8).
+    (r.startsWith("apps/nextjs/src/") && ENV_RULE_APP_SCOPE.test(r));
   for (const f of codeFiles) {
     const r = rel(f);
-    if (!ENV_RULE_SCOPE.test(r) || ENV_RULE_EXEMPT.test(r)) continue;
+    if (!inScope(r) || ENV_RULE_EXEMPT.test(r)) continue;
+    const isBundle = bundleSrc.some((prefix) => r.startsWith(prefix));
     const lines = linesOf(read(f));
     lines.forEach((ln, i) => {
-      // NODE_ENV and PORT are framework/dev-server vars, not app config —
-      // conventional exceptions (e.g. a localhost dev-URL fallback).
-      if (
-        /\bprocess\.env\.(?!NODE_ENV\b|PORT\b)[A-Z0-9_]+/.test(ln) &&
-        !isDisabled(lines, i, "no-raw-process-env")
-      ) {
+      if (isCommentLine(ln)) return;
+      // In the app layer NODE_ENV and PORT are framework/dev-server vars, not
+      // app config — conventional exceptions (e.g. a localhost dev-URL
+      // fallback). In the Worker bundle there is no process at all, so no
+      // exception applies.
+      const pattern = isBundle
+        ? /\bprocess\.env\b/
+        : /\bprocess\.env\.(?!NODE_ENV\b|PORT\b)[A-Z0-9_]+/;
+      if (pattern.test(ln) && !isDisabled(lines, i, "no-raw-process-env")) {
         add(
           "no-raw-process-env",
           f,
           i + 1,
-          "Direct process.env access in app/package code.",
-          "Import the validated `env` (from ~/env or @gmacko/*/env) instead — it validates + types the var. Add it to the env schema if missing.",
+          isBundle
+            ? "process.env read in a package that ships in the Worker bundle (apps/web dependency graph)."
+            : "Direct process.env access in app code.",
+          isBundle
+            ? "Take the value as a constructor/function option or from AppConfig (apps/web/src/server/config.ts is the only reader of bindings). Node-only packages must not be reachable from apps/web."
+            : "Import the validated `env` (from ~/env or @gmacko/*/env) instead — it validates + types the var. Add it to the env schema if missing.",
         );
       }
     });
+  }
+}
+
+// ── Rule: no-dev-vars ────────────────────────────────────────────────────────
+// Wrangler and the Cloudflare Vite plugin load `.env` / `.env.local` from the
+// wrangler config directory, which is how emulate's variables reach the
+// Worker in development (apps/web/.env links to the repo-root .env). A
+// `.dev.vars` file, even an empty one, silently disables that `.env` loading,
+// so the Worker boots with wrangler.jsonc vars only and every AppConfig secret
+// is missing. Never create one; stage secrets go in with `wrangler secret put`
+// (`pnpm secrets:push`).
+function checkDevVars() {
+  for (const f of allFiles) {
+    const name = basename(f);
+    if (!name.startsWith(".dev.vars")) continue;
+    add(
+      "no-dev-vars",
+      f,
+      1,
+      "`.dev.vars` file present: its existence disables `.env` loading in wrangler dev.",
+      "Delete it. Local variables come from the repo-root .env (linked into apps/web/.env by `predev`); stage secrets from `pnpm secrets:push --stage <stage>`.",
+    );
   }
 }
 
@@ -255,8 +353,6 @@ function checkAccountDeletion() {
 // Scope: the Effect packages and the Worker app; the legacy Postgres stack
 // (`packages/legacy-*`, `apps/nextjs`) keeps its transactions until Phase 8.
 const EFFECT_STACK_SCOPE = /^(packages\/(db|auth|api|domain)|apps\/web)\/src\//;
-// A line that is only a comment: `//`, `*` (docblock body), or `/*`.
-const isCommentLine = (ln) => /^\s*(\/\/|\*|\/\*)/.test(ln);
 function checkDbTransaction() {
   for (const f of codeFiles) {
     const r = rel(f);
@@ -353,7 +449,23 @@ function checkD1TableRebuild() {
   }
 }
 
+const asJson = process.argv.includes("--json");
+
+// `--graph`: print the web bundle (the no-raw-process-env package scope) and exit.
+if (process.argv.includes("--graph")) {
+  const bundle = webBundlePackages();
+  if (asJson) console.log(JSON.stringify({ webBundle: bundle }, null, 2));
+  else {
+    console.log(
+      "apps/web dependency graph (workspace packages in the Worker bundle):",
+    );
+    for (const dir of bundle) console.log(`  ${dir}`);
+  }
+  process.exit(0);
+}
+
 checkRawProcessEnv();
+checkDevVars();
 checkHostIncludes();
 checkCommittedCredentials();
 checkDebugRoutes();
@@ -362,10 +474,17 @@ checkDbTransaction();
 checkPlainDrizzle();
 checkD1TableRebuild();
 
-const asJson = process.argv.includes("--json");
 if (asJson) {
   console.log(
-    JSON.stringify({ ok: violations.length === 0, violations }, null, 2),
+    JSON.stringify(
+      {
+        ok: violations.length === 0,
+        webBundle: webBundlePackages(),
+        violations,
+      },
+      null,
+      2,
+    ),
   );
 } else if (violations.length === 0) {
   console.log("✓ gmacko app standards: no violations");
