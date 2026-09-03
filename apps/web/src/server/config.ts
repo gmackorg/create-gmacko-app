@@ -4,7 +4,11 @@
  * `cloudflare:workers` env (and from a literal object in tests); nothing
  * else reads bindings or `process.env`.
  */
-import { type AppConfigShape, defaultFeatures } from "@gmacko/api";
+import {
+  type AppConfigShape,
+  defaultFeatures,
+  type FeatureFlags,
+} from "@gmacko/api";
 import { Stage as StageSchema } from "@gmacko/domain/health";
 import { Schema } from "effect";
 
@@ -14,8 +18,8 @@ const Optional = Schema.optional(Schema.String);
 
 /**
  * The bindings this app reads. Secrets are optional at the type level so a
- * bare local checkout boots; TODO(Phase 7): require the provider secrets in
- * staging/production and fail fast at deploy time.
+ * bare local checkout boots; `fromBindings` requires them in staging and
+ * production (`requiredSecrets`) and fails at load with the missing list.
  */
 export const Bindings = Schema.Struct({
   STAGE: StageSchema,
@@ -40,10 +44,54 @@ export const Bindings = Schema.Struct({
   OTEL_EXPORTER_OTLP_ENDPOINT: Optional,
   /** `key=value,key2=value2`, as the OTel spec defines it. */
   OTEL_EXPORTER_OTLP_HEADERS: Optional,
+  /** Stripe's API key; required in staging/production when the Stripe feature is on. */
+  STRIPE_SECRET_KEY: Optional,
   /** Stripe's signing secret for `POST /api/webhooks/stripe`; unset → the route answers 503. */
   STRIPE_WEBHOOK_SECRET: Optional,
 });
 export type Bindings = typeof Bindings.Type;
+
+/** The stages that must carry real secrets; development and PR previews may run bare. */
+const STRICT_STAGES: ReadonlySet<string> = new Set(["staging", "production"]);
+
+const OAUTH_PAIRS = [
+  ["AUTH_GITHUB_ID", "AUTH_GITHUB_SECRET"],
+  ["AUTH_GOOGLE_ID", "AUTH_GOOGLE_SECRET"],
+  ["AUTH_APPLE_ID", "AUTH_APPLE_SECRET"],
+] as const satisfies ReadonlyArray<readonly [keyof Bindings, keyof Bindings]>;
+
+const present = (env: Bindings, key: keyof Bindings): boolean =>
+  typeof env[key] === "string" && env[key].length > 0;
+
+/**
+ * What a strict stage is missing: `AUTH_SECRET`, one complete OAuth pair
+ * (half a pair is not a provider), and the Stripe secrets when the Stripe
+ * feature is on. Empty when everything is there or the stage is permissive.
+ */
+export const requiredSecrets = (
+  env: Bindings,
+  features: Pick<FeatureFlags, "stripe">,
+): ReadonlyArray<string> => {
+  if (!STRICT_STAGES.has(env.STAGE)) return [];
+  const missing: string[] = [];
+  if (!present(env, "AUTH_SECRET")) missing.push("AUTH_SECRET");
+  if (
+    !OAUTH_PAIRS.some(
+      ([id, secret]) => present(env, id) && present(env, secret),
+    )
+  ) {
+    const pairs = OAUTH_PAIRS.map((pair) => pair.join("+"));
+    missing.push(
+      `one OAuth provider pair (${pairs.slice(0, -1).join(", ")} or ${pairs.at(-1)})`,
+    );
+  }
+  if (features.stripe) {
+    for (const key of ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"] as const) {
+      if (!present(env, key)) missing.push(key);
+    }
+  }
+  return missing;
+};
 
 const truthy = (value: string | undefined): boolean =>
   value === "1" || value === "true";
@@ -73,15 +121,27 @@ const origins = (...urls: ReadonlyArray<string | undefined>) =>
   );
 
 /**
- * Decodes bindings; throws on an invalid STAGE, or on a magic-link bypass
- * outside development, so a misconfigured Worker fails at load rather than
- * on its first request.
+ * Decodes bindings; throws on an invalid STAGE, on a magic-link bypass
+ * outside development, or on a secret missing in staging/production, so a
+ * misconfigured Worker fails at load (visible in the deploy) rather than
+ * on its first request. `features` defaults to what `@gmacko/config`
+ * ships; a test flips one.
  */
 export const fromBindings = (
   bindings: unknown,
-  options?: { readonly version?: string | undefined },
+  options?: {
+    readonly version?: string | undefined;
+    readonly features?: Partial<FeatureFlags> | undefined;
+  },
 ): AppConfigShape => {
   const env = Schema.decodeUnknownSync(Bindings)(bindings);
+  const features: FeatureFlags = { ...defaultFeatures, ...options?.features };
+  const missing = requiredSecrets(env, features);
+  if (missing.length > 0) {
+    throw new Error(
+      `STAGE is "${env.STAGE}" but the Worker is missing: ${missing.join(", ")}. Set them in ForgeGraph and push with \`pnpm secrets:push --stage ${env.STAGE}\`.`,
+    );
+  }
   const baseUrl = env.PORTLESS_URL ?? env.APP_URL ?? "http://localhost:3001";
   const productionUrl = env.APP_URL ?? baseUrl;
   const bypassMagicLink = truthy(env.BYPASS_MAGIC_LINK);
@@ -129,7 +189,7 @@ export const fromBindings = (
       endpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT,
       headers: parseHeaders(env.OTEL_EXPORTER_OTLP_HEADERS),
     },
-    features: defaultFeatures,
+    features,
   };
 };
 

@@ -75,7 +75,12 @@ Note for `vite preview`: the plugin bakes the `.env` it saw at build time into
 ## Auth, telemetry and Sentry configuration
 
 `src/server/config.ts` (`AppConfig.fromBindings`, `webFromBindings`) is the
-only reader of these bindings.
+only reader of these bindings. In `staging` and `production` it requires
+`AUTH_SECRET`, one complete OAuth pair (GitHub, Google or Apple id+secret)
+and, when the Stripe feature is on, `STRIPE_SECRET_KEY` +
+`STRIPE_WEBHOOK_SECRET`; a missing one stops the Worker at load with the
+full list and the `pnpm secrets:push --stage <stage>` fix. Development and
+PR previews boot without them.
 
 | Binding | Purpose |
 | --- | --- |
@@ -86,6 +91,7 @@ only reader of these bindings.
 | `BYPASS_MAGIC_LINK=true` | Print magic links to the server log instead of emailing them. **Development only**: `AppConfig.fromBindings` throws at load when it is set on any other `STAGE`. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` (+ `OTEL_EXPORTER_OTLP_HEADERS`) | OTLP/HTTP export of traces, logs and metrics (`@gmacko/telemetry`'s `Observability.layer`, wired in `src/server/runtime.ts`); flushed on `waitUntil` after every request. Unset → off; JSON console logging stays on either way. |
 | `SENTRY_DSN` | Enables `@sentry/cloudflare`'s `withSentry` wrapper in `src/server/worker.ts`. Unset → no-op. |
+| `STRIPE_SECRET_KEY` | Stripe API key; required in staging/production when the Stripe feature is on. |
 | `STRIPE_WEBHOOK_SECRET` | Signing secret for `POST /api/webhooks/stripe`; unset → the route answers 503. |
 | `VITE_SENTRY_DSN`, `VITE_POSTHOG_KEY`, `VITE_POSTHOG_HOST` | Browser Sentry (`src/client.tsx`) and PostHog (`src/providers.tsx`); both off when unset. |
 

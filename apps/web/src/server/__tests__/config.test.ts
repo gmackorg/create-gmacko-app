@@ -7,7 +7,12 @@ import { describe, expect, it } from "vitest";
 
 import { fromBindings } from "../config";
 
-const base = { AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth" };
+// Enough for a strict stage to boot (config.strict.test.ts covers the rest).
+const base = {
+  AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
+  AUTH_GITHUB_ID: "gh-id",
+  AUTH_GITHUB_SECRET: "gh-secret",
+};
 
 describe("fromBindings", () => {
   it("honours BYPASS_MAGIC_LINK in development", () => {
