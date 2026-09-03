@@ -21,12 +21,20 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Suspense } from "react";
 
 import { AuthShowcase } from "~/component/auth-showcase";
+import { api } from "~/lib/api";
 import { useTRPC } from "~/lib/trpc";
 
 export const Route = createFileRoute("/")({
-  loader: ({ context }) => {
+  loader: async ({ context }) => {
     const { trpc, queryClient } = context;
     void queryClient.prefetchQuery(trpc.post.all.queryOptions());
+    // On the server this goes through the in-process transport (cookie
+    // forwarded, no network hop); on client navigation it is a fetch.
+    const [ready, me] = await Promise.all([
+      api((client) => client.health.ready()).catch(() => null),
+      api((client) => client.session.me()).catch(() => null),
+    ]);
+    return { ready, me };
   },
   component: RouteComponent,
 });
@@ -39,6 +47,7 @@ function RouteComponent() {
           Create <span className="text-primary">T3</span> Turbo
         </h1>
         <AuthShowcase />
+        <LoaderStatus />
 
         <CreatePostForm />
         <div className="w-full max-w-2xl overflow-y-scroll">
@@ -56,6 +65,19 @@ function RouteComponent() {
         </div>
       </div>
     </main>
+  );
+}
+
+/** What the route loader saw through the API client (SSR or client fetch). */
+function LoaderStatus() {
+  const { ready, me } = Route.useLoaderData();
+  return (
+    <p className="text-muted-foreground text-sm" data-testid="loader-status">
+      API via loader:{" "}
+      {ready ? `ready (db ${ready.latencyMs.toFixed(1)} ms)` : "unavailable"}
+      {" · "}
+      {me?.user ? `session for ${me.user.email}` : "no session"}
+    </p>
   );
 }
 

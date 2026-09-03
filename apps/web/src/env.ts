@@ -1,10 +1,8 @@
-import { authEnv } from "@gmacko/legacy-auth/env";
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod/v4";
 
 export const env = createEnv({
   clientPrefix: "VITE_",
-  extends: [authEnv()],
   shared: {
     NODE_ENV: z
       .enum(["development", "production", "test"])
@@ -17,6 +15,7 @@ export const env = createEnv({
   server: {
     APP_URL: z.url().optional(),
     PORTLESS_URL: z.string().url().optional(),
+    // TODO(Phase 5): goes with the legacy Postgres tRPC routes.
     DATABASE_URL: z.url(),
   },
 

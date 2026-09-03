@@ -3,18 +3,19 @@ import { createLogger } from "@gmacko/logging";
 import { createFileRoute } from "@tanstack/react-router";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 
-import { auth } from "~/auth/server";
+import { authApi } from "~/server/runtime";
 
 const log = createLogger({ module: "trpc-handler" });
 
+// TODO(Phase 5): delete with the tRPC routes; the Effect HttpApi replaces them.
 const handler = (req: Request) =>
   fetchRequestHandler({
     endpoint: "/api/trpc",
     router: appRouter,
     req,
-    createContext: () =>
+    createContext: async () =>
       createTRPCContext({
-        authApi: auth.api,
+        authApi: await authApi(),
         headers: req.headers,
       }),
     onError({ error, path }) {

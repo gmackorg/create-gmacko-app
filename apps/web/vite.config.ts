@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { cloudflare } from "@cloudflare/vite-plugin";
@@ -34,7 +35,15 @@ const workerShims = (): Plugin => {
   };
 };
 
+const { version } = JSON.parse(
+  readFileSync(new URL("./package.json", import.meta.url), "utf8"),
+) as { version?: string };
+
 export default defineConfig({
+  define: {
+    // Telemetry `service.version` and the Sentry release; not npm_package_version.
+    __APP_VERSION__: JSON.stringify(version ?? "0.0.0"),
+  },
   server: {
     port: 3001,
   },
