@@ -79,9 +79,7 @@ async function runCommand(
   }
 }
 
-export async function provisionGitRepo(
-  config: ProvisionConfig,
-): Promise<boolean> {
+async function provisionGitRepo(config: ProvisionConfig): Promise<boolean> {
   const hasGh = isCliInstalled("gh");
   const hasTea = isCliInstalled("tea");
 
@@ -155,9 +153,7 @@ export async function provisionGitRepo(
  * Deployment guidance for the web lane: one Cloudflare Worker and one D1 per
  * stage, orchestrated by ForgeGraph (docs/DEPLOYMENT.md in the generated app).
  */
-export async function provisionForgeGraph(
-  config: ProvisionConfig,
-): Promise<boolean> {
+async function provisionForgeGraph(config: ProvisionConfig): Promise<boolean> {
   if (!config.platforms.web) {
     return false;
   }
@@ -212,7 +208,7 @@ export async function provisionForgeGraph(
   return true;
 }
 
-export async function provisionEAS(config: ProvisionConfig): Promise<boolean> {
+async function provisionEAS(config: ProvisionConfig): Promise<boolean> {
   if (!config.platforms.mobile) {
     return false;
   }
@@ -270,7 +266,7 @@ export async function provisionEAS(config: ProvisionConfig): Promise<boolean> {
  * The local D1: apply the checked-in migrations and seed the defaults. No
  * service to start; Miniflare keeps the database in apps/web/.wrangler/state.
  */
-export async function provisionLocalDatabase(
+async function provisionLocalDatabase(
   config: ProvisionConfig,
 ): Promise<boolean> {
   if (!config.platforms.web) {
