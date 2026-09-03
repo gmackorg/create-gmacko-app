@@ -20,6 +20,7 @@
   "dependencies": {
     "@better-auth/expo": "catalog:",
     "@gmacko/db": "workspace:*",
+    "@gmacko/domain": "workspace:*",
     "better-auth": "catalog:",
     "drizzle-orm": "catalog:",
     "effect": "catalog:"

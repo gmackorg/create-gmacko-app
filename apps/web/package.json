@@ -20,6 +20,7 @@
     "@fontsource-variable/geist-mono": "^5.2.7",
     "@gmacko/auth": "workspace:*",
     "@gmacko/db": "workspace:*",
+    "@gmacko/domain": "workspace:*",
     "@gmacko/legacy-api": "workspace:*",
     "@gmacko/legacy-db": "workspace:*",
     "@gmacko/logging": "workspace:*",
