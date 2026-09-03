@@ -5,6 +5,7 @@
  * ship without regenerating it (Node-only: it reads the file from disk).
  */
 import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { Effect, ManagedRuntime } from "effect";
