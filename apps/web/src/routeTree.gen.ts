@@ -1,4 +1,4 @@
-/* oxlint-disable */
+/* eslint-disable */
 
 // @ts-nocheck
 
@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from "./routes/__root";
 import { Route as ApiAuthSplatRouteImport } from "./routes/api/auth.$";
 import { Route as ApiTrpcSplatRouteImport } from "./routes/api/trpc.$";
+import { Route as ApiSplatRouteImport } from "./routes/api.$";
 import { Route as IndexRouteImport } from "./routes/index";
 
 const IndexRoute = IndexRouteImport.update({
@@ -18,9 +19,9 @@ const IndexRoute = IndexRouteImport.update({
   path: "/",
   getParentRoute: () => rootRouteImport,
 } as any);
-const ApiTrpcSplatRoute = ApiTrpcSplatRouteImport.update({
-  id: "/api/trpc/$",
-  path: "/api/trpc/$",
+const ApiSplatRoute = ApiSplatRouteImport.update({
+  id: "/api/$",
+  path: "/api/$",
   getParentRoute: () => rootRouteImport,
 } as any);
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
@@ -28,33 +29,42 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: "/api/auth/$",
   getParentRoute: () => rootRouteImport,
 } as any);
+const ApiTrpcSplatRoute = ApiTrpcSplatRouteImport.update({
+  id: "/api/trpc/$",
+  path: "/api/trpc/$",
+  getParentRoute: () => rootRouteImport,
+} as any);
 
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute;
+  "/api/$": typeof ApiSplatRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
   "/api/trpc/$": typeof ApiTrpcSplatRoute;
 }
 export interface FileRoutesByTo {
   "/": typeof IndexRoute;
+  "/api/$": typeof ApiSplatRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
   "/api/trpc/$": typeof ApiTrpcSplatRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   "/": typeof IndexRoute;
+  "/api/$": typeof ApiSplatRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
   "/api/trpc/$": typeof ApiTrpcSplatRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: "/" | "/api/auth/$" | "/api/trpc/$";
+  fullPaths: "/" | "/api/$" | "/api/auth/$" | "/api/trpc/$";
   fileRoutesByTo: FileRoutesByTo;
-  to: "/" | "/api/auth/$" | "/api/trpc/$";
-  id: "__root__" | "/" | "/api/auth/$" | "/api/trpc/$";
+  to: "/" | "/api/$" | "/api/auth/$" | "/api/trpc/$";
+  id: "__root__" | "/" | "/api/$" | "/api/auth/$" | "/api/trpc/$";
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
+  ApiSplatRoute: typeof ApiSplatRoute;
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute;
   ApiTrpcSplatRoute: typeof ApiTrpcSplatRoute;
 }
@@ -68,11 +78,11 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof IndexRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    "/api/trpc/$": {
-      id: "/api/trpc/$";
-      path: "/api/trpc/$";
-      fullPath: "/api/trpc/$";
-      preLoaderRoute: typeof ApiTrpcSplatRouteImport;
+    "/api/$": {
+      id: "/api/$";
+      path: "/api/$";
+      fullPath: "/api/$";
+      preLoaderRoute: typeof ApiSplatRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/api/auth/$": {
@@ -82,11 +92,19 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ApiAuthSplatRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/api/trpc/$": {
+      id: "/api/trpc/$";
+      path: "/api/trpc/$";
+      fullPath: "/api/trpc/$";
+      preLoaderRoute: typeof ApiTrpcSplatRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiSplatRoute: ApiSplatRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiTrpcSplatRoute: ApiTrpcSplatRoute,
 };
