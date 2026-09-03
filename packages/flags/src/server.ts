@@ -1,6 +1,9 @@
 /**
  * Server-side helpers for feature flags
  *
+ * The evaluation environment is an argument (the app's `AppConfig.stage`),
+ * never `process.env`.
+ *
  * Usage in tRPC procedures:
  *   import { withFlags, requireFlag, getFlagsForUser } from "@gmacko/flags/server";
  *
@@ -37,16 +40,19 @@ export interface UserLike {
 }
 
 /**
- * Build a flag context from a user-like object
+ * Build a flag context from a user-like object and the deployment's environment
  */
-export function buildFlagContext(user?: UserLike | null): FlagContext {
-  if (!user) return {};
+export function buildFlagContext(
+  user?: UserLike | null,
+  environment?: string,
+): FlagContext {
+  if (!user) return environment ? { environment } : {};
 
   return {
     userId: user.id,
     email: user.email ?? undefined,
     organizationId: user.organizationId ?? undefined,
-    environment: process.env.NODE_ENV,
+    environment,
   };
 }
 
@@ -56,8 +62,9 @@ export function buildFlagContext(user?: UserLike | null): FlagContext {
  */
 export function getFlagsForUser(
   user?: UserLike | null,
+  environment?: string,
 ): Record<RuntimeFlagName, boolean> {
-  const context = buildFlagContext(user);
+  const context = buildFlagContext(user, environment);
   return getAllFlags(context);
 }
 
@@ -67,8 +74,9 @@ export function getFlagsForUser(
 export function isFlagEnabledForUser(
   flagName: RuntimeFlagName,
   user?: UserLike | null,
+  environment?: string,
 ): boolean {
-  const context = buildFlagContext(user);
+  const context = buildFlagContext(user, environment);
   return isEnabled(flagName, context);
 }
 
@@ -78,8 +86,9 @@ export function isFlagEnabledForUser(
 export function getFlagForUser(
   flagName: RuntimeFlagName,
   user?: UserLike | null,
+  environment?: string,
 ): FlagEvaluationResult<boolean> {
-  const context = buildFlagContext(user);
+  const context = buildFlagContext(user, environment);
   return getFlag(flagName, context);
 }
 
@@ -117,8 +126,9 @@ export interface FlagsMiddlewareContext {
  */
 export function createFlagsContext(
   user?: UserLike | null,
+  environment?: string,
 ): FlagsMiddlewareContext {
-  const context = buildFlagContext(user);
+  const context = buildFlagContext(user, environment);
 
   return {
     flags: {
@@ -148,8 +158,9 @@ export function createFlagsContext(
 export function requireFlagEnabled(
   flagName: RuntimeFlagName,
   user?: UserLike | null,
+  environment?: string,
 ): void {
-  if (!isFlagEnabledForUser(flagName, user)) {
+  if (!isFlagEnabledForUser(flagName, user, environment)) {
     throw new Error(`Feature "${flagName}" is not enabled`);
   }
 }

@@ -47,7 +47,12 @@ export {
 } from "./flags";
 
 // Export store factory
-export { createFlagStore, type FlagStore } from "./store";
+export {
+  createFlagStore,
+  type FlagStore,
+  type FlagStoreOptions,
+  flagOverrideKey,
+} from "./store";
 // Export types
 export type {
   FlagContext,

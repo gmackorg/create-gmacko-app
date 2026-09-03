@@ -1,9 +1,11 @@
 /**
  * In-Memory Flag Store
  *
- * A simple, synchronous flag store that can be configured via:
- * 1. Direct configuration
- * 2. Environment variables
+ * A simple, synchronous flag store configured by its definitions and by
+ * `FlagStoreOptions`: the evaluation environment and per-flag overrides
+ * (`FLAG_<NAME>` values the app reads from its validated config). The
+ * store itself never reads `process.env`, so it is safe in the Worker
+ * bundle.
  *
  * Designed to be extended/replaced with external services like
  * LaunchDarkly or Flagsmith in the future.
@@ -17,6 +19,21 @@ import type {
   FlagName,
   FlagValue,
 } from "./types";
+
+export interface FlagStoreOptions {
+  /** The environment flags are evaluated for (`development`, `staging`, `production`). */
+  readonly environment?: string | undefined;
+  /**
+   * Per-flag overrides keyed `FLAG_<FLAGNAME>` (uppercase, hyphens to
+   * underscores), the values the deployment supplies; parsed by the flag's
+   * default value type.
+   */
+  readonly overrides?: Readonly<Record<string, string | undefined>> | undefined;
+}
+
+/** The override key for a flag: `FLAG_NEW_DASHBOARD` for `newDashboard`. */
+export const flagOverrideKey = (flagName: string): string =>
+  `FLAG_${flagName.toUpperCase().replace(/-/g, "_")}`;
 
 /**
  * Hash a string to a number between 0-99 for percentage rollouts
@@ -89,12 +106,17 @@ function evaluateRollout<T>(
 /**
  * Create a type-safe flag store with the given definitions
  */
-export function createFlagStore<T extends FlagDefinitions>(definitions: T) {
+export function createFlagStore<T extends FlagDefinitions>(
+  definitions: T,
+  options: FlagStoreOptions = {},
+) {
   // Runtime overrides (can be set programmatically)
   const overrides = new Map<string, unknown>();
+  // Deployment-supplied overrides
+  const supplied = options.overrides ?? {};
 
   // Current environment
-  let currentEnvironment: string = process.env.NODE_ENV ?? "development";
+  let currentEnvironment: string = options.environment ?? "development";
 
   /**
    * Set the current environment for flag evaluation
@@ -158,12 +180,11 @@ export function createFlagStore<T extends FlagDefinitions>(definitions: T) {
       };
     }
 
-    // 2. Check for environment variable override
+    // 2. Check for a deployment-supplied override
     // Format: FLAG_[FLAGNAME] (uppercase, hyphens to underscores)
-    const envKey = `FLAG_${flagName.toUpperCase().replace(/-/g, "_")}`;
-    const envValue = process.env[envKey];
+    const envValue = supplied[flagOverrideKey(flagName)];
     if (envValue !== undefined) {
-      // Parse environment variable based on default value type
+      // Parse the override based on default value type
       let parsedValue: unknown;
       if (typeof flagDef.defaultValue === "boolean") {
         parsedValue = envValue === "true" || envValue === "1";
