@@ -28,9 +28,12 @@
     {
       "binding": "DB",
       "database_name": "gmacko-web",
-      // Placeholder until Spike B provisions the real database.
+      // Placeholder id: local dev and tests use Miniflare's D1; the real
+      // database is provisioned per stage in Phase 7 (ForgeGraph).
       "database_id": "00000000-0000-0000-0000-000000000000",
-      "migrations_dir": "../../packages/legacy-db/migrations"
+      // Flat wrangler-style migrations flattened from drizzle-kit's folders by
+      // `pnpm -F @gmacko/db generate`. Apply with `pnpm -F @gmacko/db migrate:local`.
+      "migrations_dir": "../../packages/db/migrations"
     }
   ]
 }

@@ -5,6 +5,7 @@
  * ManagedRuntime built below. Module scope does no I/O.
  */
 import { env, waitUntil } from "cloudflare:workers";
+import { Database } from "@gmacko/db";
 import { FileSystem, Layer, ManagedRuntime, Path, Schema } from "effect";
 import { Etag, HttpPlatform, HttpRouter } from "effect/unstable/http";
 
@@ -30,6 +31,8 @@ const PlatformLive = Layer.mergeAll(
 const ServicesLive = Layer.mergeAll(
   AppConfigLive,
   Background.layer(waitUntil),
+  // D1 bindings are safe to hold at module scope; one client per isolate.
+  Database.layer(env.DB),
   PlatformLive,
 );
 

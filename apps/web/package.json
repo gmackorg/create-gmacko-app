@@ -16,6 +16,7 @@
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.8",
     "@fontsource-variable/geist-mono": "^5.2.7",
+    "@gmacko/db": "workspace:*",
     "@gmacko/legacy-api": "workspace:*",
     "@gmacko/legacy-auth": "workspace:*",
     "@gmacko/legacy-db": "workspace:*",
