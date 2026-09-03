@@ -126,7 +126,7 @@
   </div>
 
   <div class="progress" aria-label="Phase progress">
-    <i class="done"></i><i class="done"></i><i class="done"></i><i class="active"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    <i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="active"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
   </div>
 
   <h2>Overview</h2>
@@ -716,8 +716,8 @@ packages/
     <li class="done"><b>Phase 0 — Spike &amp; pin</b> · ~3 days · proves the stack on workerd and freezes versions.</li>
     <li class="done"><b>Phase 1 — Domain contract</b> · ~4 days · <code>packages/domain</code>, all endpoints declared.</li>
     <li class="done"><b>Phase 2 — D1 data layer</b> · ~4 days · schema port, migrations, <code>Database</code> service.</li>
-    <li class="active"><b>Phase 3 — Auth on D1</b> · ~3 days · better-auth sqlite, middleware, API keys.</li>
-    <li><b>Phase 4 — API services</b> · ~6 days · port 26 procedures and ~2,000 lines of tests.</li>
+    <li class="done"><b>Phase 3 — Auth on D1</b> · ~3 days · better-auth sqlite, middleware, API keys.</li>
+    <li class="active"><b>Phase 4 — API services</b> · ~6 days · port 26 procedures and ~2,000 lines of tests.</li>
     <li><b>Phase 5 — Web app</b> · ~6 days · <code>apps/web</code> to page parity.</li>
     <li><b>Phase 6 — Clients</b> · ~3 days · api-client, Expo, CLI, MCP, OpenAPI SDK.</li>
     <li><b>Phase 7 — Platform &amp; CI</b> · ~7 days · observability, wrangler, secrets bridge, rate limiting, preview databases, workflows, emulate, deploy lane.</li>
@@ -799,16 +799,16 @@ packages/
     </tbody>
   </table>
 
-  <h2>Phase 3 — Auth on D1 <span class="badge todo">Todo</span></h2>
+  <h2>Phase 3 — Auth on D1 <span class="badge done">Done</span></h2>
   <table>
     <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
     <tbody>
-      <tr><td><code>makeAuth(options, drizzle)</code>: sqlite adapter, no module-level DB import, options typed by Schema</td><td><code>packages/auth/src/index.ts</code></td><td>Unit test constructs auth against <code>layerTest</code></td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td><code>Auth</code> service (<code>currentUser</code>, <code>handler</code>) and <code>CurrentUser</code> provisioning</td><td><code>src/service.ts</code></td><td>Session from cookie resolves to <code>CurrentUser</code></td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td><code>ApiKeys</code> service: generate, hash, authenticate, list, revoke — WebCrypto</td><td><code>src/api-keys.ts</code></td><td>Hash matches the existing <code>sha256(hex)</code> format; expired/revoked keys rejected</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td><code>RequestContext</code>: request-scoped memo of session, user role, and workspace memberships, built once per incoming request and shared by every API call that request makes (SSR renders in particular)</td><td><code>src/request-context.ts</code></td><td>Test: a render issuing 6 API calls <em>through the in-process transport</em> performs 1 session, 1 role, and 1 membership read; the transport is what carries the context, and the test goes through it</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td><code>SessionLive</code>, <code>SessionOrKeyLive</code>, <code>AdminOnlyLive</code>, <code>WorkspaceRoleLive</code> middleware layers; cookie credentials on non-GET require an allowlisted <code>Origin</code>; better-auth <code>session.cookieCache</code> enabled</td><td><code>src/middleware.ts</code>, <code>src/index.ts</code></td><td>Handler tests: 401 without creds; 403 for non-admin; 200 with a <code>read</code> key on a read endpoint; <strong>403 with a <code>read</code> key on a write endpoint (regression: this was allowed)</strong>; 200 with a <code>write</code> key driving an operator write tool; <strong>403 for a cookie POST with a foreign <code>Origin</code></strong>; 401 for any key on a <code>Session</code>-only endpoint</td><td><span class="badge todo">Todo</span></td></tr>
-      <tr><td>Drop <code>@gmacko/auth/env</code>; move env schema into <code>AppConfig</code></td><td><code>packages/auth/env.ts</code> (deleted), <code>packages/api/src/config.ts</code></td><td>No <code>process.env</code> reads in <code>packages/auth</code></td><td><span class="badge todo">Todo</span></td></tr>
+      <tr><td><code>makeAuth(options, drizzle)</code>: sqlite adapter, no module-level DB import, options typed by Schema</td><td><code>packages/auth/src/index.ts</code></td><td>Unit test constructs auth against <code>layerTest</code></td><td><span class="badge done">Done</span></td></tr>
+      <tr><td><code>Auth</code> service (<code>currentUser</code>, <code>handler</code>) and <code>CurrentUser</code> provisioning</td><td><code>src/service.ts</code></td><td>Session from cookie resolves to <code>CurrentUser</code></td><td><span class="badge done">Done</span></td></tr>
+      <tr><td><code>ApiKeys</code> service: generate, hash, authenticate, list, revoke — WebCrypto</td><td><code>src/api-keys.ts</code></td><td>Hash matches the existing <code>sha256(hex)</code> format; expired/revoked keys rejected</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td><code>RequestContext</code>: request-scoped memo of session, user role, and workspace memberships, built once per incoming request and shared by every API call that request makes (SSR renders in particular)</td><td><code>src/request-context.ts</code></td><td>Test: a render issuing 6 API calls <em>through the in-process transport</em> performs 1 session, 1 role, and 1 membership read; the transport is what carries the context, and the test goes through it</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td><code>SessionLive</code>, <code>SessionOrKeyLive</code>, <code>AdminOnlyLive</code>, <code>WorkspaceRoleLive</code> middleware layers; cookie credentials on non-GET require an allowlisted <code>Origin</code>; better-auth <code>session.cookieCache</code> enabled</td><td><code>src/middleware.ts</code>, <code>src/index.ts</code></td><td>Handler tests: 401 without creds; 403 for non-admin; 200 with a <code>read</code> key on a read endpoint; <strong>403 with a <code>read</code> key on a write endpoint (regression: this was allowed)</strong>; 200 with a <code>write</code> key driving an operator write tool; <strong>403 for a cookie POST with a foreign <code>Origin</code></strong>; 401 for any key on a <code>Session</code>-only endpoint</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td>Drop <code>@gmacko/auth/env</code>; move env schema into <code>AppConfig</code></td><td><code>packages/auth/env.ts</code> (deleted), <code>packages/api/src/config.ts</code></td><td>No <code>process.env</code> reads in <code>packages/auth</code></td><td><span class="badge done">Done</span></td></tr>
     </tbody>
   </table>
 
