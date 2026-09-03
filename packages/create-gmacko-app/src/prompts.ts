@@ -19,6 +19,10 @@ function toTitleCase(str: string): string {
     .join(" ");
 }
 
+/** Printed whenever the realtime integration is on; see packages/realtime/README.md. */
+export const REALTIME_WARNING =
+  "Realtime (Redis + BullMQ) is Node-only: the web app runs on Cloudflare Workers and cannot use it. packages/realtime is kept for a separately deployed Node service (a queue consumer, a bot) that owns its own Redis.";
+
 export async function runPrompts(
   appName: string,
   defaults: Partial<CliOptions> = {},
@@ -45,9 +49,12 @@ export async function runPrompts(
   const platforms = await p.multiselect({
     message: "Which platforms?",
     options: [
-      { value: "web", label: "Web (Next.js)", hint: "recommended" },
+      {
+        value: "web",
+        label: "Web (TanStack Start + Effect on Cloudflare Workers, D1)",
+        hint: "recommended",
+      },
       { value: "mobile", label: "Mobile (Expo)", hint: "recommended" },
-      { value: "tanstackStart", label: "TanStack Start", hint: "experimental" },
     ],
     initialValues: ["web", "mobile"],
     required: true,
@@ -90,7 +97,7 @@ export async function runPrompts(
       {
         value: "everything",
         label: "Everything",
-        hint: "All integrations enabled",
+        hint: "All integrations enabled (realtime is Node-only)",
       },
       {
         value: "custom",
@@ -129,6 +136,10 @@ export async function runPrompts(
       process.exit(0);
     }
     integrations = { ...integrations, forgegraph: forgegraph as boolean };
+  }
+
+  if (integrations.realtime.enabled) {
+    p.log.warn(REALTIME_WARNING);
   }
 
   const saasLayers = await promptSaasLayers();
@@ -204,7 +215,6 @@ export async function runPrompts(
     platforms: {
       web: (platforms as string[]).includes("web"),
       mobile: (platforms as string[]).includes("mobile"),
-      tanstackStart: (platforms as string[]).includes("tanstackStart"),
     },
     saasCollaboration: saasLayers.collaboration,
     saasBilling: saasLayers.billing,
@@ -213,12 +223,9 @@ export async function runPrompts(
     saasLaunch: saasLayers.launch,
     saasReferrals: saasLayers.referrals,
     saasOperatorApis: saasLayers.operatorApis,
-    vinext: false,
     saasBootstrap: saasBootstrap as boolean,
     trpcOperators: saasLayers.operatorApis,
     forgegraphServer: "https://forge.example.com",
-    forgegraphStagingNode: "change-me-staging-node",
-    forgegraphProductionNode: "change-me-production-node",
     forgegraphPreviewDomain: "change-me.preview.example.com",
     forgegraphProductionDomain: "change-me.example.com",
     integrations: { ...integrations },
@@ -294,7 +301,8 @@ async function promptSaasLayers(): Promise<{
   }
 
   const operatorApis = await p.confirm({
-    message: "Add operator APIs (shared CLI + MCP wrappers over the API)?",
+    message:
+      "Add operator APIs (shared CLI + MCP wrappers over the HTTP API, admin-scoped keys)?",
     initialValue: false,
   });
   if (p.isCancel(operatorApis)) {
@@ -331,7 +339,7 @@ async function promptCustomIntegrations(): Promise<IntegrationConfig> {
       {
         value: "realtime",
         label: "Realtime + Jobs (Redis + BullMQ)",
-        hint: "Node services only; not supported on the Workers web lane",
+        hint: "Node services only; not supported on the Workers web app",
       },
       { value: "storage", label: "Storage" },
     ],
@@ -392,7 +400,6 @@ export function getDefaultOptions(appName: string): CliOptions {
     platforms: {
       web: true,
       mobile: true,
-      tanstackStart: false,
     },
     saasCollaboration: false,
     saasBilling: false,
@@ -401,12 +408,9 @@ export function getDefaultOptions(appName: string): CliOptions {
     saasLaunch: false,
     saasReferrals: false,
     saasOperatorApis: false,
-    vinext: false,
     saasBootstrap: false,
     trpcOperators: false,
     forgegraphServer: "https://forge.example.com",
-    forgegraphStagingNode: "change-me-staging-node",
-    forgegraphProductionNode: "change-me-production-node",
     forgegraphPreviewDomain: "change-me.preview.example.com",
     forgegraphProductionDomain: "change-me.example.com",
     integrations: DEFAULT_INTEGRATIONS,

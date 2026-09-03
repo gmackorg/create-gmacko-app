@@ -109,24 +109,22 @@ jobs:
         run: pnpm build
         env:
           SKIP_ENV_VALIDATION: true
-          # See ci.yml: placeholder so the db client can instantiate at build.
-          DATABASE_URL: postgresql://build:build@localhost:5432/build
 
       - name: Check bundle size
         run: |
           echo "## Bundle Size Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Extract route sizes from Next.js build output
-          BUILD_DIR="apps/nextjs/.next"
+          # The browser bundle of apps/web (Vite client build)
+          BUILD_DIR="apps/web/dist/client"
           if [ -d "$BUILD_DIR" ]; then
             # Report total JS bundle size
-            TOTAL_SIZE=$(find "$BUILD_DIR/static" -name "*.js" -exec wc -c {} + 2>/dev/null | tail -1 | awk '{print $1}')
+            TOTAL_SIZE=$(find "$BUILD_DIR" -name "*.js" -exec wc -c {} + 2>/dev/null | tail -1 | awk '{print $1}')
             TOTAL_KB=$((${TOTAL_SIZE:-0} / 1024))
 
             echo "| Metric | Size |" >> $GITHUB_STEP_SUMMARY
             echo "|--------|------|" >> $GITHUB_STEP_SUMMARY
-            echo "| Total JS (static) | ${TOTAL_KB} KB |" >> $GITHUB_STEP_SUMMARY
+            echo "| Total JS (client) | ${TOTAL_KB} KB |" >> $GITHUB_STEP_SUMMARY
 
             # Budget check: warn if total JS exceeds 500KB
             BUDGET_KB=500

@@ -134,9 +134,8 @@ flight.
 
 ## Running against emulate without portless
 
-`portless.json` still points `gmacko.localhost` at `apps/nextjs` (until Phase
-8), so this app runs on plain `http://localhost:3001`. The emulated OAuth
-providers accept that origin: `emulate.config.yaml` lists
+Without portless this app runs on plain `http://localhost:3001` (`pnpm -F
+@gmacko/web dev`). The emulated OAuth providers accept that origin: `emulate.config.yaml` lists
 `http://localhost:3001/api/auth/callback/{github,google}` next to the
 `https://gmacko.localhost` redirect URIs.
 

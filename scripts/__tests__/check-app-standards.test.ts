@@ -3,6 +3,8 @@
  * case writes a minimal `apps/` + `packages/` tree to a temp dir and runs the
  * script there with `--json`, so a rule is tested on exactly the file layout
  * it is scoped to and nothing in the real workspace can mask a regression.
+ * Every rule has a "fires on a deliberate violation" case and an "ignores
+ * the sanctioned shape" case.
  */
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -32,8 +34,7 @@ afterEach(() => {
     rmSync(dir, { recursive: true, force: true });
 });
 
-/** Writes `files` (relative path → contents) into a fresh temp repo and runs the script there. */
-const check = (files: Record<string, string>): ReadonlyArray<Violation> => {
+const writeTree = (files: Record<string, string>): string => {
   const root = mkdtempSync(join(tmpdir(), "gmacko-standards-"));
   created.push(root);
   for (const [path, contents] of Object.entries(files)) {
@@ -41,8 +42,13 @@ const check = (files: Record<string, string>): ReadonlyArray<Violation> => {
     mkdirSync(dirname(full), { recursive: true });
     writeFileSync(full, contents);
   }
+  return root;
+};
+
+/** Writes `files` (relative path → contents) into a fresh temp repo and runs the script there. */
+const check = (files: Record<string, string>): ReadonlyArray<Violation> => {
   const result = spawnSync(process.execPath, [script, "--json"], {
-    cwd: root,
+    cwd: writeTree(files),
     encoding: "utf8",
   });
   const parsed = JSON.parse(result.stdout) as {
@@ -58,15 +64,8 @@ const rules = (violations: ReadonlyArray<Violation>) =>
 
 /** `--graph --json`: the packages the rule scopes to, from a fixture tree. */
 const graph = (files: Record<string, string>): ReadonlyArray<string> => {
-  const root = mkdtempSync(join(tmpdir(), "gmacko-standards-"));
-  created.push(root);
-  for (const [path, contents] of Object.entries(files)) {
-    const full = join(root, path);
-    mkdirSync(dirname(full), { recursive: true });
-    writeFileSync(full, contents);
-  }
   const result = spawnSync(process.execPath, [script, "--graph", "--json"], {
-    cwd: root,
+    cwd: writeTree(files),
     encoding: "utf8",
   });
   expect(result.status).toBe(0);
@@ -76,7 +75,7 @@ const graph = (files: Record<string, string>): ReadonlyArray<string> => {
 const pkg = (name: string, deps: Record<string, string> = {}) =>
   JSON.stringify({ name, dependencies: deps });
 
-/** A workspace where apps/web depends on api, which depends on db; flags is Node-only. */
+/** A workspace where apps/web depends on api, which depends on db; mcp-server is Node-only. */
 const workspace = {
   "apps/web/package.json": pkg("@gmacko/web", {
     "@gmacko/api": "workspace:*",
@@ -84,10 +83,8 @@ const workspace = {
   }),
   "packages/api/package.json": pkg("@gmacko/api", {
     "@gmacko/db": "workspace:*",
-    "@gmacko/legacy-db": "workspace:*",
   }),
   "packages/db/package.json": pkg("@gmacko/db"),
-  "packages/legacy-db/package.json": pkg("@gmacko/legacy-db"),
   "packages/mcp-server/package.json": pkg("@gmacko/mcp-server", {
     "@gmacko/api": "workspace:*",
   }),
@@ -95,11 +92,7 @@ const workspace = {
 
 describe("no-raw-process-env", () => {
   it("computes the web bundle from apps/web's workspace dependencies, transitively", () => {
-    expect(graph(workspace)).toEqual([
-      "packages/api",
-      "packages/db",
-      "packages/legacy-db",
-    ]);
+    expect(graph(workspace)).toEqual(["packages/api", "packages/db"]);
   });
 
   it("flags any process.env read in a bundled package, and typed-env misses in app code", () => {
@@ -110,15 +103,17 @@ describe("no-raw-process-env", () => {
       "packages/db/src/client.ts": "const url = process.env.NODE_ENV;\n",
       "apps/web/src/lib/x.ts": "const a = process.env.API_URL;\n",
       "apps/web/src/lib/y.ts": "const b = process.env.NODE_ENV;\n",
+      "apps/expo/src/lib/z.ts": "const c = process.env.EXPO_PUBLIC_API_URL;\n",
     });
     expect(rules(violations)).toEqual([
+      "no-raw-process-env apps/expo/src/lib/z.ts:1",
       "no-raw-process-env apps/web/src/lib/x.ts:1",
       "no-raw-process-env packages/api/src/config.ts:1",
       "no-raw-process-env packages/db/src/client.ts:1",
     ]);
   });
 
-  it("exempts env modules, tests, comments, Node-only packages, legacy packages and disabled lines", () => {
+  it("exempts env modules, tests, comments, Node-only packages and disabled lines", () => {
     const violations = check({
       ...workspace,
       "packages/api/src/env.ts": "export const env = process.env;\n",
@@ -131,8 +126,146 @@ describe("no-raw-process-env", () => {
         "const z = process.env.Z;",
       ].join("\n"),
       "packages/mcp-server/src/index.ts": "process.env.GMACKO_API_KEY;\n",
-      "packages/legacy-db/src/client.ts": "process.env.DATABASE_URL;\n",
-      "apps/nextjs/src/lib/legacy.ts": "process.env.NODE_ENV;\n",
+      "packages/realtime/src/index.ts": "process.env.REDIS_URL;\n",
+    });
+    expect(rules(violations)).toEqual([]);
+  });
+});
+
+describe("no-cloudflare-env-outside-runtime", () => {
+  it("flags cloudflare:workers imports outside apps/web/src/server/runtime.ts", () => {
+    const violations = check({
+      "apps/web/src/server/config.ts":
+        'import { env } from "cloudflare:workers";\n',
+      "apps/web/src/lib/wait.ts":
+        'const { waitUntil } = await import("cloudflare:workers");\n',
+      "packages/api/src/background.ts":
+        'import { waitUntil } from "cloudflare:workers";\n',
+    });
+    expect(rules(violations)).toEqual([
+      "no-cloudflare-env-outside-runtime apps/web/src/lib/wait.ts:1",
+      "no-cloudflare-env-outside-runtime apps/web/src/server/config.ts:1",
+      "no-cloudflare-env-outside-runtime packages/api/src/background.ts:1",
+    ]);
+  });
+
+  it("allows runtime.ts, Workers tests, declarations, comments and disabled lines", () => {
+    const violations = check({
+      "apps/web/src/server/runtime.ts":
+        'import { env, waitUntil } from "cloudflare:workers";\n',
+      "packages/db/src/__tests__/database.workers.test.ts":
+        'import { env } from "cloudflare:workers";\n',
+      "apps/web/src/server/bindings.d.ts":
+        'declare module "cloudflare:workers" {}\n',
+      "apps/web/src/server/headers.ts":
+        " * see runtime.ts, the only importer of `cloudflare:workers`.\n",
+      "packages/api/src/config.ts": [
+        "// gmacko-standards-disable-next-line no-cloudflare-env-outside-runtime",
+        'import { env } from "cloudflare:workers";',
+      ].join("\n"),
+    });
+    expect(rules(violations)).toEqual([]);
+  });
+});
+
+describe("no-server-fn-for-data", () => {
+  it("flags createServerFn anywhere but src/server/actions.ts", () => {
+    const violations = check({
+      "apps/web/src/routes/posts.tsx":
+        'const list = createServerFn({ method: "GET" }).handler(async () => []);\n',
+      "apps/web/src/server/data.ts":
+        'import { createServerFn } from "@tanstack/react-start";\n',
+    });
+    expect(rules(violations)).toEqual([
+      "no-server-fn-for-data apps/web/src/routes/posts.tsx:1",
+      "no-server-fn-for-data apps/web/src/server/data.ts:1",
+    ]);
+  });
+
+  it("allows src/server/actions.ts, packages, tests, comments and disabled lines", () => {
+    const violations = check({
+      "apps/web/src/server/actions.ts":
+        'export const signOut = createServerFn({ method: "POST" }).handler(async () => ({}));\n',
+      "apps/web/src/server/__tests__/actions.test.ts": "createServerFn;\n",
+      "apps/web/src/lib/api.ts":
+        "// data never goes through createServerFn (see actions.ts)\n",
+      "apps/web/src/routes/x.tsx": [
+        "// gmacko-standards-disable-next-line no-server-fn-for-data",
+        "const fn = createServerFn();",
+      ].join("\n"),
+      "packages/api-client/src/client.ts": "const createServerFn = 1;\n",
+    });
+    expect(rules(violations)).toEqual([]);
+  });
+});
+
+describe("endpoint-declares-credential", () => {
+  const endpoint = (id: string, middlewares: string) =>
+    `  .add(\n    HttpApiEndpoint.get("${id}", "/${id}", { success: X })${middlewares},\n  )\n`;
+
+  it("flags two credentials, a role without a credential, and a credential declared before the role", () => {
+    const violations = check({
+      "packages/domain/src/things/api.ts": [
+        'export class ThingsApi extends HttpApiGroup.make("things")',
+        endpoint(
+          "twoCredentials",
+          '.middleware(Session).middleware(SessionOrKey("read"))',
+        ),
+        endpoint("roleOnly", ".middleware(AdminOnly)"),
+        endpoint(
+          "inverted",
+          '.middleware(SessionOrKey("admin")).middleware(AdminOnly)',
+        ),
+        endpoint(
+          "nestedInverted",
+          '\n      .middleware(SessionOrKey("write"))\n      .middleware(WorkspaceRole("admin"))',
+        ),
+        "  {}",
+      ].join("\n"),
+    });
+    expect(rules(violations)).toEqual([
+      "endpoint-declares-credential packages/domain/src/things/api.ts:11",
+      "endpoint-declares-credential packages/domain/src/things/api.ts:15",
+      "endpoint-declares-credential packages/domain/src/things/api.ts:3",
+      "endpoint-declares-credential packages/domain/src/things/api.ts:7",
+    ]);
+    expect(violations.map((v) => v.message)).toEqual([
+      "Endpoint `twoCredentials` declares 2 security middlewares (Session, SessionOrKey).",
+      "Endpoint `roleOnly` has a role check (AdminOnly) but no credential.",
+      "Endpoint `inverted` declares its credential before a role check.",
+      "Endpoint `nestedInverted` declares its credential before a role check.",
+    ]);
+  });
+
+  it("accepts public endpoints, one credential, role-then-credential, rate limits anywhere, and other files", () => {
+    const violations = check({
+      "packages/domain/src/things/api.ts": [
+        'export class ThingsApi extends HttpApiGroup.make("things")',
+        endpoint("list", ""),
+        endpoint("byId", '.middleware(SessionOrKey("read"))'),
+        endpoint("remove", ".middleware(Session)"),
+        endpoint(
+          "admin",
+          '\n      .middleware(AdminOnly)\n      .middleware(SessionOrKey("admin"))\n      .annotate(RateLimitScopeAnnotation, "operator-api")\n      .middleware(RateLimit)',
+        ),
+        endpoint(
+          "invites",
+          '\n      .middleware(WorkspaceRole("admin"))\n      .middleware(SessionOrKey("write"))',
+        ),
+        "  // .middleware(Session).middleware(Session) in a comment does not count",
+        "  {}",
+      ].join("\n"),
+      "packages/domain/src/things/models.ts":
+        ".middleware(Session).middleware(Session)\n",
+      "packages/api/src/things/api.ts":
+        'HttpApiEndpoint.get("x", "/x").middleware(Session).middleware(Session)\n',
+      "packages/domain/src/other/api.ts": [
+        'export class OtherApi extends HttpApiGroup.make("other")',
+        "  .add(",
+        "    // gmacko-standards-disable-next-line endpoint-declares-credential",
+        '    HttpApiEndpoint.get("legacy", "/legacy", { success: X }).middleware(AdminOnly),',
+        "  ) {}",
+      ].join("\n"),
     });
     expect(rules(violations)).toEqual([]);
   });
@@ -151,18 +284,137 @@ describe("no-dev-vars", () => {
       "no-dev-vars apps/web/.dev.vars:1",
     ]);
   });
+
+  it("is quiet without one", () => {
+    expect(
+      rules(check({ ...workspace, "apps/web/.env": "AUTH_SECRET=x\n" })),
+    ).toEqual([]);
+  });
+});
+
+describe("exact-host-check", () => {
+  it("flags substring host validation", () => {
+    const violations = check({
+      "apps/expo/src/utils/base-url.ts":
+        'if (apiUrl.includes("api.example.io")) return apiUrl;\n',
+    });
+    expect(rules(violations)).toEqual([
+      "exact-host-check apps/expo/src/utils/base-url.ts:1",
+    ]);
+  });
+
+  it("accepts a parsed-hostname comparison and disabled lines", () => {
+    const violations = check({
+      "apps/expo/src/utils/base-url.ts": [
+        'if (new URL(apiUrl).hostname === "api.example.io") return apiUrl;',
+        "// gmacko-standards-disable-next-line exact-host-check",
+        'if (apiUrl.includes("api.example.io")) return apiUrl;',
+      ].join("\n"),
+    });
+    expect(rules(violations)).toEqual([]);
+  });
+});
+
+describe("no-committed-credentials", () => {
+  it("flags working-looking credentials in e2e files and .env.example", () => {
+    const violations = check({
+      "apps/web/e2e/auth.spec.ts": [
+        'const email = "admin@real-company.io";',
+        'const password = process.env.E2E_PASSWORD ?? "hunter2-password";',
+      ].join("\n"),
+      "apps/web/.env.example": 'AUTH_SECRET="s3cr3t-value-here"\n',
+    });
+    expect(rules(violations)).toEqual([
+      "no-committed-credentials apps/web/.env.example:1",
+      "no-committed-credentials apps/web/e2e/auth.spec.ts:1",
+      "no-committed-credentials apps/web/e2e/auth.spec.ts:2",
+    ]);
+  });
+
+  it("accepts placeholders, URLs, non-test files and disabled lines", () => {
+    const violations = check({
+      "apps/web/e2e/auth.spec.ts": [
+        'const email = "user@example.com";',
+        'const dsn = "https://key@o1.ingest.sentry.io/1";',
+        "// gmacko-standards-disable-next-line no-committed-credentials -- emulate seed",
+        'const secret = "dev-github-secret";',
+      ].join("\n"),
+      "apps/web/.env.example": 'AUTH_SECRET="set-me-to-a-random-string"\n',
+      "apps/web/src/copy.ts": 'const support = "help@real-company.io";\n',
+    });
+    expect(rules(violations)).toEqual([]);
+  });
+});
+
+describe("gate-debug-routes", () => {
+  it("flags a debug route with no visible gate", () => {
+    const violations = check({
+      "apps/web/src/routes/api/debug/env.route.ts":
+        "export const GET = () => Response.json(Object.keys(bindings));\n",
+    });
+    expect(rules(violations)).toEqual([
+      "gate-debug-routes apps/web/src/routes/api/debug/env.route.ts:1",
+    ]);
+  });
+
+  it("accepts a route gated on a stage check or a bearer secret", () => {
+    const violations = check({
+      "apps/web/src/routes/api/debug/env.route.ts":
+        'if (config.stage !== "development") return new Response(null, { status: 404 });\n',
+      "apps/web/src/routes/api/verify/sentry.route.ts":
+        'if (request.headers.get("authorization") !== `Bearer ${secret}`) return unauthorized();\n',
+    });
+    expect(rules(violations)).toEqual([]);
+  });
+});
+
+describe("no-partial-account-deletion", () => {
+  it("flags a deletion handler that removes an app users table but never the auth user", () => {
+    const violations = check({
+      "packages/api/src/settings/service.ts": [
+        "const deleteAccount = (userId) =>",
+        "  db.delete(profiles).where(eq(profiles.userId, userId));",
+      ].join("\n"),
+    });
+    expect(rules(violations)).toEqual([
+      "no-partial-account-deletion packages/api/src/settings/service.ts:2",
+    ]);
+  });
+
+  it("accepts Account.deleteAccount, the contract mutation, and a delete of the auth user", () => {
+    const violations = check({
+      "packages/api/src/settings/service.ts": [
+        "const deleteAccount = (userId) =>",
+        "  Effect.all([db.delete(profiles).where(eq(profiles.userId, userId)), db.delete(user).where(eq(user.id, userId))]);",
+      ].join("\n"),
+      "packages/api/src/settings/handlers.ts": [
+        'handlers.handle("deleteAccount", () => Effect.gen(function* () {',
+        "  yield* db.delete(profiles);",
+        "  yield* account.deleteAccount(user.id);",
+        "}))",
+      ].join("\n"),
+      "apps/expo/src/app/settings.tsx": [
+        "// account deletion",
+        "const { mutate: deleteAccount } = useMutation({ ...mutations.settings.deleteAccount() });",
+        "db.delete(profiles);",
+      ].join("\n"),
+    });
+    expect(rules(violations)).toEqual([]);
+  });
 });
 
 describe("no-db-transaction", () => {
-  it("flags db.transaction and withTransaction in the Effect packages and apps/web", () => {
+  it("flags db.transaction and withTransaction in the Effect packages and the apps", () => {
     const violations = check({
       "packages/api/src/posts.ts":
         "export const a = db.transaction(async (tx) => tx);\n",
       "packages/auth/src/x.ts": "sql.withTransaction(effect);\n",
       "packages/domain/src/y.ts": "client.withTransaction(effect)\n",
       "apps/web/src/server/z.ts": "await db.transaction(() => 1);\n",
+      "apps/expo/src/w.ts": "await db.transaction(() => 1);\n",
     });
     expect(rules(violations)).toEqual([
+      "no-db-transaction apps/expo/src/w.ts:1",
       "no-db-transaction apps/web/src/server/z.ts:1",
       "no-db-transaction packages/api/src/posts.ts:1",
       "no-db-transaction packages/auth/src/x.ts:1",
@@ -170,10 +422,9 @@ describe("no-db-transaction", () => {
     ]);
   });
 
-  it("ignores legacy packages, other apps, comments, and disabled lines", () => {
+  it("ignores Node-only packages, comments, and disabled lines", () => {
     const violations = check({
-      "packages/legacy-api/src/a.ts": "db.transaction(async (tx) => tx);\n",
-      "apps/nextjs/src/b.ts": "db.transaction(async (tx) => tx);\n",
+      "packages/realtime/src/a.ts": "db.transaction(async (tx) => tx);\n",
       "packages/db/src/c.ts": [
         "// `withTransaction` is documented here but not called",
         " * a docblock line mentioning db.transaction(",
@@ -259,7 +510,6 @@ describe("no-d1-table-rebuild", () => {
         rebuild,
       "packages/db/migrations/20260904120000_add_author.sql":
         "ALTER TABLE `post` ADD `author_id` text REFERENCES `user`(`id`);\n",
-      "packages/legacy-db/drizzle/0001_x.sql": rebuild,
     });
     expect(rules(violations)).toEqual([]);
   });

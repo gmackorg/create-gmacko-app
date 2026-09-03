@@ -20,7 +20,6 @@
     "@biomejs/biome": "catalog:",
     "@gmacko/tsconfig": "workspace:*",
     "@types/node": "catalog:",
-    "oxlint": "catalog:",
     "typescript": "catalog:"
   },
   "peerDependencies": {

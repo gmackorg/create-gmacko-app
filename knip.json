@@ -1,5 +1,54 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignore": ["apps/web/src/routeTree.gen.ts"],
-  "ignoreDependencies": ["cloudflare"]
+  "rules": {
+    "exports": "off",
+    "types": "off",
+    "duplicates": "off"
+  },
+  "ignore": [".claude/**", "sdks/generated/**"],
+  "ignoreDependencies": ["cloudflare"],
+  "ignoreBinaries": ["expo", "eas", "maestro", "generate"],
+  "workspaces": {
+    ".": {
+      "entry": [
+        "scripts/*.mjs",
+        "test/emulate-setup.ts",
+        "turbo/generators/config.ts"
+      ]
+    },
+    "apps/web": {
+      "entry": ["src/client.tsx", "scripts/*.mjs", "e2e/**/*.ts"]
+    },
+    "apps/expo": {
+      "entry": ["metro.config.js", "postcss.config.mjs", "src/app/**/*.tsx"],
+      "ignore": ["src/components/locale-switcher.tsx"],
+      "ignoreDependencies": [
+        "buffer",
+        "effect",
+        "i18next",
+        "react-i18next",
+        "react-native-worklets",
+        "expo-updates",
+        "metro-cache"
+      ]
+    },
+    "packages/auth": {
+      "entry": ["script/auth-cli.ts"]
+    },
+    "packages/api-cli": {
+      "ignoreDependencies": ["tsx"]
+    },
+    "packages/mcp-server": {
+      "ignoreDependencies": ["tsx"]
+    },
+    "tooling/tailwind": {
+      "ignoreDependencies": ["@tailwindcss/postcss", "postcss", "tailwindcss"]
+    },
+    "tooling/vitest": {
+      "ignoreDependencies": ["@vitest/coverage-v8"]
+    },
+    "tooling/openapi-generator": {
+      "ignoreDependencies": ["@openapitools/openapi-generator-cli"]
+    }
+  }
 }

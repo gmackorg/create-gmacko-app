@@ -72,15 +72,3 @@ the `no-raw-process-env` rule keep true for every package in the bundle.
 `@gmacko/realtime` (ioredis + BullMQ) is Node-only and is not in the Worker's
 dependency graph.
 
-## Legacy: `vinext` (apps/nextjs, until Phase 8)
-
-Scaffolding with `--vinext` gives the legacy Next.js app its own experimental
-Workers lane (`apps/nextjs/wrangler.jsonc`, `apps/nextjs/README.cloudflare.md`).
-It is separate from the web lane above and goes away with `apps/nextjs`:
-
-```sh
-pnpm --filter @gmacko/nextjs dev:vinext
-pnpm --filter @gmacko/nextjs build:vinext
-pnpm --filter @gmacko/nextjs deploy:cloudflare:staging
-pnpm --filter @gmacko/nextjs deploy:cloudflare:production
-```

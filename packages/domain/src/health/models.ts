@@ -1,5 +1,5 @@
 /**
- * Health probes. Shapes match what the Next.js routes returned (minus the
+ * Health probes. Shapes keep the pre-migration route contract (minus the
  * Node-only memory check and process uptime), so ForgeGraph and the
  * platform probes keep working unchanged. Failure bodies are tagged errors
  * with status 503; production handlers fill `message`/`error` with generic

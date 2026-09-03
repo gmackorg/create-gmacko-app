@@ -41,8 +41,8 @@ Every stage serves `/api/health`, `/api/health/live`, `/api/health/ready` and
 Outside development the responses are generic: status and version, no
 internals.
 
-## Legacy
+## History
 
-`apps/nextjs` and `packages/legacy-*` (Postgres on a VPS node, ForgeGraph +
-Nix) are deleted in Phase 8. Their deployment notes moved to `docs/legacy/`;
-nothing in this directory applies to them.
+The Postgres-on-a-VPS lane (Next.js + tRPC, ForgeGraph + Nix) was removed
+with the TanStack Start + Effect + D1 migration; its notes are archived under
+`docs/legacy/` and nothing in this directory applies to them.

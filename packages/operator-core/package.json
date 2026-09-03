@@ -30,8 +30,6 @@
   "devDependencies": {
     "@biomejs/biome": "catalog:",
     "@gmacko/api": "workspace:*",
-    "@gmacko/auth": "workspace:*",
-    "@gmacko/db": "workspace:*",
     "@gmacko/tsconfig": "workspace:*",
     "@types/node": "catalog:",
     "oxlint": "catalog:",

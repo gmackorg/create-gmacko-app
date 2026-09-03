@@ -19,7 +19,7 @@ const ROOT = process.cwd();
 const SCAN_DIRS = ["apps", "packages"];
 const CODE_EXT = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
 const IGNORE =
-  /(^|\/)(node_modules|dist|build|\.next|\.expo|storybook-static|coverage|\.turbo|generated)(\/|$)/;
+  /(^|\/)(node_modules|dist|build|\.expo|storybook-static|coverage|\.turbo|\.wrangler|generated)(\/|$)/;
 
 /** @typedef {{ rule: string, file: string, line: number, message: string, hint: string }} Violation */
 /** @type {Violation[]} */
@@ -74,6 +74,11 @@ const isDisabled = (lines, idx, rule) => {
   return prev.includes(`gmacko-standards-disable-next-line ${rule}`);
 };
 
+// Test files and type declarations sit outside the runtime rules below.
+const IS_TEST_OR_DECL = /(\.(test|spec)\.[tj]sx?$)|(\.d\.ts$)/;
+// Source under any app or package: `apps/<x>/src/**`, `packages/<x>/src/**`.
+const SRC_SCOPE = /^(apps|packages)\/[^/]+\/src\//;
+
 // ── Rule: no-raw-process-env ─────────────────────────────────────────────────
 // Config enters once, validated: the app feature layer (apps/*/src/**) reads
 // the typed `env` object, and nothing that ships inside the Worker bundle
@@ -84,14 +89,12 @@ const isDisabled = (lines, idx, rule) => {
 // (`dependencies`, transitively), computed here so a new dependency joins
 // the scope on its own. Node-only packages (the CLI, the MCP server,
 // realtime) are not reachable from apps/web and keep their typed env
-// modules; `packages/legacy-*` and `apps/nextjs` are excluded until Phase 8
-// deletes them. The env-definition layer stays exempt in both scopes
-// (env.ts / src/config / src/env / instrumentation / *.config.* / tests).
+// modules. The env-definition layer stays exempt in both scopes (env.ts /
+// src/config / src/env / instrumentation / *.config.* / tests).
 const WEB_APP_DIR = "apps/web";
 const ENV_RULE_APP_SCOPE = /^apps\/[^/]+\/src\//;
 const ENV_RULE_EXEMPT =
   /(^|\/)(env\.ts|env\.mjs|env\.js|instrumentation\.[tj]sx?|.*\.config\.(ts|js|mjs|cjs)|.*\.(test|spec)\.[tj]sx?)|(^|\/)(src\/config|src\/env)\//;
-const ENV_RULE_PACKAGE_EXCLUDED = /^packages\/legacy-/;
 
 const readJson = (file) => {
   try {
@@ -143,15 +146,10 @@ export function webBundlePackages(root = ROOT) {
 }
 
 function checkRawProcessEnv() {
-  const bundle = webBundlePackages().filter(
-    (dir) => !ENV_RULE_PACKAGE_EXCLUDED.test(dir),
-  );
-  const bundleSrc = bundle.map((dir) => `${dir}/src/`);
+  const bundleSrc = webBundlePackages().map((dir) => `${dir}/src/`);
   const inScope = (r) =>
-    (ENV_RULE_APP_SCOPE.test(r) && !r.startsWith("apps/nextjs/")) ||
-    bundleSrc.some((prefix) => r.startsWith(prefix)) ||
-    // apps/nextjs keeps the app-layer rule it always had (legacy, Phase 8).
-    (r.startsWith("apps/nextjs/src/") && ENV_RULE_APP_SCOPE.test(r));
+    ENV_RULE_APP_SCOPE.test(r) ||
+    bundleSrc.some((prefix) => r.startsWith(prefix));
   for (const f of codeFiles) {
     const r = rel(f);
     if (!inScope(r) || ENV_RULE_EXEMPT.test(r)) continue;
@@ -177,6 +175,157 @@ function checkRawProcessEnv() {
           isBundle
             ? "Take the value as a constructor/function option or from AppConfig (apps/web/src/server/config.ts is the only reader of bindings). Node-only packages must not be reachable from apps/web."
             : "Import the validated `env` (from ~/env or @gmacko/*/env) instead — it validates + types the var. Add it to the env schema if missing.",
+        );
+      }
+    });
+  }
+}
+
+// ── Rule: no-cloudflare-env-outside-runtime ──────────────────────────────────
+// `cloudflare:workers` (the `env` and `waitUntil` globals) is the Worker's
+// ambient environment. Exactly one module turns it into Effect services —
+// `apps/web/src/server/runtime.ts` (AppConfig, Database, Background) — and
+// everything else takes those services. A second importer would be a second
+// reader of bindings (bypassing `AppConfig` and its validation) and code that
+// only runs on workerd, so it can no longer be exercised by the sqlite-node
+// test layer. Workers tests (`*.workers.test.ts`) read `env` on purpose and
+// are exempt, as are type declarations.
+const CF_ENV_ALLOWED = new Set(["apps/web/src/server/runtime.ts"]);
+const CF_ENV_IMPORT =
+  /\b(?:from\s*|import\s*\(?\s*|require\s*\(\s*)["']cloudflare:workers["']/;
+function checkCloudflareEnvImports() {
+  for (const f of codeFiles) {
+    const r = rel(f);
+    if (!SRC_SCOPE.test(r) || IS_TEST_OR_DECL.test(r) || CF_ENV_ALLOWED.has(r))
+      continue;
+    const lines = linesOf(read(f));
+    lines.forEach((ln, i) => {
+      if (isCommentLine(ln)) return;
+      if (
+        CF_ENV_IMPORT.test(ln) &&
+        !isDisabled(lines, i, "no-cloudflare-env-outside-runtime")
+      ) {
+        add(
+          "no-cloudflare-env-outside-runtime",
+          f,
+          i + 1,
+          "`cloudflare:workers` imported outside apps/web/src/server/runtime.ts.",
+          "Read bindings through the services runtime.ts builds (AppConfig, Database, Background) instead of importing `env`/`waitUntil` directly; only runtime.ts touches the Worker's ambient environment.",
+        );
+      }
+    });
+  }
+}
+
+// ── Rule: no-server-fn-for-data ──────────────────────────────────────────────
+// Every read and write of app data goes through the `HttpApi` contract
+// (`@gmacko/api-client`), so the browser, the SSR loader, Expo and the
+// operator tools share one typed surface. TanStack Start's `createServerFn`
+// is for the two things the contract cannot do — set a cookie or redirect —
+// and lives in one file per app, `src/server/actions.ts` (plan principle
+// 09). A server function elsewhere is a second, untyped data path.
+const SERVER_FN_ALLOWED = /^apps\/[^/]+\/src\/server\/actions\.tsx?$/;
+function checkServerFnForData() {
+  for (const f of codeFiles) {
+    const r = rel(f);
+    if (
+      !ENV_RULE_APP_SCOPE.test(r) ||
+      IS_TEST_OR_DECL.test(r) ||
+      SERVER_FN_ALLOWED.test(r)
+    )
+      continue;
+    const lines = linesOf(read(f));
+    lines.forEach((ln, i) => {
+      if (isCommentLine(ln)) return;
+      if (
+        /\bcreateServerFn\b/.test(ln) &&
+        !isDisabled(lines, i, "no-server-fn-for-data")
+      ) {
+        add(
+          "no-server-fn-for-data",
+          f,
+          i + 1,
+          "`createServerFn` outside src/server/actions.ts.",
+          "Reads and writes go through the contract client (`@gmacko/api-client/queries`); a server function is only for setting a cookie or redirecting, and belongs in src/server/actions.ts.",
+        );
+      }
+    });
+  }
+}
+
+// ── Rule: endpoint-declares-credential ───────────────────────────────────────
+// Every endpoint of the contract (`packages/domain/src/**/api.ts`) names the
+// credential it accepts: nothing (public), `Session`, or one
+// `SessionOrKey(scope)` (plan principle 07; docs/API_AUTH.md). Two security
+// middlewares on one endpoint would run both schemes and the second one
+// last; a role check (`AdminOnly`, `WorkspaceRole(min)`) without a credential
+// has no `CurrentUser` to read; and the credential must be declared after the
+// role checks, because `HttpApiBuilder` wraps the handler in declaration
+// order, so the last one runs outermost and is the only order in which the
+// role check sees the user the credential provided (API_AUTH.md, rule 6).
+// `RateLimit` and `EndpointBoundary` neither provide nor require
+// `CurrentUser` and may sit anywhere. Read statically from the source so a
+// fixture can be tested without building the contract; the domain's own
+// api.test.ts checks the same facts through `HttpApi.reflect`.
+const ENDPOINT_START =
+  /\bHttpApiEndpoint\.(get|post|put|patch|del|delete|head|options)\s*\(/;
+const MIDDLEWARE_CALL = /\.middleware\(\s*([A-Za-z_$][\w$]*)/g;
+const SECURITY_MIDDLEWARE = new Set(["Session", "SessionOrKey"]);
+const ROLE_MIDDLEWARE = new Set(["AdminOnly", "WorkspaceRole"]);
+function checkEndpointCredentials() {
+  const contractFiles = codeFiles.filter((f) => {
+    const r = rel(f);
+    return r.startsWith("packages/domain/src/") && basename(f) === "api.ts";
+  });
+  for (const f of contractFiles) {
+    const lines = linesOf(read(f));
+    const starts = [];
+    lines.forEach((ln, i) => {
+      if (!isCommentLine(ln) && ENDPOINT_START.test(ln)) starts.push(i);
+    });
+    starts.forEach((start, n) => {
+      if (isDisabled(lines, start, "endpoint-declares-credential")) return;
+      const end = starts[n + 1] ?? lines.length;
+      const chunk = lines
+        .slice(start, end)
+        .filter((ln) => !isCommentLine(ln))
+        .join("\n");
+      const idMatch = /\bHttpApiEndpoint\.\w+\s*\(\s*"([^"]+)"/.exec(chunk);
+      const id = idMatch?.[1] ?? "(unknown)";
+      const order = [];
+      for (const m of chunk.matchAll(MIDDLEWARE_CALL)) {
+        const name = m[1];
+        if (SECURITY_MIDDLEWARE.has(name))
+          order.push({ kind: "security", name });
+        else if (ROLE_MIDDLEWARE.has(name)) order.push({ kind: "role", name });
+      }
+      const security = order.filter((m) => m.kind === "security");
+      const roles = order.filter((m) => m.kind === "role");
+      const last = order[order.length - 1];
+      const line = start + 1;
+      if (security.length > 1) {
+        add(
+          "endpoint-declares-credential",
+          f,
+          line,
+          `Endpoint \`${id}\` declares ${security.length} security middlewares (${security.map((m) => m.name).join(", ")}).`,
+          "Name exactly one credential: `Session` (cookie only) or `SessionOrKey(scope)` (cookie or a key holding the scope).",
+        );
+      } else if (roles.length > 0 && security.length === 0) {
+        add(
+          "endpoint-declares-credential",
+          f,
+          line,
+          `Endpoint \`${id}\` has a role check (${roles.map((m) => m.name).join(", ")}) but no credential.`,
+          "A role middleware reads the `CurrentUser` a credential provides; add `.middleware(SessionOrKey(scope))` (or `Session`) after the role check.",
+        );
+      } else if (roles.length > 0 && last?.kind !== "security") {
+        add(
+          "endpoint-declares-credential",
+          f,
+          line,
+          `Endpoint \`${id}\` declares its credential before a role check.`,
+          'Declare the credential last so it runs outermost: `.middleware(AdminOnly).middleware(SessionOrKey("admin"))` (docs/API_AUTH.md, rule 6).',
         );
       }
     });
@@ -298,7 +447,7 @@ function checkDebugRoutes() {
   for (const f of routeFiles) {
     const src = read(f);
     const gated =
-      /(authoriz|Bearer|secret|requireAdmin|isAdmin|NODE_ENV\s*!==\s*["']production["']|getSession|apiKey|unauthorized|401|403)/i.test(
+      /(authoriz|Bearer|secret|requireAdmin|isAdmin|NODE_ENV\s*!==\s*["']production["']|stage\s*[!=]==\s*["'](production|development)["']|getSession|apiKey|unauthorized|401|403)/i.test(
         src,
       );
     if (!gated) {
@@ -307,16 +456,20 @@ function checkDebugRoutes() {
         f,
         1,
         "Debug/verify/dev route with no visible auth/secret/non-prod gate.",
-        "Require a bearer secret (fail closed if unset in prod) or restrict to non-production before capturing events / returning env info.",
+        "Require a bearer secret (fail closed if unset in prod) or restrict to non-production (`AppConfig.stage`) before capturing events / returning env info.",
       );
     }
   }
 }
 
 // ── Rule: no-partial-account-deletion ────────────────────────────────────────
-// Account deletion must remove the auth `user` (which cascades sessions/apikeys),
-// not just an app-specific table. Flags a delete on a users-like table in a
-// deletion handler that never deletes the auth `user`.
+// Account deletion must remove the auth `user` (which cascades sessions,
+// accounts, api keys, memberships via the schema), not just an app-specific
+// table. In this stack that is `Account.deleteAccount` (packages/api,
+// settings/service.ts), reached over the contract as `settings.deleteAccount`
+// and from the clients through `mutations.settings.deleteAccount()`. Flags a
+// delete on a users-like table in a deletion handler that never deletes the
+// auth `user` or routes through those.
 function checkAccountDeletion() {
   for (const f of codeFiles) {
     const src = read(f);
@@ -326,7 +479,7 @@ function checkAccountDeletion() {
       continue;
     const deletesAppUsers = /\.delete\((users|appUsers|profiles)\)/.test(src);
     const deletesAuthUser =
-      /\.delete\((user)\)|deleteAuthUser|authClient\.deleteUser|api\.settings\.deleteAccount|settings\.deleteAccount/.test(
+      /\.delete\((user)\)|deleteAuthUser|authClient\.deleteUser|\b[Aa]ccount\.deleteAccount\b|settings\.deleteAccount/.test(
         src,
       );
     if (deletesAppUsers && !deletesAuthUser) {
@@ -339,7 +492,7 @@ function checkAccountDeletion() {
         f,
         idx + 1,
         "Account deletion removes an app users table but never the auth `user`.",
-        "Delete the auth `user` (cascades sessions/accounts/apikeys) so credentials can no longer authenticate — App Store 5.1.1(v).",
+        "Route deletion through `Account.deleteAccount` (packages/api/src/settings/service.ts; `settings.deleteAccount` over the contract), which deletes the auth `user` so credentials can no longer authenticate — App Store 5.1.1(v).",
       );
     }
   }
@@ -350,13 +503,12 @@ function checkAccountDeletion() {
 // into a defect and the Database service removes `db.transaction`, so a call
 // only "works" on the sqlite-node test layer and dies in production. Use
 // `Database.batch` (atomic multi-statement) or a guarded write (`updateWhere`).
-// Scope: the Effect packages and the Worker app; the legacy Postgres stack
-// (`packages/legacy-*`, `apps/nextjs`) keeps its transactions until Phase 8.
-const EFFECT_STACK_SCOPE = /^(packages\/(db|auth|api|domain)|apps\/web)\/src\//;
+// Scope: everything that can reach D1 — the Effect packages and the apps.
+const DB_RULE_SCOPE = /^(packages\/(db|auth|api|domain)|apps\/[^/]+)\/src\//;
 function checkDbTransaction() {
   for (const f of codeFiles) {
     const r = rel(f);
-    if (!EFFECT_STACK_SCOPE.test(r)) continue;
+    if (!DB_RULE_SCOPE.test(r)) continue;
     const lines = linesOf(read(f));
     lines.forEach((ln, i) => {
       if (isCommentLine(ln)) return;
@@ -382,7 +534,7 @@ function checkDbTransaction() {
 // the `DatabaseError` mapping, spans, and the transaction-free surface, and
 // silently diverges between sqlite-node and D1. Only `packages/auth` (the
 // adapter) may touch it; `packages/db` defines it.
-const PLAIN_RULE_SCOPE = /^(packages\/(api|domain)|apps\/web)\/src\//;
+const PLAIN_RULE_SCOPE = /^(packages\/(api|domain)|apps\/[^/]+)\/src\//;
 function checkPlainDrizzle() {
   for (const f of codeFiles) {
     const r = rel(f);
@@ -465,6 +617,9 @@ if (process.argv.includes("--graph")) {
 }
 
 checkRawProcessEnv();
+checkCloudflareEnvImports();
+checkServerFnForData();
+checkEndpointCredentials();
 checkDevVars();
 checkHostIncludes();
 checkCommittedCredentials();

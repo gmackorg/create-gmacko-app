@@ -3,7 +3,7 @@
 # Mobile Development Script
 # =============================================================================
 # Starts the full mobile development environment with:
-# 1. Next.js API server
+# 1. The web app (apps/web: TanStack Start + the Effect HTTP API on workerd)
 # 2. ngrok tunnel for API (so mobile device can reach local API)
 # 3. Expo with tunnel mode
 #
@@ -81,7 +81,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Temp files for logs
-NEXT_LOG="/tmp/gmacko-next.log"
+WEB_LOG="/tmp/gmacko-web.log"
+WEB_PORT="${WEB_PORT:-3001}"
 NGROK_LOG="/tmp/gmacko-ngrok.log"
 
 echo ""
@@ -116,20 +117,20 @@ fi
 # Cleanup Handler
 # =============================================================================
 
-NEXT_PID=""
+WEB_PID=""
 NGROK_PID=""
 
 cleanup() {
     echo ""
     echo -e "${YELLOW}Shutting down...${NC}"
     
-    [ -n "$NEXT_PID" ] && kill $NEXT_PID 2>/dev/null || true
+    [ -n "$WEB_PID" ] && kill $WEB_PID 2>/dev/null || true
     [ -n "$NGROK_PID" ] && kill $NGROK_PID 2>/dev/null || true
     
     # Kill any orphaned processes
-    pkill -f "next dev" 2>/dev/null || true
+    pkill -f "vite dev" 2>/dev/null || true
     
-    rm -f "$NEXT_LOG" "$NGROK_LOG"
+    rm -f "$WEB_LOG" "$NGROK_LOG"
     
     echo -e "${GREEN}Goodbye!${NC}"
     exit 0
@@ -168,30 +169,30 @@ if [[ "$BUILD_DEV_CLIENT" == true ]]; then
 fi
 
 # =============================================================================
-# Step 1: Start Next.js Server
+# Step 1: Start the web app (vite dev on workerd, local D1)
 # =============================================================================
 
-step "Starting Next.js server..."
-> "$NEXT_LOG"
+step "Starting the web app on port ${WEB_PORT}..."
+> "$WEB_LOG"
 
-pnpm dev:next > "$NEXT_LOG" 2>&1 &
-NEXT_PID=$!
+PORT="$WEB_PORT" pnpm dev:app > "$WEB_LOG" 2>&1 &
+WEB_PID=$!
 
-# Wait for Next.js to be ready
-NEXT_PORT=""
+# Wait for the Worker to answer its liveness probe
+WEB_READY=""
 for i in {1..60}; do
-    NEXT_PORT=$(grep -oE 'Local:[[:space:]]*http://localhost:[0-9]+' "$NEXT_LOG" 2>/dev/null | grep -oE '[0-9]+$' | head -1)
-    if [ -n "$NEXT_PORT" ]; then
+    if curl -sf "http://localhost:${WEB_PORT}/api/health/live" >/dev/null 2>&1; then
+        WEB_READY=1
         break
     fi
     sleep 1
 done
 
-if [ -z "$NEXT_PORT" ]; then
-    error "Next.js failed to start. Check logs: $NEXT_LOG"
+if [ -z "$WEB_READY" ]; then
+    error "The web app failed to start. Check logs: $WEB_LOG"
 fi
 
-success "Next.js running on port ${NEXT_PORT}"
+success "Web app running on port ${WEB_PORT}"
 
 # =============================================================================
 # Step 2: Start ngrok Tunnel
@@ -202,10 +203,10 @@ step "Starting ngrok tunnel..."
 if [ -n "$NGROK_DOMAIN" ]; then
     # Static domain (requires ngrok paid plan)
     NGROK_URL="https://${NGROK_DOMAIN}.ngrok.app"
-    ngrok http "$NEXT_PORT" --url="$NGROK_URL" --log=stdout > "$NGROK_LOG" 2>&1 &
+    ngrok http "$WEB_PORT" --url="$NGROK_URL" --log=stdout > "$NGROK_LOG" 2>&1 &
 else
     # Random URL (free tier)
-    ngrok http "$NEXT_PORT" --log=stdout --log-format=json > "$NGROK_LOG" 2>&1 &
+    ngrok http "$WEB_PORT" --log=stdout --log-format=json > "$NGROK_LOG" 2>&1 &
 fi
 NGROK_PID=$!
 
@@ -243,9 +244,9 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo -e "${GREEN}Development environment ready!${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo -e "${BLUE}Web App:${NC}      http://localhost:${NEXT_PORT}"
+echo -e "${BLUE}Web App:${NC}      http://localhost:${WEB_PORT}"
 echo -e "${BLUE}API Tunnel:${NC}   ${API_URL}"
-echo -e "${BLUE}tRPC:${NC}         ${API_URL}/api/trpc"
+echo -e "${BLUE}API:${NC}          ${API_URL}/api"
 echo -e "${BLUE}Auth:${NC}         ${API_URL}/api/auth"
 echo ""
 

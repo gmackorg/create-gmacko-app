@@ -35,19 +35,6 @@ export default defineConfig({
   build: {
     sourcemap: sentryAuthToken ? "hidden" : false,
   },
-  environments: {
-    ssr: {
-      optimizeDeps: {
-        // TODO(migration Phase 8): remove with the legacy packages. Vite's dep
-        // optimizer keys entries on the bare specifier, so with drizzle-orm
-        // 0.45 (legacy Postgres) and 1.0 rc (@gmacko/db) both in the graph,
-        // packages/db's `import "drizzle-orm"` was rewritten to the optimized
-        // 0.45 copy (no `defineRelations`). Excluded, each importer resolves
-        // its own version.
-        exclude: ["drizzle-orm"],
-      },
-    },
-  },
   plugins: [
     tsConfigPaths({
       projects: ["./tsconfig.json"],

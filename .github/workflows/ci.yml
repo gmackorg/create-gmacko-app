@@ -135,8 +135,3 @@ jobs:
         run: pnpm build
         env:
           SKIP_ENV_VALIDATION: true
-          # TODO(Phase 8): remove with apps/nextjs. Placeholder so
-          # @gmacko/legacy-db/client (which throws at import if unset) can
-          # instantiate during `next build` page-data collection. apps/web
-          # (Workers + D1) reads no DATABASE_URL.
-          DATABASE_URL: postgresql://build:build@localhost:5432/build

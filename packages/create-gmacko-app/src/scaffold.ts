@@ -3,12 +3,20 @@ import path from "node:path";
 import * as p from "@clack/prompts";
 import fs from "fs-extra";
 import pc from "picocolors";
-import { runProvisioning } from "./provision.js";
+import { REALTIME_WARNING } from "./prompts.js";
+import { runProvisioning, workerName } from "./provision.js";
 import type { CliOptions, IntegrationConfig } from "./types.js";
 
 const TEMPLATE_REPO =
   process.env.CREATE_GMACKO_APP_TEMPLATE_REPO ??
   "https://github.com/gmackorg/create-gmacko-app.git";
+
+/** The web app: TanStack Start + the Effect HTTP API as one Worker on D1. */
+export const WEB_APP_DIR = "apps/web";
+/** The Expo app. */
+export const MOBILE_APP_DIR = "apps/expo";
+/** The template's worker/D1 base name; renamed to `<app>-web` per scaffold. */
+const TEMPLATE_WORKER_NAME = "gmacko-web";
 
 export async function scaffold(options: CliOptions): Promise<void> {
   const targetDir = path.resolve(process.cwd(), options.appName);
@@ -29,7 +37,7 @@ export async function scaffold(options: CliOptions): Promise<void> {
   try {
     if (isLocalTemplatePath(TEMPLATE_REPO)) {
       fs.copySync(TEMPLATE_REPO, targetDir, {
-        filter: (src) => shouldCopyTemplatePath(src, TEMPLATE_REPO),
+        filter: (src) => shouldCopyTemplatePath(src),
       });
     } else {
       execSync(`git clone --depth 1 ${TEMPLATE_REPO} "${targetDir}"`, {
@@ -57,6 +65,7 @@ export async function scaffold(options: CliOptions): Promise<void> {
     pruneIntegrations(targetDir, options.integrations);
   }
   updatePackageScope(targetDir, options.packageScope);
+  renameWorkerNames(targetDir, options.appName);
   createManifest(targetDir, options);
   createForgeGraphConfig(targetDir, options);
   addForgeGraphScripts(targetDir);
@@ -66,17 +75,10 @@ export async function scaffold(options: CliOptions): Promise<void> {
   customizeBootstrapPlaybook(targetDir, options);
 
   if (!options.platforms.web) {
-    fs.removeSync(path.join(targetDir, "apps/nextjs"));
+    removeWebApp(targetDir);
   }
   if (!options.platforms.mobile) {
-    fs.removeSync(path.join(targetDir, "apps/expo"));
-  }
-  if (!options.platforms.tanstackStart) {
-    fs.removeSync(path.join(targetDir, "apps/web"));
-  }
-
-  if (options.platforms.web && options.vinext) {
-    configureVinext(targetDir);
+    fs.removeSync(path.join(targetDir, MOBILE_APP_DIR));
   }
 
   if (options.platforms.mobile) {
@@ -100,6 +102,10 @@ export async function scaffold(options: CliOptions): Promise<void> {
   }
 
   spinner.stop("Project configured");
+
+  if (options.integrations.realtime.enabled) {
+    p.log.warn(REALTIME_WARNING);
+  }
 
   if (options.git) {
     spinner.start("Initializing repository...");
@@ -156,16 +162,42 @@ export async function scaffold(options: CliOptions): Promise<void> {
     }
   }
 
-  console.log(`
-  ${pc.bold("Next steps:")}
+  console.log(buildNextSteps(options));
+}
 
-  ${pc.cyan("cd")} ${options.appName}
-  ${pc.cyan("pnpm")} bootstrap:local
-  ${pc.dim("# Update .forgegraph.yaml with your real server, domains, and nodes")}
-  ${pc.cyan("pnpm")} forge:doctor
-  ${pc.cyan("pnpm")} check:fast
-  ${pc.cyan("pnpm")} dev
-`);
+function buildNextSteps(options: CliOptions): string {
+  const worker = workerName(options.appName);
+  const lines = [
+    "",
+    `  ${pc.bold("Next steps:")}`,
+    "",
+    `  ${pc.cyan("cd")} ${options.appName}`,
+    `  ${pc.cyan("pnpm")} bootstrap:local   ${pc.dim("# doctor, .env, auth + db generate, local D1 migrate + seed, check:fast")}`,
+  ];
+  if (options.platforms.web) {
+    lines.push(
+      `  ${pc.cyan("pnpm")} dev               ${pc.dim("# emulate + apps/web at https://gmacko.localhost (local D1, no DATABASE_URL)")}`,
+      "",
+      `  ${pc.dim("# Schema changes: edit packages/db/src/schema.ts, then")}`,
+      `  ${pc.cyan("pnpm")} db:generate && ${pc.cyan("pnpm")} -F @gmacko/db migrate:local`,
+      "",
+      `  ${pc.dim("# Deploys (once per stage): create the D1 databases, paste the ids into apps/web/wrangler.jsonc")}`,
+      `  ${pc.cyan("pnpm")} -F @gmacko/web exec wrangler d1 create ${worker}-staging`,
+      `  ${pc.cyan("pnpm")} -F @gmacko/web exec wrangler d1 create ${worker}`,
+      `  ${pc.dim("# Update .forgegraph.yaml (server, domains), then: pnpm forge:doctor && pnpm deploy:staging")}`,
+    );
+  } else {
+    lines.push(
+      `  ${pc.cyan("pnpm")} --filter @gmacko/expo dev:client   ${pc.dim("# point EXPO_PUBLIC_API_URL at your hosted API")}`,
+    );
+  }
+  if (options.platforms.mobile && options.platforms.web) {
+    lines.push(
+      `  ${pc.cyan("pnpm")} --filter @gmacko/expo dev:client   ${pc.dim("# the Expo dev client against the web app's API")}`,
+    );
+  }
+  lines.push("");
+  return lines.join("\n");
 }
 
 function initializeRepository(
@@ -216,6 +248,9 @@ function updateIntegrationsConfig(
     enabled: ${integrations.email.enabled},
     provider: "${integrations.email.provider}" as "resend" | "sendgrid" | "none",
   },
+  // Node-only (ioredis + BullMQ): unsupported on the web app, which runs on
+  // Cloudflare Workers. Enable it only for a Node service on a VPS node; see
+  // packages/realtime/README.md.
   realtime: {
     enabled: ${integrations.realtime.enabled},
     provider: "${integrations.realtime.provider}" as "redis" | "none",
@@ -302,6 +337,19 @@ export const isEmailDeliveryEnabled = () =>
   fs.writeFileSync(configPath, content);
 }
 
+const TEXT_EXTENSIONS = new Set([
+  ".json",
+  ".jsonc",
+  ".ts",
+  ".tsx",
+  ".js",
+  ".mjs",
+  ".css",
+  ".md",
+  ".yml",
+  ".yaml",
+]);
+
 function updatePackageScope(targetDir: string, scope: string): void {
   if (scope === "@gmacko") return;
 
@@ -329,6 +377,32 @@ function updatePackageScope(targetDir: string, scope: string): void {
       } catch {
         // Skip files that can't be read
       }
+    }
+  }
+}
+
+/**
+ * The template names its Worker and D1 databases `gmacko-web` (`-staging`,
+ * `-preview`, `-pr-<n>`); a scaffold is `<app>-web`. Applied to every text
+ * file (wrangler.jsonc, the preview workflow, the deploy docs, the
+ * telemetry service name) so the names agree everywhere; the scaffolder's
+ * own sources and tests are left alone.
+ */
+function renameWorkerNames(targetDir: string, appName: string): void {
+  const worker = workerName(appName);
+  if (worker === TEMPLATE_WORKER_NAME) return;
+  const pattern = new RegExp(`\\b${TEMPLATE_WORKER_NAME}\\b`, "g");
+
+  for (const file of getAllFiles(targetDir)) {
+    if (!TEXT_EXTENSIONS.has(path.extname(file))) continue;
+    const relativePath = path.relative(targetDir, file);
+    if (relativePath.startsWith("packages/create-gmacko-app/")) continue;
+    try {
+      const content = fs.readFileSync(file, "utf-8");
+      if (!pattern.test(content)) continue;
+      fs.writeFileSync(file, content.replace(pattern, worker));
+    } catch {
+      // Skip files that can't be read
     }
   }
 }
@@ -466,27 +540,35 @@ function getBootstrapRecommendations(options: CliOptions): {
   ];
   const selectedLayerLines: string[] = [];
 
+  const collaborationPaths =
+    "`packages/db/src/schema.ts`, `packages/domain/src/settings/api.ts` (the contract) and `packages/api/src/settings/service.ts` (the `Workspaces` service)";
+  const billingPaths =
+    "`packages/billing`, `packages/domain/src/settings/api.ts` and `packages/api/src/settings/billing.ts`";
+  const supportPaths =
+    "`apps/web/src/routes` (pricing, faq, changelog, contact, privacy, terms), `packages/domain/src/admin/api.ts` and `packages/api/src/admin/service.ts`";
+  const referralPaths = "`packages/api/src/admin/service.ts`";
+
   if (options.saasCollaboration) {
     selectedLayerLines.push(
-      "- Collaboration: use `packages/legacy-db/src/schema.ts` and `packages/legacy-api/src/router/settings.ts` for workspace membership and invites.",
+      `- Collaboration: use ${collaborationPaths} for workspace membership and invites.`,
     );
     codexLines.push(
-      "- Collaboration: inspect `packages/legacy-db/src/schema.ts` and `packages/legacy-api/src/router/settings.ts` for workspace membership and invites.",
+      `- Collaboration: inspect ${collaborationPaths} for workspace membership and invites.`,
     );
     opencodeLines.push(
-      "- Collaboration: inspect `packages/legacy-db/src/schema.ts` and `packages/legacy-api/src/router/settings.ts` for workspace membership and invites.",
+      `- Collaboration: inspect ${collaborationPaths} for workspace membership and invites.`,
     );
   }
 
   if (options.saasBilling || options.saasMetering) {
     selectedLayerLines.push(
-      "- Billing and metering: use `packages/billing` and `packages/legacy-api/src/router/settings.ts` for plan shape, limits, and usage rollups.",
+      `- Billing and metering: use ${billingPaths} for plan shape, limits, and usage rollups.`,
     );
     codexLines.push(
-      "- Billing and metering: use `packages/billing` and `packages/legacy-api/src/router/settings.ts` for plans, limits, and usage rollups.",
+      `- Billing and metering: use ${billingPaths} for plans, limits, and usage rollups.`,
     );
     opencodeLines.push(
-      "- Billing and metering: use `packages/billing` and `packages/legacy-api/src/router/settings.ts` for plans, limits, and usage rollups.",
+      `- Billing and metering: use ${billingPaths} for plans, limits, and usage rollups.`,
     );
     claudeLines.push(
       "- Claude-only: run `/setup-stripe-billing` once the workspace, plan, and usage model are clear.",
@@ -495,13 +577,13 @@ function getBootstrapRecommendations(options: CliOptions): {
 
   if (options.saasSupport || options.saasLaunch) {
     selectedLayerLines.push(
-      "- Support and launch: use `apps/nextjs/src/app`, `packages/legacy-api/src/router/admin.ts`, and `packages/legacy-api/src/router/settings.ts` for landing, contact, FAQ, changelog, maintenance mode, signup toggles, and waitlist review.",
+      `- Support and launch: use ${supportPaths} for landing, contact, FAQ, changelog, maintenance mode, signup toggles, and waitlist review.`,
     );
     codexLines.push(
-      "- Support and launch: use `apps/nextjs/src/app`, `packages/legacy-api/src/router/admin.ts`, and `packages/legacy-api/src/router/settings.ts` for landing, contact, FAQ, changelog, maintenance mode, signup toggles, and waitlist review.",
+      `- Support and launch: use ${supportPaths} for landing, contact, FAQ, changelog, maintenance mode, signup toggles, and waitlist review.`,
     );
     opencodeLines.push(
-      "- Support and launch: use `apps/nextjs/src/app`, `packages/legacy-api/src/router/admin.ts`, and `packages/legacy-api/src/router/settings.ts` for landing, contact, FAQ, changelog, maintenance mode, signup toggles, and waitlist review.",
+      `- Support and launch: use ${supportPaths} for landing, contact, FAQ, changelog, maintenance mode, signup toggles, and waitlist review.`,
     );
     claudeLines.push(
       "- Claude-only: run `/launch-landing-page` once the public shell and support flow are ready to shape.",
@@ -513,16 +595,16 @@ function getBootstrapRecommendations(options: CliOptions): {
       "- Referrals: keep referral capture and invite growth tied to the landing page and admin review tools.",
     );
     codexLines.push(
-      "- Referrals: keep referral capture and invite growth tied to the landing page and admin review tools in `packages/legacy-api/src/router/admin.ts`.",
+      `- Referrals: keep referral capture and invite growth tied to the landing page and admin review tools in ${referralPaths}.`,
     );
     opencodeLines.push(
-      "- Referrals: keep referral capture and invite growth tied to the landing page and admin review tools in `packages/legacy-api/src/router/admin.ts`.",
+      `- Referrals: keep referral capture and invite growth tied to the landing page and admin review tools in ${referralPaths}.`,
     );
   }
 
   if (options.saasOperatorApis || options.trpcOperators) {
     selectedLayerLines.push(
-      "- Operator APIs: use `pnpm trpc:ops -- --help` and `pnpm mcp:app` for the shared CLI and MCP wrapper lane.",
+      "- Operator APIs: use `pnpm trpc:ops -- --help` and `pnpm mcp:app` for the shared CLI and MCP wrapper lane (an API key with the `admin` scope).",
     );
     codexLines.push(
       "- Operator APIs: use `packages/operator-core`, `packages/api-cli`, and `packages/mcp-server` for the shared CLI and MCP wrapper lane.",
@@ -566,21 +648,22 @@ function customizeBootstrapPlaybook(
 function buildTrpcOperatorsBlock(): string {
   return `## Operator lane
 
-- This scaffold includes CLI + MCP wrappers over the same tRPC API.
+- This scaffold includes CLI + MCP wrappers over the same HTTP API (\`@gmacko/api-client\`).
 - Use \`pnpm trpc:ops -- --help\` for the terminal operator surface.
 - Start with \`pnpm trpc:ops -- auth_help\` for login guidance.
 - Use \`pnpm trpc:ops -- get_workspace_context\` to inspect the current workspace.
 - Use \`pnpm trpc:ops -- list_api_keys\` and \`pnpm trpc:ops -- create_api_key --name automation\` for automation credentials.
 - Use \`pnpm trpc:ops -- get_billing_overview\` for usage and limits.
-- Use \`pnpm mcp:app\` to run the local MCP server. \`auth_help\` works without an API key; protected tools require \`GMACKO_API_KEY\`.
+- Use \`pnpm mcp:app\` to run the local MCP server. \`auth_help\` works without an API key; protected tools require \`GMACKO_API_KEY\` (a key holding the \`admin\` scope).
 `;
 }
 
 function buildScaffoldProfileBlock(options: CliOptions): string {
   const platforms = [
-    options.platforms.web ? "Next.js" : null,
+    options.platforms.web
+      ? "Web (TanStack Start + Effect on Cloudflare Workers, D1)"
+      : null,
     options.platforms.mobile ? "Expo" : null,
-    options.platforms.tanstackStart ? "TanStack Start" : null,
   ].filter(Boolean);
 
   const integrations = [
@@ -596,7 +679,7 @@ function buildScaffoldProfileBlock(options: CliOptions): string {
       ? "ForgeGraph (health, logging, OTEL)"
       : null,
     options.integrations.realtime.enabled
-      ? "Realtime + Jobs (Redis + BullMQ)"
+      ? "Realtime + Jobs (Redis + BullMQ, Node services only)"
       : null,
     options.integrations.storage.enabled
       ? `Storage (${options.integrations.storage.provider})`
@@ -615,82 +698,126 @@ function buildScaffoldProfileBlock(options: CliOptions): string {
 
   const preferredDevCommands = [
     "- `pnpm bootstrap:local`",
-    options.platforms.web ? "- `pnpm dev:next`" : null,
+    options.platforms.web ? "- `pnpm dev`" : null,
     options.platforms.mobile
       ? "- `pnpm --filter @gmacko/expo dev:client`"
-      : null,
-    options.platforms.tanstackStart
-      ? "- `pnpm --filter @gmacko/web dev`"
       : null,
     options.trpcOperators ? "- `pnpm trpc:ops -- --help`" : null,
   ]
     .filter(Boolean)
     .join("\n");
 
+  const deployPath = options.platforms.web
+    ? "ForgeGraph → one Cloudflare Worker + one D1 per stage (migrate, then deploy)"
+    : "EAS Build (no web app scaffolded)";
+
   return `<!-- SCAFFOLD_PROFILE_START -->
 > **Scaffold profile**
 > - Platforms: ${platforms.join(", ") || "none selected"}
 > - Integrations: ${integrations.join(", ") || "core only"}
 > - SaaS layers: ${saasLayers.join(", ") || "none selected"}
-> - Default deploy path: ForgeGraph + Nix + colocated Postgres
-> - Workers lane: ${options.vinext ? "vinext enabled (experimental)" : "not scaffolded"}
+> - Default deploy path: ${deployPath}
 > - Claude SaaS bootstrap pack: ${options.saasBootstrap ? "enabled" : "not scaffolded"}
-> - Operator lane: ${options.trpcOperators ? "CLI + MCP wrappers over the same tRPC API" : "not scaffolded"}
+> - Operator lane: ${options.trpcOperators ? "CLI + MCP wrappers over the same HTTP API" : "not scaffolded"}
 >
 > **Recommended first commands**
 ${preferredDevCommands}
 <!-- SCAFFOLD_PROFILE_END -->`;
 }
 
-function getPrimaryServicePath(options: CliOptions): string {
-  if (options.platforms.web) return "apps/nextjs";
-  if (options.platforms.tanstackStart) return "apps/web";
-  if (options.platforms.mobile) return "apps/expo";
-  return ".";
-}
-
-function getHealthcheckHint(options: CliOptions): string {
-  if (options.platforms.web) return "/api/health";
-  if (options.platforms.tanstackStart) return "/api/health";
-  if (options.platforms.mobile) return "n/a (mobile-only scaffold)";
-  return "n/a";
-}
-
+/**
+ * `.forgegraph.yaml`: the ForgeGraph repo contract for the web lane — one
+ * `cloudflare-workers` target per stage, the D1 resources, the health URL and
+ * the migrate-then-deploy sequence (`scripts/deploy-stage.mjs`). A
+ * mobile-only scaffold registers the app with no stages.
+ */
 function createForgeGraphConfig(targetDir: string, options: CliOptions): void {
-  const primaryServicePath = getPrimaryServicePath(options);
-  const healthcheckHint = options.integrations.forgegraph
-    ? "/.well-known/forge-health"
-    : getHealthcheckHint(options);
+  const worker = workerName(options.appName);
+  const notes = `# ForgeGraph operator notes:
+# primary web service path: ${options.platforms.web ? WEB_APP_DIR : options.platforms.mobile ? MOBILE_APP_DIR : "."}
+# healthcheck path: ${options.platforms.web ? "/.well-known/forge-health" : "n/a (mobile-only scaffold)"}
+# database strategy: ${options.platforms.web ? `cloudflare-d1 (per stage; previews share ${worker}-preview)` : "n/a (mobile-only scaffold)"}
+# preview domain: ${options.forgegraphPreviewDomain}
+# production domain: ${options.forgegraphProductionDomain}
+`;
 
-  const resources: string[] = [];
-  resources.push("  - type: postgres");
-  if (options.integrations.realtime.enabled) {
-    resources.push("  - type: redis");
+  if (!options.platforms.web) {
+    fs.writeFileSync(
+      path.join(targetDir, ".forgegraph.yaml"),
+      `# ForgeGraph repo contract. This scaffold has no web app: the Expo app talks
+# to a separately hosted API, so no stage is registered here. Add stages
+# once a backend repo exists (see deploy/README.md for the Workers shape).
+app: ${options.appName}
+server: ${options.forgegraphServer}
+
+${notes}`,
+    );
+    return;
   }
+
+  const stage = (name: string, sortOrder: number, workerSuffix: string) =>
+    `  - name: ${name}
+    sortOrder: ${sortOrder}
+    targets:
+      - name: web
+        platform: cloudflare-workers
+        config:
+          workerName: ${worker}${workerSuffix}
+          configPath: ${WEB_APP_DIR}/wrangler.jsonc
+          environment: ${name}
+          deploy: pnpm deploy:${name}`;
 
   fs.writeFileSync(
     path.join(targetDir, ".forgegraph.yaml"),
-    `app: ${options.appName}
+    `# ForgeGraph repo contract for the web lane (${WEB_APP_DIR} on Cloudflare Workers + D1).
+# \`forge diff\` / \`forge apply\` sync this file with the server; \`forge deploy
+# create <stage> --wait\` (pnpm forge:deploy:<stage>) runs the repo's deploy
+# workflow for a cloudflare-workers target (deploy/forgegraph/deploy.yml).
+#
+# Deploy sequence per stage (scripts/deploy-stage.mjs, the single source):
+#   1. pnpm -F @gmacko/db migrate:remote --env <stage>   # D1 migrations, forward-only
+#   2. pnpm -F @gmacko/web deploy:<stage>                # CLOUDFLARE_ENV=<stage> vite build && wrangler deploy
+# A failing migration aborts the deploy. Migrations are expand/contract only
+# (docs/drizzle-migrations.md).
+#
+# D1 is NOT provisioned by \`forge db create\`. Create the databases once with
+# wrangler and put their ids in ${WEB_APP_DIR}/wrangler.jsonc (\`env.<stage>.d1_databases\`):
+#   pnpm -F @gmacko/web exec wrangler d1 create ${worker}-staging
+#   pnpm -F @gmacko/web exec wrangler d1 create ${worker}
+#   pnpm -F @gmacko/web exec wrangler d1 create ${worker}-preview   # shared by PR previews
+# Stage secrets live in ForgeGraph (\`forge secret set KEY --stage <stage>\`)
+# and reach the Worker with \`pnpm secrets:push --stage <stage>\`.
+
+app: ${options.appName}
 server: ${options.forgegraphServer}
+
+db:
+  type: d1
+  name: ${worker}
+  # Run by ForgeGraph before the deploy step; FG_STAGE selects the stage.
+  migrate: node scripts/deploy-stage.mjs --migrate-only
+  migrateType: wrangler
+
 stages:
-  - name: staging
-    nodeId: ${options.forgegraphStagingNode}
-    sortOrder: 10
-  - name: production
-    nodeId: ${options.forgegraphProductionNode}
-    sortOrder: 20
+${stage("staging", 10, "-staging")}
+${stage("production", 20, "")}
 
 resources:
-${resources.join("\n")}
+  d1:
+    - name: ${worker}-staging
+      binding: DB
+    - name: ${worker}
+      binding: DB
+    - name: ${worker}-preview
+      binding: DB
 
-# ForgeGraph operator notes:
-# flakeRef: .
-# primary web service path: ${primaryServicePath}
-# healthcheck path: ${healthcheckHint}
-# database strategy: colocated-postgres
-# preview domain: ${options.forgegraphPreviewDomain}
-# production domain: ${options.forgegraphProductionDomain}
-`,
+health:
+  # Served by the Worker (packages/api HealthApi); generic outside development.
+  url: /.well-known/forge-health
+  interval: 60
+  timeout: 10
+
+${notes}`,
   );
 }
 
@@ -738,6 +865,10 @@ function addOptionalOperatorScripts(
   fs.writeJsonSync(rootPackagePath, rootPackage, { spaces: 2 });
 }
 
+/**
+ * `.mcp.json` ships empty; the operator lane adds the app's own MCP server
+ * (packages/mcp-server over the HTTP API) when AI files are kept.
+ */
 function customizeMcpConfig(targetDir: string, options: CliOptions): void {
   if (!options.includeAi || !options.trpcOperators) {
     return;
@@ -764,7 +895,7 @@ function customizeMcpConfig(targetDir: string, options: CliOptions): void {
     command: "pnpm",
     args: ["--filter", "@gmacko/mcp-server", "exec", "tsx", "src/index.ts"],
     env: {
-      GMACKO_API_URL: "http://localhost:3000",
+      GMACKO_API_URL: "http://localhost:3001",
       GMACKO_API_KEY: "change-me",
     },
   };
@@ -806,215 +937,44 @@ After \`pnpm bootstrap:local\`:
   );
 }
 
-function configureVinext(targetDir: string): void {
-  const nextPkgPath = path.join(targetDir, "apps/nextjs/package.json");
-  const nextPkg = fs.readJsonSync(nextPkgPath) as {
+/**
+ * `--no-web`: drop the Worker and everything in the root that only drives it
+ * (its dev/deploy/e2e scripts, the per-PR preview workflow). The Expo app
+ * then targets a separately hosted API (`EXPO_PUBLIC_API_URL`).
+ */
+function removeWebApp(targetDir: string): void {
+  fs.removeSync(path.join(targetDir, WEB_APP_DIR));
+  fs.removeSync(path.join(targetDir, ".github/workflows/preview.yml"));
+
+  const rootPackagePath = path.join(targetDir, "package.json");
+  const rootPackage = fs.readJsonSync(rootPackagePath) as {
     scripts?: Record<string, string>;
-    devDependencies?: Record<string, string>;
   };
-
-  nextPkg.scripts ??= {};
-  nextPkg.devDependencies ??= {};
-
-  nextPkg.scripts["prebuild:vinext"] =
-    "pnpm --dir ../.. --filter @gmacko/nextjs^... build";
-  nextPkg.scripts["dev:vinext"] =
-    "pnpm prebuild:vinext && pnpm with-env vinext dev";
-  nextPkg.scripts["build:vinext"] =
-    "pnpm prebuild:vinext && pnpm with-env vinext build";
-  nextPkg.scripts["start:vinext"] = "pnpm with-env vinext start";
-  nextPkg.scripts["deploy:cloudflare"] = "pnpm deploy:cloudflare:production";
-  nextPkg.scripts["deploy:cloudflare:staging"] =
-    "pnpm build:vinext && pnpm with-env wrangler deploy --env staging";
-  nextPkg.scripts["deploy:cloudflare:production"] =
-    "pnpm build:vinext && pnpm with-env wrangler deploy";
-
-  nextPkg.devDependencies.vinext = "^0.0.35";
-  nextPkg.devDependencies.vite = "^8.0.2";
-  nextPkg.devDependencies.wrangler = "^4.77.0";
-  nextPkg.devDependencies["@cloudflare/vite-plugin"] = "^1.30.1";
-  nextPkg.devDependencies["@vitejs/plugin-rsc"] = "^0.5.21";
-  nextPkg.devDependencies = sortObjectKeys(nextPkg.devDependencies);
-
-  fs.writeJsonSync(nextPkgPath, nextPkg, { spaces: 2 });
-
-  fs.writeFileSync(
-    path.join(targetDir, "apps/nextjs/vite.config.ts"),
-    `import { cloudflare } from "@cloudflare/vite-plugin";
-import vinext from "vinext";
-import { defineConfig } from "vite";
-
-export default defineConfig({
-  plugins: [
-    vinext(),
-    cloudflare({
-      viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
-    }),
-  ],
-});
-`,
-  );
-
-  fs.writeFileSync(
-    path.join(targetDir, "apps/nextjs/wrangler.jsonc"),
-    `{
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "${path.basename(targetDir)}",
-  "compatibility_date": "2026-03-23",
-  "compatibility_flags": ["nodejs_compat"],
-  "main": "./worker/index.ts",
-  "assets": {
-    "directory": "dist/client",
-    "not_found_handling": "none",
-    "binding": "ASSETS"
-  },
-  "images": {
-    "binding": "IMAGES"
-  },
-  "vars": {
-    "APP_ENV": "production"
-  },
-  "env": {
-    "staging": {
-      "vars": {
-        "APP_ENV": "staging"
-      }
-    }
+  rootPackage.scripts ??= {};
+  for (const script of [
+    "dev:web",
+    "dev:app",
+    "e2e:web",
+    "cf-typegen",
+    "check:cf-types",
+    "deploy:migrate",
+    "deploy:staging",
+    "deploy:production",
+    "secrets:push",
+  ]) {
+    delete rootPackage.scripts[script];
   }
-}
-`,
-  );
+  rootPackage.scripts.dev = "pnpm dev:emulate";
+  fs.writeJsonSync(rootPackagePath, rootPackage, { spaces: 2 });
 
-  fs.writeFileSync(
-    path.join(targetDir, "apps/nextjs/src/cloudflare-env.ts"),
-    `import { z } from "zod/v4";
-
-export const cloudflareEnvSchema = z.object({
-  APP_ENV: z.enum(["development", "staging", "production"]).default("production"),
-  CLOUDFLARE_ACCOUNT_ID: z.string().min(1),
-  CLOUDFLARE_API_TOKEN: z.string().min(1),
-});
-
-export type CloudflareEnv = z.infer<typeof cloudflareEnvSchema>;
-`,
-  );
-
-  fs.ensureDirSync(path.join(targetDir, "apps/nextjs/worker"));
-  fs.writeFileSync(
-    path.join(targetDir, "apps/nextjs/worker/index.ts"),
-    `import {
-  DEFAULT_DEVICE_SIZES,
-  DEFAULT_IMAGE_SIZES,
-  handleImageOptimization,
-} from "vinext/server/image-optimization";
-import type { ImageConfig } from "vinext/server/image-optimization";
-import handler from "vinext/server/app-router-entry";
-
-interface Env {
-  APP_ENV?: "development" | "staging" | "production";
-  ASSETS: {
-    fetch(request: Request): Promise<Response>;
-  };
-  IMAGES: {
-    input(stream: ReadableStream): {
-      transform(options: Record<string, unknown>): {
-        output(options: {
-          format: string;
-          quality: number;
-        }): Promise<{ response(): Response }>;
-      };
+  const portlessPath = path.join(targetDir, "portless.json");
+  if (fs.existsSync(portlessPath)) {
+    const portless = fs.readJsonSync(portlessPath) as {
+      apps?: Record<string, unknown>;
     };
-  };
-}
-
-interface ExecutionContext {
-  waitUntil(promise: Promise<unknown>): void;
-  passThroughOnException(): void;
-}
-
-const imageConfig: ImageConfig = {};
-
-export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(request.url);
-
-    if (url.pathname === "/_vinext/image") {
-      const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
-      return handleImageOptimization(
-        request,
-        {
-          fetchAsset: (assetPath) =>
-            env.ASSETS.fetch(new Request(new URL(assetPath, request.url))),
-          transformImage: async (body, { width, format, quality }) => {
-            const result = await env.IMAGES.input(body)
-              .transform(width > 0 ? { width } : {})
-              .output({ format, quality });
-            return result.response();
-          },
-        },
-        allowedWidths,
-        imageConfig,
-      );
-    }
-
-    return handler.fetch(request, env, ctx);
-  },
-};
-`,
-  );
-
-  const envExamplePath = path.join(targetDir, ".env.example");
-  const envExample = fs.readFileSync(envExamplePath, "utf-8");
-  if (!envExample.includes("CLOUDFLARE_ACCOUNT_ID")) {
-    fs.writeFileSync(
-      envExamplePath,
-      `${envExample}
-
-# =====================================================
-# OPTIONAL: Cloudflare Workers (vinext)
-# Used for the experimental Next.js-on-Workers lane
-# =====================================================
-# CLOUDFLARE_ACCOUNT_ID='your-account-id'
-# CLOUDFLARE_API_TOKEN='your-api-token'
-`,
-    );
+    if (portless.apps) delete portless.apps[WEB_APP_DIR];
+    fs.writeJsonSync(portlessPath, portless, { spaces: 2 });
   }
-
-  fs.writeFileSync(
-    path.join(targetDir, "apps/nextjs/README.cloudflare.md"),
-    `# Cloudflare Workers Lane
-
-This app includes an experimental \`vinext\` lane for Cloudflare Workers.
-
-## Commands
-
-\`\`\`bash
-pnpm --filter @gmacko/nextjs dev:vinext
-pnpm --filter @gmacko/nextjs build:vinext
-pnpm --filter @gmacko/nextjs deploy:cloudflare:staging
-pnpm --filter @gmacko/nextjs deploy:cloudflare:production
-\`\`\`
-
-## Required Env
-
-- \`CLOUDFLARE_ACCOUNT_ID\`
-- \`CLOUDFLARE_API_TOKEN\`
-
-## Notes
-
-- This lane is experimental and should not replace the default ForgeGraph + Nix deployment path by accident.
-- The generated Worker config lives in \`apps/nextjs/wrangler.jsonc\`.
-- Prefer the root deployment guidance for the stable Hetzner VPS path.
-`,
-  );
-}
-
-function sortObjectKeys(
-  record: Record<string, string>,
-): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(record).sort(([left], [right]) => left.localeCompare(right)),
-  );
 }
 
 function configureExpoApp(
@@ -1022,7 +982,7 @@ function configureExpoApp(
   appName: string,
   displayName: string,
 ): void {
-  const expoConfigPath = path.join(targetDir, "apps/expo/app.config.ts");
+  const expoConfigPath = path.join(targetDir, `${MOBILE_APP_DIR}/app.config.ts`);
   const sanitizedId = appName.replace(/[^a-z0-9-]/gi, "").toLowerCase();
   const bundleSegment = sanitizedId.replace(/-/g, "");
 
@@ -1084,18 +1044,18 @@ function pruneIntegrations(
     }
   }
 
-  if (!integrations.sentry) {
-    pruneNextSentryFiles(targetDir);
+  if (!integrations.posthog) {
+    pruneWebAnalyticsFiles(targetDir);
   }
 
-  if (!integrations.posthog) {
-    pruneNextAnalyticsFiles(targetDir);
+  if (!integrations.stripe) {
+    pruneWebStripeFiles(targetDir);
   }
 
   // Remove references to pruned packages from EVERY remaining workspace
-  // package.json — not just apps. e.g. packages/billing declares
-  // @gmacko/payments, so pruning payments (Stripe off) otherwise breaks
-  // `pnpm install` with ERR_PNPM_WORKSPACE_PKG_NOT_FOUND.
+  // package.json — not just apps. e.g. apps/web declares @gmacko/payments,
+  // so pruning payments (Stripe off) otherwise breaks `pnpm install` with
+  // ERR_PNPM_WORKSPACE_PKG_NOT_FOUND.
   const prunedDeps = packagesToPrune.map((p) => `@gmacko/${p}`);
   for (const dir of ["apps", "packages", "tooling"]) {
     const base = path.join(targetDir, dir);
@@ -1150,106 +1110,74 @@ function pruneOptionalLanes(targetDir: string, options: CliOptions): void {
   }
 }
 
-function pruneNextSentryFiles(targetDir: string): void {
-  const sentryFiles = [
-    "apps/nextjs/sentry.client.config.ts",
-    "apps/nextjs/sentry.edge.config.ts",
-    "apps/nextjs/sentry.server.config.ts",
-  ];
-
-  for (const relativePath of sentryFiles) {
-    const filePath = path.join(targetDir, relativePath);
-    if (fs.existsSync(filePath)) {
-      fs.removeSync(filePath);
-    }
-  }
-
-  removeSnippet(
-    path.join(targetDir, "apps/nextjs/src/app/error.tsx"),
-    'import { captureException } from "~/env/monitoring";\n',
-  );
-  removeSnippet(
-    path.join(targetDir, "apps/nextjs/src/app/error.tsx"),
-    `    // Report error to Sentry if enabled
-    if (integrations.sentry) {
-      captureException(error);
-    }
-
-`,
-  );
-
-  removeSnippet(
-    path.join(targetDir, "apps/nextjs/src/app/global-error.tsx"),
-    'import { captureException } from "~/env/monitoring";\n',
-  );
-  removeSnippet(
-    path.join(targetDir, "apps/nextjs/src/app/global-error.tsx"),
-    `    // Report error to Sentry if enabled
-    if (integrations.sentry) {
-      captureException(error);
-    }
-
-`,
-  );
-
-  removeSnippet(
-    path.join(targetDir, "apps/nextjs/src/components/error-boundary.tsx"),
-    'import { captureException } from "~/env/monitoring";\n',
-  );
-  removeSnippet(
-    path.join(targetDir, "apps/nextjs/src/components/error-boundary.tsx"),
-    `    // Report to Sentry if enabled
-    if (integrations.sentry) {
-      captureException(error);
-    }
-
-`,
-  );
-
-  const instrumentationPath = path.join(
-    targetDir,
-    "apps/nextjs/src/instrumentation.ts",
-  );
-  if (fs.existsSync(instrumentationPath)) {
-    fs.writeFileSync(
-      instrumentationPath,
-      `export async function register() {}
-`,
-    );
-  }
-}
-
-function pruneNextAnalyticsFiles(targetDir: string): void {
-  const providersPath = path.join(
-    targetDir,
-    "apps/nextjs/src/app/providers.tsx",
-  );
+/**
+ * PostHog off + prune: `apps/web/src/providers.tsx` is the only importer of
+ * `@gmacko/analytics/web`; it becomes a pass-through. (Sentry in apps/web is
+ * `@sentry/cloudflare` + `@sentry/react` directly and stays off without a DSN,
+ * so pruning `packages/monitoring` touches nothing there.)
+ */
+function pruneWebAnalyticsFiles(targetDir: string): void {
+  const providersPath = path.join(targetDir, `${WEB_APP_DIR}/src/providers.tsx`);
   if (!fs.existsSync(providersPath)) return;
 
   fs.writeFileSync(
     providersPath,
-    `"use client";
-
+    `/**
+ * Browser-side providers. Analytics was pruned at scaffold time; add a
+ * provider here when one is needed.
+ */
 import type { ReactNode } from "react";
 
-interface ProvidersProps {
-  children: ReactNode;
-}
-
-export function Providers({ children }: ProvidersProps) {
-  return <>{children}</>;
+export function Providers({ children }: { children: ReactNode }) {
+  return children;
 }
 `,
   );
 }
 
-function removeSnippet(filePath: string, snippet: string): void {
-  if (!fs.existsSync(filePath)) return;
+/**
+ * Stripe off + prune: the webhook route keeps its path (it is part of the
+ * generated route tree) but no longer verifies deliveries through
+ * `@gmacko/payments`; it answers 503 until the payments package is added
+ * back. Its signature test goes with the package.
+ */
+function pruneWebStripeFiles(targetDir: string): void {
+  const webhookPath = path.join(
+    targetDir,
+    `${WEB_APP_DIR}/src/server/stripe-webhook.ts`,
+  );
+  if (!fs.existsSync(webhookPath)) return;
 
-  const content = fs.readFileSync(filePath, "utf-8");
-  if (!content.includes(snippet)) return;
+  fs.writeFileSync(
+    webhookPath,
+    `/**
+ * \`POST /api/webhooks/stripe\`: payments were pruned at scaffold time, so the
+ * route only acknowledges that no webhook is configured. Restore
+ * \`packages/payments\` and its \`constructWebhookEvent\` to verify deliveries.
+ */
+export interface StripeWebhookOptions {
+  /** \`STRIPE_WEBHOOK_SECRET\`; unset means the endpoint is not configured. */
+  readonly secret: string | undefined;
+  readonly onEvent?: ((type: string, id: string) => void) | undefined;
+}
 
-  fs.writeFileSync(filePath, content.replace(snippet, ""));
+const json = (status: number, body: unknown): Response =>
+  Response.json(body, { status });
+
+export const handleStripeWebhook = async (
+  request: Request,
+  _options: StripeWebhookOptions,
+): Promise<Response> => {
+  if (request.method !== "POST") {
+    return json(405, { error: "method not allowed" });
+  }
+  return json(503, { error: "webhook not configured" });
+};
+`,
+  );
+  fs.removeSync(
+    path.join(targetDir, `${WEB_APP_DIR}/src/server/__tests__/stripe-webhook.test.ts`),
+  );
 }
 
 function getAllFiles(dir: string): string[] {
@@ -1281,23 +1209,24 @@ function isLocalTemplatePath(templateRepo: string): boolean {
   return fs.existsSync(templateRepo) && fs.statSync(templateRepo).isDirectory();
 }
 
-function shouldCopyTemplatePath(src: string, templateRoot: string): boolean {
-  const basename = path.basename(src);
+/** Skipped when copying a local template: VCS state, installs, build and dev-server output. */
+const SKIPPED_TEMPLATE_DIRS = new Set([
+  ".git",
+  ".jj",
+  "node_modules",
+  ".turbo",
+  ".cache",
+  "dist",
+  ".wrangler",
+  ".tanstack",
+  ".artifacts",
+  ".expo",
+  "coverage",
+  "playwright-report",
+  "test-results",
+  "storybook-static",
+]);
 
-  if (
-    basename === ".git" ||
-    basename === ".jj" ||
-    basename === "node_modules" ||
-    basename === ".turbo" ||
-    basename === ".cache" ||
-    basename === "dist"
-  ) {
-    return false;
-  }
-
-  if (src === templateRoot) {
-    return true;
-  }
-
-  return true;
+function shouldCopyTemplatePath(src: string): boolean {
+  return !SKIPPED_TEMPLATE_DIRS.has(path.basename(src));
 }

@@ -78,9 +78,7 @@
     }
   },
   "globalEnv": [
-    "DATABASE_URL",
     "REDIS_URL",
-    "NEXT_PUBLIC_PREVIEW",
     "AUTH_GITHUB_ID",
     "AUTH_GITHUB_SECRET",
     "AUTH_GOOGLE_ID",
@@ -112,7 +110,6 @@
     "NODE_ENV",
     "CI",
     "SKIP_ENV_VALIDATION",
-    "NEXT_RUNTIME",
     "PORTLESS_URL",
     "AUTH_GITHUB_URL",
     "AUTH_GITHUB_API_URL",

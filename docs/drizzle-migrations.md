@@ -6,11 +6,6 @@ applied with `wrangler d1 migrations apply`. They are **forward-only** and
 **expand/contract only**; the reasons are below and enforced by tests and
 `pnpm check:standards`.
 
-The legacy Next.js app (`apps/nextjs`, `packages/legacy-db`) still runs on
-Postgres until Phase 8 and is driven by that package's own scripts
-(`pnpm -F @gmacko/legacy-db generate|push|seed`, `pnpm db:legacy:push`).
-Everything here is about D1.
-
 ## Quick reference
 
 ```bash

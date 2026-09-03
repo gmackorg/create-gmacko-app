@@ -9,8 +9,10 @@ const program = new Command();
 
 program
   .name("create-gmacko-app")
-  .description("Create a new Gmacko app with Next.js, Expo, tRPC, and more")
-  .version("0.1.1")
+  .description(
+    "Create a new Gmacko app: TanStack Start + Effect on Cloudflare Workers with D1, Expo, and agent-native DX defaults",
+  )
+  .version("0.2.0")
   .argument("<app-name>", "Name of the app to create")
   .option("--yes, -y", "Accept all defaults without prompting")
   .option("--prune", "Remove unused integration packages")
@@ -18,12 +20,13 @@ program
   .option("--no-git", "Skip repository init (jj/git)")
   .option("--no-ai", "Exclude AI workflow system")
   .option("--no-provision", "Exclude provisioning script")
-  .option("--web", "Include Next.js web app (default: true)")
-  .option("--no-web", "Exclude Next.js web app")
+  .option(
+    "--web",
+    "Include the web app: TanStack Start + Effect on Cloudflare Workers with D1 (default: true)",
+  )
+  .option("--no-web", "Exclude the web app (mobile-only scaffold)")
   .option("--mobile", "Include Expo mobile app (default: true)")
   .option("--no-mobile", "Exclude Expo mobile app")
-  .option("--tanstack-start", "Include TanStack Start app")
-  .option("--no-tanstack-start", "Exclude TanStack Start app (default)")
   .option("--saas-collaboration", "Add collaboration layers to the SaaS app")
   .option("--saas-billing", "Add billing and plans to the SaaS app")
   .option("--saas-metering", "Add metering and usage rollups to the SaaS app")
@@ -34,14 +37,13 @@ program
     "--saas-operator-apis",
     "Add operator APIs (CLI + MCP wrappers) to the SaaS app",
   )
-  .option("--vinext", "Add experimental vinext support to the Next.js app")
   .option(
     "--saas-bootstrap",
     "Add optional Claude SaaS bootstrap skills and post-setup playbook",
   )
   .option(
     "--trpc-operators",
-    "Add optional CLI + MCP wrappers around the app's tRPC API",
+    "Add the optional operator lane: CLI + MCP wrappers over the app's HTTP API (admin-scoped API keys)",
   )
   .option(
     "--integrations <list>",
@@ -57,14 +59,6 @@ program
   .option(
     "--forgegraph-server <url>",
     "ForgeGraph server URL to write into .forgegraph.yaml",
-  )
-  .option(
-    "--forgegraph-staging-node <id>",
-    "ForgeGraph staging node placeholder to write into .forgegraph.yaml",
-  )
-  .option(
-    "--forgegraph-production-node <id>",
-    "ForgeGraph production node placeholder to write into .forgegraph.yaml",
   )
   .option(
     "--forgegraph-preview-domain <domain>",
@@ -97,30 +91,10 @@ program
       if (opts.web !== undefined) options.platforms.web = opts.web === true;
       if (opts.mobile !== undefined)
         options.platforms.mobile = opts.mobile === true;
-      if (opts.tanstackStart !== undefined)
-        options.platforms.tanstackStart = opts.tanstackStart === true;
-      options.vinext = opts.vinext === true;
       applySaasCapabilityFlags(options, opts);
       applyOperatorLaneFlags(options, opts);
       options.saasBootstrap = opts.saasBootstrap === true;
-      if (opts.forgegraphServer) {
-        options.forgegraphServer = opts.forgegraphServer as string;
-      }
-      if (opts.forgegraphStagingNode) {
-        options.forgegraphStagingNode = opts.forgegraphStagingNode as string;
-      }
-      if (opts.forgegraphProductionNode) {
-        options.forgegraphProductionNode =
-          opts.forgegraphProductionNode as string;
-      }
-      if (opts.forgegraphPreviewDomain) {
-        options.forgegraphPreviewDomain =
-          opts.forgegraphPreviewDomain as string;
-      }
-      if (opts.forgegraphProductionDomain) {
-        options.forgegraphProductionDomain =
-          opts.forgegraphProductionDomain as string;
-      }
+      applyForgeGraphFlags(options, opts);
       if (opts.packageScope) options.packageScope = opts.packageScope as string;
       if (opts.forgegraph !== undefined) {
         options.integrations.forgegraph = opts.forgegraph === true;
@@ -139,7 +113,6 @@ program
       if (opts.prune !== undefined) options.prune = opts.prune === true;
       if (opts.install !== undefined) options.install = opts.install !== false;
       if (opts.git !== undefined) options.git = opts.git !== false;
-      options.vinext = opts.vinext === true;
       applySaasCapabilityFlags(options, opts);
       applyOperatorLaneFlags(options, opts);
       if (opts.saasBootstrap !== undefined) {
@@ -148,24 +121,14 @@ program
       if (opts.forgegraph !== undefined) {
         options.integrations.forgegraph = opts.forgegraph === true;
       }
-      if (opts.forgegraphServer) {
-        options.forgegraphServer = opts.forgegraphServer as string;
-      }
-      if (opts.forgegraphStagingNode) {
-        options.forgegraphStagingNode = opts.forgegraphStagingNode as string;
-      }
-      if (opts.forgegraphProductionNode) {
-        options.forgegraphProductionNode =
-          opts.forgegraphProductionNode as string;
-      }
-      if (opts.forgegraphPreviewDomain) {
-        options.forgegraphPreviewDomain =
-          opts.forgegraphPreviewDomain as string;
-      }
-      if (opts.forgegraphProductionDomain) {
-        options.forgegraphProductionDomain =
-          opts.forgegraphProductionDomain as string;
-      }
+      applyForgeGraphFlags(options, opts);
+    }
+
+    if (!options.platforms.web && !options.platforms.mobile) {
+      console.error(
+        pc.red("Nothing to scaffold: pass at most one of --no-web / --no-mobile."),
+      );
+      process.exit(1);
     }
 
     await scaffold(options);
@@ -244,6 +207,22 @@ function applyOperatorLaneFlags(
 
   if (opts.trpcOperators !== undefined) {
     options.trpcOperators = opts.trpcOperators === true;
+  }
+}
+
+function applyForgeGraphFlags(
+  options: CliOptions,
+  opts: Record<string, unknown>,
+): void {
+  if (opts.forgegraphServer) {
+    options.forgegraphServer = opts.forgegraphServer as string;
+  }
+  if (opts.forgegraphPreviewDomain) {
+    options.forgegraphPreviewDomain = opts.forgegraphPreviewDomain as string;
+  }
+  if (opts.forgegraphProductionDomain) {
+    options.forgegraphProductionDomain =
+      opts.forgegraphProductionDomain as string;
   }
 }
 

@@ -67,19 +67,19 @@ else
   warn ".env is missing; copy .env.example to .env before starting app services"
 fi
 
+# A `.dev.vars` next to wrangler.jsonc silently disables wrangler's `.env`
+# loading (the way emulate's values reach the Worker). Never create one.
+if ls "$ROOT_DIR"/apps/web/.dev.vars* >/dev/null 2>&1; then
+  fail "apps/web/.dev.vars exists; delete it (it disables .env loading for the Worker)"
+fi
+
 if [ -f "$ROOT_DIR/.forgegraph.yaml" ]; then
   ok ".forgegraph.yaml present"
-  if grep -q "forge.example.com\|change-me-staging-node\|change-me-production-node\|change-me.preview.example.com\|change-me.example.com" "$ROOT_DIR/.forgegraph.yaml"; then
+  if grep -q "forge.example.com\|change-me.preview.example.com\|change-me.example.com" "$ROOT_DIR/.forgegraph.yaml"; then
     warn ".forgegraph.yaml still has placeholder ForgeGraph values; update server, domains, and stage node IDs before deploying"
   fi
 else
   warn ".forgegraph.yaml is missing; ForgeGraph deployment metadata has not been configured"
-fi
-
-if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-  ok "Docker Compose available"
-else
-  warn "Docker Compose not available; local Postgres bootstrap will be unavailable"
 fi
 
 if command -v jj >/dev/null 2>&1; then
@@ -121,10 +121,12 @@ check_env_group() {
   fi
 }
 
-check_env_group "Core app env values" "DATABASE_URL" "AUTH_SECRET"
+# The web app reads its bindings from .env (apps/web/.env links to it); there is
+# no DATABASE_URL, the database is a local D1.
+check_env_group "Core app env values" "STAGE" "AUTH_SECRET"
 
 if [ -f "$ROOT_DIR/.forgegraph.yaml" ]; then
-  check_env_group "ForgeGraph deploy values" "DATABASE_URL" "AUTH_SECRET"
+  check_env_group "ForgeGraph deploy values" "AUTH_SECRET"
 fi
 
 echo ""
@@ -138,15 +140,16 @@ if [ -f "$ROOT_DIR/packages/config/src/integrations.ts" ] && grep -q 'provider: 
   check_env_group "Resend email env values" "RESEND_API_KEY"
 fi
 
-if [ -f "$ROOT_DIR/apps/nextjs/wrangler.jsonc" ]; then
+if [ -f "$ROOT_DIR/apps/web/wrangler.jsonc" ]; then
   ok "Cloudflare Workers lane detected"
 
-  if command -v wrangler >/dev/null 2>&1; then
+  if command -v wrangler >/dev/null 2>&1 || [ -x "$ROOT_DIR/apps/web/node_modules/.bin/wrangler" ]; then
     ok "Wrangler CLI available"
   else
-    warn "Wrangler CLI not installed; vinext deploy workflows will be unavailable"
+    warn "Wrangler CLI not installed; run pnpm install (apps/web depends on wrangler) before pnpm dev or a deploy"
   fi
 
+  # Only deploys and remote D1 commands need these; local dev (Miniflare) does not.
   check_env_group \
     "Cloudflare Workers env values" \
     "CLOUDFLARE_ACCOUNT_ID" \

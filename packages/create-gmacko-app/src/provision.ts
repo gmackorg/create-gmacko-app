@@ -38,11 +38,6 @@ const CLI_TOOLS: Record<string, CliTool> = {
     command: "eas",
     installHint: "npm i -g eas-cli",
   },
-  docker: {
-    name: "Docker",
-    command: "docker",
-    installHint: "Install Docker Desktop or docker engine",
-  },
 };
 
 function isCliInstalled(command: string): boolean {
@@ -156,6 +151,10 @@ export async function provisionGitRepo(
   }
 }
 
+/**
+ * Deployment guidance for the web lane: one Cloudflare Worker and one D1 per
+ * stage, orchestrated by ForgeGraph (docs/DEPLOYMENT.md in the generated app).
+ */
 export async function provisionForgeGraph(
   config: ProvisionConfig,
 ): Promise<boolean> {
@@ -164,7 +163,7 @@ export async function provisionForgeGraph(
   }
 
   const shouldSetup = await p.confirm({
-    message: "Show ForgeGraph deployment steps?",
+    message: "Show ForgeGraph + Cloudflare deployment steps?",
     initialValue: true,
   });
 
@@ -174,27 +173,28 @@ export async function provisionForgeGraph(
 
   const forgeGraphPath = path.resolve(config.projectPath, "../ForgeGraph");
   const hasLocalReference = existsSync(forgeGraphPath);
+  const worker = workerName(config.appName);
 
-  p.log.info("ForgeGraph deployment guidance:");
+  p.log.info("Deployment guidance (Cloudflare Workers + D1 via ForgeGraph):");
   p.log.message(
     pc.cyan(
-      `1. Keep this repo flake-based and deploy it from ForgeGraph on your Hetzner VPS.`,
+      `1. Create the stage databases once and paste their ids into apps/web/wrangler.jsonc:\n   pnpm -F @gmacko/web exec wrangler d1 create ${worker}-staging\n   pnpm -F @gmacko/web exec wrangler d1 create ${worker}\n   pnpm -F @gmacko/web exec wrangler d1 create ${worker}-preview`,
     ),
   );
   p.log.message(
     pc.cyan(
-      `2. Run Postgres alongside the app first and export DATABASE_URL in the deployment environment.`,
+      `2. Put the stage secrets in ForgeGraph (forge secret set KEY --stage staging), then push them: pnpm secrets:push --stage staging`,
     ),
   );
   p.log.message(
     pc.cyan(
-      `3. Use flake.nix as the Nix entry point for build and runtime definitions.`,
+      `3. Deploy: pnpm deploy:staging (applies the pending D1 migrations, then wrangler deploy); ForgeGraph runs the same script from .forgegraph.yaml.`,
     ),
   );
   if (hasLocalReference) {
     p.log.message(
       pc.cyan(
-        `4. Use the local ForgeGraph repo at ${forgeGraphPath} and deploy with forge.`,
+        `4. Use the local ForgeGraph repo at ${forgeGraphPath} and register the app with forge.`,
       ),
     );
     p.log.message(
@@ -204,7 +204,7 @@ export async function provisionForgeGraph(
     );
     p.log.message(
       pc.cyan(
-        `   Then: forge app create ${config.appName} --flake-ref . && forge stage add production --node <node-id> && forge deploy create production --wait`,
+        `   Then: pnpm forge:apply && forge deploy create staging --wait`,
       ),
     );
   }
@@ -266,30 +266,19 @@ export async function provisionEAS(config: ProvisionConfig): Promise<boolean> {
   }
 }
 
-export async function provisionPostgres(
+/**
+ * The local D1: apply the checked-in migrations and seed the defaults. No
+ * service to start; Miniflare keeps the database in apps/web/.wrangler/state.
+ */
+export async function provisionLocalDatabase(
   config: ProvisionConfig,
 ): Promise<boolean> {
-  if (!isCliInstalled("docker")) {
-    p.log.warn(
-      `Docker not found. Install with: ${CLI_TOOLS.docker.installHint}`,
-    );
-    return false;
-  }
-
-  try {
-    execSync("docker compose version", {
-      cwd: config.projectPath,
-      stdio: "ignore",
-    });
-  } catch {
-    p.log.warn(
-      "Docker Compose is required to start the local Postgres service",
-    );
+  if (!config.platforms.web) {
     return false;
   }
 
   const shouldSetup = await p.confirm({
-    message: "Start the local Postgres service?",
+    message: "Set up the local D1 database (migrate + seed)?",
     initialValue: true,
   });
 
@@ -298,28 +287,36 @@ export async function provisionPostgres(
   }
 
   const spinner = p.spinner();
-  spinner.start("Starting Postgres...");
+  spinner.start("Applying D1 migrations to the local database...");
 
-  const result = await runCommand(
-    "docker compose up -d postgres",
+  const migrate = await runCommand(
+    "pnpm -F @gmacko/db migrate:local",
     config.projectPath,
   );
-
-  if (!result.success) {
-    spinner.stop("Failed to start Postgres");
-    p.log.error(result.output);
+  if (!migrate.success) {
+    spinner.stop("Failed to migrate the local D1");
+    p.log.error(migrate.output);
     return false;
   }
 
-  spinner.stop("Postgres started!");
-  p.log.info("Use this connection string in your .env file:");
-  p.log.message(
-    pc.cyan(
-      `DATABASE_URL="postgresql://postgres:postgres@localhost:5432/gmacko_dev"`,
-    ),
+  const seed = await runCommand("pnpm db:seed", config.projectPath);
+  if (!seed.success) {
+    spinner.stop("Migrated, but the seed failed");
+    p.log.error(seed.output);
+    return false;
+  }
+
+  spinner.stop("Local D1 ready");
+  p.log.info(
+    "The web app reads the repo-root .env (no DATABASE_URL); `pnpm dev` starts emulate and the app.",
   );
 
   return true;
+}
+
+/** Worker and D1 base name for an app (wrangler names are lowercase, digits and dashes). */
+export function workerName(appName: string): string {
+  return `${appName.replace(/^@[^/]+\//, "").replace(/[^a-z0-9-]/g, "-")}-web`;
 }
 
 export async function runProvisioning(config: ProvisionConfig): Promise<void> {
@@ -337,13 +334,13 @@ export async function runProvisioning(config: ProvisionConfig): Promise<void> {
             : "CLI not found",
       },
       {
-        value: "postgres",
-        label: "Postgres Setup",
-        hint: isCliInstalled("docker") ? "available" : "Docker not found",
+        value: "database",
+        label: "Local D1 database (migrate + seed)",
+        hint: config.platforms.web ? "recommended" : "web not selected",
       },
       {
         value: "forgegraph",
-        label: "ForgeGraph Deployment",
+        label: "ForgeGraph + Cloudflare deployment",
         hint: config.platforms.web ? "recommended" : "web not selected",
       },
       {
@@ -371,8 +368,8 @@ export async function runProvisioning(config: ProvisionConfig): Promise<void> {
     results.git = await provisionGitRepo(config);
   }
 
-  if (selectedServices.includes("postgres")) {
-    results.postgres = await provisionPostgres(config);
+  if (selectedServices.includes("database")) {
+    results.database = await provisionLocalDatabase(config);
   }
 
   if (selectedServices.includes("forgegraph")) {

@@ -23,19 +23,14 @@
             packages = [
               pkgs.nodejs_22
               pkgs.pnpm_10
-              pkgs.postgresql_16
               pkgs.git
-            ]
-            ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
-              pkgs.docker
-              pkgs.docker-compose
             ];
 
             shellHook = ''
               echo "ForgeGraph-oriented development shell"
               echo "Run: pnpm install"
               echo "Run: pnpm db:migrate:local && pnpm db:seed   # local D1 (apps/web)"
-              echo "Run: docker compose up -d postgres && pnpm db:legacy:push   # legacy Postgres (apps/nextjs, until Phase 8)"
+              echo "Run: pnpm dev                                 # emulate + apps/web on https://gmacko.localhost"
             '';
           };
         });

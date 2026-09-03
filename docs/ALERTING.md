@@ -9,7 +9,7 @@ dashboard recommendations for products built from create-gmacko-app.
 
 ```
 ┌─────────────┐     ┌───────────────┐     ┌──────────────┐
-│  Next.js App │────▶│  /api/metrics │────▶│  Prometheus   │
+│  Web Worker  │────▶│  /api/metrics │────▶│  Prometheus   │
 │  @gmacko/    │     │  (Prom format)│     │  / Grafana    │
 │  metrics     │     └───────────────┘     │  Agent        │
 └─────────────┘                            └──────┬───────┘

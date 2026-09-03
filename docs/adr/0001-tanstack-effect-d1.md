@@ -9,8 +9,8 @@
 The web app moves from Next.js + tRPC + Postgres to a single Cloudflare Worker: TanStack Start
 for rendering and routing, Effect 4 for the service and API layer (`HttpApi` as the one contract),
 and D1 as the database accessed through Drizzle's native Effect API over `@effect/sql-d1`.
-The legacy stack lives under `packages/legacy-*` and `apps/nextjs` until the cutover merge
-(plan Phase 8), then is deleted.
+The legacy stack lived under `packages/legacy-*` and `apps/nextjs` until the cutover (plan
+Phase 8, 2026-09-03), when it was deleted; `docs/legacy/` keeps its notes.
 
 Why D1 rather than Postgres via Hyperdrive, and the Postgres floor if D1 fails, are recorded in the
 plan's Overview. Every Phase 0 kill criterion passed, so no fallback is in use.
@@ -72,5 +72,5 @@ Pinned by `packages/db/src/__tests__/migrations.workers.test.ts`. Rules from now
 ## Consequences
 
 - No interactive transactions anywhere in app code; a standards rule forbids `db.transaction` and `withTransaction`.
-- Two Drizzle majors coexist in the workspace (legacy 0.45, rc5) until Phase 8; `apps/web` excludes `drizzle-orm` from the SSR dep optimizer to keep the right one.
-- `apps/web` and every new package depend on `@gmacko/domain` (Phase 1) for the contract; nothing depends on `packages/legacy-*` except `apps/nextjs` and, transiently, the tRPC routes still mounted in `apps/web`.
+- Two Drizzle majors coexisted in the workspace (legacy 0.45, rc5) until Phase 8, which is why `apps/web` excluded `drizzle-orm` from the SSR dep optimizer; both the legacy copy and the exclusion are gone.
+- `apps/web` and every package depend on `@gmacko/domain` (Phase 1) for the contract; the tRPC routes and `packages/legacy-*` are gone (Phase 8).

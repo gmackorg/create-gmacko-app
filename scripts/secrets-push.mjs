@@ -10,7 +10,7 @@
  * (`forge secret list --stage`), reads each value (`forge secret get`) and
  * hands it to `wrangler secret put KEY --env <stage>` on stdin, from
  * apps/web, so no value touches a shell argument or a file. Keys that are
- * not Worker bindings (the legacy `DATABASE_URL`, ForgeGraph's own `FG_*`)
+ * not Worker bindings (a VPS-style `DATABASE_URL`/`REDIS_URL`, ForgeGraph's own `FG_*`)
  * are skipped by default; `--only` restricts to a list, `--skip` extends
  * the skip list. `--dry-run` prints the plan and pushes nothing.
  *

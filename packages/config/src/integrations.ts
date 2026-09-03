@@ -20,10 +20,9 @@ export const integrations = {
     enabled: false,
     provider: "none" as "uploadthing" | "none",
   },
-  // Keep disabled to match the flat (non-localized) app route structure — with
-  // i18n enabled, next-intl's locale routing leaves the root `/` unresolved
-  // (404). The scaffolder also generates apps with i18n:false; enabling it
-  // requires adding a [locale] segment.
+  // Keep disabled to match the flat (non-localized) route structure of
+  // apps/web; enabling it means adding a locale segment to the routes. The
+  // scaffolder also generates apps with i18n:false.
   i18n: false,
   openapi: false,
 } as const;

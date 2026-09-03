@@ -1,7 +1,9 @@
 {
   "name": "gmacko",
   "apps": {
-    "apps/web": { "name": "gmacko", "script": "dev:portless" },
-    "apps/nextjs": { "name": "legacy.gmacko", "script": "dev" }
+    "apps/web": {
+      "name": "gmacko",
+      "script": "dev:portless"
+    }
   }
 }

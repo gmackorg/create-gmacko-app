@@ -6,14 +6,22 @@ export interface IntegrationConfig {
   revenuecat: boolean;
   notifications: boolean;
   email: { enabled: boolean; provider: "resend" | "sendgrid" | "none" };
+  /**
+   * Redis + BullMQ, Node-only. The web app runs on Cloudflare Workers and
+   * cannot use it; when enabled the package is kept for a Node service and
+   * the scaffolder warns.
+   */
   realtime: { enabled: boolean; provider: "redis" | "none" };
   storage: { enabled: boolean; provider: "uploadthing" | "none" };
 }
 
+/**
+ * `web` is apps/web: TanStack Start + the Effect HTTP API as one Cloudflare
+ * Worker on D1. `mobile` is apps/expo.
+ */
 export interface PlatformConfig {
   web: boolean;
   mobile: boolean;
-  tanstackStart: boolean;
 }
 
 export interface CliOptions {
@@ -28,12 +36,9 @@ export interface CliOptions {
   saasLaunch: boolean;
   saasReferrals: boolean;
   saasOperatorApis: boolean;
-  vinext: boolean;
   saasBootstrap: boolean;
   trpcOperators: boolean;
   forgegraphServer: string;
-  forgegraphStagingNode: string;
-  forgegraphProductionNode: string;
   forgegraphPreviewDomain: string;
   forgegraphProductionDomain: string;
   integrations: IntegrationConfig;
