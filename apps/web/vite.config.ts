@@ -28,7 +28,7 @@ const workerShims = (): Plugin => {
     name: "gmacko:worker-shims",
     enforce: "pre",
     resolveId(source) {
-      if (this.environment.name !== "ssr") return null;
+      if (this.environment?.name !== "ssr") return null;
       return shims[source] ?? null;
     },
   };

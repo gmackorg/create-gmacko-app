@@ -29,6 +29,11 @@ export const env = createEnv({
   },
   /**
    * Destructure all variables from `process.env` to make sure they aren't tree-shaken away.
+   *
+   * TODO(migration Phase 5): this and lib/url.ts are the last readers of
+   * `process.env` in the Worker. They only work because the `dev` script sets
+   * `CLOUDFLARE_INCLUDE_PROCESS_ENV=true`; see apps/web/README.md. Replace
+   * with the `AppConfig` service built from `cloudflare:workers` env.
    */
   runtimeEnv: process.env,
   skipValidation:

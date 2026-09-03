@@ -7,13 +7,19 @@
  * `fetch` and adds the rest.
  */
 import startEntry from "@tanstack/react-start/server-entry";
+import { Effect } from "effect";
+
+import { runtime } from "./runtime";
 
 export default {
   fetch: (request) => startEntry.fetch(request),
-  scheduled(controller) {
-    // oxlint-disable-next-line no-console -- Worker-level log; no logger is wired yet.
-    console.log(
-      `cron tick: ${controller.cron} at ${new Date(controller.scheduledTime).toISOString()}`,
-    );
-  },
+  // Runs on the shared ManagedRuntime, so cron work gets the same services
+  // (AppConfig, Database, Background) and logger as the HTTP handlers.
+  scheduled: (controller) =>
+    runtime.runPromise(
+      Effect.logInfo("cron tick", {
+        cron: controller.cron,
+        scheduledTime: new Date(controller.scheduledTime).toISOString(),
+      }),
+    ),
 } satisfies ExportedHandler<Cloudflare.Env>;

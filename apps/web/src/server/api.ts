@@ -8,8 +8,6 @@ import {
   HttpApiSchema,
 } from "effect/unstable/httpapi";
 
-import { Background } from "./background";
-
 export const Stage = Schema.Literals([
   "development",
   "preview",
@@ -66,23 +64,10 @@ export const HealthHandlers = HttpApiBuilder.group(
   (handlers) =>
     Effect.gen(function* () {
       const config = yield* AppConfig;
-      const background = yield* Background;
       const database = yield* Database;
       return handlers
         .handle("live", () =>
-          Effect.gen(function* () {
-            // Spike A evidence for waitUntil: this completes after the response.
-            yield* background.run(
-              Effect.sleep("200 millis").pipe(
-                Effect.andThen(
-                  Effect.log(
-                    "background effect completed after /api/health/live",
-                  ),
-                ),
-              ),
-            );
-            return { status: "ok" as const, stage: config.stage };
-          }),
+          Effect.succeed({ status: "ok" as const, stage: config.stage }),
         )
         .handle("ready", () =>
           database.ping.pipe(

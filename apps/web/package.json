@@ -43,7 +43,6 @@
   "devDependencies": {
     "@biomejs/biome": "catalog:",
     "@cloudflare/vite-plugin": "catalog:",
-    "@cloudflare/workers-types": "catalog:",
     "@gmacko/tailwind-config": "workspace:*",
     "@gmacko/tsconfig": "workspace:*",
     "@tailwindcss/vite": "catalog:",

@@ -12,6 +12,11 @@ import { Etag, HttpPlatform, HttpRouter } from "effect/unstable/http";
 import { ApiLive, AppConfig, Stage } from "./api";
 import { Background } from "./background";
 
+/**
+ * Deliberately fails fast at module load: a misconfigured STAGE should stop
+ * the Worker from starting (visible in the deploy) rather than surface as a
+ * 500 on the first request.
+ */
 const stage = Schema.decodeUnknownSync(Stage)(env.STAGE);
 
 const AppConfigLive = Layer.succeed(AppConfig)({ stage });
@@ -21,8 +26,7 @@ const AppConfigLive = Layer.succeed(AppConfig)({ stage });
  * never touches a file; workerd has no filesystem, so they are no-ops.
  */
 const PlatformLive = Layer.mergeAll(
-  HttpPlatform.layer.pipe(Layer.provide(FileSystem.layerNoop({}))),
-  FileSystem.layerNoop({}),
+  HttpPlatform.layer.pipe(Layer.provideMerge(FileSystem.layerNoop({}))),
   Path.layer,
   Etag.layer,
 );
