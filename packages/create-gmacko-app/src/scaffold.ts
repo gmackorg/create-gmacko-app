@@ -1166,7 +1166,7 @@ function pruneNextSentryFiles(targetDir: string): void {
 
   removeSnippet(
     path.join(targetDir, "apps/nextjs/src/app/error.tsx"),
-    'import { captureException } from "@gmacko/monitoring/web";\n',
+    'import { captureException } from "~/env/monitoring";\n',
   );
   removeSnippet(
     path.join(targetDir, "apps/nextjs/src/app/error.tsx"),
@@ -1180,7 +1180,7 @@ function pruneNextSentryFiles(targetDir: string): void {
 
   removeSnippet(
     path.join(targetDir, "apps/nextjs/src/app/global-error.tsx"),
-    'import { captureException } from "@gmacko/monitoring/web";\n',
+    'import { captureException } from "~/env/monitoring";\n',
   );
   removeSnippet(
     path.join(targetDir, "apps/nextjs/src/app/global-error.tsx"),
@@ -1194,7 +1194,7 @@ function pruneNextSentryFiles(targetDir: string): void {
 
   removeSnippet(
     path.join(targetDir, "apps/nextjs/src/components/error-boundary.tsx"),
-    'import { captureException } from "@gmacko/monitoring/web";\n',
+    'import { captureException } from "~/env/monitoring";\n',
   );
   removeSnippet(
     path.join(targetDir, "apps/nextjs/src/components/error-boundary.tsx"),

@@ -24,7 +24,6 @@
     "@gmacko/legacy-auth": "workspace:*",
     "@gmacko/legacy-db": "workspace:*",
     "@gmacko/logging": "workspace:*",
-    "@gmacko/monitoring": "workspace:*",
     "@gmacko/ui": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/exporter-metrics-otlp-http": "^0.217.0",

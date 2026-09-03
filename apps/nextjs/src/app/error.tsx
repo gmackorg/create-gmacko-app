@@ -1,9 +1,9 @@
 "use client";
 
 import { integrations } from "@gmacko/config";
-import { captureException } from "@gmacko/monitoring/web";
 import { Button } from "@gmacko/ui/button";
 import { useEffect } from "react";
+import { captureException } from "~/env/monitoring";
 
 interface ErrorPageProps {
   error: Error & { digest?: string };

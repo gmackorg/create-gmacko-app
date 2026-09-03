@@ -20,7 +20,6 @@ const config = {
     "@gmacko/legacy-db",
     "@gmacko/i18n",
     "@gmacko/logging",
-    "@gmacko/monitoring",
     "@gmacko/ui",
     "@gmacko/validators",
   ],

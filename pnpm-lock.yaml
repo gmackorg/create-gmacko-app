@@ -428,9 +428,6 @@ importers:
       '@gmacko/logging':
         specifier: workspace:*
         version: link:../../packages/logging
-      '@gmacko/monitoring':
-        specifier: workspace:*
-        version: link:../../packages/monitoring
       '@gmacko/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -683,7 +680,7 @@ importers:
         specifier: workspace:*
         version: link:../config
       posthog-js:
-        specifier: ^1.362.0
+        specifier: 'catalog:'
         version: 1.362.0
       posthog-react-native:
         specifier: ^4.37.4
@@ -1092,12 +1089,6 @@ importers:
       i18next:
         specifier: ^25.8.18
         version: 25.8.18(typescript@5.9.3)
-      next:
-        specifier: '>=15.0.0'
-        version: 16.2.1(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      next-intl:
-        specifier: ^4.8.3
-        version: 4.8.3(next@16.2.1(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
       react:
         specifier: '>=18.0.0'
         version: 19.2.4
@@ -1329,15 +1320,15 @@ importers:
       '@gmacko/config':
         specifier: workspace:*
         version: link:../config
-      '@sentry/nextjs':
-        specifier: ^10.44.0
-        version: 10.44.0(@opentelemetry/context-async-hooks@2.7.1(@opentelemetry/api@1.9.1))(@opentelemetry/core@2.7.1(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.7.1(@opentelemetry/api@1.9.1))(next@16.2.1(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)(webpack@5.104.1(esbuild@0.27.4))
+      '@sentry/cloudflare':
+        specifier: 'catalog:'
+        version: 10.73.0(@cloudflare/workers-types@5.20260903.1)(wrangler@4.128.0(@cloudflare/workers-types@5.20260903.1)(bufferutil@4.1.0)(utf-8-validate@6.0.4))
+      '@sentry/react':
+        specifier: 'catalog:'
+        version: 10.73.0(react@19.2.4)
       '@sentry/react-native':
         specifier: ^8.4.0
         version: 8.4.0(expo@56.0.18)(react-native@0.85.3(@babel/core@7.29.0)(@react-native/metro-config@0.85.3(@babel/core@7.29.0)(bufferutil@4.1.0)(utf-8-validate@6.0.4))(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.4)(utf-8-validate@6.0.4))(react@19.2.4)
-      next:
-        specifier: '>=15.0.0'
-        version: 16.2.1(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       react:
         specifier: '>=18.0.0'
         version: 19.2.4
@@ -1345,9 +1336,15 @@ importers:
       '@biomejs/biome':
         specifier: 'catalog:'
         version: 2.4.8
+      '@cloudflare/workers-types':
+        specifier: 'catalog:'
+        version: 5.20260903.1
       '@gmacko/tsconfig':
         specifier: workspace:*
         version: link:../../tooling/typescript
+      '@types/react':
+        specifier: catalog:react19
+        version: 19.2.14
       oxlint:
         specifier: 'catalog:'
         version: 1.56.0
