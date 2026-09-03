@@ -89,40 +89,127 @@ MAINTENANCE_MODE=true
 
 ## Database Operations
 
-### Connection Issues
-```bash
-# Check connection from your machine
-psql $DATABASE_URL -c "SELECT 1"
-
-# Check active connections (Neon dashboard or SQL)
-SELECT count(*) FROM pg_stat_activity;
-```
+The app's database is Cloudflare D1 (`apps/web/wrangler.jsonc`, binding `DB`).
+Full guide: `docs/drizzle-migrations.md`. Procedures: "D1 operations" below.
 
 ### Slow Queries
-- Check structured logs for `component: "database"` entries with high duration
-- Drizzle query logging is enabled in development
-- Add indexes for frequently filtered columns
-- Use `EXPLAIN ANALYZE` for query optimization
+- Every query runs under the D1 client's span (`db.system.name = sqlite`,
+  statement as an attribute); filter traces by duration.
+- Add indexes for frequently filtered columns via a migration (`CREATE INDEX`
+  is expand-only and safe).
+- `wrangler d1 execute DB --remote --command "EXPLAIN QUERY PLAN <sql>"` shows
+  the plan; D1 also reports `rows_read`/`rows_written` per query in the
+  dashboard's Insights.
 
 ### Migrations
 ```bash
-# Generate migration from schema changes
+# Generate from schema changes (drizzle-kit + flatten), then REVIEW the SQL:
+# expand/contract only, no `__new_` tables (D1 cascade-deletes on rebuild)
 pnpm db:generate
 
-# Apply migrations (preview first)
-pnpm db:migrate
+# Apply to the local D1 and run the D1 suite
+pnpm db:migrate:local
+pnpm -F @gmacko/db test:workers
 
-# Emergency: push schema directly (skips migration history)
-pnpm db:push
+# Apply to the stage's database — before `wrangler deploy`, in the same stage
+pnpm db:migrate:remote
 ```
 
-### Data Backup & Recovery
-- Neon provides point-in-time recovery (PITR)
-- Create manual backups before risky migrations:
-  ```bash
-  pg_dump $DATABASE_URL > backup_$(date +%Y%m%d_%H%M%S).sql
-  ```
-- Neon branching can create instant database copies for testing
+There is no `push` and no down migration. To undo, ship a forward migration or
+use Time Travel (below).
+
+### Legacy Postgres (apps/nextjs, until Phase 8)
+```bash
+psql $DATABASE_URL -c "SELECT 1"          # connection check
+pnpm db:legacy:push                        # push the legacy schema
+pg_dump $DATABASE_URL > backup_$(date +%Y%m%d_%H%M%S).sql
+```
+
+## D1 operations
+
+All commands run from `packages/db` with `--config ../../apps/web/wrangler.jsonc`
+(shortened below as `$CFG`); `DB` is the binding name. Use `--env <stage>` when
+the stage has its own wrangler environment.
+
+```bash
+cd packages/db && CFG=../../apps/web/wrangler.jsonc
+```
+
+### Export (backup)
+
+Take one before any restore, any backfill, and any migration that deletes.
+
+```bash
+mkdir -p ../../.artifacts
+pnpm exec wrangler d1 export DB --remote --config $CFG \
+  --output ../../.artifacts/d1-$(date +%Y%m%dT%H%M%S).sql
+
+# schema only / data only / selected tables
+pnpm exec wrangler d1 export DB --remote --config $CFG --no-data   --output schema.sql
+pnpm exec wrangler d1 export DB --remote --config $CFG --no-schema --table user --table workspace --output users.sql
+```
+
+Exports are plain SQL. Keep them outside the repo (`.artifacts/` is ignored) and
+treat them as production data.
+
+### Restore with Time Travel (point in time, in place)
+
+D1 keeps 30 days of history (7 on the Free plan). Restoring rewrites the live
+database; nothing is deleted from history, and the pre-restore state gets its
+own bookmark.
+
+1. Freeze writes if you can (maintenance mode via the admin launch controls).
+2. Export the current state (above).
+3. Find the point to return to and note its bookmark:
+   ```bash
+   pnpm exec wrangler d1 time-travel info DB --config $CFG --timestamp 2026-09-03T08:00:00Z
+   ```
+4. Restore:
+   ```bash
+   pnpm exec wrangler d1 time-travel restore DB --config $CFG --timestamp 2026-09-03T08:00:00Z
+   # or: --bookmark <bookmark from step 3>
+   ```
+   The command prints the bookmark of the state it replaced; keep it. To undo
+   the restore, run `restore` again with that bookmark.
+5. `d1_migrations` is restored too. If a migration was applied after the chosen
+   point, `pnpm db:migrate:remote` will apply it again; confirm it is safe to
+   re-run (expand/contract migrations are) or roll the deploy back to the
+   matching version first.
+6. Run `curl https://<app>/api/health/ready` and spot-check the restored rows.
+
+### Restore from an export (into a fresh or local database)
+
+```bash
+# into the local D1 (e.g. to reproduce an incident with real data)
+pnpm exec wrangler d1 execute DB --local --config $CFG --file ../../.artifacts/d1-<stamp>.sql
+
+# into a new remote database: create it, point a wrangler env at its id, then
+pnpm exec wrangler d1 execute DB --remote --env <stage> --config $CFG --file ../../.artifacts/d1-<stamp>.sql
+```
+
+`execute --file` runs the file as one batch; a failing statement rolls back the
+whole file.
+
+### Copy production to staging
+
+```bash
+pnpm exec wrangler d1 export DB --remote --env production --config $CFG --output ../../.artifacts/prod.sql
+pnpm exec wrangler d1 execute DB --remote --env staging --config $CFG --file ../../.artifacts/prod.sql
+```
+
+Scrub personal data before loading it anywhere less protected than production.
+
+### Reseed defaults
+
+`pnpm db:seed` (local) or `pnpm exec wrangler d1 execute DB --remote --config $CFG --file seed/seed.sql`
+restores the default plans, limits, and meters without touching user data or an
+existing `application_settings` row; it is idempotent.
+
+### Size
+
+`pnpm exec wrangler d1 info DB --remote --config $CFG` reports the size. The cap
+is 10 GB per database (500 MB on Free); plan a split (per-tenant databases or
+moving cold tables out) well before that — D1 has no online resize.
 
 ## Monitoring & Alerting
 

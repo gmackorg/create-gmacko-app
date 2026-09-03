@@ -55,6 +55,20 @@ plan's Overview. Every Phase 0 kill criterion passed, so no fallback is in use.
 - The Effect D1 driver ignores `casing`; every column carries an explicit snake_case name. `@effect/sql-d1` does not classify errors, so `DatabaseError.reason` on D1 is derived from the SQLite message.
 - `Model.Class` adoption and the remaining hardening moved to Phase 9 (plan decision D1).
 
+## D1 migration constraint (found 2026-09-03)
+
+D1 runs each migration file as one batch and does **not** honour `PRAGMA foreign_keys=OFF`
+inside it (`PRAGMA foreign_keys` still reads 1). drizzle-kit's table rebuild pattern
+(`CREATE TABLE __new_x; INSERT … SELECT; DROP TABLE x; ALTER TABLE __new_x RENAME TO x`)
+therefore runs `DROP TABLE` with foreign keys on and cascade-deletes every referencing row.
+Pinned by `packages/db/src/__tests__/migrations.workers.test.ts`. Rules from now on:
+
+- Expand/contract only: add nullable or defaulted columns, backfill, tighten later; new table plus
+  copy instead of drop-and-recreate; never rebuild a table that is the target of `ON DELETE CASCADE`.
+- Review every drizzle-kit output for `__new_` tables before committing it.
+- `20260903035551_auth_1_7_issuer.sql` was safe only because no database had rows; it must not
+  be used as a template.
+
 ## Consequences
 
 - No interactive transactions anywhere in app code; a standards rule forbids `db.transaction` and `withTransaction`.
