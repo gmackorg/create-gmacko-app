@@ -14,6 +14,10 @@
     "./columns": {
       "types": "./dist/columns.d.ts",
       "default": "./src/columns.ts"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./src/testing.ts"
     }
   },
   "license": "MIT",

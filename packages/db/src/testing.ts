@@ -10,12 +10,13 @@ import { fileURLToPath } from "node:url";
 
 import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient";
 import * as SqliteDrizzle from "drizzle-orm/effect-sqlite-node";
+import { drizzle as drizzleProxy } from "drizzle-orm/sqlite-proxy";
 import { Effect, Layer } from "effect";
 import * as Reactivity from "effect/unstable/reactivity/Reactivity";
 import type { SqlClient } from "effect/unstable/sql/SqlClient";
 import type { SqlError } from "effect/unstable/sql/SqlError";
 
-import { Database, makeDatabase } from "./database";
+import { Database, makeDatabase, type PlainDatabase } from "./database";
 import { relations } from "./relations";
 
 const migrationsDir = join(
@@ -45,6 +46,27 @@ const applyMigrations = (sql: SqlClient): Effect.Effect<void, SqlError> =>
     },
   );
 
+/**
+ * Promise-based drizzle over the same in-memory sqlite-node client, through
+ * drizzle's `sqlite-proxy` driver, so `Database.plain` (better-auth's adapter
+ * input) behaves like the D1 flavour: same rows, same transactions-free
+ * surface, one database.
+ */
+const makePlain = (client: SqliteClient.SqliteClient): PlainDatabase =>
+  drizzleProxy(
+    async (query, params, method) => {
+      const rows = await Effect.runPromise(
+        client.unsafe(query, params as ReadonlyArray<unknown>).values,
+      );
+      // The proxy driver expects one row (a value array) for `get`, all rows
+      // for `all`/`values`, and ignores the result of `run`.
+      if (method === "get") return { rows: [...(rows[0] ?? [])] };
+      if (method === "run") return { rows: [] };
+      return { rows: [...rows] };
+    },
+    { relations },
+  );
+
 export const layerTest: Layer.Layer<Database> = Layer.effect(Database)(
   Effect.gen(function* () {
     const client = yield* SqliteClient.make({ filename: ":memory:" });
@@ -52,6 +74,7 @@ export const layerTest: Layer.Layer<Database> = Layer.effect(Database)(
     const db = yield* SqliteDrizzle.makeWithDefaults({ relations }).pipe(
       Effect.provideService(SqliteClient.SqliteClient, client),
     );
+    const plain = makePlain(client);
     return makeDatabase({
       db,
       sql: client,
@@ -61,11 +84,7 @@ export const layerTest: Layer.Layer<Database> = Layer.effect(Database)(
         client.withTransaction(
           Effect.forEach(statements, (statement) => statement),
         ),
-      plain: () => {
-        throw new Error(
-          "Database.plain is unavailable on the sqlite-node test layer; use the D1 layer under vitest-pool-workers.",
-        );
-      },
+      plain: () => plain,
     });
   }),
 ).pipe(Layer.provide(Reactivity.layer));

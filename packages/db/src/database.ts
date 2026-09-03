@@ -6,15 +6,13 @@
  */
 import type { D1Database } from "@cloudflare/workers-types";
 import * as D1Client from "@effect/sql-d1/D1Client";
-import {
-  type DrizzleD1Database,
-  drizzle as drizzlePlain,
-} from "drizzle-orm/d1";
+import { drizzle as drizzlePlain } from "drizzle-orm/d1";
 import {
   type EffectDrizzleQueryError,
   type QueryEffectHKTBase,
 } from "drizzle-orm/effect-core";
 import * as D1Drizzle from "drizzle-orm/effect-d1";
+import type { SQLiteAsyncDatabase } from "drizzle-orm/sqlite-core";
 import type { SQLiteEffectDatabase } from "drizzle-orm/sqlite-core/effect";
 import {
   Cause,
@@ -147,8 +145,12 @@ export type DatabaseDrizzle = Omit<
   "transaction"
 >;
 
-/** Promise-based drizzle on the same binding; for better-auth's adapter only. */
-export type PlainDatabase = DrizzleD1Database<Relations>;
+/**
+ * Promise-based drizzle on the same database; for better-auth's adapter only.
+ * Typed as the async sqlite surface rather than the D1 class so the sqlite-node
+ * test layer can supply one too (via drizzle's `sqlite-proxy` driver).
+ */
+export type PlainDatabase = SQLiteAsyncDatabase<"async", unknown, Relations>;
 
 /** Anything with drizzle's `toSQL()`: query builders and relational queries. */
 export interface BatchItem {

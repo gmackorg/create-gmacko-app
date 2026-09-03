@@ -54,6 +54,37 @@ export const databaseSuite = (
     });
     afterAll(() => runtime.dispose());
 
+    describe("plain", () => {
+      it("is a promise drizzle over the same database (better-auth's adapter input)", async () => {
+        const title = unique("plain");
+        const seen = await run(
+          Effect.gen(function* () {
+            const { db, plain } = yield* Database;
+            // Written through the promise flavour...
+            yield* Effect.promise(() =>
+              plain.insert(Post).values({ title, content: "via plain" }),
+            );
+            const viaPlain = yield* Effect.promise(() =>
+              plain.select().from(Post).where(eq(Post.title, title)),
+            );
+            // ...visible through the Effect flavour: one database.
+            const viaEffect = yield* db
+              .select()
+              .from(Post)
+              .where(eq(Post.title, title));
+            const single = yield* Effect.promise(() =>
+              plain.select().from(Post).where(eq(Post.title, title)).get(),
+            );
+            return { viaPlain, viaEffect, single };
+          }),
+        );
+        expect(seen.viaPlain).toHaveLength(1);
+        expect(seen.viaEffect).toHaveLength(1);
+        expect(seen.viaPlain[0]?.content).toBe("via plain");
+        expect(seen.single?.title).toBe(title);
+      });
+    });
+
     describe("first", () => {
       it("returns the first row with the builder's inferred type", async () => {
         const row = await run(
