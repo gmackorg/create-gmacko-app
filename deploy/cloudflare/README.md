@@ -9,8 +9,9 @@ side of the deploy lane described in [`docs/DEPLOYMENT.md`](../../docs/DEPLOYMEN
 `apps/web/wrangler.jsonc` defines the top-level (development) config and the
 `preview`, `staging` and `production` environments. Each environment sets:
 
-- `name` — `gmacko-web-staging`, `gmacko-web`; previews override it per PR
-  with `--name gmacko-web-pr-<n>`.
+- `name` — `gmacko-web-staging`, `gmacko-web`, `gmacko-web-preview`. There is
+  no Worker per PR: a preview is a *version* of `gmacko-web-preview`
+  (`wrangler versions upload`), which inherits its bindings and secrets.
 - `vars.STAGE` — read by `AppConfig` (cookie security, docs exposure, health
   redaction, log level). `vars.APP_URL` / `ALLOWED_ORIGINS` are the stage's
   public origin and extra credentialed origins.

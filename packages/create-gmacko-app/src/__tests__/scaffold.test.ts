@@ -328,8 +328,14 @@ describe("create-gmacko-app scaffold", () => {
       expect(forgeGraphConfig).toContain(`workerName: ${appName}-web-staging`);
       expect(forgeGraphConfig).toContain(`workerName: ${appName}-web\n`);
       expect(forgeGraphConfig).toContain("configPath: apps/web/wrangler.jsonc");
-      expect(forgeGraphConfig).toContain("deploy: pnpm deploy:staging");
-      expect(forgeGraphConfig).toContain("deploy: pnpm deploy:production");
+      // The stage target deploys only (`wrangler deploy`); ForgeGraph runs
+      // `db.migrate` before it, so the migration is never done twice.
+      expect(forgeGraphConfig).toContain(
+        "deploy: pnpm -F @gmacko/web deploy:staging",
+      );
+      expect(forgeGraphConfig).toContain(
+        "deploy: pnpm -F @gmacko/web deploy:production",
+      );
       expect(forgeGraphConfig).toContain("resources:");
       expect(forgeGraphConfig).toContain("d1:");
       expect(forgeGraphConfig).toContain(`- name: ${appName}-web-preview`);
@@ -637,7 +643,11 @@ describe("create-gmacko-app scaffold", () => {
         ".github/workflows/preview.yml",
       );
 
-      expect(previewWorkflow).toContain("wrangler deploy --env preview");
+      // Workers Versions, not a Worker per PR: `preview:upload` is
+      // `CLOUDFLARE_ENV=preview vite build && wrangler versions upload`.
+      expect(previewWorkflow).toContain("preview:upload");
+      expect(previewWorkflow).toContain("wrangler versions upload");
+      expect(previewWorkflow).not.toContain("--name");
       expect(previewWorkflow).toContain(`${appName}-web-preview`);
       expect(previewWorkflow).not.toContain("gmacko-web");
       expect(previewWorkflow).not.toContain("DEPLOY_TARGET");

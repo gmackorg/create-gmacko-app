@@ -15,7 +15,7 @@ copy, size) are in [`RUNBOOK.md`](./RUNBOOK.md) and the migration rules in
 | Stage | Worker | wrangler env | D1 | Who deploys |
 | --- | --- | --- | --- | --- |
 | development | `vite dev` on workerd | (none) | local, `apps/web/.wrangler/state` | you: `pnpm dev` |
-| preview | `gmacko-web-pr-<n>` | `preview` | shared `gmacko-web-preview` | `.github/workflows/preview.yml`, per PR |
+| preview | `gmacko-web-preview` (a version per PR) | `preview` | shared `gmacko-web-preview` | `.github/workflows/preview.yml`, per PR |
 | staging | `gmacko-web-staging` | `staging` | `gmacko-web-staging` | ForgeGraph (`pnpm forge:deploy:staging`) or `pnpm deploy:staging` |
 | production | `gmacko-web` | `production` | `gmacko-web` | ForgeGraph (`pnpm forge:deploy:production`) or `pnpm deploy:production` |
 
@@ -75,8 +75,15 @@ migration command (`db.migrate: node scripts/deploy-stage.mjs
 which runs the repo's deploy workflow. `forge init` scaffolds a generic
 "build then `wrangler deploy`" workflow; use
 [`deploy/forgegraph/deploy.yml`](../deploy/forgegraph/deploy.yml) instead,
-which runs `scripts/deploy-stage.mjs` so the migrate-then-deploy rule holds
-in ForgeGraph too. Health stays at `/.well-known/forge-health` (served by the
+which runs `scripts/deploy-stage.mjs` once so the migrate-then-deploy rule
+holds in ForgeGraph too.
+
+The stage target's `deploy` is `pnpm -F @gmacko/web deploy:<stage>` — build
+and `wrangler deploy`, nothing else. Migrating is `db.migrate`'s job, so
+whichever path ForgeGraph takes (its own `db.migrate` + target `deploy`, or
+`deploy/forgegraph/deploy.yml` running `deploy-stage.mjs`) a stage is
+migrated exactly once. `scripts/deploy-stage.mjs` stays the one place the
+ordering is written down. Health stays at `/.well-known/forge-health` (served by the
 Worker, redacted outside development).
 
 ### D1 is not `forge db create`
@@ -125,15 +132,23 @@ CI's `pnpm check:cf-types` fails when it drifts, so a binding added to
 
 ## Previews
 
-`.github/workflows/preview.yml` deploys `gmacko-web-pr-<n>` on every PR
-update with `wrangler deploy --env preview --name gmacko-web-pr-<n>`, after
-applying pending migrations to the shared `gmacko-web-preview` database, and
-deletes the Worker when the PR closes. All open PRs share that database,
-which the expand/contract rule keeps compatible; Phase 9 gives each PR its
-own. The workflow needs the `CLOUDFLARE_API_TOKEN` and
-`CLOUDFLARE_ACCOUNT_ID` secrets and posts the URL when the
-`CLOUDFLARE_WORKERS_SUBDOMAIN` variable is set; without the secrets it skips
-with a warning rather than failing the PR.
+`.github/workflows/preview.yml` uploads a *version* of the single
+`gmacko-web-preview` Worker on every PR update (`pnpm -F @gmacko/web
+preview:upload` = `CLOUDFLARE_ENV=preview vite build && wrangler versions
+upload`), after applying pending migrations to the shared
+`gmacko-web-preview` database in a step of its own. A version inherits the
+Worker's bindings and secrets and gets its own
+`https://<version-prefix>-gmacko-web-preview.<subdomain>.workers.dev` URL
+without taking any traffic, so there is no per-PR Worker to create and
+nothing to delete when the PR closes. `cancel-in-progress` is off: a run may
+be inside `migrate:remote`.
+
+All open PRs share that database, which the expand/contract rule keeps
+compatible; Phase 9 gives each PR its own — and that is the point to revisit
+this workflow, since a per-PR database cannot be a binding on the shared
+Worker. The workflow needs the `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID` secrets and posts the URL wrangler prints; without
+the secrets it skips with a warning rather than failing the PR.
 
 ## Observability
 

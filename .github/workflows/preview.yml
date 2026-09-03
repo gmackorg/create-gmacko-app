@@ -1,31 +1,47 @@
 name: Preview Deploy
 
-# A Workers preview per pull request: `gmacko-web-pr-<n>`, deployed with
-# wrangler's `preview` environment (apps/web/wrangler.jsonc) against the
-# shared preview D1 `gmacko-web-preview`. Pending migrations are applied to
-# that database first (expand/contract keeps it compatible with every open
-# PR); per-PR databases arrive in Phase 9. The Worker is deleted when the
-# PR closes. Needs the CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID secrets
-# and, for the comment's URL, the CLOUDFLARE_WORKERS_SUBDOMAIN variable.
+# A preview URL per pull request, as a *version* of the single
+# `gmacko-web-preview` Worker (`wrangler versions upload`) rather than a
+# Worker per PR. A version inherits that Worker's bindings and secrets, gets
+# its own `https://<version-prefix>-gmacko-web-preview.<subdomain>.workers.dev`
+# URL, and takes no production traffic until someone deploys it — so there is
+# nothing to create and nothing to delete when the PR closes.
+#
+# Pending migrations are applied to the shared preview D1 first, in a step of
+# its own; expand/contract (docs/drizzle-migrations.md) keeps that one
+# database compatible with every open PR. Phase 9 gives each PR its own D1 —
+# revisit this workflow then: a per-PR database cannot be a binding on the
+# shared Worker, so previews would go back to a Worker (or a dispatch
+# namespace) per PR, and the close job would come back with it.
+#
+# `wrangler versions upload` is run through `pnpm -F @gmacko/web
+# preview:upload` = `CLOUDFLARE_ENV=preview vite build && wrangler versions
+# upload`, the same shape as the `deploy:<stage>` scripts: the Cloudflare Vite
+# plugin resolves `env.preview` from wrangler.jsonc at build time and emits a
+# flat config, so wrangler is not given `--env` a second time.
+#
+# Needs the CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID secrets. Preview URLs
+# must be enabled for the Worker (they are by default).
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened]
     branches: [main]
 
 concurrency:
   group: preview-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  # Never cancel a run in flight: it may be inside `migrate:remote` against
+  # the shared preview D1, and a half-applied migration is not something a
+  # rerun can reason about.
+  cancel-in-progress: false
 
 env:
-  WORKER_NAME: gmacko-web-pr-${{ github.event.pull_request.number }}
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
   CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
 jobs:
-  deploy:
-    name: Deploy preview Worker
-    if: github.event.action != 'closed'
+  preview:
+    name: Upload preview version
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -51,7 +67,7 @@ jobs:
         id: creds
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "::warning::CLOUDFLARE_API_TOKEN is not set; skipping the preview deploy"
+            echo "::warning::CLOUDFLARE_API_TOKEN is not set; skipping the preview upload"
             echo "ok=false" >> "$GITHUB_OUTPUT"
           else
             echo "ok=true" >> "$GITHUB_OUTPUT"
@@ -61,41 +77,46 @@ jobs:
         if: steps.creds.outputs.ok == 'true'
         run: pnpm -F @gmacko/db migrate:remote --env preview
 
-      - name: Build for the preview environment
+      - name: Upload a preview version of gmacko-web-preview
+        id: upload
         if: steps.creds.outputs.ok == 'true'
-        run: pnpm -F @gmacko/web build
         env:
-          CLOUDFLARE_ENV: preview
           VITE_POSTHOG_KEY: ${{ vars.PREVIEW_POSTHOG_KEY }}
           VITE_SENTRY_DSN: ${{ vars.PREVIEW_SENTRY_DSN }}
-
-      - name: Deploy the PR's Worker
-        if: steps.creds.outputs.ok == 'true'
-        # `--name` gives each PR its own Worker on the preview environment's
-        # bindings (the shared D1, STAGE=preview).
-        run: pnpm -F @gmacko/web exec wrangler deploy --env preview --name "$WORKER_NAME"
+        run: |
+          set -o pipefail
+          pnpm -F @gmacko/web preview:upload | tee /tmp/versions-upload.log
+          url="$(grep -oE 'https://[A-Za-z0-9.-]+\.workers\.dev' /tmp/versions-upload.log | head -n1)"
+          version="$(grep -oE '[0-9a-f-]{36}' /tmp/versions-upload.log | head -n1)"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ -z "$url" ]; then
+            echo "::warning::wrangler did not print a version preview URL; enable preview URLs for the Worker"
+          fi
 
       - name: Comment the preview URL
         if: steps.creds.outputs.ok == 'true'
         uses: actions/github-script@v7
         env:
-          SUBDOMAIN: ${{ vars.CLOUDFLARE_WORKERS_SUBDOMAIN }}
+          PREVIEW_URL: ${{ steps.upload.outputs.url }}
+          VERSION_ID: ${{ steps.upload.outputs.version }}
         with:
           script: |
-            const name = process.env.WORKER_NAME;
-            const subdomain = process.env.SUBDOMAIN;
-            const url = subdomain ? `https://${name}.${subdomain}.workers.dev` : `(set the CLOUDFLARE_WORKERS_SUBDOMAIN variable to link the Worker ${name})`;
+            const url = process.env.PREVIEW_URL;
+            const version = process.env.VERSION_ID || '(unknown)';
+            const link = url || '(preview URLs are not enabled for `gmacko-web-preview`)';
             const sha = '${{ github.event.pull_request.head.sha }}'.slice(0, 7);
             const body = `## Preview deploy
 
             | Field | Value |
             |------|-------|
-            | Worker | \`${name}\` |
-            | URL | ${url} |
+            | Worker | \`gmacko-web-preview\` (version, not deployed) |
+            | Version | \`${version}\` |
+            | URL | ${link} |
             | Commit | \`${sha}\` |
             | Database | shared \`gmacko-web-preview\` D1 (per-PR databases: Phase 9) |
 
-            Health: ${subdomain ? `${url}/.well-known/forge-health` : "n/a"}
+            Health: ${url ? `${url}/.well-known/forge-health` : "n/a"}
             `;
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
@@ -117,59 +138,6 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                body,
-              });
-            }
-
-  cleanup:
-    name: Delete preview Worker
-    if: github.event.action == 'closed'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: ".nvmrc"
-          cache: "pnpm"
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Delete the PR's Worker
-        if: env.CLOUDFLARE_API_TOKEN != ''
-        run: pnpm -F @gmacko/web exec wrangler delete --env preview --name "$WORKER_NAME" --force || true
-
-      - name: Comment the closeout
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const body = `## Preview deploy
-
-            PR closed; the Worker \`${process.env.WORKER_NAME}\` has been deleted.
-            `;
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-            const existing = comments.find(
-              (c) => c.user.type === 'Bot' && c.body.includes('## Preview deploy'),
-            );
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
                 body,
               });
             }

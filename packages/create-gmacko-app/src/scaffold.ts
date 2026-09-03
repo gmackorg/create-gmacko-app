@@ -765,7 +765,7 @@ ${notes}`,
           workerName: ${worker}${workerSuffix}
           configPath: ${WEB_APP_DIR}/wrangler.jsonc
           environment: ${name}
-          deploy: pnpm deploy:${name}`;
+          deploy: pnpm -F @gmacko/web deploy:${name}`;
 
   fs.writeFileSync(
     path.join(targetDir, ".forgegraph.yaml"),
@@ -774,11 +774,16 @@ ${notes}`,
 # create <stage> --wait\` (pnpm forge:deploy:<stage>) runs the repo's deploy
 # workflow for a cloudflare-workers target (deploy/forgegraph/deploy.yml).
 #
-# Deploy sequence per stage (scripts/deploy-stage.mjs, the single source):
+# Deploy sequence per stage:
 #   1. pnpm -F @gmacko/db migrate:remote --env <stage>   # D1 migrations, forward-only
 #   2. pnpm -F @gmacko/web deploy:<stage>                # CLOUDFLARE_ENV=<stage> vite build && wrangler deploy
-# A failing migration aborts the deploy. Migrations are expand/contract only
-# (docs/drizzle-migrations.md).
+# scripts/deploy-stage.mjs is the single place that ordering lives: \`pnpm
+# deploy:<stage>\` and deploy/forgegraph/deploy.yml both run it once and it
+# does 1 then 2. ForgeGraph's own stage machinery runs the two halves
+# separately — \`db.migrate\` below is step 1 (deploy-stage.mjs --migrate-only)
+# and each target's \`deploy\` is step 2 alone — so a stage is migrated exactly
+# once either way. A failing migration aborts the deploy. Migrations are
+# expand/contract only (docs/drizzle-migrations.md).
 #
 # D1 is NOT provisioned by \`forge db create\`. Create the databases once with
 # wrangler and put their ids in ${WEB_APP_DIR}/wrangler.jsonc (\`env.<stage>.d1_databases\`):

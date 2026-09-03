@@ -195,7 +195,7 @@ export type Integrations = typeof integrations;
 ```
 
 #### C) ForgeGraph (unless `--no-forgegraph`)
-- Create: `.forgegraph.yaml` with `db: { type: d1, migrate: node scripts/deploy-stage.mjs --migrate-only }`, stages `staging` and `production` as `cloudflare-workers` targets (`workerName`, `configPath: apps/web/wrangler.jsonc`, `environment`, `deploy: pnpm deploy:<stage>`), `resources.d1` for `<app>-web-staging`, `<app>-web`, `<app>-web-preview`, and the `/.well-known/forge-health` health URL.
+- Create: `.forgegraph.yaml` with `db: { type: d1, migrate: node scripts/deploy-stage.mjs --migrate-only }`, stages `staging` and `production` as `cloudflare-workers` targets (`workerName`, `configPath: apps/web/wrangler.jsonc`, `environment`, `deploy: pnpm -F @gmacko/web deploy:<stage>` — ForgeGraph runs `db.migrate` before it, so the stage target deploys only), `resources.d1` for `<app>-web-staging`, `<app>-web`, `<app>-web-preview`, and the `/.well-known/forge-health` health URL.
 - Keep: `scripts/deploy-stage.mjs`, `scripts/secrets-push.mjs`, `deploy/forgegraph/deploy.yml`, and the root `forge:*`, `deploy:*`, `secrets:push` scripts.
 
 ---

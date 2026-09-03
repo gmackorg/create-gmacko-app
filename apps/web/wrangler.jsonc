@@ -43,8 +43,10 @@
   // top level; `vars` and `d1_databases` are not inherited and are
   // restated. Replace the placeholder ids after `wrangler d1 create`.
   "env": {
-    // Per-PR Workers (`--name gmacko-web-pr-<n>`, .github/workflows/preview.yml)
-    // on one shared database until Phase 9 gives each PR its own.
+    // One Worker for every PR preview: .github/workflows/preview.yml uploads a
+    // *version* of it (`wrangler versions upload`), which gets its own preview
+    // URL and inherits these bindings. All open PRs share this database until
+    // Phase 9 gives each PR its own.
     "preview": {
       "name": "gmacko-web-preview",
       "vars": { "STAGE": "preview" },

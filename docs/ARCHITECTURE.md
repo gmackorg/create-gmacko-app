@@ -177,7 +177,7 @@ Rules that follow:
 | Environment | Worker | D1 | Config source | Observability |
 |------------|--------|----|---------------|---------------|
 | development | `vite dev` on workerd | local, `apps/web/.wrangler/state` | repo-root `.env` via `apps/web/.env` | debug logs; OTLP/Sentry/PostHog off unless set |
-| preview | `gmacko-web-pr-<n>` | shared `gmacko-web-preview` | wrangler `env.preview` vars + secrets | info logs, Sentry `preview` |
+| preview | `gmacko-web-preview` (a version per PR) | shared `gmacko-web-preview` | wrangler `env.preview` vars + secrets | info logs, Sentry `preview` |
 | staging | `gmacko-web-staging` | `gmacko-web-staging` | wrangler `env.staging` + `pnpm secrets:push --stage staging` | full |
 | production | `gmacko-web` | `gmacko-web` | wrangler `env.production` + `pnpm secrets:push --stage production` | full; health responses redacted |
 
