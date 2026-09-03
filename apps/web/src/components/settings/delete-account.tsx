@@ -2,7 +2,7 @@ import { Button } from "@gmacko/ui/button";
 import { SettingsCard } from "@gmacko/ui/settings-card";
 import { toast } from "@gmacko/ui/toast";
 import { useMutation } from "@tanstack/react-query";
-import { useNavigate, useRouter } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 
 import { useApiErrorHandler } from "~/components/use-api-error";
 import { mutations } from "~/lib/api";
@@ -13,14 +13,17 @@ import { mutations } from "~/lib/api";
  * expires the session cookies; the mutation's meta clears the whole cache.
  */
 export function DeleteAccountSection() {
-  const router = useRouter();
   const navigate = useNavigate();
   const onError = useApiErrorHandler();
   const remove = useMutation({
     ...mutations.settings.deleteAccount(),
     onSuccess: async () => {
       toast.success("Your account has been deleted.");
-      await router.invalidate();
+      // Leave first. The cache is already empty (the mutation's meta), so
+      // the home loader fetches the anonymous session fresh; invalidating
+      // the router while still on /settings would re-run its guard and
+      // bounce through `/?signin=1`, raising "Sign in to continue." on top
+      // of the deletion toast.
       await navigate({ to: "/", replace: true });
     },
     onError: (error) => onError(error, "Could not delete your account."),

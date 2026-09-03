@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { MarketingPage, marketingHead } from "~/components/marketing";
 import { WaitlistForm } from "~/components/waitlist-form";
-import { queries } from "~/lib/api";
 
 const DESCRIPTION =
   "Use this form for support requests, product feedback, or launch interest. It writes into the same reviewable queue as the waitlist.";
@@ -30,7 +29,3 @@ function ContactPage() {
     </MarketingPage>
   );
 }
-
-// The form prefills the signed-in email from the session the root loader
-// already fetched; nothing else to load.
-void queries;

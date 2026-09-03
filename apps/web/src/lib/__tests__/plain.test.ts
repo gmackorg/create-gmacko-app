@@ -49,3 +49,24 @@ describe("toPlain", () => {
     expect(toPlain("str")).toBe("str");
   });
 });
+
+describe("toPlain refuses what Object.entries would silently empty", () => {
+  it.each([
+    ["Map", new Map([["a", 1]])],
+    ["Set", new Set([1])],
+    ["WeakMap", new WeakMap()],
+    ["WeakSet", new WeakSet()],
+    ["Uint8Array", new Uint8Array([1, 2])],
+    ["Float64Array", new Float64Array(2)],
+    ["DataView", new DataView(new ArrayBuffer(4))],
+    ["ArrayBuffer", new ArrayBuffer(4)],
+  ])("throws for a %s, at the top level and nested", (name, value) => {
+    expect(() => toPlain(value)).toThrow(TypeError);
+    expect(() => toPlain(value)).toThrow(name);
+    expect(() => toPlain({ nested: [{ value }] })).toThrow(TypeError);
+  });
+
+  it("still flattens plain objects with those names as keys", () => {
+    expect(toPlain({ Map: 1, Set: [2] })).toEqual({ Map: 1, Set: [2] });
+  });
+});

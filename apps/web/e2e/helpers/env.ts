@@ -35,24 +35,31 @@ export const GITHUB_USER = {
   email: "dev@gmacko.localhost",
 };
 
-/** The Worker's bindings for the suite; process.env wins over `.env` files. */
+/**
+ * The only host variables the suite's Worker process inherits. Everything
+ * else in the developer's shell (tokens, the real OTLP endpoint, Sentry,
+ * Stripe secrets, a PORTLESS_URL) stays out of the Worker's bindings.
+ */
+const INHERITED_HOST_ENV = ["PATH", "HOME", "NODE_OPTIONS", "CI", "TMPDIR"];
+
+/**
+ * The Worker's bindings for the suite: an allowlisted slice of the host
+ * environment plus the suite's own fixed values; nothing else crosses over.
+ */
 export const serverEnv = (): Record<string, string> => {
-  const {
-    PORTLESS_URL: _portless,
-    OTEL_EXPORTER_OTLP_ENDPOINT: _otlp,
-    OTEL_EXPORTER_OTLP_HEADERS: _otlpHeaders,
-    SENTRY_DSN: _sentry,
-    STRIPE_WEBHOOK_SECRET: _stripe,
-    ...inherited
-  } = process.env;
   const env: Record<string, string> = {};
-  for (const [key, value] of Object.entries(inherited)) {
+  for (const key of INHERITED_HOST_ENV) {
+    const value = process.env[key];
     if (value !== undefined) env[key] = value;
   }
   return {
     ...env,
-    // Copies process.env into the Worker (see apps/web/README.md); the
-    // suite's values below override anything in apps/web/.env.
+    // TODO: `CLOUDFLARE_INCLUDE_PROCESS_ENV` survives only here. Wrangler
+    // and the Cloudflare Vite plugin read `.env` from the config directory
+    // (apps/web) and nowhere else, and the suite must not write to, or
+    // depend on, the developer's `apps/web/.env`; copying this process's
+    // (allowlisted) environment into the Worker is the one way to hand it
+    // the bindings below. Drop it once the plugin accepts bindings directly.
     CLOUDFLARE_INCLUDE_PROCESS_ENV: "true",
     E2E_STATE_DIR: STATE_DIR,
     STAGE: "development",
