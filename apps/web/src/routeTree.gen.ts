@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from "./routes/__root";
 import { Route as IndexRouteImport } from "./routes/index";
+import { Route as DotwellKnownForgeHealthRouteImport } from "./routes/[.]well-known.forge-health";
 import { Route as ApiSplatRouteImport } from "./routes/api.$";
 import { Route as ApiAuthSplatRouteImport } from "./routes/api/auth.$";
 import { Route as ApiTrpcSplatRouteImport } from "./routes/api/trpc.$";
@@ -17,6 +18,11 @@ import { Route as ApiTrpcSplatRouteImport } from "./routes/api/trpc.$";
 const IndexRoute = IndexRouteImport.update({
   id: "/",
   path: "/",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const DotwellKnownForgeHealthRoute = DotwellKnownForgeHealthRouteImport.update({
+  id: "/.well-known/forge-health",
+  path: "/.well-known/forge-health",
   getParentRoute: () => rootRouteImport,
 } as any);
 const ApiSplatRoute = ApiSplatRouteImport.update({
@@ -37,12 +43,14 @@ const ApiTrpcSplatRoute = ApiTrpcSplatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute;
+  "/.well-known/forge-health": typeof DotwellKnownForgeHealthRoute;
   "/api/$": typeof ApiSplatRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
   "/api/trpc/$": typeof ApiTrpcSplatRoute;
 }
 export interface FileRoutesByTo {
   "/": typeof IndexRoute;
+  "/.well-known/forge-health": typeof DotwellKnownForgeHealthRoute;
   "/api/$": typeof ApiSplatRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
   "/api/trpc/$": typeof ApiTrpcSplatRoute;
@@ -50,20 +58,38 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   "/": typeof IndexRoute;
+  "/.well-known/forge-health": typeof DotwellKnownForgeHealthRoute;
   "/api/$": typeof ApiSplatRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
   "/api/trpc/$": typeof ApiTrpcSplatRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: "/" | "/api/$" | "/api/auth/$" | "/api/trpc/$";
+  fullPaths:
+    | "/"
+    | "/.well-known/forge-health"
+    | "/api/$"
+    | "/api/auth/$"
+    | "/api/trpc/$";
   fileRoutesByTo: FileRoutesByTo;
-  to: "/" | "/api/$" | "/api/auth/$" | "/api/trpc/$";
-  id: "__root__" | "/" | "/api/$" | "/api/auth/$" | "/api/trpc/$";
+  to:
+    | "/"
+    | "/.well-known/forge-health"
+    | "/api/$"
+    | "/api/auth/$"
+    | "/api/trpc/$";
+  id:
+    | "__root__"
+    | "/"
+    | "/.well-known/forge-health"
+    | "/api/$"
+    | "/api/auth/$"
+    | "/api/trpc/$";
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
+  DotwellKnownForgeHealthRoute: typeof DotwellKnownForgeHealthRoute;
   ApiSplatRoute: typeof ApiSplatRoute;
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute;
   ApiTrpcSplatRoute: typeof ApiTrpcSplatRoute;
@@ -76,6 +102,13 @@ declare module "@tanstack/react-router" {
       path: "/";
       fullPath: "/";
       preLoaderRoute: typeof IndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/.well-known/forge-health": {
+      id: "/.well-known/forge-health";
+      path: "/.well-known/forge-health";
+      fullPath: "/.well-known/forge-health";
+      preLoaderRoute: typeof DotwellKnownForgeHealthRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/api/$": {
@@ -104,6 +137,7 @@ declare module "@tanstack/react-router" {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DotwellKnownForgeHealthRoute: DotwellKnownForgeHealthRoute,
   ApiSplatRoute: ApiSplatRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiTrpcSplatRoute: ApiTrpcSplatRoute,

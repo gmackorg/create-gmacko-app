@@ -3,15 +3,10 @@
  * in `runtime.ts` from `cloudflare:workers` env (and from a literal object in
  * tests); nothing else reads bindings or `process.env`.
  */
+import { Stage } from "@gmacko/domain/health";
 import { Context, Schema } from "effect";
 
-export const Stage = Schema.Literals([
-  "development",
-  "preview",
-  "staging",
-  "production",
-]);
-export type Stage = typeof Stage.Type;
+export { Stage } from "@gmacko/domain/health";
 
 const Optional = Schema.optional(Schema.String);
 
@@ -53,6 +48,8 @@ export interface OAuthClientConfig {
 
 export interface AppConfigShape {
   readonly stage: Stage;
+  /** The build's version (Vite `__APP_VERSION__`): telemetry, Sentry, health. */
+  readonly version: string;
   /** Public origin of this deployment. */
   readonly appUrl: string;
   /** Origins allowed to send credentials: CORS, better-auth trustedOrigins, cookie rule. */
@@ -119,7 +116,10 @@ export class AppConfig extends Context.Service<AppConfig, AppConfigShape>()(
    * outside development, so a misconfigured Worker fails at load rather than
    * on its first request.
    */
-  static fromBindings = (bindings: unknown): AppConfigShape => {
+  static fromBindings = (
+    bindings: unknown,
+    options?: { readonly version?: string | undefined },
+  ): AppConfigShape => {
     const env = Schema.decodeUnknownSync(Bindings)(bindings);
     const baseUrl = env.PORTLESS_URL ?? env.APP_URL ?? "http://localhost:3001";
     const productionUrl = env.APP_URL ?? baseUrl;
@@ -134,6 +134,7 @@ export class AppConfig extends Context.Service<AppConfig, AppConfigShape>()(
     }
     return {
       stage: env.STAGE,
+      version: options?.version ?? "0.0.0",
       appUrl: productionUrl,
       allowedOrigins: origins(baseUrl, productionUrl, env.ALLOWED_ORIGINS),
       auth: {

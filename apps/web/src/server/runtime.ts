@@ -19,7 +19,7 @@ import { flushTelemetry, Observability } from "./observability";
  * the Worker from starting (visible in the deploy) rather than surface as a
  * 500 on the first request.
  */
-const config = AppConfig.fromBindings(env);
+const config = AppConfig.fromBindings(env, { version: __APP_VERSION__ });
 
 const AppConfigLive = Layer.succeed(AppConfig)(config);
 // D1 bindings are safe to hold at module scope; one client per isolate.
@@ -35,7 +35,7 @@ const ServicesLive = Layer.mergeAll(
     endpoint: config.otlp.endpoint,
     headers: config.otlp.headers,
     serviceName: "gmacko-web",
-    serviceVersion: __APP_VERSION__,
+    serviceVersion: config.version,
   }),
 );
 

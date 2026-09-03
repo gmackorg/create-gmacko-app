@@ -1,5 +1,15 @@
 import { Auth } from "@gmacko/auth/service";
-import { Database } from "@gmacko/db";
+import { Database, type DatabaseError } from "@gmacko/db";
+import {
+  ForgeHealth,
+  ForgeUnhealthy,
+  HealthApi,
+  HealthStatus,
+  LiveStatus,
+  ReadyStatus,
+  Unhealthy,
+  UnhealthyReport,
+} from "@gmacko/domain/health";
 import { Effect, FileSystem, Layer, Path, Schema } from "effect";
 import {
   Etag,
@@ -12,41 +22,11 @@ import {
   HttpApiBuilder,
   HttpApiEndpoint,
   HttpApiGroup,
-  HttpApiSchema,
 } from "effect/unstable/httpapi";
 
-import { AppConfig, Stage } from "./config";
+import { AppConfig, type AppConfigShape } from "./config";
 
 export { AppConfig, Stage } from "./config";
-
-export const LiveStatus = Schema.Struct({
-  status: Schema.Literal("ok"),
-  stage: Stage,
-});
-
-export const ReadyStatus = Schema.Struct({
-  status: Schema.Literal("ok"),
-  latencyMs: Schema.Number,
-});
-
-/**
- * 503 body for a failed readiness probe. Always generic: the DatabaseError
- * goes to the server log, never to the client (AGENTS.md health invariant).
- */
-export class Unhealthy extends Schema.TaggedError<Unhealthy>()("Unhealthy", {
-  status: Schema.Literal("unhealthy"),
-  detail: Schema.String,
-}) {}
-
-export class HealthApi extends HttpApiGroup.make("health")
-  .add(HttpApiEndpoint.get("live", "/live", { success: LiveStatus }))
-  .add(
-    HttpApiEndpoint.get("ready", "/ready", {
-      success: ReadyStatus,
-      error: Unhealthy.pipe(HttpApiSchema.status(503)),
-    }),
-  )
-  .prefix("/health") {}
 
 export const SessionUser = Schema.Struct({
   id: Schema.String,
@@ -68,10 +48,35 @@ export class SessionApi extends HttpApiGroup.make("session")
   .add(HttpApiEndpoint.get("me", "/me", { success: Me }))
   .prefix("/session") {}
 
+/**
+ * The groups this app serves today: the Spike C session probe and the
+ * contract's HealthApi. TODO(Phase 4): replace with `AppApi` from
+ * @gmacko/domain once every group has handlers. HealthApi goes after the
+ * prefix, as in AppApi, so the ForgeGraph probe keeps its absolute path.
+ */
 export class GmackoApi extends HttpApi.make("gmacko")
-  .add(HealthApi)
   .add(SessionApi)
-  .prefix("/api") {}
+  .prefix("/api")
+  .add(HealthApi) {}
+
+/** A database round trip slower than this counts as degraded, as before. */
+const DEGRADED_AFTER_MS = 2000;
+
+/**
+ * Health responses never carry driver detail outside development
+ * (AGENTS.md); the DatabaseError itself goes to the log.
+ */
+const failureDetail = (
+  config: AppConfigShape,
+  error: DatabaseError,
+  generic: string,
+): string =>
+  config.stage === "development"
+    ? `${generic}: ${error.reason}${error.cause instanceof Error ? ` (${error.cause.message})` : ""}`
+    : generic;
+
+const logPingFailure = (probe: string, error: DatabaseError) =>
+  Effect.logError(`${probe}: database ping failed`, error);
 
 export const HealthHandlers = HttpApiBuilder.group(
   GmackoApi,
@@ -82,21 +87,109 @@ export const HealthHandlers = HttpApiBuilder.group(
       const database = yield* Database;
       return handlers
         .handle("live", () =>
-          Effect.succeed({ status: "ok" as const, stage: config.stage }),
+          Effect.succeed(new LiveStatus({ status: "ok", stage: config.stage })),
         )
         .handle("ready", () =>
           database.ping.pipe(
-            Effect.map((latencyMs) => ({ status: "ok" as const, latencyMs })),
+            Effect.map(
+              (latencyMs) => new ReadyStatus({ status: "ok", latencyMs }),
+            ),
             Effect.catchTag("DatabaseError", (error) =>
-              Effect.logError(
-                "readiness probe: database ping failed",
-                error,
-              ).pipe(
+              logPingFailure("readiness probe", error).pipe(
                 Effect.andThen(
                   Effect.fail(
                     new Unhealthy({
                       status: "unhealthy",
-                      detail: "database unavailable",
+                      detail: failureDetail(
+                        config,
+                        error,
+                        "database unavailable",
+                      ),
+                    }),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        )
+        .handle("full", () =>
+          database.ping.pipe(
+            Effect.map((responseTime) => {
+              const degraded = responseTime > DEGRADED_AFTER_MS;
+              return new HealthStatus({
+                status: degraded ? "degraded" : "healthy",
+                timestamp: new Date(),
+                version: config.version,
+                checks: {
+                  database: {
+                    status: degraded ? "warn" : "pass",
+                    responseTime,
+                  },
+                },
+              });
+            }),
+            Effect.catchTag("DatabaseError", (error) =>
+              logPingFailure("health report", error).pipe(
+                Effect.andThen(
+                  Effect.fail(
+                    new UnhealthyReport({
+                      status: "unhealthy",
+                      timestamp: new Date(),
+                      version: config.version,
+                      checks: {
+                        database: {
+                          status: "fail",
+                          message: failureDetail(
+                            config,
+                            error,
+                            "Database connection failed",
+                          ),
+                        },
+                      },
+                    }),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        )
+        .handle("forge", () =>
+          Effect.timed(database.ping).pipe(
+            Effect.map(([, latencyMs]) => {
+              const degraded = latencyMs > DEGRADED_AFTER_MS;
+              return new ForgeHealth({
+                status: degraded ? "degraded" : "healthy",
+                version: "1.0",
+                timestamp: new Date(),
+                checks: {
+                  database: {
+                    status: degraded ? "degraded" : "healthy",
+                    latencyMs,
+                    checkedAt: new Date(),
+                  },
+                },
+              });
+            }),
+            Effect.catchTag("DatabaseError", (error) =>
+              logPingFailure("forge health", error).pipe(
+                Effect.andThen(
+                  Effect.fail(
+                    new ForgeUnhealthy({
+                      status: "unhealthy",
+                      version: "1.0",
+                      timestamp: new Date(),
+                      checks: {
+                        database: {
+                          status: "unhealthy",
+                          latencyMs: 0,
+                          checkedAt: new Date(),
+                          error: failureDetail(
+                            config,
+                            error,
+                            "connection failed",
+                          ),
+                        },
+                      },
                     }),
                   ),
                 ),
@@ -152,9 +245,10 @@ export const ApiLive = HttpApiBuilder.layer(GmackoApi).pipe(
 );
 
 /**
- * The fetch-style handler for `/api/*`, over the given services. `runtime.ts`
- * passes the production layers (sharing its memo map); tests pass the
- * sqlite-node ones. One `http.server` span per request.
+ * The fetch-style handler for `/api/*` and `/.well-known/forge-health`, over
+ * the given services. `runtime.ts` passes the production layers (sharing its
+ * memo map); tests pass the sqlite-node ones. One `http.server` span per
+ * request.
  */
 export const makeApiHandler = (
   services: Layer.Layer<Database | AppConfig | Auth>,
