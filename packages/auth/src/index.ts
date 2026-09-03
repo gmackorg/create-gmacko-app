@@ -190,10 +190,9 @@ export function makeAuth(options: AuthOptions, db: PlainDatabase) {
     },
     session: {
       // The signed cookie serves `getSession` for up to 5 minutes without a
-      // D1 read. Anything that gates on `user.role` (admin routes, the
-      // AdminOnly middleware) or on a revoked session must read fresh:
-      // `getSession({ headers, query: { disableCookieCache: true } })`.
-      // TODO(Phase 3): the Authentication/AdminOnly middlewares do this.
+      // D1 read. Anything that gates on `user.role` reads the row instead:
+      // `RequestContext.role` (request-context.ts), which `AdminOnlyLive`
+      // (middleware.ts) uses, so a demotion applies on the next request.
       cookieCache: { enabled: true, maxAge: 300 },
     },
     plugins: [
