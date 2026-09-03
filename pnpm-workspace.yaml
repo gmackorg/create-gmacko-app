@@ -7,11 +7,14 @@ packages:
 catalog:
   '@biomejs/biome': ^2.4.8
   '@cloudflare/vite-plugin': 1.54.3
+  '@cloudflare/vitest-pool-workers': 0.22.0
   '@cloudflare/workers-types': 5.20260903.1
   '@better-auth/cli': 1.4.21
   '@better-auth/expo': 1.5.5
   '@commitlint/cli': ^20.5.0
   '@commitlint/config-conventional': ^20.5.0
+  '@effect/sql-d1': 4.0.0-rc.112
+  '@effect/sql-sqlite-node': 4.0.0-rc.112
   '@storybook/addon-a11y': ^10.3.0
   '@storybook/addon-docs': ^10.3.0
   '@storybook/nextjs-vite': ^10.3.0
@@ -29,6 +32,10 @@ catalog:
   '@types/node': ^25.5.0
   '@vitejs/plugin-react': 6.0.1
   better-auth: 1.5.5
+  # drizzle 1.0 rc5 is the first line that compiles against effect rc.108+
+  # (rc.4 still calls the removed Schema.TaggedErrorClass). Pin exact builds.
+  drizzle-kit: 1.0.0-rc.5-ab785fc
+  drizzle-orm: 1.0.0-rc.5-169397b
   effect: 4.0.0-rc.112
   knip: ^6.0.4
   lefthook: ^2.1.4
