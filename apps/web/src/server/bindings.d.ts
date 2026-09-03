@@ -26,6 +26,7 @@ declare namespace Cloudflare {
     OTEL_EXPORTER_OTLP_ENDPOINT?: string;
     OTEL_EXPORTER_OTLP_HEADERS?: string;
     SENTRY_DSN?: string;
+    STRIPE_WEBHOOK_SECRET?: string;
   }
 }
 

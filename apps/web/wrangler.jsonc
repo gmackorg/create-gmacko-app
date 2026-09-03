@@ -9,16 +9,11 @@
   // Node.js compatibility. With a compatibility_date >= 2026-08-04 workerd
   // enables `nodejs_compat` by default (wrangler NODEJS_COMPAT_DEFAULT_ON_DATE),
   // so nothing is listed here. Turning it off (`no_nodejs_compat`) is not an
-  // option today; Phase 0 measured who needs it:
+  // option: Phase 0 measured who needs it, and after Phase 5 (the legacy
+  // tRPC/pino/postgres chain is out of this Worker) what remains is
   //   - @tanstack/start-server-core: `node:async_hooks` (AsyncLocalStorage for
-  //     the request context) - stays after the migration.
-  //   - better-auth: `node:async_hooks` - stays after the migration.
-  //   - legacy tRPC/pino/postgres chain (@gmacko/logging, @gmacko/legacy-api,
-  //     @gmacko/legacy-db/client): node:fs, node:os, node:path, node:stream,
-  //     node:events, node:buffer, node:url, node:diagnostics_channel - goes
-  //     away with Phases 2-6.
-  // Verified: with `no_nodejs_compat` the Worker fails at load with
-  // `No such module "node:os"`.
+  //     the request context);
+  //   - better-auth: `node:async_hooks`.
   "compatibility_flags": [],
   "observability": { "enabled": true },
   // Nightly maintenance tick, handled by `scheduled` in src/server/worker.ts.

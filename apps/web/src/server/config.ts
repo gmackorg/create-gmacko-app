@@ -40,6 +40,8 @@ export const Bindings = Schema.Struct({
   OTEL_EXPORTER_OTLP_ENDPOINT: Optional,
   /** `key=value,key2=value2`, as the OTel spec defines it. */
   OTEL_EXPORTER_OTLP_HEADERS: Optional,
+  /** Stripe's signing secret for `POST /api/webhooks/stripe`; unset → the route answers 503. */
+  STRIPE_WEBHOOK_SECRET: Optional,
 });
 export type Bindings = typeof Bindings.Type;
 
@@ -128,5 +130,39 @@ export const fromBindings = (
       headers: parseHeaders(env.OTEL_EXPORTER_OTLP_HEADERS),
     },
     features: defaultFeatures,
+  };
+};
+
+/** What the web app reads beyond `AppConfig`: the Stripe webhook secret and the CSP `connect-src` extras. */
+export interface WebConfig {
+  readonly stripeWebhookSecret: string | undefined;
+  /** Origins the browser may call besides its own: PostHog, Sentry ingest. */
+  readonly connectSrc: ReadonlyArray<string>;
+}
+
+const originOf = (url: string | undefined): string | undefined => {
+  if (!url) return undefined;
+  try {
+    return new URL(url).origin;
+  } catch {
+    return undefined;
+  }
+};
+
+export const webFromBindings = (
+  bindings: unknown,
+  client: {
+    readonly posthogHost: string | undefined;
+    readonly sentryDsn: string | undefined;
+  },
+): WebConfig => {
+  const env = Schema.decodeUnknownSync(Bindings)(bindings);
+  const connectSrc = [
+    originOf(client.posthogHost ?? "https://us.i.posthog.com"),
+    originOf(client.sentryDsn),
+  ].filter((origin): origin is string => origin !== undefined);
+  return {
+    stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET,
+    connectSrc: Array.from(new Set(connectSrc)),
   };
 };

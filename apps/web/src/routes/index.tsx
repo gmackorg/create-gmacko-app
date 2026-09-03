@@ -1,71 +1,209 @@
-import type { RouterOutputs } from "@gmacko/legacy-api";
-import { CreatePostSchema } from "@gmacko/legacy-db/schema";
-import { cn } from "@gmacko/ui";
-import { Button } from "@gmacko/ui/button";
-import {
-  Field,
-  FieldContent,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@gmacko/ui/field";
-import { Input } from "@gmacko/ui/input";
+import { LaunchBanner } from "@gmacko/ui/launch-banner";
+import { MarketingCard } from "@gmacko/ui/marketing-page";
 import { toast } from "@gmacko/ui/toast";
-import { useForm } from "@tanstack/react-form";
-import {
-  useMutation,
-  useQueryClient,
-  useSuspenseQuery,
-} from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 
-import { AuthShowcase } from "~/component/auth-showcase";
-import { api } from "~/lib/api";
-import { useTRPC } from "~/lib/trpc";
+import { AuthShowcase } from "~/components/auth-showcase";
+import { BootstrapScreen } from "~/components/bootstrap";
+import { MarketingPage } from "~/components/marketing";
+import { CreatePostForm, PostCardSkeleton, PostList } from "~/components/posts";
+import { RouterLink } from "~/components/router-link";
+import { WaitlistForm } from "~/components/waitlist-form";
+import { queries } from "~/lib/api";
+import { useSession } from "~/lib/session";
 
-/** Swallows only the listed tagged errors; rethrows everything else. */
-const orNull =
-  (...tags: ReadonlyArray<string>) =>
-  (error: unknown): null => {
-    const tag = (error as { readonly _tag?: unknown } | null)?._tag;
-    if (typeof tag === "string" && tags.includes(tag)) return null;
-    throw error;
-  };
+/** `?signin=1` and friends: one-shot hints other routes redirect here with. */
+interface HomeSearch {
+  signin?: true;
+  waitlist?: true;
+  maintenance?: true;
+}
 
-export const Route = createFileRoute("/")({
-  loader: async ({ context }) => {
-    const { trpc, queryClient } = context;
-    void queryClient.prefetchQuery(trpc.post.all.queryOptions());
-    // On the server this goes through the in-process transport (cookie
-    // forwarded, no network hop); on client navigation it is a fetch. The
-    // probe may be unhealthy (503 `Unhealthy`) and the session public
-    // endpoint may 500; both render as "unavailable" rather than failing
-    // the page. Anything else (a transport failure, a decode error) is a
-    // bug and propagates.
-    const [ready, me] = await Promise.all([
-      api((client) => client.health.ready()).catch(
-        orNull("Unhealthy", "InternalError"),
-      ),
-      api((client) => client.auth.session()).catch(orNull("InternalError")),
-    ]);
-    return { ready, me };
-  },
-  component: RouteComponent,
+const isFlag = (value: unknown): boolean =>
+  value === true || value === 1 || value === "1";
+
+const validateSearch = (search: Record<string, unknown>): HomeSearch => ({
+  ...(isFlag(search.signin) ? { signin: true as const } : {}),
+  ...(isFlag(search.waitlist) ? { waitlist: true as const } : {}),
+  ...(isFlag(search.maintenance) ? { maintenance: true as const } : {}),
 });
 
-function RouteComponent() {
+export const Route = createFileRoute("/")({
+  validateSearch,
+  loader: async ({ context: { queryClient } }) => {
+    // What the page branches on must be ready before render; the posts
+    // list is only needed for a signed-in visitor of the running app.
+    const [session, launch, bootstrap] = await Promise.all([
+      queryClient.ensureQueryData(queries.auth.session()),
+      queryClient.ensureQueryData(queries.settings.launchState()),
+      queryClient.ensureQueryData(queries.admin.bootstrapStatus()),
+    ]);
+    if (session.user && !launch.maintenanceMode && !bootstrap.requiresSetup) {
+      await queryClient.prefetchQuery(queries.posts.list());
+    }
+  },
+  component: HomePage,
+});
+
+function useSearchHints() {
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  useEffect(() => {
+    if (!search.signin && !search.waitlist && !search.maintenance) return;
+    // Deferred past this commit's effects: the Toaster mounts after the
+    // page (it is a later sibling), and a toast raised before it subscribes
+    // is lost.
+    const timer = setTimeout(() => {
+      if (search.signin) toast.info("Sign in to continue.");
+      if (search.waitlist) {
+        toast.info(
+          "Sign-up is invite-only right now. Join the waitlist below.",
+        );
+      }
+      if (search.maintenance) {
+        toast.info("The app is in maintenance mode; sign-in is paused.");
+      }
+      void navigate({ to: "/", search: {}, replace: true });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [search.signin, search.waitlist, search.maintenance, navigate]);
+}
+
+function HomePage() {
+  useSearchHints();
+  const session = useSession();
+  const { data: launch } = useSuspenseQuery(queries.settings.launchState());
+  const { data: bootstrap } = useSuspenseQuery(queries.admin.bootstrapStatus());
+
+  if (bootstrap.requiresSetup) {
+    return <BootstrapScreen />;
+  }
+
+  if (session.user && !launch.maintenanceMode) {
+    return <AppHome />;
+  }
+
+  const shouldShowWaitlist =
+    launch.maintenanceMode ||
+    (!launch.signupEnabled && !launch.canAutoCreateAccounts);
+
   return (
-    <main className="container h-screen py-16">
+    <MarketingPage
+      eyebrow="Launch controls"
+      title={
+        launch.maintenanceMode
+          ? "We are in maintenance mode"
+          : "Build, launch, and collect interest without changing the template"
+      }
+      description={
+        launch.maintenanceMode
+          ? "The public shell is temporarily offline while the platform is being updated. Use the waitlist to collect interest, and review requests from admin settings."
+          : "This template ships with a public landing page, support content, and a clean path for invite-only or open signup. Turn on the pieces you need from the admin controls."
+      }
+    >
+      <div className="space-y-6">
+        <LaunchBanner
+          announcementMessage={launch.announcementMessage}
+          announcementTone={launch.announcementTone}
+          maintenanceMode={launch.maintenanceMode}
+        />
+
+        <div className="flex flex-wrap gap-3">
+          {shouldShowWaitlist ? (
+            <span className="border-border bg-card rounded-full border px-4 py-2 text-sm">
+              Request access is open
+            </span>
+          ) : (
+            <AuthShowcase />
+          )}
+          <RouterLink
+            href="/pricing"
+            className="border-border hover:bg-muted rounded-full border px-4 py-2 text-sm transition-colors"
+          >
+            See pricing
+          </RouterLink>
+          <RouterLink
+            href="/contact"
+            className="border-border hover:bg-muted rounded-full border px-4 py-2 text-sm transition-colors"
+          >
+            Contact support
+          </RouterLink>
+        </div>
+      </div>
+
+      <div className="mt-10 grid gap-4 md:grid-cols-2">
+        <MarketingCard>
+          <h2 className="text-xl font-semibold">Product surface</h2>
+          <div className="text-muted-foreground mt-4 space-y-3 text-sm leading-6">
+            <p>
+              Landing, pricing, FAQ, changelog, contact, privacy, and terms.
+            </p>
+            <p>Admin launch toggles for maintenance mode and signup control.</p>
+            <p>
+              Waitlist review, referral tracking, and allowlist/domain settings.
+            </p>
+          </div>
+        </MarketingCard>
+
+        <MarketingCard>
+          <h2 className="text-xl font-semibold">Access mode</h2>
+          <div className="text-muted-foreground mt-4 space-y-3 text-sm leading-6">
+            <p>
+              {launch.signupEnabled
+                ? "Sign up is enabled for new accounts."
+                : "Sign up is disabled, so invite-only access is in effect."}
+            </p>
+            <p>
+              {launch.canAutoCreateAccounts
+                ? "Non-production environments auto-create accounts during social sign-in."
+                : "Production environments fall back to waitlist review when access is blocked."}
+            </p>
+            <p>
+              Allowed domains are configured in platform admin settings and can
+              be expanded once the auth flow is tightened beyond the launch
+              shell.
+            </p>
+          </div>
+        </MarketingCard>
+      </div>
+
+      {shouldShowWaitlist ? (
+        <div className="mt-10 max-w-2xl">
+          <WaitlistForm
+            source={launch.maintenanceMode ? "landing" : "blocked-signup"}
+            title="Request access"
+            description="Leave your email and a short note. We will use this queue to manage the waitlist and invite-only access."
+            buttonLabel="Join waitlist"
+          />
+        </div>
+      ) : null}
+    </MarketingPage>
+  );
+}
+
+/** The signed-in home: the posts demo, as the T3 scaffold shipped it. */
+function AppHome() {
+  return (
+    <main className="container min-h-screen py-16">
       <div className="flex flex-col items-center justify-center gap-4">
         <h1 className="text-5xl font-extrabold tracking-tight sm:text-[5rem]">
           Create <span className="text-primary">T3</span> Turbo
         </h1>
         <AuthShowcase />
-        <LoaderStatus />
+        <nav className="flex flex-wrap gap-3 text-sm" aria-label="Account">
+          <RouterLink
+            href="/settings"
+            className="border-border hover:bg-muted rounded-full border px-4 py-2 transition-colors"
+          >
+            Settings
+          </RouterLink>
+          <AdminLink />
+        </nav>
 
         <CreatePostForm />
-        <div className="w-full max-w-2xl overflow-y-scroll">
+        <div className="w-full max-w-2xl overflow-y-auto">
           <Suspense
             fallback={
               <div className="flex w-full flex-col gap-4">
@@ -83,199 +221,15 @@ function RouteComponent() {
   );
 }
 
-/** What the route loader saw through the API client (SSR or client fetch). */
-function LoaderStatus() {
-  const { ready, me } = Route.useLoaderData();
+function AdminLink() {
+  const session = useSession();
+  if (session.user?.role !== "admin") return null;
   return (
-    <p className="text-muted-foreground text-sm" data-testid="loader-status">
-      API via loader:{" "}
-      {ready ? `ready (db ${ready.latencyMs.toFixed(1)} ms)` : "unavailable"}
-      {" · "}
-      {me?.user ? `session for ${me.user.email}` : "no session"}
-    </p>
-  );
-}
-
-function CreatePostForm() {
-  const trpc = useTRPC();
-
-  const queryClient = useQueryClient();
-  const createPost = useMutation(
-    trpc.post.create.mutationOptions({
-      onSuccess: async () => {
-        form.reset();
-        await queryClient.invalidateQueries(trpc.post.pathFilter());
-      },
-      onError: (err) => {
-        toast.error(
-          err.data?.code === "UNAUTHORIZED"
-            ? "You must be logged in to post"
-            : "Failed to create post",
-        );
-      },
-    }),
-  );
-
-  const form = useForm({
-    defaultValues: {
-      content: "",
-      title: "",
-    },
-    validators: {
-      onSubmit: CreatePostSchema,
-    },
-    onSubmit: (data) => createPost.mutate(data.value),
-  });
-
-  return (
-    <form
-      className="w-full max-w-2xl"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void form.handleSubmit();
-      }}
+    <RouterLink
+      href="/admin"
+      className="border-border hover:bg-muted rounded-full border px-4 py-2 transition-colors"
     >
-      <FieldGroup>
-        <form.Field
-          name="title"
-          children={(field) => {
-            const isInvalid =
-              field.state.meta.isTouched && !field.state.meta.isValid;
-            return (
-              <Field data-invalid={isInvalid}>
-                <FieldContent>
-                  <FieldLabel htmlFor={field.name}>Bug Title</FieldLabel>
-                </FieldContent>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  aria-invalid={isInvalid}
-                  placeholder="Title"
-                />
-                {isInvalid && <FieldError errors={field.state.meta.errors} />}
-              </Field>
-            );
-          }}
-        />
-        <form.Field
-          name="content"
-          children={(field) => {
-            const isInvalid =
-              field.state.meta.isTouched && !field.state.meta.isValid;
-            return (
-              <Field data-invalid={isInvalid}>
-                <FieldContent>
-                  <FieldLabel htmlFor={field.name}>Content</FieldLabel>
-                </FieldContent>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  aria-invalid={isInvalid}
-                  placeholder="Content"
-                />
-                {isInvalid && <FieldError errors={field.state.meta.errors} />}
-              </Field>
-            );
-          }}
-        />
-      </FieldGroup>
-      <Button type="submit">Create</Button>
-    </form>
-  );
-}
-
-function PostList() {
-  const trpc = useTRPC();
-  const { data: posts } = useSuspenseQuery(trpc.post.all.queryOptions());
-
-  if (posts.length === 0) {
-    return (
-      <div className="relative flex w-full flex-col gap-4">
-        <PostCardSkeleton pulse={false} />
-        <PostCardSkeleton pulse={false} />
-        <PostCardSkeleton pulse={false} />
-
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/10">
-          <p className="text-2xl font-bold text-white">No posts yet</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex w-full flex-col gap-4">
-      {posts.map((p) => {
-        return <PostCard key={p.id} post={p} />;
-      })}
-    </div>
-  );
-}
-
-function PostCard(props: { post: RouterOutputs["post"]["all"][number] }) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const deletePost = useMutation(
-    trpc.post.delete.mutationOptions({
-      onSuccess: async () => {
-        await queryClient.invalidateQueries(trpc.post.pathFilter());
-      },
-      onError: (err) => {
-        toast.error(
-          err.data?.code === "UNAUTHORIZED"
-            ? "You must be logged in to delete a post"
-            : "Failed to delete post",
-        );
-      },
-    }),
-  );
-
-  return (
-    <div className="bg-muted flex flex-row rounded-lg p-4">
-      <div className="grow">
-        <h2 className="text-primary text-2xl font-bold">{props.post.title}</h2>
-        <p className="mt-2 text-sm">{props.post.content}</p>
-      </div>
-      <div>
-        <Button
-          variant="ghost"
-          className="text-primary cursor-pointer text-sm font-bold uppercase hover:bg-transparent hover:text-white"
-          onClick={() => deletePost.mutate(props.post.id)}
-        >
-          Delete
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function PostCardSkeleton(props: { pulse?: boolean }) {
-  const { pulse = true } = props;
-  return (
-    <div className="bg-muted flex flex-row rounded-lg p-4">
-      <div className="grow">
-        <h2
-          className={cn(
-            "bg-primary w-1/4 rounded-sm text-2xl font-bold",
-            pulse && "animate-pulse",
-          )}
-        >
-          &nbsp;
-        </h2>
-        <p
-          className={cn(
-            "mt-2 w-1/3 rounded-sm bg-current text-sm",
-            pulse && "animate-pulse",
-          )}
-        >
-          &nbsp;
-        </p>
-      </div>
-    </div>
+      Admin
+    </RouterLink>
   );
 }

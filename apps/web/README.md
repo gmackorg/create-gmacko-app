@@ -1,35 +1,74 @@
 # @gmacko/web
 
 TanStack Start app served as a Cloudflare Worker (`src/server/worker.ts`),
-with the Effect HTTP API mounted under `/api/*` (`src/server/api.ts`,
-`src/server/runtime.ts`).
+with the Effect HTTP API mounted under `/api/*` (`@gmacko/api`, built in
+`src/server/runtime.ts`) and better-auth under `/api/auth/*`.
 
 ## Scripts
 
-- `pnpm dev` - Vite dev server with the ssr environment running in workerd.
+- `pnpm dev` - Vite dev server with the ssr environment running in workerd
+  (`predev` links `.env`, see below).
 - `pnpm build` / `pnpm preview` - production build and local preview.
+- `pnpm e2e` - the Playwright suite (see "Browser tests").
 - `pnpm cf-typegen` - regenerate `worker-configuration.d.ts` from `wrangler.jsonc`.
 
-## `CLOUDFLARE_INCLUDE_PROCESS_ENV=true` in the `dev` script
+## How pages get their data
 
-<!-- TODO(migration Phase 5): remove this bridge. -->
+Every read and write goes through the contract client: `src/lib/api.ts`
+builds `queries` and `mutations` from `@gmacko/api-client/queries` over a
+client that is in-process on the server (the SSR loader calls the API
+handler directly, forwarding only the page request's `cookie` and
+`cf-connecting-ip`, and sharing one `RequestContext` per render) and `fetch`
+in the browser. Route loaders `prefetchQuery`/`ensureQueryData` what the page
+needs; components `useSuspenseQuery` the same options; mutations invalidate
+through the meta the query layer attaches (`makeQueryClient`). Query keys are
+never spelled in this app.
 
-The `dev` script sets `CLOUDFLARE_INCLUDE_PROCESS_ENV=true` so the Cloudflare
-Vite plugin copies the Node `process.env` (loaded from `../../.env` by
-`with-env`) into the Worker's `process.env`. It exists only because
-`src/env.ts` (t3 `createEnv` over `process.env`) and `src/lib/url.ts` still
-read `process.env` directly. Both are legacy carry-overs from the Next.js app.
+Forms validate client-side with the domain's Standard Schema views
+(`CreatePostForm`, `WaitlistSubmitForm`, `MagicLinkRequestForm`,
+`UpdatePreferencesForm`, `CreateApiKeyForm`, `CreateInviteForm`), so a 400 from
+the server's decoder is rare. Typed errors become words in
+`src/lib/errors.ts` (`Unauthorized` → "Sign in to continue.", `Forbidden{scope}`
+→ "This API key lacks permission...", `Conflict{reason}` → the reason's
+sentence, `RateLimited` → the retry-after).
 
-Phase 5 of the migration replaces them with the `AppConfig` service in
-`src/server/api.ts`, built once in `src/server/runtime.ts` from
-`cloudflare:workers` env. Once no module under `src/` reads `process.env`,
-drop the variable from the `dev` script and delete this section.
+Query data crosses SSR through TanStack's serializer, which refuses class
+instances; `dehydrate.serializeData` flattens the contract's `Schema.Class`
+results to plain objects first (`src/lib/plain.ts`).
+
+### Server functions
+
+`createServerFn` is used for actions that must set a cookie or redirect, and
+nothing else (plan principle 09). The only file is `src/server/actions.ts`:
+`signOut`. Data never goes through a server function; `grep createServerFn
+src` should list that file alone.
+
+## Environment: `apps/web/.env` is a link to the repo-root `.env`
+
+Wrangler and the Cloudflare Vite plugin load `.env` / `.env.local` from the
+directory of `wrangler.jsonc` and nowhere else; `process.env` is not copied
+into the Worker unless `CLOUDFLARE_INCLUDE_PROCESS_ENV=true` (the bridge the
+`dev` script used to set). Measured on this repo:
+
+- `dotenv -e ../../.env -- vite dev` without the bridge: the Worker sees
+  `DB` and `STAGE` only.
+- `apps/web/.env -> ../../.env` (symlink) and plain `vite dev`: wrangler logs
+  `Using secrets defined in .env` and every root variable is a binding.
+
+So `predev` (`scripts/link-env.mjs`) creates that symlink (a copy where
+symlinks are unavailable). emulate keeps writing the repo-root `.env`; nothing
+under `src/` reads `process.env`. `src/env.ts` holds only the browser-visible
+`VITE_*` values (validated with `@t3-oss/env-core`); the server reads its
+bindings once in `src/server/config.ts`. (A `.dev.vars` file must never be
+created: its presence disables `.env` loading.)
+
+Note for `vite preview`: the plugin bakes the `.env` it saw at build time into
+`dist/server/.dev.vars`; a preview does not re-read `.env`.
 
 ## Auth, telemetry and Sentry configuration
 
-`src/server/config.ts` (`AppConfig.fromBindings`) is the only reader of these
-bindings; in development they come from the repo-root `.env` through the
-`dev` script bridge above.
+`src/server/config.ts` (`AppConfig.fromBindings`, `webFromBindings`) is the
+only reader of these bindings.
 
 | Binding | Purpose |
 | --- | --- |
@@ -40,10 +79,51 @@ bindings; in development they come from the repo-root `.env` through the
 | `BYPASS_MAGIC_LINK=true` | Print magic links to the server log instead of emailing them. **Development only**: `AppConfig.fromBindings` throws at load when it is set on any other `STAGE`. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` (+ `OTEL_EXPORTER_OTLP_HEADERS`) | OTLP/HTTP export of traces, logs and metrics (`src/server/observability.ts`); flushed on `waitUntil` after every request. Unset → off. |
 | `SENTRY_DSN` | Enables `@sentry/cloudflare`'s `withSentry` wrapper in `src/server/worker.ts`. Unset → no-op. |
+| `STRIPE_WEBHOOK_SECRET` | Signing secret for `POST /api/webhooks/stripe`; unset → the route answers 503. |
+| `VITE_SENTRY_DSN`, `VITE_POSTHOG_KEY`, `VITE_POSTHOG_HOST` | Browser Sentry (`src/client.tsx`) and PostHog (`src/providers.tsx`); both off when unset. |
 
-`/api/auth/*` is better-auth (`@gmacko/auth`); `/api/*` is the Effect HttpApi.
-SSR loaders call the API in-process through `src/lib/local-transport.ts`,
-which forwards only the incoming `cookie` header.
+Build-time only: `SENTRY_AUTH_TOKEN` (+ `SENTRY_ORG`, `SENTRY_PROJECT`) turns
+on the Sentry Vite plugin, which uploads hidden source maps for the
+`__APP_VERSION__` release and deletes them from `dist/`.
+
+## Security headers
+
+`src/server/headers.ts` is a TanStack Start request middleware (registered in
+`src/start.ts`) that sets `X-Frame-Options: DENY`, `Referrer-Policy:
+strict-origin-when-cross-origin`, `X-Content-Type-Options: nosniff`, a
+`Permissions-Policy`, HSTS on every stage but development, and on HTML a
+Content-Security-Policy with a per-request nonce. The nonce reaches the router
+as request context (`getGlobalStartContext().nonce` → `ssr.nonce` in
+`src/router.tsx`); Start stamps it on every inline script it streams and
+publishes it as `<meta property="csp-nonce">` for the client, and the theme
+detector script in `ThemeProvider` takes the same nonce. `script-src` is
+`'self' 'nonce-…'`; `style-src` allows inline styles (React `style=`, sonner).
+
+## Stripe webhook
+
+`POST /api/webhooks/stripe` (`src/routes/api.webhooks.stripe.ts` →
+`src/server/stripe-webhook.ts`) verifies the delivery with
+`@gmacko/payments`' `constructWebhookEvent` (`constructEventAsync` over
+SubtleCrypto, fetch HTTP client) and acknowledges it; a bad signature is a
+400, a missing secret a 503. Billing side effects arrive with the billing
+layer.
+
+## Browser tests
+
+`pnpm e2e` (root: `pnpm e2e:web`) runs Playwright against `vite dev` on port
+3111 (`E2E_PORT`) with the Worker's bindings passed through the process
+environment (`e2e/helpers/env.ts`; `CLOUDFLARE_INCLUDE_PROCESS_ENV=true` is
+set for that server only) and its own local D1 under `.wrangler/e2e`
+(`E2E_STATE_DIR` → the Vite plugin's `persistState`, `--persist-to` for the
+helpers). `e2e/global-setup.ts` migrates and seeds that database and starts an
+emulated GitHub (`@gmacko/emulate`, port 4310) for the OAuth journey;
+`e2e/helpers/db.ts` resets rows per spec and reads magic-link tokens back from
+the `verification` table, so sign-in runs through the real magic-link flow
+with `BYPASS_MAGIC_LINK=true`.
+
+In development only, an `x-test-delay: <ms>` request header holds an API
+response (capped at 10s) so a spec can leave a page while a mutation is in
+flight.
 
 ## Running against emulate without portless
 
@@ -57,7 +137,7 @@ providers accept that origin: `emulate.config.yaml` lists
    the services come up on `http://localhost:4001` (GitHub) and
    `http://localhost:4002` (Google); `emulate` prints the actual ports at
    start-up, and `--port` / `EMULATE_PORT` shifts them.
-2. In the repo-root `.env` (read by the `dev` script through `with-env`):
+2. In the repo-root `.env` (linked into `apps/web/.env` by `predev`):
 
    ```sh
    STAGE=development
@@ -82,4 +162,6 @@ providers accept that origin: `emulate.config.yaml` lists
    `https://oauth2.googleapis.com/token` (the emulator serves it at
    `/oauth2/token`), and the authorization endpoint
    `/o/oauth2/v2/auth` hangs off `AUTH_GOOGLE_URL`.
-3. `pnpm -F @gmacko/web dev`, then sign in at `http://localhost:3001`.
+3. `pnpm -F @gmacko/db migrate:local && pnpm -F @gmacko/db seed:local`, then
+   `pnpm -F @gmacko/web dev` and sign in at `http://localhost:3001`. The first
+   signed-in user completes the bootstrap screen and becomes the admin.

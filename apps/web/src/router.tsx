@@ -1,36 +1,36 @@
-import { QueryClient } from "@tanstack/react-query";
+import { makeQueryClient, shouldRetry } from "@gmacko/api-client/queries";
 import { createRouter } from "@tanstack/react-router";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
-import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
-import SuperJSON from "superjson";
+import { getGlobalStartContext } from "@tanstack/react-start";
 
-import { makeTRPCClient, TRPCProvider } from "~/lib/trpc";
+import { toPlain } from "~/lib/plain";
 import { routeTree } from "./routeTree.gen";
 
 export function getRouter() {
-  const queryClient = new QueryClient({
+  // `makeQueryClient` applies each mutation's `invalidates` meta on success
+  // and retries per `shouldRetry` (never a typed 4xx). Retries are off on the
+  // server so an SSR loader never waits on them.
+  const queryClient = makeQueryClient({
     defaultOptions: {
-      dehydrate: { serializeData: SuperJSON.serialize },
-      hydrate: { deserializeData: SuperJSON.deserialize },
+      queries: {
+        staleTime: 30 * 1000,
+        retry: typeof window === "undefined" ? false : shouldRetry,
+      },
+      dehydrate: { serializeData: toPlain },
     },
   });
-  const trpcClient = makeTRPCClient();
-  const trpc = createTRPCOptionsProxy({
-    client: trpcClient,
-    queryClient,
-  });
+
+  // The per-request CSP nonce minted by the security-headers middleware
+  // (src/server/headers.ts). Start stamps it on every inline script it
+  // emits; the browser picks it back up from the `csp-nonce` meta tag.
+  const nonce = getGlobalStartContext()?.nonce;
 
   const router = createRouter({
     routeTree,
-    context: { queryClient, trpc },
+    context: { queryClient },
     defaultPreload: "intent",
-    Wrap: (props) => (
-      <TRPCProvider
-        trpcClient={trpcClient}
-        queryClient={queryClient}
-        {...props}
-      />
-    ),
+    scrollRestoration: true,
+    ...(nonce ? { ssr: { nonce } } : {}),
   });
   setupRouterSsrQueryIntegration({
     router,

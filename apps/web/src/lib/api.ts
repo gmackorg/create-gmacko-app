@@ -6,6 +6,11 @@
  * its logger and tracer (the endpoint span parents on the render's). In the
  * browser it is fetch against the page's origin. Same client, same types,
  * same typed errors, either way.
+ *
+ * `queries` and `mutations` are the only way a route reads or writes data:
+ * every key and every `queryOptions`/`mutationOptions` comes from
+ * `@gmacko/api-client/queries`, built over a lazy client that resolves the
+ * side's real client at call time, never at module scope.
  */
 import {
   type ApiClientMethods,
@@ -13,6 +18,7 @@ import {
   forwardedHeaders,
   makeApiClient,
 } from "@gmacko/api-client";
+import { makeMutations, makeQueries } from "@gmacko/api-client/queries";
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import type { Context, Effect } from "effect";
@@ -61,3 +67,21 @@ export type ApiClient = ApiClientMethods;
 export const api = <A, E>(
   call: (client: ApiClient) => Effect.Effect<A, E>,
 ): Promise<A> => client().run(call);
+
+/**
+ * A client that resolves the side's real client on every use, so the query
+ * layer can be built once at module scope (no I/O, no request) and still
+ * dispatch each call through the current request on the server.
+ */
+const lazy: Client = {
+  get client() {
+    return client().client;
+  },
+  run: (f) => client().run(f),
+};
+
+/** `queryOptions` per GET endpoint: `queries.posts.list()`, `queries.auth.session()`. */
+export const queries = makeQueries(lazy);
+
+/** `mutationOptions` per write endpoint, each carrying its invalidation meta. */
+export const mutations = makeMutations(lazy);

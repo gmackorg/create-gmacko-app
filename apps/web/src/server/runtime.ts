@@ -18,8 +18,9 @@ import { Auth } from "@gmacko/auth/service";
 import { Database } from "@gmacko/db";
 import { Context, Effect, Layer, ManagedRuntime } from "effect";
 
+import { env as clientEnv } from "~/env";
 import { AuthLive } from "./auth";
-import { fromBindings } from "./config";
+import { fromBindings, webFromBindings } from "./config";
 import { flushTelemetry, Observability } from "./observability";
 
 /**
@@ -27,7 +28,13 @@ import { flushTelemetry, Observability } from "./observability";
  * the Worker from starting (visible in the deploy) rather than surface as a
  * 500 on the first request.
  */
-const config = fromBindings(env, { version: __APP_VERSION__ });
+export const config = fromBindings(env, { version: __APP_VERSION__ });
+
+/** What the web app itself reads from the bindings, beyond `AppConfig`. */
+export const webConfig = webFromBindings(env, {
+  posthogHost: clientEnv.VITE_POSTHOG_HOST,
+  sentryDsn: clientEnv.VITE_SENTRY_DSN,
+});
 
 const AppConfigLive = Layer.succeed(AppConfig)(config);
 // D1 bindings are safe to hold at module scope; one client per isolate.
@@ -64,6 +71,28 @@ const flushAfter =
     }
   };
 
+/** Longest `x-test-delay` honoured, so a stray header cannot hold a request forever. */
+const MAX_TEST_DELAY_MS = 10_000;
+
+/**
+ * Development only: an `x-test-delay: <ms>` request header holds the API
+ * response for that long, so the browser suite can leave a page while a
+ * mutation is in flight. Any other stage ignores the header.
+ */
+const withTestDelay =
+  (respond: ApiHandler): ApiHandler =>
+  async (request, context) => {
+    if (config.stage === "development") {
+      const delay = Number(request.headers.get("x-test-delay"));
+      if (Number.isFinite(delay) && delay > 0) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, Math.min(delay, MAX_TEST_DELAY_MS)),
+        );
+      }
+    }
+    return respond(request, context);
+  };
+
 // Share the memo map so the services above are built once, not per layer.
 const api = makeWebHandler(ServicesLive, { memoMap: runtime.memoMap });
 
@@ -74,7 +103,7 @@ const api = makeWebHandler(ServicesLive, { memoMap: runtime.memoMap });
  * The SSR path passes `renderContext(...)` so every call of one render
  * shares it.
  */
-export const apiHandler: ApiHandler = flushAfter(api.handler);
+export const apiHandler: ApiHandler = flushAfter(withTestDelay(api.handler));
 
 /**
  * The per-request services for one incoming page request: its
@@ -94,9 +123,6 @@ export const authHandler: (request: Request) => Promise<Response> = flushAfter(
     runtime.runPromise(Effect.flatMap(Auth, (auth) => auth.handler(request))),
 );
 
-/**
- * TODO(Phase 5): delete with the tRPC routes. The legacy router only needs
- * `authApi.getSession`, which the new instance provides.
- */
+/** better-auth's server API, for the sign-out server function (src/server/actions.ts). */
 export const authApi = () =>
   runtime.runPromise(Effect.map(Auth, (auth) => auth.instance.api));
