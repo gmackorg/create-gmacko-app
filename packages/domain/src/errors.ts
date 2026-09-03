@@ -68,7 +68,6 @@ export class NotFound extends Schema.TaggedError<NotFound>()(
  */
 export const ConflictReason = Schema.Literals([
   "invite-exists",
-  "allowlist-exists",
   "already-in-workspace",
   "owner-invite-unsupported",
   "bootstrap-already-completed",

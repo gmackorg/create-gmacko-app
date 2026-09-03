@@ -4,6 +4,7 @@
  * packages/legacy-api/src/router/__tests__/settings.test.ts, now against a
  * real database instead of a fake `db`.
  */
+import type { RequestContextShape } from "@gmacko/auth/request-context";
 import { Database } from "@gmacko/db";
 import {
   account,
@@ -35,6 +36,7 @@ import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { makeTestApi, type TestApi, type TestUser } from "../testing";
+import { toApiKeyCreate, Workspaces } from "./service";
 
 let api: TestApi;
 beforeAll(() => {
@@ -382,6 +384,54 @@ describe("settings collaboration invites (ported)", () => {
       { cookie: member.cookie },
     );
     expect(accepted).toEqual({ workspaceId: atlas.id, role: "admin" });
+  });
+
+  it("acceptInvite's membership insert is idempotent: a membership that landed after the caller's memberships were read is left alone", async () => {
+    const owner = await api.createUser();
+    const atlas = await api.createWorkspace({ owner, name: "Atlas" });
+    await setSettings({ initialWorkspaceId: atlas.id });
+    const invitee = await api.createUser();
+    const pending = await invite(atlas.id, invitee.email, "member", owner);
+    // The race, replayed deterministically: the request read no
+    // memberships, then a concurrent accept inserted one before this
+    // call's batch ran.
+    await db(({ db }) =>
+      db.insert(workspaceMembership).values({
+        workspaceId: atlas.id,
+        userId: invitee.id,
+        role: "admin",
+      }),
+    );
+    const stale = {
+      memberships: () => Effect.succeed([]),
+    } as unknown as RequestContextShape;
+    const accepted = await api.run(
+      Effect.flatMap(Workspaces, (workspaces) =>
+        workspaces.acceptInvite(
+          { id: invitee.id, email: invitee.email },
+          pending.id as InviteId,
+          stale,
+        ),
+      ).pipe(Effect.provide(Workspaces.layer)),
+    );
+    expect(accepted).toEqual({ workspaceId: atlas.id, role: "member" });
+    const memberships = await db(({ db }) =>
+      db
+        .select()
+        .from(workspaceMembership)
+        .where(eq(workspaceMembership.userId, invitee.id)),
+    );
+    expect(memberships).toMatchObject([
+      { workspaceId: atlas.id, role: "admin" },
+    ]);
+    expect(
+      await db(({ db }) =>
+        db
+          .select()
+          .from(workspaceInviteAllowlist)
+          .where(eq(workspaceInviteAllowlist.id, pending.id)),
+      ),
+    ).toEqual([]);
   });
 
   it("leaves no partial rows when the batch's last statement fails", async () => {
@@ -757,6 +807,10 @@ describe("settings preferences", () => {
       emailNotifications: true,
       pushNotifications: true,
     });
+    // Honest about being unsaved: no sentinel id or epoch date.
+    expect(prefs.id).toBeNull();
+    expect(prefs.createdAt).toBeNull();
+    expect(prefs.updatedAt).toBeNull();
     const rows = await db(({ db }) =>
       db
         .select()
@@ -780,6 +834,8 @@ describe("settings preferences", () => {
       language: "en",
       timezone: "UTC",
     });
+    expect(first.id).toEqual(expect.any(String));
+    expect(first.createdAt).toBeInstanceOf(Date);
 
     const second = await api.call(
       (client) =>
@@ -829,6 +885,30 @@ describe("settings preferences", () => {
 });
 
 describe("settings api keys", () => {
+  it("toApiKeyCreate turns expiresInDays into the expiresAt instant, or leaves a key that never expires without one", () => {
+    const now = Date.UTC(2026, 0, 1);
+    expect(
+      toApiKeyCreate(
+        new CreateApiKey({
+          name: "ci",
+          permissions: ["read"],
+          expiresInDays: 30,
+        }),
+        now,
+      ),
+    ).toEqual({
+      name: "ci",
+      permissions: ["read"],
+      expiresAt: new Date(now + 30 * 24 * 60 * 60 * 1000),
+    });
+    expect(
+      toApiKeyCreate(
+        new CreateApiKey({ name: "ci", permissions: ["read"] }),
+        now,
+      ).expiresAt,
+    ).toBeUndefined();
+  });
+
   it("creates a key once with its secret, lists it, and revokes it", async () => {
     const person = await api.createUser();
     const created = await api.call(

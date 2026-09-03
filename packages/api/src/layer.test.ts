@@ -7,8 +7,12 @@
 import { platformPrimitives } from "@gmacko/config";
 import { Database, DatabaseError } from "@gmacko/db";
 import { layerTest } from "@gmacko/db/testing";
-import { RateLimitScope, WaitlistSubmit } from "@gmacko/domain";
-import { Context, Effect, Layer, Metric, Option } from "effect";
+import {
+  RateLimitScope,
+  sessionCookieName,
+  WaitlistSubmit,
+} from "@gmacko/domain";
+import { Context, Effect, Exit, Layer, Metric, Option } from "effect";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { httpServerDuration } from "./boundary";
@@ -84,6 +88,15 @@ describe("InternalError boundary", () => {
     expect(response.headers.get(TRACE_ID_HEADER)).toMatch(/^[0-9a-f]{32}$/);
     expect(response.headers.get(REQUEST_ID_HEADER)).toBeTruthy();
 
+    // A 500 is the endpoint failing: its span ends as a failure, with the
+    // status code.
+    const span = spansNamed(api, "posts.list").at(-1);
+    expect(span?.attributes.get("http.response.status_code")).toBe(500);
+    expect(span?.status._tag).toBe("Ended");
+    if (span?.status._tag === "Ended") {
+      expect(Exit.isFailure(span.status.exit)).toBe(true);
+    }
+
     const logged = logsMentioning(api, DRIVER_MESSAGE);
     expect(logged.length).toBeGreaterThanOrEqual(1);
     expect(logged[0]?.annotations).toMatchObject({
@@ -133,6 +146,15 @@ describe("tracing and metrics", () => {
     expect(roots[0]?.attributes.get("http.response.status_code")).toBe(200);
     expect(roots[0]?.status._tag).toBe("Ended");
     expect(roots[1]?.status._tag).toBe("Ended");
+    // A declared 4xx is the endpoint answering as designed, not failing:
+    // the span carries the status code and ends successfully.
+    expect(roots[1]?.attributes.get("http.response.status_code")).toBe(404);
+    for (const root of roots) {
+      expect(root.status._tag).toBe("Ended");
+      if (root.status._tag === "Ended") {
+        expect(Exit.isSuccess(root.status.exit)).toBe(true);
+      }
+    }
   });
 
   it("parents the span on the caller's traceparent and echoes the trace id", async () => {
@@ -180,7 +202,8 @@ describe("CORS", () => {
       headers: {
         origin: api.baseUrl,
         "access-control-request-method": "POST",
-        "access-control-request-headers": "content-type",
+        "access-control-request-headers":
+          "content-type, traceparent, tracestate, x-request-id",
       },
     });
     expect(allowed.status).toBe(204);
@@ -193,9 +216,18 @@ describe("CORS", () => {
     expect(allowed.headers.get("access-control-allow-methods")).toContain(
       "POST",
     );
-    expect(allowed.headers.get("access-control-allow-headers")).toContain(
+    // An explicit allow list, never an echo: the trace context headers a
+    // browser client propagates and the request id it may mint are on it.
+    const allowedHeaders = allowed.headers.get("access-control-allow-headers");
+    for (const header of [
       "authorization",
-    );
+      "content-type",
+      "traceparent",
+      "tracestate",
+      REQUEST_ID_HEADER,
+    ]) {
+      expect(allowedHeaders).toContain(header);
+    }
     expect(allowed.headers.get("access-control-expose-headers")).toContain(
       TRACE_ID_HEADER,
     );
@@ -233,7 +265,9 @@ describe("request ids", () => {
 });
 
 describe("rate limit", () => {
-  it("answers 429 RateLimited with a retry hint after N calls on a limited endpoint, per scope", async () => {
+  const IP = "198.51.100.7";
+
+  it("answers 429 RateLimited with a retry hint and Retry-After after N calls on a limited endpoint, per scope", async () => {
     const api = start({
       rateLimits: {
         contact: { limit: 2, windowMs: 60_000 },
@@ -241,13 +275,15 @@ describe("rate limit", () => {
       },
     });
     const submit = () =>
-      api.result((client) =>
-        client.settings.submitWaitlistEntry({
-          payload: new WaitlistSubmit({
-            email: `rl-${crypto.randomUUID().slice(0, 6)}@example.com`,
-            source: "landing",
+      api.result(
+        (client) =>
+          client.settings.submitWaitlistEntry({
+            payload: new WaitlistSubmit({
+              email: `rl-${crypto.randomUUID().slice(0, 6)}@example.com`,
+              source: "landing",
+            }),
           }),
-        }),
+        { headers: { "cf-connecting-ip": IP } },
       );
     expect((await submit())._tag).toBe("Success");
     expect((await submit())._tag).toBe("Success");
@@ -261,61 +297,128 @@ describe("rate limit", () => {
     }
     const raw = await api.fetch("/api/waitlist", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "cf-connecting-ip": IP },
       body: JSON.stringify({ email: "raw@example.com" }),
     });
     expect(raw.status).toBe(429);
+    expect(raw.headers.get("retry-after")).toMatch(/^[1-9]\d*$/);
+    expect(Number(raw.headers.get("retry-after"))).toBeLessThanOrEqual(60);
 
     // Other scopes and unlimited endpoints are unaffected.
-    expect((await api.fetch("/api/posts")).status).toBe(200);
+    expect(
+      (await api.fetch("/api/posts", { headers: { "cf-connecting-ip": IP } }))
+        .status,
+    ).toBe(200);
     const person = await api.createUser();
     expect(
       (
         await api.fetch("/api/api-keys", {
-          headers: { cookie: person.cookie },
+          headers: { cookie: person.cookie, "cf-connecting-ip": IP },
         })
       ).status,
     ).toBe(200);
   });
 
-  it("refuses before any credential is read: an over-limit call is 429 even without a cookie", async () => {
+  it("keys a session call by the cookie as sent, before it is validated: the same cookie is one caller, another cookie another", async () => {
     const api = start({
       rateLimits: { "api-keys": { limit: 1, windowMs: 60_000 } },
     });
     const person = await api.createUser();
-    const first = await api.fetch("/api/api-keys", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        cookie: person.cookie,
-        origin: api.baseUrl,
-      },
-      body: JSON.stringify({ name: "one", permissions: ["read"] }),
-    });
-    expect(first.status).toBe(201);
-    const anonymous = await api.fetch("/api/api-keys", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "two", permissions: ["read"] }),
-    });
-    expect(anonymous.status).toBe(429);
+    const create = (cookie: string, name: string) =>
+      api.fetch("/api/api-keys", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie,
+          origin: api.baseUrl,
+        },
+        body: JSON.stringify({ name, permissions: ["read"] }),
+      });
+    expect((await create(person.cookie, "one")).status).toBe(201);
+    // Refused before the credential is read.
+    expect((await create(person.cookie, "two")).status).toBe(429);
+    // No client address on any call: the cookie alone tells callers apart
+    // (in-process SSR calls carry the browser's cookie and no address), even
+    // one that will not validate.
+    const other = await create(
+      `${sessionCookieName(false)}=not-a-session`,
+      "three",
+    );
+    expect(other.status).toBe(401);
+    const someoneElse = await api.createUser();
+    expect((await create(someoneElse.cookie, "four")).status).toBe(201);
   });
 
-  it("keys the window per client address", async () => {
+  it("keys a bearer call by the key as sent: a bad key hammering an endpoint is one caller, refused before the credential is read", async () => {
+    const api = start({
+      rateLimits: { "api-keys": { limit: 1, windowMs: 60_000 } },
+    });
+    const withKey = (key: string) =>
+      api.fetch("/api/api-keys", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${key}`,
+        },
+        body: JSON.stringify({ name: "x", permissions: ["read"] }),
+      });
+    expect((await withKey("gmk_bad")).status).toBe(401);
+    expect((await withKey("gmk_bad")).status).toBe(429);
+    expect((await withKey("gmk_other")).status).toBe(401);
+    // A real key is its own caller too.
+    const person = await api.createUser();
+    const key = await api.createApiKey(person, ["admin"]);
+    expect((await withKey(key.key)).status).toBe(201);
+    expect((await withKey(key.key)).status).toBe(429);
+  });
+
+  it("keys the window per client address for anonymous calls", async () => {
     const api = start({
       rateLimits: { contact: { limit: 1, windowMs: 60_000 } },
     });
-    const from = (ip: string) =>
+    const from = (headers: Record<string, string>) =>
       api.fetch("/api/waitlist", {
         method: "POST",
-        headers: { "content-type": "application/json", "cf-connecting-ip": ip },
+        headers: { "content-type": "application/json", ...headers },
         body: JSON.stringify({
-          email: `${ip.replaceAll(".", "-")}@example.com`,
+          email: `${crypto.randomUUID().slice(0, 8)}@example.com`,
         }),
       });
-    expect((await from("203.0.113.1")).status).toBe(201);
-    expect((await from("203.0.113.1")).status).toBe(429);
-    expect((await from("203.0.113.2")).status).toBe(201);
+    expect((await from({ "cf-connecting-ip": "203.0.113.1" })).status).toBe(
+      201,
+    );
+    expect((await from({ "cf-connecting-ip": "203.0.113.1" })).status).toBe(
+      429,
+    );
+    expect((await from({ "cf-connecting-ip": "203.0.113.2" })).status).toBe(
+      201,
+    );
+    // Without Cloudflare's header, the first X-Forwarded-For hop.
+    expect(
+      (await from({ "x-forwarded-for": "203.0.113.3, 10.0.0.1" })).status,
+    ).toBe(201);
+    expect(
+      (await from({ "x-forwarded-for": "203.0.113.3, 10.0.0.2" })).status,
+    ).toBe(429);
+  });
+
+  it("never collapses calls with no credential and no address into one bucket: each is counted alone, with a warning", async () => {
+    const api = start({
+      rateLimits: { contact: { limit: 1, windowMs: 60_000 } },
+    });
+    const post = () =>
+      api.fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email: `anon-${crypto.randomUUID().slice(0, 6)}@example.com`,
+        }),
+      });
+    expect((await post()).status).toBe(201);
+    expect((await post()).status).toBe(201);
+    expect(
+      logsMentioning(api, "no credential and no client address").length,
+    ).toBeGreaterThanOrEqual(2);
   });
 
   it("the in-memory limiter resets after the window", async () => {

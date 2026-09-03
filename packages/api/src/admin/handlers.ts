@@ -3,7 +3,7 @@ import { Effect, Layer } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 
 import { internal, withUser } from "../boundary";
-import { primitives } from "../settings/handlers";
+import { primitives } from "../settings/primitives";
 import {
   AdminUsers,
   Bootstrap,

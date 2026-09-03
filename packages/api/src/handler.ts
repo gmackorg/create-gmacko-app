@@ -61,7 +61,16 @@ const corsFor = (config: AppConfigShape) => {
       // allow-origin header at all.
       allowedOrigins: (origin) => allowed.has(origin),
       credentials: true,
-      allowedHeaders: ["authorization", "content-type", REQUEST_ID_HEADER],
+      // An explicit list, never an echo of the request's own: the W3C trace
+      // context headers so a browser client can propagate its trace, and the
+      // request id it may mint.
+      allowedHeaders: [
+        "authorization",
+        "content-type",
+        "traceparent",
+        "tracestate",
+        REQUEST_ID_HEADER,
+      ],
       exposedHeaders: [REQUEST_ID_HEADER, TRACE_ID_HEADER],
       maxAge: 600,
     });

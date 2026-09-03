@@ -13,7 +13,12 @@ export interface AuthSecurityConfigShape {
    * normalised through `new URL(...).origin`; never a substring match.
    */
   readonly allowedOrigins: ReadonlyArray<string>;
-  // TODO(Phase 4): unused — drop with the apps/web cleanup
+  /**
+   * The deployment stage, from the app's `AppConfig` (packages/api's
+   * `AuthSecurityConfigLive`). Nothing in this package branches on it yet:
+   * the cookie path reads whichever session cookie name better-auth set
+   * (docs/API_AUTH.md, rule 4) rather than deriving it from the stage.
+   */
   readonly stage: Stage;
 }
 

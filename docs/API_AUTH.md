@@ -31,8 +31,12 @@ completing bootstrap are `Session` only: a leaked key must never reach them.
 ## Endpoints
 
 Every endpoint under `/api` (the health probes excepted) also carries the `EndpointBoundary` middleware:
-one span named `group.endpoint`, and 500 `InternalError` for anything unhandled. `Rate limit` names the
-`RateLimit` scope a call counts against (429 `RateLimited` over the allowance).
+one span named `group.endpoint` (a declared 4xx ends it successfully with `http.response.status_code`;
+only 500s and defects end it as a failure), and 500 `InternalError` for anything unhandled. The health
+probes have no endpoint span and therefore no `x-trace-id` response header (they still carry
+`x-request-id`). `Rate limit` names the `RateLimit` scope a call counts against (429 `RateLimited`, with
+`Retry-After`, over the allowance); the counter is keyed by the credential as sent (bearer, else session
+cookie), else the client address.
 
 | Group | Endpoint | Method | Path | Credential | Key scope | Roles | Rate limit | Success | Errors |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -111,3 +115,11 @@ effect 4.0.0-rc.112's `HttpApiBuilder` runs security middlewares and from better
   rather than 401, so the client can render signed-out state from one request.
 - `settings.deleteAccount` by a workspace owner cascades the workspace (memberships, invites, subscription,
   usage). Documented here, not signalled: there is no `Conflict` for it.
+- `settings.submitWaitlistEntry` upserts on (email, source): a re-submission replaces `message` and
+  `referralCode` with what it carries (omitting them clears the stored ones) and never resets a reviewed status.
+- `settings.getPreferences` before any `updatePreferences` answers the defaults without writing a row:
+  `id`, `createdAt` and `updatedAt` are `null` until first write.
+- `admin.reviewWaitlistEntry` approving an email already on the initial workspace's allowlist succeeds and
+  leaves that row alone; there is no `Conflict` for it.
+- `settings.acceptInvite` twice concurrently succeeds twice (the membership insert is idempotent); a later
+  accept of the consumed invite is 404 `NotFound`.

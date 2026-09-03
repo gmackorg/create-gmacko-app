@@ -25,6 +25,7 @@ import type { UserId } from "@gmacko/domain/auth";
 import { Conflict, NotFound } from "@gmacko/domain/errors";
 import {
   AnnouncementTone,
+  type CreateApiKey,
   type CreateInvite,
   InviteAccepted,
   type InviteId,
@@ -142,9 +143,11 @@ export class Launch extends Context.Service<Launch, LaunchShape>()(
 
 export interface WaitlistShape {
   /**
-   * One atomic upsert on `(email, source)`. A re-submission refreshes the
-   * message and referral code but never resets a reviewed entry's status
-   * (the legacy handler put it back to `pending`).
+   * One atomic upsert on `(email, source)`. A re-submission replaces the
+   * message and referral code with what it carries — omitting them clears
+   * the stored ones, so the entry always mirrors the latest submission —
+   * but never resets a reviewed entry's status (the legacy handler put it
+   * back to `pending`).
    */
   readonly submit: (
     input: WaitlistSubmit,
@@ -226,7 +229,10 @@ export interface WorkspacesShape {
    * consumes the invite, as one batch. `NotFound` for an unknown invite or
    * one addressed to another email (never confirms it exists);
    * `Conflict("owner-invite-unsupported")`; `Conflict("already-in-workspace")`
-   * when the caller belongs to a different workspace.
+   * when the caller belongs to a different workspace. Two concurrent accepts
+   * of the same invite both succeed: the membership insert is `ON CONFLICT
+   * DO NOTHING` on (workspace, user), and consuming an already-consumed
+   * invite changes nothing.
    */
   readonly acceptInvite: (
     user: { readonly id: string; readonly email: string },
@@ -374,11 +380,14 @@ export class Workspaces extends Context.Service<Workspaces, WorkspacesShape>()(
               .where(eq(workspaceInviteAllowlist.id, invite.id));
             if (existing === undefined) {
               yield* batch([
-                db.insert(workspaceMembership).values({
-                  workspaceId: invite.workspaceId,
-                  userId: caller.id,
-                  role: invite.role,
-                }),
+                db
+                  .insert(workspaceMembership)
+                  .values({
+                    workspaceId: invite.workspaceId,
+                    userId: caller.id,
+                    role: invite.role,
+                  })
+                  .onConflictDoNothing(),
                 consume,
               ]);
             } else {
@@ -399,7 +408,11 @@ export class Workspaces extends Context.Service<Workspaces, WorkspacesShape>()(
 // ---------------------------------------------------------------------------
 
 export interface PreferencesShape {
-  /** The row, or the column defaults without inserting one. */
+  /**
+   * The row, or the column defaults without inserting one; then `id`,
+   * `createdAt` and `updatedAt` are `null` (the contract: "null until first
+   * write"), never a sentinel.
+   */
   readonly get: (
     userId: string,
   ) => Effect.Effect<UserPreferences, DatabaseError>;
@@ -412,14 +425,14 @@ export interface PreferencesShape {
 
 const defaultPreferences = (userId: string): UserPreferences =>
   new UserPreferences({
-    id: "" as UserPreferencesId,
+    id: null,
     userId: userId as UserId,
     theme: "system",
     language: "en",
     timezone: "UTC",
     emailNotifications: true,
     pushNotifications: true,
-    createdAt: new Date(0),
+    createdAt: null,
     updatedAt: null,
   });
 
@@ -477,6 +490,32 @@ export class Preferences extends Context.Service<
     ),
   );
 }
+
+// ---------------------------------------------------------------------------
+// API keys (the service is @gmacko/auth's `ApiKeys`; this is the call shape)
+// ---------------------------------------------------------------------------
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The contract's `expiresInDays` (relative, what a form asks for) as the
+ * `expiresAt` instant `ApiKeys.create` stores; `undefined` never expires.
+ */
+export const toApiKeyCreate = (
+  payload: CreateApiKey,
+  now: number = Date.now(),
+): {
+  readonly name: string;
+  readonly permissions: CreateApiKey["permissions"];
+  readonly expiresAt: Date | undefined;
+} => ({
+  name: payload.name,
+  permissions: payload.permissions,
+  expiresAt:
+    payload.expiresInDays === undefined
+      ? undefined
+      : new Date(now + payload.expiresInDays * DAY_MS),
+});
 
 // ---------------------------------------------------------------------------
 // Account

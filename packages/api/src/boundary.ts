@@ -14,8 +14,19 @@ import {
   EndpointBoundary,
   InternalError,
 } from "@gmacko/domain";
-import { Context, Effect, Layer, Metric, Option } from "effect";
+import {
+  Cause,
+  Context,
+  Effect,
+  type Exit,
+  Layer,
+  Metric,
+  Option,
+  Result,
+  SchemaAST,
+} from "effect";
 import { HttpServerRequest, HttpTraceContext } from "effect/unstable/http";
+import { HttpApiError } from "effect/unstable/httpapi";
 
 // ---------------------------------------------------------------------------
 // Request trace holder
@@ -52,11 +63,55 @@ const pathOf = (url: string): string => {
   return query === -1 ? url : url.slice(0, query);
 };
 
+const STATUS_ATTRIBUTE = "http.response.status_code";
+
+const resolveStatus = SchemaAST.resolveAt<number>("httpApiStatus");
+
+/**
+ * The status a typed failure will be sent with: the `httpApiStatus`
+ * annotation of the error's schema (every contract error carries one, see
+ * domain/errors.ts), or 400 for the builder's own request-decoding error.
+ * `undefined` for anything else, which the boundary treats as a 500.
+ */
+const statusOfError = (error: unknown): number | undefined => {
+  if (HttpApiError.HttpApiSchemaError.is(error)) return 400;
+  const ast = (
+    error as { readonly constructor?: { readonly ast?: SchemaAST.AST } }
+  ).constructor?.ast;
+  return ast === undefined ? undefined : resolveStatus(ast);
+};
+
+/**
+ * Whether the span should end successfully for this exit. A typed failure
+ * the contract declares (401, 404, 409, 429, a 400 decode error...) is the
+ * endpoint answering as designed, not the endpoint failing: it gets its
+ * status code as an attribute and a successful span. Only `InternalError`
+ * (500), an undeclared error, an interrupt or a defect end the span as a
+ * failure.
+ */
+const settle = <A extends { readonly status: number }, E>(
+  exit: Exit.Exit<A, E>,
+): { readonly status: number; readonly ok: boolean } => {
+  if (exit._tag === "Success") return { status: exit.value.status, ok: true };
+  const failure = Cause.findError(exit.cause);
+  if (Result.isFailure(failure)) return { status: 500, ok: false };
+  if (failure.success instanceof InternalError) {
+    return { status: 500, ok: false };
+  }
+  const status = statusOfError(failure.success);
+  return status === undefined || status >= 500
+    ? { status: status ?? 500, ok: false }
+    : { status, ok: true };
+};
+
 /**
  * Outermost on every `/api` endpoint (it is added at the api level after
  * the endpoint's own middlewares), so the span covers the credential and
  * role checks too, and a database failure that a middleware turned into a
  * defect ends as a 500 `InternalError` with the cause in the log.
+ *
+ * The health probes sit outside it (domain/api.ts) and so have no endpoint
+ * span and no `x-trace-id` on their responses; they still get a request id.
  */
 export const EndpointBoundaryLive: Layer.Layer<EndpointBoundary> =
   Layer.succeed(EndpointBoundary)(
@@ -73,23 +128,31 @@ export const EndpointBoundaryLive: Layer.Layer<EndpointBoundary> =
           (clock) => clock.currentTimeMillis,
         );
 
+        // The span wraps the exit, not the effect: a declared 4xx must not
+        // end it as a failure (see `settle`), so the exit is inspected inside
+        // the span and re-raised outside it (`Effect.flatMap` below), unless
+        // it is a real failure, which is re-raised inside so the span records
+        // it.
         const body = Effect.gen(function* () {
           const span = yield* Effect.option(Effect.currentSpan);
           if (Option.isSome(trace) && Option.isSome(span)) {
             trace.value.traceId = span.value.traceId;
           }
-          const response = yield* httpEffect.pipe(
-            Effect.catchDefect((defect) =>
-              Effect.logError(`${name}: unhandled defect`, defect).pipe(
-                Effect.andThen(Effect.fail(new InternalError())),
+          const exit = yield* Effect.exit(
+            httpEffect.pipe(
+              Effect.catchDefect((defect) =>
+                Effect.logError(`${name}: unhandled defect`, defect).pipe(
+                  Effect.andThen(Effect.fail(new InternalError())),
+                ),
               ),
             ),
           );
-          yield* Effect.annotateCurrentSpan(
-            "http.response.status_code",
-            response.status,
-          );
-          return response;
+          const { status, ok } = settle(exit);
+          yield* Effect.annotateCurrentSpan(STATUS_ATTRIBUTE, status);
+          if (!ok && exit._tag === "Failure") {
+            return yield* Effect.failCause(exit.cause);
+          }
+          return exit;
         }).pipe(
           Effect.onExit(() =>
             Effect.clockWith((clock) =>
@@ -111,6 +174,7 @@ export const EndpointBoundaryLive: Layer.Layer<EndpointBoundary> =
                 : {}),
             },
           }),
+          Effect.flatMap((exit) => exit),
         );
 
         return yield* Option.isSome(requestId)
@@ -148,7 +212,8 @@ export const internal = <A, E, R>(
 
 /**
  * An authenticated handler body: resolves `CurrentUser`, annotates the log
- * and the endpoint span with the user id, and applies `internal`.
+ * and the endpoint span with the user id (before the body runs, so a failing
+ * call is attributed too), and applies `internal`.
  */
 export const withUser = <A, E, R>(
   f: (user: CurrentUserShape) => Effect.Effect<A, E, R>,
@@ -158,9 +223,9 @@ export const withUser = <A, E, R>(
   R | CurrentUser
 > =>
   Effect.flatMap(CurrentUser, (user) =>
-    internal(f(user)).pipe(
+    Effect.annotateCurrentSpan("user.id", user.id).pipe(
+      Effect.andThen(internal(f(user))),
       Effect.annotateLogs("user.id", user.id),
-      Effect.tap(() => Effect.annotateCurrentSpan("user.id", user.id)),
     ),
   );
 

@@ -415,6 +415,50 @@ describe("admin launch controls (ported)", () => {
     });
   });
 
+  it("updateLaunchControls with an empty patch on an empty table answers the defaults and creates the one row", async () => {
+    await resetBootstrap();
+    const avery = await asAdmin();
+    const raw = await api.fetch("/api/admin/launch-controls", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        cookie: avery.cookie,
+        origin: api.baseUrl,
+      },
+      body: "{}",
+    });
+    expect(raw.status).toBe(200);
+    expect(await raw.json()).toMatchObject({
+      maintenanceMode: false,
+      signupEnabled: true,
+      announcementMessage: null,
+      announcementTone: "info",
+      allowedEmailDomains: [],
+    });
+    const rows = await db(({ db }) => db.select().from(applicationSettings));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      maintenanceMode: false,
+      signupEnabled: true,
+      announcementMessage: null,
+      announcementTone: "info",
+      allowedEmailDomains: [],
+      setupCompletedAt: null,
+    });
+    // A later patch updates that row rather than adding another.
+    const updated = await api.call(
+      (client) =>
+        client.admin.updateLaunchControls({
+          payload: new UpdateLaunchControls({ signupEnabled: false }),
+        }),
+      { cookie: avery.cookie },
+    );
+    expect(updated).toMatchObject({ id: rows[0]?.id, signupEnabled: false });
+    expect(
+      await db(({ db }) => db.select().from(applicationSettings)),
+    ).toHaveLength(1);
+  });
+
   it("requires the admin role: a user session and a non-admin's admin key are Forbidden(role)", async () => {
     const person = await api.createUser();
     const bySession = await api.failure(
@@ -497,7 +541,7 @@ describe("admin waitlist review", () => {
     });
   });
 
-  it("approval with an existing allowlist row is Conflict(allowlist-exists) and changes nothing", async () => {
+  it("approval with an existing allowlist row succeeds and leaves that row alone", async () => {
     await resetBootstrap();
     const avery = await asAdmin();
     const acme = await api.createWorkspace({ owner: avery, name: "Acme" });
@@ -511,7 +555,7 @@ describe("admin waitlist review", () => {
       }),
     );
     const entry = await addWaitlist({ email: "dup@example.com" });
-    const failure = await api.failure(
+    const reviewed = await api.call(
       (client) =>
         client.admin.reviewWaitlistEntry({
           params: { id: entry.id as WaitlistEntryId },
@@ -519,14 +563,20 @@ describe("admin waitlist review", () => {
         }),
       { cookie: avery.cookie },
     );
-    expect(failure).toMatchObject({
-      _tag: "Conflict",
-      reason: "allowlist-exists",
+    expect(reviewed).toMatchObject({
+      id: entry.id,
+      status: "approved",
+      reviewedByUserId: avery.id,
     });
-    const [row] = await db(({ db }) =>
-      db.select().from(waitlistEntry).where(eq(waitlistEntry.id, entry.id)),
+    // Idempotent on the allowlist: the hand-made invite keeps its role.
+    const allowlist = await db(({ db }) =>
+      db
+        .select()
+        .from(workspaceInviteAllowlist)
+        .where(eq(workspaceInviteAllowlist.email, "dup@example.com")),
     );
-    expect(row).toMatchObject({ status: "pending", reviewedByUserId: null });
+    expect(allowlist).toHaveLength(1);
+    expect(allowlist[0]).toMatchObject({ workspaceId: acme.id, role: "admin" });
   });
 
   it("approval without an initial workspace only marks the entry", async () => {

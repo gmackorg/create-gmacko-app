@@ -1,9 +1,7 @@
 import { ApiKeys } from "@gmacko/auth/api-keys";
 import { toWebHeaders } from "@gmacko/auth/middleware";
 import { Auth } from "@gmacko/auth/service";
-import { platformPrimitives } from "@gmacko/config";
 import { AppApi } from "@gmacko/domain";
-import { PlatformPrimitives } from "@gmacko/domain/settings";
 import { Effect, Layer } from "effect";
 import {
   Cookies,
@@ -15,46 +13,16 @@ import { HttpApiBuilder } from "effect/unstable/httpapi";
 
 import { internal, requestContext, withUser } from "../boundary";
 import { Billing } from "./billing";
+import { primitives } from "./primitives";
 import {
   Account,
   Launch,
   Preferences,
   SettingsServicesLive,
+  toApiKeyCreate,
   Waitlist,
   Workspaces,
 } from "./service";
-
-/** A constant from `@gmacko/config`; the same object `admin.launchControls` embeds. */
-export const primitives = new PlatformPrimitives({
-  featureFlags: {
-    enabled: platformPrimitives.featureFlags.enabled,
-    provider: platformPrimitives.featureFlags.provider,
-  },
-  jobs: {
-    enabled: platformPrimitives.jobs.enabled,
-    provider: platformPrimitives.jobs.provider,
-  },
-  rateLimits: {
-    enabled: platformPrimitives.rateLimits.enabled,
-    scopes: [...platformPrimitives.rateLimits.scopes],
-  },
-  botProtection: {
-    enabled: platformPrimitives.botProtection.enabled,
-    provider: platformPrimitives.botProtection.provider,
-  },
-  compliance: {
-    enabled: platformPrimitives.compliance.enabled,
-    dataExport: platformPrimitives.compliance.dataExport,
-    dataDeletion: platformPrimitives.compliance.dataDeletion,
-  },
-  emailDelivery: {
-    enabled: platformPrimitives.emailDelivery.enabled,
-    provider: platformPrimitives.emailDelivery.provider,
-    requiredEnv: [...platformPrimitives.emailDelivery.requiredEnv],
-  },
-});
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const SettingsHandlers = HttpApiBuilder.group(
   AppApi,
@@ -120,16 +88,7 @@ export const SettingsHandlers = HttpApiBuilder.group(
         )
         .handle("listApiKeys", () => withUser((user) => keys.list(user.id)))
         .handle("createApiKey", ({ payload }) =>
-          withUser((user) =>
-            keys.create(user.id, {
-              name: payload.name,
-              permissions: payload.permissions,
-              expiresAt:
-                payload.expiresInDays === undefined
-                  ? undefined
-                  : new Date(Date.now() + payload.expiresInDays * DAY_MS),
-            }),
-          ),
+          withUser((user) => keys.create(user.id, toApiKeyCreate(payload))),
         )
         .handle("revokeApiKey", ({ params }) =>
           withUser((user) => keys.revoke(user.id, params.id)),

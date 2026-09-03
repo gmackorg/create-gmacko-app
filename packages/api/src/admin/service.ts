@@ -120,11 +120,25 @@ export const slugifyWorkspaceName = (name: string): string => {
 
 export interface LaunchControlsShape {
   readonly get: Effect.Effect<LaunchControls, DatabaseError>;
-  /** Upserts the singleton row, touching only the fields sent. */
+  /**
+   * Upserts the singleton row, touching only the fields sent. On an empty
+   * table the first write inserts the row with the patch over the column
+   * defaults (so `{}` yields the defaults), guarded so two first writers
+   * cannot create two singletons.
+   */
   readonly update: (
     patch: UpdateLaunchControls,
   ) => Effect.Effect<ApplicationSettings, DatabaseError>;
 }
+
+/** The launch controls' column defaults, as read when no row exists yet. */
+const launchDefaults = {
+  maintenanceMode: false,
+  signupEnabled: true,
+  announcementMessage: null,
+  announcementTone: "info",
+  allowedEmailDomains: [] as ReadonlyArray<string>,
+} as const;
 
 export class LaunchControlsService extends Context.Service<
   LaunchControlsService,
@@ -144,13 +158,20 @@ export class LaunchControlsService extends Context.Service<
             Effect.map(
               ([[settings], [waitlist]]) =>
                 new LaunchControls({
-                  maintenanceMode: settings?.maintenanceMode ?? false,
-                  signupEnabled: settings?.signupEnabled ?? true,
-                  announcementMessage: settings?.announcementMessage ?? null,
+                  maintenanceMode:
+                    settings?.maintenanceMode ?? launchDefaults.maintenanceMode,
+                  signupEnabled:
+                    settings?.signupEnabled ?? launchDefaults.signupEnabled,
+                  announcementMessage:
+                    settings?.announcementMessage ??
+                    launchDefaults.announcementMessage,
                   announcementTone: toAnnouncementTone(
-                    settings?.announcementTone ?? "info",
+                    settings?.announcementTone ??
+                      launchDefaults.announcementTone,
                   ),
-                  allowedEmailDomains: settings?.allowedEmailDomains ?? [],
+                  allowedEmailDomains:
+                    settings?.allowedEmailDomains ??
+                    launchDefaults.allowedEmailDomains,
                   platformPrimitives: primitives,
                   waitlistCount: waitlist?.n ?? 0,
                 }),
@@ -176,51 +197,39 @@ export class LaunchControlsService extends Context.Service<
                   : { allowedEmailDomains: [...patch.allowedEmailDomains] }),
               };
               const [existing] = yield* singleton;
-              if (existing !== undefined) {
-                return yield* first(
-                  db
-                    .update(applicationSettings)
-                    .set({ ...fields, updatedAt: new Date() })
-                    .where(eq(applicationSettings.id, existing.id))
-                    .returning(),
-                  () =>
-                    new Error("application_settings update returned no row"),
-                ).pipe(Effect.orDie, Effect.map(toSettings));
-              }
-              // First write: insert only while the table is still empty, so
-              // two first writers cannot create two singletons.
-              const id = crypto.randomUUID();
-              const [inserted] = yield* db
-                .insert(applicationSettings, "id", "createdAt")
-                .select(
-                  sql`select ${id}, ${Date.now()} where not exists (select 1 from ${applicationSettings})`,
-                )
-                .returning();
-              if (inserted === undefined) {
-                // Lost the race: the other writer's row exists now; update it.
-                const [row] = yield* singleton;
-                if (row === undefined) {
-                  return yield* Effect.die(
-                    new Error(
-                      "application_settings vanished between insert and read",
-                    ),
-                  );
-                }
-                return yield* first(
-                  db
-                    .update(applicationSettings)
-                    .set({ ...fields, updatedAt: new Date() })
-                    .where(eq(applicationSettings.id, row.id))
-                    .returning(),
-                  () =>
-                    new Error("application_settings update returned no row"),
-                ).pipe(Effect.orDie, Effect.map(toSettings));
+              if (existing === undefined) {
+                // First write: one guarded INSERT … SELECT carrying the patch
+                // over the defaults, only while the table is still empty, so
+                // two first writers cannot create two singletons and an empty
+                // patch still yields the defaults row. Values are bound as
+                // the driver stores them (0/1 booleans, JSON text, epoch ms):
+                // `insert().select()` bypasses the column mappers.
+                const row = { ...launchDefaults, ...fields };
+                const [inserted] = yield* db
+                  .insert(
+                    applicationSettings,
+                    "id",
+                    "maintenanceMode",
+                    "signupEnabled",
+                    "announcementMessage",
+                    "announcementTone",
+                    "allowedEmailDomains",
+                    "createdAt",
+                  )
+                  .select(
+                    sql`select ${crypto.randomUUID()}, ${row.maintenanceMode ? 1 : 0}, ${row.signupEnabled ? 1 : 0}, ${row.announcementMessage}, ${row.announcementTone}, ${JSON.stringify(row.allowedEmailDomains)}, ${Date.now()} where not exists (select 1 from ${applicationSettings})`,
+                  )
+                  .returning();
+                if (inserted !== undefined) return toSettings(inserted);
+                // Lost the race: the other writer's row exists now; patch it.
               }
               return yield* first(
                 db
                   .update(applicationSettings)
-                  .set(fields)
-                  .where(eq(applicationSettings.id, inserted.id))
+                  .set({ ...fields, updatedAt: new Date() })
+                  .where(
+                    sql`${applicationSettings.id} = (select ${applicationSettings.id} from ${applicationSettings} limit 1)`,
+                  )
                   .returning(),
                 () => new Error("application_settings update returned no row"),
               ).pipe(Effect.orDie, Effect.map(toSettings));
@@ -241,8 +250,9 @@ export interface WaitlistReviewShape {
    * Sets the status with `WHERE status != <new>` as the guard (zero rows ⇒
    * `Conflict("waitlist-status-changed")`). Approving while application
    * settings name an initial workspace also allowlists the email there, in
-   * the same batch, conditioned on the same guard; an existing allowlist
-   * row is `Conflict("allowlist-exists")` and nothing changes.
+   * the same batch, conditioned on the same guard and on no allowlist row
+   * for (workspace, email) existing yet: an email invited by hand is
+   * approved without touching its invite.
    */
   readonly review: (
     reviewerId: string,
@@ -296,6 +306,9 @@ export class WaitlistReview extends Context.Service<
               )
               .returning({ id: waitlistEntry.id });
             const workspaceId = settings?.initialWorkspaceId ?? null;
+            // Idempotent on the allowlist: an existing (workspace, email)
+            // row, however it got there, is left as it is.
+            const notListed = sql`not exists (select 1 from ${workspaceInviteAllowlist} where ${workspaceInviteAllowlist.workspaceId} = ${workspaceId} and ${workspaceInviteAllowlist.email} = ${entry.email})`;
             const allowlist =
               input.status === "approved" && workspaceId !== null
                 ? db
@@ -309,18 +322,13 @@ export class WaitlistReview extends Context.Service<
                       "createdAt",
                     )
                     .select(
-                      sql`select ${crypto.randomUUID()}, ${workspaceId}, ${entry.email}, 'member', ${reviewerId}, ${Date.now()} where ${notYet}`,
+                      sql`select ${crypto.randomUUID()}, ${workspaceId}, ${entry.email}, 'member', ${reviewerId}, ${Date.now()} where ${notYet} and ${notListed}`,
                     )
                 : null;
 
             const items: ReadonlyArray<BatchItem> =
               allowlist === null ? [update] : [allowlist, update];
-            const results = yield* batch(items).pipe(
-              Effect.catchIf(
-                (error: DatabaseError) => error.reason === "unique",
-                () => Effect.fail(new Conflict({ reason: "allowlist-exists" })),
-              ),
-            );
+            const results = yield* batch(items);
             const changed = results[results.length - 1] ?? [];
             if (changed.length === 0) {
               return yield* new Conflict({ reason: "waitlist-status-changed" });
@@ -445,36 +453,42 @@ export class Bootstrap extends Context.Service<Bootstrap, BootstrapShape>()(
               .update(user)
               .set({ role: "admin" })
               .where(sql`${user.id} = ${userId} and ${won}`);
-            const completeSettings =
-              settings === undefined
-                ? db
-                    .insert(
-                      applicationSettings,
-                      "id",
-                      "setupCompletedAt",
-                      "setupCompletedByUserId",
-                      "initialWorkspaceId",
-                      "createdAt",
-                    )
-                    .select(
-                      sql`select ${crypto.randomUUID()}, ${now}, ${userId}, ${workspaceId}, ${now} where not exists (select 1 from ${applicationSettings}) and exists (select 1 from ${workspace} where ${workspace.id} = ${workspaceId})`,
-                    )
-                : db
-                    .update(applicationSettings)
-                    .set({
-                      setupCompletedAt: new Date(now),
-                      setupCompletedByUserId: userId,
-                      initialWorkspaceId: workspaceId,
-                    })
-                    .where(
-                      sql`${applicationSettings.id} = ${settings.id} and ${applicationSettings.setupCompletedAt} is null and ${won}`,
-                    );
+            // Both settings statements go in the batch, each guarded so
+            // exactly one takes effect: the update when a row exists, the
+            // insert when the table is empty *at batch time*. Choosing one
+            // from the `settingsRow` read above would race a first
+            // `updateLaunchControls` landing in between: the insert's guard
+            // would then make it a no-op and the workspace would be created
+            // with setup never marked complete.
+            const completeSettings = db
+              .update(applicationSettings)
+              .set({
+                setupCompletedAt: new Date(now),
+                setupCompletedByUserId: userId,
+                initialWorkspaceId: workspaceId,
+              })
+              .where(
+                sql`${applicationSettings.setupCompletedAt} is null and ${won}`,
+              );
+            const createSettings = db
+              .insert(
+                applicationSettings,
+                "id",
+                "setupCompletedAt",
+                "setupCompletedByUserId",
+                "initialWorkspaceId",
+                "createdAt",
+              )
+              .select(
+                sql`select ${crypto.randomUUID()}, ${now}, ${userId}, ${workspaceId}, ${now} where not exists (select 1 from ${applicationSettings}) and ${won}`,
+              );
 
             const results = yield* batch([
               createWorkspace,
               createMembership,
               promote,
               completeSettings,
+              createSettings,
             ]);
             if (results[0].length === 0) return yield* conflict;
 

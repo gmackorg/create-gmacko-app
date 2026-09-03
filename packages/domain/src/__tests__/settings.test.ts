@@ -153,6 +153,21 @@ describe("row models round-trip through JSON", () => {
       }),
     ],
     [
+      "UserPreferences (never written: null id and dates)",
+      UserPreferences,
+      new UserPreferences({
+        id: null,
+        userId,
+        theme: "system",
+        language: "en",
+        timezone: "UTC",
+        emailNotifications: true,
+        pushNotifications: true,
+        createdAt: null,
+        updatedAt: null,
+      }),
+    ],
+    [
       "ApiKey",
       ApiKey,
       new ApiKey({

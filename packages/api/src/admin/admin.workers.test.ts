@@ -111,7 +111,7 @@ describe("guarded writes on D1", () => {
     expect(status).toMatchObject({ isInitialized: true, requiresSetup: false });
   });
 
-  it("two concurrent approvals: one success, one Conflict(waitlist-status-changed), one allowlist row", async () => {
+  it("two concurrent approvals: one success, one Conflict(waitlist-status-changed), one allowlist row; a re-approval keeps it at one", async () => {
     const entry = await runtime
       .runPromise(
         Effect.flatMap(Database, ({ db }) =>
@@ -154,9 +154,9 @@ describe("guarded writes on D1", () => {
     expect(allowlist).toHaveLength(1);
     expect(allowlist[0]?.role).toBe("member");
 
-    // An existing allowlist row makes a later re-approval attempt a
-    // Conflict(allowlist-exists) with the entry untouched... once the entry
-    // is not yet approved: reset it and try again.
+    // The allowlist insert is idempotent: with the row already there, a
+    // re-approval (once the entry is back to pending) succeeds and leaves
+    // the count at one.
     await runtime.runPromise(
       Effect.flatMap(Database, ({ db }) =>
         db
@@ -176,12 +176,22 @@ describe("guarded writes on D1", () => {
         ),
       ),
     );
-    expect(outcome(again)).toBe("allowlist-exists");
+    expect(outcome(again)).toBe("success");
     const [row] = await runtime.runPromise(
       Effect.flatMap(Database, ({ db }) =>
         db.select().from(waitlistEntry).where(eq(waitlistEntry.id, entry.id)),
       ),
     );
-    expect(row?.status).toBe("pending");
+    expect(row?.status).toBe("approved");
+    const after = await runtime.runPromise(
+      Effect.flatMap(Database, ({ db }) =>
+        db
+          .select()
+          .from(workspaceInviteAllowlist)
+          .where(eq(workspaceInviteAllowlist.email, "race@example.com")),
+      ),
+    );
+    expect(after).toHaveLength(1);
+    expect(after[0]?.id).toBe(allowlist[0]?.id);
   });
 });

@@ -115,10 +115,16 @@ const timestamps = {
 // Row models
 // ---------------------------------------------------------------------------
 
+/**
+ * The caller's preferences. `getPreferences` answers the defaults without
+ * writing a row, so `id`, `createdAt` and `updatedAt` are `null` until the
+ * first `updatePreferences`; the other fields always carry a value.
+ */
 export class UserPreferences extends Schema.Class<UserPreferences>(
   "UserPreferences",
 )({
-  id: UserPreferencesId,
+  /** `null` until first write. */
+  id: Schema.NullOr(UserPreferencesId),
   userId: UserId,
   /** See `Theme`: the column is free text, the row model is not. */
   theme: Theme,
@@ -126,7 +132,9 @@ export class UserPreferences extends Schema.Class<UserPreferences>(
   timezone: Schema.String,
   emailNotifications: Schema.Boolean,
   pushNotifications: Schema.Boolean,
-  ...timestamps,
+  /** `null` until first write. */
+  createdAt: Schema.NullOr(Schema.Date),
+  updatedAt: Schema.NullOr(Schema.Date),
 }) {}
 
 /** An API key as listed: never the hash, never the plaintext. */
@@ -277,6 +285,11 @@ export class LaunchState extends Schema.Class<LaunchState>("LaunchState")({
   canUseWaitlist: Schema.Boolean,
 }) {}
 
+/**
+ * One submission per (email, source): a re-submission replaces `message` and
+ * `referralCode` with what it carries, so omitting them clears the stored
+ * ones. A reviewed entry keeps its status.
+ */
 export class WaitlistSubmit extends Schema.Class<WaitlistSubmit>(
   "WaitlistSubmit",
 )({
