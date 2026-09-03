@@ -36,7 +36,6 @@
     "@gmacko/legacy-auth": "workspace:*",
     "@gmacko/legacy-db": "workspace:*",
     "@gmacko/telemetry": "workspace:*",
-    "@gmacko/validators": "workspace:*",
     "@trpc/server": "catalog:",
     "superjson": "catalog:",
     "zod": "catalog:"

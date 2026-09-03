@@ -56,7 +56,7 @@ describe("create-gmacko-app scaffold", () => {
       expect(
         fileExists(result.appPath, "packages/operator-core/package.json"),
       ).toBe(false);
-      expect(fileExists(result.appPath, "packages/trpc-cli/package.json")).toBe(
+      expect(fileExists(result.appPath, "packages/api-cli/package.json")).toBe(
         false,
       );
       expect(
@@ -898,7 +898,7 @@ describe("create-gmacko-app scaffold", () => {
       expect(
         fileExists(result.appPath, "packages/operator-core/package.json"),
       ).toBe(true);
-      expect(fileExists(result.appPath, "packages/trpc-cli/package.json")).toBe(
+      expect(fileExists(result.appPath, "packages/api-cli/package.json")).toBe(
         true,
       );
       expect(
@@ -996,10 +996,10 @@ describe("create-gmacko-app scaffold", () => {
       expect(
         fileExists(result.appPath, "packages/operator-core/package.json"),
       ).toBe(true);
-      expect(fileExists(result.appPath, "packages/trpc-cli/package.json")).toBe(
+      expect(fileExists(result.appPath, "packages/api-cli/package.json")).toBe(
         true,
       );
-      expect(fileExists(result.appPath, "packages/trpc-cli/src/index.ts")).toBe(
+      expect(fileExists(result.appPath, "packages/api-cli/src/index.ts")).toBe(
         true,
       );
       expect(
@@ -1022,13 +1022,13 @@ describe("create-gmacko-app scaffold", () => {
         result.appPath,
         "packages/config/src/integrations.ts",
       );
-      const trpcCliPackage = readJson<{
+      const apiCliPackage = readJson<{
         name?: string;
         bin?: Record<string, string>;
-      }>(result.appPath, "packages/trpc-cli/package.json");
-      const trpcCliSource = readFile(
+      }>(result.appPath, "packages/api-cli/package.json");
+      const apiCliSource = readFile(
         result.appPath,
-        "packages/trpc-cli/src/index.ts",
+        "packages/api-cli/src/index.ts",
       );
       const mcpServerSource = readFile(
         result.appPath,
@@ -1040,12 +1040,12 @@ describe("create-gmacko-app scaffold", () => {
       );
       const rootReadme = readFile(result.appPath, "README.md");
 
-      expect(rootPackage.scripts?.["trpc:ops"]).toContain("@gmacko/trpc-cli");
+      expect(rootPackage.scripts?.["trpc:ops"]).toContain("@gmacko/api-cli");
       expect(rootPackage.scripts?.["mcp:app"]).toContain("@gmacko/mcp-server");
       expect(operatorCorePackage.name).toBe("@gmacko/operator-core");
-      expect(trpcCliPackage.name).toBe("@gmacko/trpc-cli");
-      expect(Object.keys(trpcCliPackage.bin ?? {})).toContain("gmacko-ops");
-      expect(trpcCliSource).toContain("@gmacko/operator-core");
+      expect(apiCliPackage.name).toBe("@gmacko/api-cli");
+      expect(Object.keys(apiCliPackage.bin ?? {})).toContain("gmacko-ops");
+      expect(apiCliSource).toContain("@gmacko/operator-core");
       expect(mcpServerCoreSource).toContain("@gmacko/operator-core");
       expect(mcpServerSource).toContain('name: "gmacko-app"');
       expect(mcpServerSource).not.toContain(
@@ -1148,7 +1148,7 @@ describe("create-gmacko-app scaffold", () => {
         "apps/nextjs/src/trpc/react.tsx",
         "apps/nextjs/src/trpc/server.tsx",
         "apps/web/src/lib/url.ts",
-        "packages/trpc-client/src/client.ts",
+        "packages/api-client/src/client.ts",
         "packages/ui/src/theme.tsx",
       ].map((file) => readFile(result.appPath, file));
 

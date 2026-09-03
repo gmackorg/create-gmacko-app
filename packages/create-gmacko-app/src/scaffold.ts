@@ -525,10 +525,10 @@ function getBootstrapRecommendations(options: CliOptions): {
       "- Operator APIs: use `pnpm trpc:ops -- --help` and `pnpm mcp:app` for the shared CLI and MCP wrapper lane.",
     );
     codexLines.push(
-      "- Operator APIs: use `packages/operator-core`, `packages/trpc-cli`, and `packages/mcp-server` for the shared CLI and MCP wrapper lane.",
+      "- Operator APIs: use `packages/operator-core`, `packages/api-cli`, and `packages/mcp-server` for the shared CLI and MCP wrapper lane.",
     );
     opencodeLines.push(
-      "- Operator APIs: use `packages/operator-core`, `packages/trpc-cli`, and `packages/mcp-server` for the shared CLI and MCP wrapper lane.",
+      "- Operator APIs: use `packages/operator-core`, `packages/api-cli`, and `packages/mcp-server` for the shared CLI and MCP wrapper lane.",
     );
   }
 
@@ -731,7 +731,7 @@ function addOptionalOperatorScripts(
   // workspace package's OWN declared bin into node_modules/.bin, so the
   // `exec gmacko-ops` / `exec gmacko-mcp` bin forms fail EACCES.
   rootPackage.scripts["trpc:ops"] =
-    "pnpm --filter @gmacko/trpc-cli exec tsx src/index.ts";
+    "pnpm --filter @gmacko/api-cli exec tsx src/index.ts";
   rootPackage.scripts["mcp:app"] =
     "pnpm --filter @gmacko/mcp-server exec tsx src/index.ts";
 
@@ -1145,7 +1145,7 @@ function pruneOptionalLanes(targetDir: string, options: CliOptions): void {
 
   if (!options.trpcOperators) {
     fs.removeSync(path.join(targetDir, "packages/operator-core"));
-    fs.removeSync(path.join(targetDir, "packages/trpc-cli"));
+    fs.removeSync(path.join(targetDir, "packages/api-cli"));
     fs.removeSync(path.join(targetDir, "packages/mcp-server"));
   }
 }

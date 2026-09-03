@@ -31,7 +31,7 @@
     "forge:stages": "forge stage list",
     "forge:deploy:staging": "forge deploy create staging --wait",
     "forge:deploy:production": "forge deploy create production --wait",
-    "trpc:ops": "pnpm --filter @gmacko/trpc-cli exec tsx src/index.ts",
+    "trpc:ops": "pnpm --filter @gmacko/api-cli exec tsx src/index.ts",
     "mcp:app": "pnpm --filter @gmacko/mcp-server exec tsx src/index.ts",
     "dev": "concurrently \"pnpm dev:emulate\" \"portless\"",
     "dev:app": "turbo watch dev --continue",
@@ -68,7 +68,7 @@
     "e2e:web": "turbo run e2e -F @gmacko/nextjs",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "turbo run build --filter='@gmacko/mcp-server' --filter='@gmacko/trpc-client' && changeset publish",
+    "release": "turbo run build --filter='@gmacko/mcp-server' --filter='@gmacko/api-cli' && changeset publish",
     "ui-add": "pnpm dlx shadcn@latest add && biome check src --write",
     "android": "expo run:android",
     "ios": "expo run:ios"

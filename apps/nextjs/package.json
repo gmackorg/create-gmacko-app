@@ -29,7 +29,6 @@
     "@gmacko/monitoring": "workspace:*",
     "@gmacko/telemetry": "workspace:*",
     "@gmacko/ui": "workspace:*",
-    "@gmacko/validators": "workspace:*",
     "@sentry/nextjs": "^10.44.0",
     "@t3-oss/env-nextjs": "^0.13.10",
     "@tanstack/react-form": "catalog:",
