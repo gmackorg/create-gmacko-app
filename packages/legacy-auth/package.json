@@ -13,7 +13,7 @@
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "format": "biome check .",
     "lint": "oxlint .",
-    "generate": "dotenv -e ../../.env -- pnpx @better-auth/cli generate --config script/auth-cli.ts --output ../legacy-db/src/auth-schema.ts",
+    "generate": "dotenv -e ../../.env -- pnpx auth@1.7.2 generate --config script/auth-cli.ts --output ../legacy-db/src/auth-schema.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -25,7 +25,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@better-auth/cli": "catalog:",
     "@biomejs/biome": "catalog:",
     "@gmacko/tsconfig": "workspace:*",
     "@types/node": "catalog:",

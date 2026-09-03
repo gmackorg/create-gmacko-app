@@ -48,10 +48,7 @@ export function initAuth<
   extraPlugins?: TExtraPlugins;
 }) {
   const ghUrl = options.githubUrl ?? "https://github.com";
-  const ghApiUrl = options.githubApiUrl ?? "https://api.github.com";
   const googleUrl = options.googleUrl ?? "https://accounts.google.com";
-  const googleTokenUrl =
-    options.googleTokenUrl ?? "https://oauth2.googleapis.com/token";
   const appleUrl = options.appleUrl ?? "https://appleid.apple.com";
 
   const config = {
@@ -78,19 +75,24 @@ export function initAuth<
       }),
       ...(options.extraPlugins ?? []),
     ],
+    // better-auth 1.7.2 (published) only honours `authorizationEndpoint` on the
+    // built-in social providers; the `tokenEndpoint` / `userInfoEndpoint` /
+    // `jwksEndpoint` overrides came from the unmerged upstream PR #8814 that
+    // the old pkg.pr.new pin tracked. Token and user-info calls therefore go to
+    // the real GitHub/Google/Apple hosts, so the emulate-based GitHub/Google
+    // flows are no longer supported for this legacy package. The Effect
+    // rewrite (@gmacko/auth) uses the genericOAuth plugin instead, whose
+    // tokenUrl/userInfoUrl are configurable.
     socialProviders: {
       github: {
         clientId: options.githubClientId,
         clientSecret: options.githubClientSecret,
         authorizationEndpoint: `${ghUrl}/login/oauth/authorize`,
-        tokenEndpoint: `${ghUrl}/login/oauth/access_token`,
-        userInfoEndpoint: `${ghApiUrl}/user`,
       },
       google: {
         clientId: options.googleClientId,
         clientSecret: options.googleClientSecret,
         authorizationEndpoint: `${googleUrl}/o/oauth2/v2/auth`,
-        tokenEndpoint: googleTokenUrl,
       },
       ...(options.appleClientId && options.appleClientSecret
         ? {
@@ -99,8 +101,6 @@ export function initAuth<
               clientSecret: options.appleClientSecret,
               appBundleIdentifier: options.appleBundleIdentifier,
               authorizationEndpoint: `${appleUrl}/auth/authorize`,
-              tokenEndpoint: `${appleUrl}/auth/token`,
-              jwksEndpoint: `${appleUrl}/auth/keys`,
             },
           }
         : {}),
@@ -117,4 +117,6 @@ export function initAuth<
 }
 
 export type Auth = ReturnType<typeof initAuth>;
+/** This package's `BetterAuthPlugin`; apps cast framework plugins to it (see apps/nextjs). */
+export type AuthPlugin = BetterAuthPlugin;
 export type Session = Auth["$Infer"]["Session"];

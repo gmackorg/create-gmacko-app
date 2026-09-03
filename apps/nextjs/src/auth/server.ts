@@ -1,6 +1,6 @@
 import "server-only";
 
-import { initAuth } from "@gmacko/legacy-auth";
+import { type AuthPlugin, initAuth } from "@gmacko/legacy-auth";
 import { nextCookies } from "better-auth/next-js";
 import { headers } from "next/headers";
 import { cache } from "react";
@@ -30,8 +30,10 @@ export const auth = initAuth({
   googleTokenUrl: env.AUTH_GOOGLE_TOKEN_URL,
   appleUrl: env.AUTH_APPLE_URL,
   bypassMagicLink: env.BYPASS_MAGIC_LINK,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- pkg.pr.new causes duplicate @better-auth/core type instances
-  extraPlugins: [nextCookies() as any],
+  // pnpm keeps one better-auth copy per distinct peer set, so `nextCookies()`
+  // (this app's copy) and `initAuth`'s plugin type (legacy-auth's copy) are
+  // nominally different `@better-auth/core` types with identical shapes.
+  extraPlugins: [nextCookies() as unknown as AuthPlugin],
 });
 
 export const getSession = cache(async () =>

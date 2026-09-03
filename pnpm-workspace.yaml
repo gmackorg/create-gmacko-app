@@ -9,8 +9,8 @@ catalog:
   '@cloudflare/vite-plugin': 1.54.3
   '@cloudflare/vitest-pool-workers': 0.22.0
   '@cloudflare/workers-types': 5.20260903.1
-  '@better-auth/cli': 1.4.21
-  '@better-auth/expo': 1.5.5
+  '@sentry/cloudflare': 10.73.0
+  '@better-auth/expo': 1.7.2
   '@commitlint/cli': ^20.5.0
   '@commitlint/config-conventional': ^20.5.0
   '@effect/sql-d1': 4.0.0-rc.112
@@ -31,7 +31,10 @@ catalog:
   '@trpc/tanstack-react-query': ^11.13.4
   '@types/node': ^25.5.0
   '@vitejs/plugin-react': 6.0.1
-  better-auth: 1.5.5
+  # better-auth 1.7.2 is the first published release with the generic OAuth
+  # rewrite (providers as first-class social providers); replaces the expired
+  # pkg.pr.new pin of the unmerged endpoint-override PR #8814.
+  better-auth: 1.7.2
   # drizzle 1.0 rc5 is the first line that compiles against effect rc.108+
   # (rc.4 still calls the removed Schema.TaggedErrorClass). Pin exact builds.
   drizzle-kit: 1.0.0-rc.5-ab785fc
@@ -121,8 +124,6 @@ overrides:
   expo-symbols: 56.0.6
   expo-system-ui: 56.0.5
   expo-web-browser: 56.0.6
-  better-auth: https://pkg.pr.new/better-auth/better-auth@e9a2a6d
-  '@better-auth/core': https://pkg.pr.new/better-auth/better-auth/@better-auth/core@e9a2a6d
   # Force patched versions of transitive deps with critical advisories
   # (GHSA arbitrary-code-exec / DoS / type-confusion). See deps.yml audit gate.
   protobufjs: '>=7.5.5'
