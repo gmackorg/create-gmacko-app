@@ -16,10 +16,20 @@ const APP = resolve(import.meta.dirname, "../..");
 const SRC = join(APP, "src");
 const PACKAGES = resolve(APP, "../../packages");
 
+/**
+ * The workspace scope, read from this app's own name rather than hard-coded,
+ * so the test keeps its teeth in a scaffold generated with `--package-scope`.
+ */
+const SCOPE = (
+  JSON.parse(readFileSync(join(APP, "package.json"), "utf8")) as {
+    name: string;
+  }
+).name.split("/")[0]!;
+
 /** Exact specifiers (the package roots also match their subpaths). */
 const FORBIDDEN_EXACT = new Set([
-  "@gmacko/monitoring",
-  "@gmacko/monitoring/web/server",
+  `${SCOPE}/monitoring`,
+  `${SCOPE}/monitoring/web/server`,
 ]);
 const FORBIDDEN_PACKAGES = ["@sentry/cloudflare", "@sentry/react-native"];
 const isForbidden = (spec: string): boolean =>
@@ -53,9 +63,12 @@ const asFile = (base: string): string | undefined => {
   return undefined;
 };
 
-/** `@gmacko/<pkg>[/<sub>]` → the source file its `exports` names (default condition). */
+/** `<scope>/<pkg>[/<sub>]` → the source file its `exports` names (default condition). */
+const WORKSPACE_SPEC = new RegExp(
+  `^${SCOPE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/([^/]+)(/.*)?$`,
+);
 const workspaceFile = (spec: string): string | undefined => {
-  const m = /^@gmacko\/([^/]+)(\/.*)?$/.exec(spec);
+  const m = WORKSPACE_SPEC.exec(spec);
   if (!m) return undefined;
   const dir = join(PACKAGES, m[1]!);
   const pkgPath = join(dir, "package.json");
@@ -104,9 +117,12 @@ describe("the client entry graph", () => {
     join(SRC, "router.tsx"),
   ]);
 
-  it("reaches the routes and the browser Sentry entry", () => {
+  it("reaches the routes, the workspace packages and the browser Sentry entry", () => {
     expect([...files].some((f) => f.endsWith("/routes/__root.tsx"))).toBe(true);
-    expect(bare.has("@gmacko/monitoring/web")).toBe(true);
+    // The walk follows workspace `exports` too, or the assertion below would
+    // only ever see apps/web's own imports.
+    expect([...files].some((f) => f.startsWith(`${PACKAGES}/`))).toBe(true);
+    expect(bare.has(`${SCOPE}/monitoring/web`)).toBe(true);
   });
 
   it("never imports the Workers Sentry SDK or the monitoring server entry", () => {
