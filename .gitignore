@@ -71,3 +71,5 @@ sdks/openapi/openapi.json
 # Generated SDKs are CI artifacts (sdk.yml); only the placeholder is tracked.
 sdks/generated/*
 !sdks/generated/.gitkeep
+# Written by openapi-generator-cli on every run.
+openapitools.json
