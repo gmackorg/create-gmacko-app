@@ -18,7 +18,8 @@
       "!**/coverage",
       "!**/dist",
       "!**/node_modules",
-      "!docs/plans/**/*.html"
+      "!docs/plans/**/*.html",
+      "!apps/web/src/routeTree.gen.ts"
     ]
   },
   "formatter": {

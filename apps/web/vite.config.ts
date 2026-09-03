@@ -46,7 +46,8 @@ export default defineConfig({
     // Runs the "ssr" environment (TanStack Start's server build) inside
     // workerd, using wrangler.jsonc for the entry, bindings and compat flags.
     cloudflare({ viteEnvironment: { name: "ssr" } }),
-    tanstackStart(),
+    // Generate routeTree.gen.ts in biome's style so builds never dirty it.
+    tanstackStart({ router: { quoteStyle: "double", semicolons: true } }),
     viteReact(),
     tailwindcss(),
   ],
