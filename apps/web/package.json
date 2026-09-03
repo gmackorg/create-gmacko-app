@@ -7,6 +7,7 @@
     "predev": "node scripts/link-env.mjs",
     "dev": "vite dev",
     "dev:portless": "portless gmacko node scripts/dev-portless.mjs",
+    "dev:check": "node scripts/dev-portless.mjs --check",
     "build": "vite build",
     "preview": "vite preview",
     "deploy:preview": "CLOUDFLARE_ENV=preview vite build && wrangler deploy",

@@ -8,7 +8,9 @@ with the Effect HTTP API mounted under `/api/*` (`@gmacko/api`, built in
 
 - `pnpm dev` - Vite dev server with the ssr environment running in workerd
   (`predev` links `.env`, see below); `pnpm dev:portless` is the same under
-  portless at `https://gmacko.localhost` (what the root `pnpm dev` runs).
+  portless at `https://gmacko.localhost` (what the root `pnpm dev` runs) and
+  links `.env` itself before starting Vite. `pnpm dev:check` runs that
+  preparation alone and fails if no `apps/web/.env` came out of it.
 - `pnpm build` / `pnpm preview` - production build and local preview.
 - `pnpm deploy:<preview|staging|production>` - `CLOUDFLARE_ENV=<env> vite
   build && wrangler deploy`; `:dry-run` variants compile without uploading.
@@ -62,8 +64,10 @@ into the Worker unless `CLOUDFLARE_INCLUDE_PROCESS_ENV=true` (the bridge the
 
 So `predev` (`scripts/link-env.mjs`) creates that symlink (a copy where
 symlinks are unavailable), and under portless `scripts/dev-portless.mjs`
+runs the same `linkEnv` (pnpm runs no `pre` hook for `dev:portless`) and
 writes `PORTLESS_URL` to `apps/web/.env.local` (loaded after `.env`) so the
-Worker knows its public origin. emulate keeps writing the repo-root `.env`; nothing
+Worker knows its public origin; `pnpm dev:check` asserts the link is in
+place. emulate keeps writing the repo-root `.env`; nothing
 under `src/` reads `process.env`. `src/env.ts` holds only the browser-visible
 `VITE_*` values (validated with `@t3-oss/env-core`); the server reads its
 bindings once in `src/server/config.ts`. (A `.dev.vars` file must never be
