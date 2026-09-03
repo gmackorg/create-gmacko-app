@@ -28,6 +28,7 @@ import {
   fileExists,
   generateAppName,
   readFile,
+  readJson,
   runCli,
   runInApp,
 } from "./helpers.js";
@@ -320,8 +321,11 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
       expect(fileExists(appPath, "apps/web")).toBe(true);
       expect(fileExists(appPath, "apps/expo")).toBe(false);
       expect(fileExists(appPath, "packages/analytics")).toBe(false);
-      expect(fileExists(appPath, "packages/monitoring")).toBe(false);
       expect(fileExists(appPath, "packages/payments")).toBe(false);
+      // @gmacko/monitoring is structural for the web lane (client Sentry
+      // init, root error boundary, the Worker's withSentry wrapper) and is
+      // inert with the integration off, so prune keeps it here.
+      expect(fileExists(appPath, "packages/monitoring")).toBe(true);
     });
 
     it("should pass the doctor and fast checks", () => {
@@ -469,6 +473,10 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
     }, 300000);
   });
 
+  // The scope rename runs after every generator, so this cell also covers the
+  // files those generators write: the operator root scripts, `.mcp.json`,
+  // `.forgegraph.yaml` and the generated workflows. `--operator-lane` (and
+  // keeping the AI files) is what puts those on disk.
   describe("custom package scope", () => {
     let appPath: string;
     let appName: string;
@@ -483,8 +491,8 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
           "--yes",
           "--no-git",
           "--no-mobile",
-          "--no-ai",
           "--prune",
+          "--operator-lane",
           "--package-scope",
           "@mycompany",
           "--integrations",
@@ -515,6 +523,41 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
       checkPackage("packages/db/package.json", "@mycompany/db");
       checkPackage("packages/auth/package.json", "@mycompany/auth");
       checkPackage("apps/web/package.json", "@mycompany/web");
+    });
+
+    it("should use the custom scope in every generated file, not just package.json", () => {
+      const root = readJson<{ scripts?: Record<string, string> }>(
+        appPath,
+        "package.json",
+      );
+      expect(root.scripts?.["api:ops"]).toContain("@mycompany/api-cli");
+      expect(root.scripts?.["mcp:app"]).toContain("@mycompany/mcp-server");
+      expect(root.scripts?.["dev:web"]).toContain("@mycompany/web");
+
+      const mcp = readFile(appPath, ".mcp.json");
+      expect(mcp).toContain("@mycompany/mcp-server");
+      expect(mcp).not.toContain("@gmacko/");
+
+      // The generators that write shell commands: workflows, ForgeGraph
+      // contract, provisioning script.
+      for (const file of [
+        ".github/workflows/preview.yml",
+        ".github/workflows/e2e.yml",
+        ".github/workflows/sdk.yml",
+        ".forgegraph.yaml",
+      ]) {
+        const content = readFile(appPath, file);
+        expect(`${file}: ${content.includes("@mycompany/")}`).toBe(
+          `${file}: true`,
+        );
+        expect(`${file}: ${content.includes("@gmacko/")}`).toBe(
+          `${file}: false`,
+        );
+      }
+
+      // `@gmacko/emulate` is a published package, not a workspace one: it
+      // keeps its name or `pnpm install` 404s.
+      expect(readFile(appPath, "package.json")).toContain("@gmacko/emulate");
     });
 
     it("should pass typecheck with custom scope", () => {
@@ -584,6 +627,83 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
       if (!doctor.success) logFailure("Doctor", doctor);
       expect(doctor.success).toBe(true);
       expect(doctor.stdout).not.toContain("Cloudflare Workers lane detected");
+    }, 600000);
+  });
+
+  // Pruning with Expo kept is the case that used to leave dangling
+  // `@gmacko/analytics/native` / `@gmacko/monitoring/native` imports in
+  // apps/expo once those packages were removed.
+  describe("mobile-only, pruned with no integrations", () => {
+    let appPath: string;
+    let appName: string;
+
+    beforeAll(async () => {
+      appName = generateAppName("e2e-mobile-pruned");
+      console.log(`\n[E2E] Scaffolding pruned mobile-only ${appName}...`);
+
+      const result = await runCli({
+        appName,
+        flags: [
+          "--yes",
+          "--no-git",
+          "--no-web",
+          "--no-ai",
+          "--prune",
+          "--integrations",
+          "",
+        ],
+        cwd: tempDir,
+        timeout: 600000,
+      });
+
+      appPath = result.appPath;
+      appsToClean.push(appPath);
+
+      expect(result.exitCode).toBe(0);
+      console.log(`[E2E] Scaffolded to ${appPath}`);
+    }, 900000);
+
+    it("should leave no imports of the pruned packages behind", () => {
+      expect(fileExists(appPath, "packages/analytics")).toBe(false);
+      expect(fileExists(appPath, "packages/monitoring")).toBe(false);
+
+      const providers = readFile(appPath, "apps/expo/src/providers.tsx");
+      expect(providers).not.toContain("@gmacko/analytics");
+      expect(providers).not.toContain("@gmacko/monitoring");
+
+      const boundary = readFile(
+        appPath,
+        "apps/expo/src/components/error-boundary.tsx",
+      );
+      expect(boundary).not.toContain("@gmacko/monitoring");
+      expect(boundary).not.toContain("captureExceptionNative");
+    });
+
+    it("should have no D1 scripts without a web app", () => {
+      const root = readJson<{ scripts?: Record<string, string> }>(
+        appPath,
+        "package.json",
+      );
+      for (const script of [
+        "db:migrate:local",
+        "db:migrate:remote",
+        "db:seed",
+        "deploy:staging",
+        "e2e:web",
+      ]) {
+        expect(`${script}: ${script in (root.scripts ?? {})}`).toBe(
+          `${script}: false`,
+        );
+      }
+    });
+
+    it("should typecheck", () => {
+      console.log("[E2E] Running typecheck (pruned mobile-only)...");
+      createMockEnv(appPath);
+
+      const result = runInApp(appPath, "pnpm typecheck", { timeout: 300000 });
+      if (!result.success) logFailure("Typecheck", result);
+      expect(result.success).toBe(true);
     }, 600000);
   });
 

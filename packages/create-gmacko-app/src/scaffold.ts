@@ -62,9 +62,8 @@ export async function scaffold(options: CliOptions): Promise<void> {
   // imports/deps); running after updatePackageScope would miss the @scope/*
   // references and leave dangling workspace deps and broken imports.
   if (options.prune) {
-    pruneIntegrations(targetDir, options.integrations);
+    pruneIntegrations(targetDir, options.integrations, options.platforms.web);
   }
-  updatePackageScope(targetDir, options.packageScope);
   renameWorkerNames(targetDir, options.appName);
   createManifest(targetDir, options);
   createForgeGraphConfig(targetDir, options);
@@ -87,6 +86,11 @@ export async function scaffold(options: CliOptions): Promise<void> {
 
   customizeGeneratedReadme(targetDir, options);
   pruneOptionalLanes(targetDir, options);
+  // Rename the package scope LAST: every generator above writes the template's
+  // @gmacko/* names (the forge/operator root scripts, .mcp.json,
+  // .forgegraph.yaml, the README/playbook blocks), so the rename has to run
+  // after all of them or those files keep the old scope.
+  updatePackageScope(targetDir, options.packageScope);
 
   if (!options.includeAi) {
     fs.removeSync(path.join(targetDir, ".claude"));
@@ -167,6 +171,7 @@ export async function scaffold(options: CliOptions): Promise<void> {
 
 function buildNextSteps(options: CliOptions): string {
   const worker = workerName(options.appName);
+  const scope = options.packageScope;
   const lines = [
     "",
     `  ${pc.bold("Next steps:")}`,
@@ -179,21 +184,21 @@ function buildNextSteps(options: CliOptions): string {
       `  ${pc.cyan("pnpm")} dev               ${pc.dim("# emulate + apps/web at https://gmacko.localhost (local D1, no DATABASE_URL)")}`,
       "",
       `  ${pc.dim("# Schema changes: edit packages/db/src/schema.ts, then")}`,
-      `  ${pc.cyan("pnpm")} db:generate && ${pc.cyan("pnpm")} -F @gmacko/db migrate:local`,
+      `  ${pc.cyan("pnpm")} db:generate && ${pc.cyan("pnpm")} db:migrate:local`,
       "",
       `  ${pc.dim("# Deploys (once per stage): create the D1 databases, paste the ids into apps/web/wrangler.jsonc")}`,
-      `  ${pc.cyan("pnpm")} -F @gmacko/web exec wrangler d1 create ${worker}-staging`,
-      `  ${pc.cyan("pnpm")} -F @gmacko/web exec wrangler d1 create ${worker}`,
+      `  ${pc.cyan("pnpm")} -F ${scope}/web exec wrangler d1 create ${worker}-staging`,
+      `  ${pc.cyan("pnpm")} -F ${scope}/web exec wrangler d1 create ${worker}`,
       `  ${pc.dim("# Update .forgegraph.yaml (server, domains), then: pnpm forge:doctor && pnpm deploy:staging")}`,
     );
   } else {
     lines.push(
-      `  ${pc.cyan("pnpm")} --filter @gmacko/expo dev:client   ${pc.dim("# point EXPO_PUBLIC_API_URL at your hosted API")}`,
+      `  ${pc.cyan("pnpm")} --filter ${scope}/expo dev:client   ${pc.dim("# point EXPO_PUBLIC_API_URL at your hosted API")}`,
     );
   }
   if (options.platforms.mobile && options.platforms.web) {
     lines.push(
-      `  ${pc.cyan("pnpm")} --filter @gmacko/expo dev:client   ${pc.dim("# the Expo dev client against the web app's API")}`,
+      `  ${pc.cyan("pnpm")} --filter ${scope}/expo dev:client   ${pc.dim("# the Expo dev client against the web app's API")}`,
     );
   }
   lines.push("");
@@ -348,35 +353,33 @@ const TEXT_EXTENSIONS = new Set([
   ".md",
   ".yml",
   ".yaml",
+  ".sh",
 ]);
 
+/**
+ * `--package-scope`: rename the workspace packages from `@gmacko/*` to
+ * `@scope/*` in every text file — sources and package.json files, but also
+ * the workflows (`pnpm -F @gmacko/web ...`), `.forgegraph.yaml`,
+ * `.mcp.json`, `scripts/*.sh` and the docs, which all spell the scope out.
+ */
 function updatePackageScope(targetDir: string, scope: string): void {
   if (scope === "@gmacko") return;
 
-  const files = getAllFiles(targetDir);
-
-  for (const file of files) {
-    if (
-      file.endsWith(".json") ||
-      file.endsWith(".ts") ||
-      file.endsWith(".tsx") ||
-      file.endsWith(".js") ||
-      file.endsWith(".mjs") ||
-      file.endsWith(".css")
-    ) {
-      try {
-        let content = fs.readFileSync(file, "utf-8");
-        if (content.includes("@gmacko/")) {
-          // Rename internal workspace packages only. @gmacko/emulate is an
-          // external published dev dependency — renaming it to @scope/emulate
-          // makes `pnpm install` 404. Preserve it (and any future external
-          // @gmacko/* deps added here).
-          content = content.replace(/@gmacko\/(?!emulate\b)/g, `${scope}/`);
-          fs.writeFileSync(file, content);
-        }
-      } catch {
-        // Skip files that can't be read
-      }
+  for (const file of getAllFiles(targetDir)) {
+    if (!TEXT_EXTENSIONS.has(path.extname(file))) continue;
+    try {
+      const content = fs.readFileSync(file, "utf-8");
+      if (!content.includes("@gmacko/")) continue;
+      // Rename internal workspace packages only. @gmacko/emulate is an
+      // external published dev dependency — renaming it to @scope/emulate
+      // makes `pnpm install` 404. Preserve it (and any future external
+      // @gmacko/* deps added here).
+      fs.writeFileSync(
+        file,
+        content.replace(/@gmacko\/(?!emulate\b)/g, `${scope}/`),
+      );
+    } catch {
+      // Skip files that can't be read
     }
   }
 }
@@ -532,11 +535,11 @@ function getBootstrapRecommendations(options: CliOptions): {
   ];
   const codexLines = [
     "- Start from `AGENTS.md` and `docs/ai/IMPLEMENTATION_PLAN.md`.",
-    "- Run `pnpm bootstrap:local`, then `pnpm doctor` and `pnpm check:fast`.",
+    "- Run `pnpm bootstrap:local`, then `pnpm run doctor` and `pnpm check:fast`.",
   ];
   const opencodeLines = [
     "- Start from `AGENTS.md`, `opencode.json`, and `docs/ai/IMPLEMENTATION_PLAN.md`.",
-    "- Run `pnpm bootstrap:local`, then `pnpm doctor` and `pnpm check:fast`.",
+    "- Run `pnpm bootstrap:local`, then `pnpm run doctor` and `pnpm check:fast`.",
   ];
   const selectedLayerLines: string[] = [];
 
@@ -782,8 +785,8 @@ ${notes}`,
 # does 1 then 2. ForgeGraph's own stage machinery runs the two halves
 # separately — \`db.migrate\` below is step 1 (deploy-stage.mjs --migrate-only)
 # and each target's \`deploy\` is step 2 alone — so a stage is migrated exactly
-# once either way. A failing migration aborts the deploy. Migrations are
-# expand/contract only (docs/drizzle-migrations.md).
+# once either way. A failing migration aborts the deploy. Migrations are expand/contract
+# only (docs/drizzle-migrations.md).
 #
 # D1 is NOT provisioned by \`forge db create\`. Create the databases once with
 # wrangler and put their ids in ${WEB_APP_DIR}/wrangler.jsonc (\`env.<stage>.d1_databases\`):
@@ -956,12 +959,17 @@ function removeWebApp(targetDir: string): void {
     scripts?: Record<string, string>;
   };
   rootPackage.scripts ??= {};
+  // The D1 scripts run wrangler against apps/web/wrangler.jsonc, which is
+  // gone with the app.
   for (const script of [
     "dev:web",
     "dev:app",
     "e2e:web",
     "cf-typegen",
     "check:cf-types",
+    "db:migrate:local",
+    "db:migrate:remote",
+    "db:seed",
     "deploy:migrate",
     "deploy:staging",
     "deploy:production",
@@ -1017,10 +1025,18 @@ function configureExpoApp(
 function pruneIntegrations(
   targetDir: string,
   integrations: IntegrationConfig,
+  keepWebApp: boolean,
 ): void {
   const packagesToPrune: string[] = [];
 
-  if (!integrations.sentry) {
+  // `@gmacko/monitoring` is structural for the web lane, not optional
+  // decoration: apps/web imports it for the browser Sentry init, the root
+  // error boundary and the Worker's `withSentry` wrapper, and the package is
+  // already inert when `integrations.sentry` is off (every entry point checks
+  // the flag). Deleting it would leave four dangling imports, so with a web
+  // app it stays and Sentry is simply off.
+  const pruneMonitoring = !integrations.sentry && !keepWebApp;
+  if (pruneMonitoring) {
     packagesToPrune.push("monitoring");
   }
   if (!integrations.posthog) {
@@ -1058,6 +1074,19 @@ function pruneIntegrations(
 
   if (!integrations.stripe) {
     pruneWebStripeFiles(targetDir);
+  }
+
+  // Only rewrite the Expo files for a package that is actually gone; an
+  // integration that is merely off is handled at runtime by `integrations`.
+  if (!integrations.posthog || pruneMonitoring) {
+    pruneExpoProviders(targetDir, {
+      posthog: integrations.posthog,
+      sentry: !pruneMonitoring,
+    });
+  }
+
+  if (pruneMonitoring) {
+    pruneExpoErrorBoundary(targetDir);
   }
 
   // Remove references to pruned packages from EVERY remaining workspace
@@ -1131,9 +1160,9 @@ function pruneOptionalLanes(targetDir: string, options: CliOptions): void {
 
 /**
  * PostHog off + prune: `apps/web/src/providers.tsx` is the only importer of
- * `@gmacko/analytics/web`; it becomes a pass-through. (Sentry in apps/web is
- * `@sentry/cloudflare` + `@sentry/react` directly and stays off without a DSN,
- * so pruning `packages/monitoring` touches nothing there.)
+ * `@gmacko/analytics/web`; it becomes a pass-through. (Sentry has no
+ * equivalent here: `packages/monitoring` survives whenever apps/web does —
+ * see `pruneIntegrations` — and is inert with the integration off.)
  */
 function pruneWebAnalyticsFiles(targetDir: string): void {
   const providersPath = path.join(
@@ -1155,6 +1184,148 @@ export function Providers({ children }: { children: ReactNode }) {
 }
 `,
   );
+}
+
+/**
+ * PostHog and/or Sentry off + prune: `apps/expo/src/providers.tsx` is the one
+ * importer of `@gmacko/analytics/native` and (with the error boundary) of
+ * `@gmacko/monitoring/native`. Regenerate it with only the providers whose
+ * packages survive, so no import dangles once the packages are removed.
+ */
+function pruneExpoProviders(
+  targetDir: string,
+  keep: { posthog: boolean; sentry: boolean },
+): void {
+  const providersPath = path.join(
+    targetDir,
+    `${MOBILE_APP_DIR}/src/providers.tsx`,
+  );
+  if (!fs.existsSync(providersPath)) return;
+
+  const sentry = keep.sentry;
+  const posthog = keep.posthog;
+  const imports = [
+    posthog
+      ? 'import { PostHogNativeProvider } from "@gmacko/analytics/native";'
+      : null,
+    // `integrations` and `env` are only read by the Sentry/PostHog branches.
+    sentry || posthog ? 'import { integrations } from "@gmacko/config";' : null,
+    'import en from "@gmacko/i18n/messages/en.json";',
+    'import es from "@gmacko/i18n/messages/es.json";',
+    'import { I18nNativeProvider } from "@gmacko/i18n/native";',
+    sentry
+      ? 'import { initSentryNative } from "@gmacko/monitoring/native";'
+      : null,
+    'import type { ReactNode } from "react";',
+    sentry
+      ? 'import { useEffect, useState } from "react";'
+      : 'import { useState } from "react";',
+    "",
+    sentry || posthog ? 'import { env } from "./config/env";' : null,
+    'import { getStoredLocale } from "./utils/i18n";',
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
+
+  const sentryEffect = sentry
+    ? `
+  useEffect(() => {
+    if (integrations.sentry && env.observability.sentryDsn) {
+      initSentryNative({
+        dsn: env.observability.sentryDsn,
+        environment: env.environment,
+        debug: env.enableDebugMode,
+        tracesSampleRate: env.isProduction ? 0.1 : 1.0,
+      });
+    }
+  }, []);
+`
+    : "";
+
+  const posthogWrap = posthog
+    ? `
+  if (integrations.posthog && env.observability.posthogKey) {
+    return (
+      <PostHogNativeProvider
+        apiKey={env.observability.posthogKey}
+        apiHost={env.observability.posthogHost}
+      >
+        {content}
+      </PostHogNativeProvider>
+    );
+  }
+`
+    : "";
+
+  const pruned = [
+    !posthog ? "analytics" : null,
+    !sentry ? "monitoring" : null,
+  ].filter(Boolean);
+
+  fs.writeFileSync(
+    providersPath,
+    `/**
+ * App-wide providers. ${pruned.join(" and ")} ${pruned.length > 1 ? "were" : "was"} pruned at
+ * scaffold time; add the provider back here when the package is restored.
+ */
+${imports}
+
+interface ProvidersProps {
+  children: ReactNode;
+}
+
+const resources = {
+  en: { translation: en },
+  es: { translation: es },
+} as const;
+
+export function Providers({ children }: ProvidersProps) {
+  const [initialLocale] = useState(getStoredLocale);
+${sentryEffect}
+  const content = (
+    <I18nNativeProvider resources={resources} initialLocale={initialLocale}>
+      {children}
+    </I18nNativeProvider>
+  );
+${posthogWrap}
+  return content;
+}
+`,
+  );
+}
+
+/**
+ * Sentry off + prune: `apps/expo/src/components/error-boundary.tsx` reports
+ * caught errors through `@gmacko/monitoring/native`. Strip that import and
+ * the two guarded `captureExceptionNative` calls; the boundary itself (and
+ * its `integrations.sentry` status line, now always false) stays.
+ */
+function pruneExpoErrorBoundary(targetDir: string): void {
+  const boundaryPath = path.join(
+    targetDir,
+    `${MOBILE_APP_DIR}/src/components/error-boundary.tsx`,
+  );
+  if (!fs.existsSync(boundaryPath)) return;
+
+  let content = fs.readFileSync(boundaryPath, "utf-8");
+  content = content.replace(
+    'import { captureExceptionNative } from "@gmacko/monitoring/native";\n',
+    "",
+  );
+  content = content.replace(
+    /\n *\/\/ Report to Sentry if enabled\n *if \(integrations\.sentry\) \{\n *captureExceptionNative\(error\);\n *\}\n/,
+    "\n",
+  );
+  content = content.replace(
+    /const handleReport = \(\) => \{\n *if \(onReport\) \{\n *onReport\(\);\n *\} else if \(integrations\.sentry && error\) \{\n[^}]*\}\n *\};/,
+    "const handleReport = () => {\n    onReport?.();\n  };",
+  );
+  if (content.includes("captureExceptionNative")) {
+    throw new Error(
+      "pruneExpoErrorBoundary: apps/expo/src/components/error-boundary.tsx no longer matches the template; update the scaffolder",
+    );
+  }
+  fs.writeFileSync(boundaryPath, content);
 }
 
 /**

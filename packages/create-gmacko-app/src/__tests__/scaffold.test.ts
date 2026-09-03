@@ -1831,7 +1831,6 @@ describe("create-gmacko-app scaffold", () => {
 
       // These packages should be removed when their integrations are disabled
       for (const pkg of [
-        "monitoring",
         "analytics",
         "payments",
         "purchases",
@@ -1842,6 +1841,11 @@ describe("create-gmacko-app scaffold", () => {
       ]) {
         expect(fileExists(result.appPath, `packages/${pkg}`)).toBe(false);
       }
+      // ...but @gmacko/monitoring is structural for the web lane (client
+      // Sentry init, root error boundary, the Worker's withSentry wrapper)
+      // and is inert with the integration off, so it survives alongside
+      // apps/web. It only goes when the web app does.
+      expect(fileExists(result.appPath, "packages/monitoring")).toBe(true);
 
       const webPkg = readJson<{
         dependencies?: Record<string, string>;
@@ -1858,7 +1862,7 @@ describe("create-gmacko-app scaffold", () => {
 
       expect(webPkg.dependencies?.["@gmacko/analytics"]).toBeUndefined();
       expect(webPkg.dependencies?.["@gmacko/payments"]).toBeUndefined();
-      expect(webPkg.dependencies?.["@gmacko/monitoring"]).toBeUndefined();
+      expect(webPkg.dependencies?.["@gmacko/monitoring"]).toBeDefined();
       expect(webPkg.dependencies?.["@gmacko/api"]).toBeDefined();
       expect(webProviders).not.toContain("@gmacko/analytics/web");
       expect(stripeWebhook).not.toContain("@gmacko/payments");
@@ -1882,7 +1886,6 @@ describe("create-gmacko-app scaffold", () => {
             devDependencies?: Record<string, string>;
           };
           for (const dep of [
-            "@gmacko/monitoring",
             "@gmacko/analytics",
             "@gmacko/payments",
             "@gmacko/email",
