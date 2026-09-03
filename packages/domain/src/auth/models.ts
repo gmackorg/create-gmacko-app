@@ -5,7 +5,7 @@
  */
 import { Schema } from "effect";
 
-import { id } from "../primitives";
+import { Email, id } from "../primitives";
 import { Credential, UserRole } from "../roles";
 
 export const UserId = id("UserId");
@@ -51,14 +51,7 @@ export class SessionState extends Schema.Class<SessionState>("SessionState")({
 export class MagicLinkRequest extends Schema.Class<MagicLinkRequest>(
   "MagicLinkRequest",
 )({
-  email: Schema.String.pipe(
-    Schema.check(
-      Schema.isPattern(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, {
-        description: "an email address",
-      }),
-      Schema.isMaxLength(254),
-    ),
-  ),
+  email: Email,
 }) {}
 
 /** Standard Schema view for TanStack Form validators. */

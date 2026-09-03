@@ -54,6 +54,11 @@ export type BillingLimitPeriod = typeof BillingLimitPeriod.Type;
 export const UsageAggregation = Schema.Literals(["sum", "max"]);
 export type UsageAggregation = typeof UsageAggregation.Type;
 
+/**
+ * `application_settings.announcement_tone` is free text in D1; Phase 4's
+ * repository maps or validates the column into this literal set (falling
+ * back to `info`) before it reaches `LaunchState`.
+ */
 export const AnnouncementTone = Schema.Literals([
   "info",
   "warning",
@@ -61,6 +66,11 @@ export const AnnouncementTone = Schema.Literals([
 ]);
 export type AnnouncementTone = typeof AnnouncementTone.Type;
 
+/**
+ * `user_preferences.theme` is free text in D1; Phase 4's repository maps or
+ * validates the column into this literal set (falling back to `system`)
+ * before it reaches `UserPreferences`.
+ */
 export const Theme = Schema.Literals(["light", "dark", "system"]);
 export type Theme = typeof Theme.Type;
 
@@ -110,6 +120,7 @@ export class UserPreferences extends Schema.Class<UserPreferences>(
 )({
   id: UserPreferencesId,
   userId: UserId,
+  /** See `Theme`: the column is free text, the row model is not. */
   theme: Theme,
   language: Schema.String,
   timezone: Schema.String,
@@ -252,6 +263,7 @@ export class UsageRollup extends Schema.Class<UsageRollup>("UsageRollup")({
 
 export class LaunchState extends Schema.Class<LaunchState>("LaunchState")({
   announcementMessage: Schema.NullOr(Schema.String),
+  /** See `AnnouncementTone`: the column is free text, the model is not. */
   announcementTone: AnnouncementTone,
   allowedEmailDomains: Schema.Array(Schema.String),
   /** `stage !== "production"`. */

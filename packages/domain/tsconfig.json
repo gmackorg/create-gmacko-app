@@ -1,8 +1,8 @@
 {
   "extends": "@gmacko/tsconfig/base.json",
   "compilerOptions": {
-    "types": ["node"]
+    "types": []
   },
-  "include": ["src", "scripts"],
-  "exclude": ["node_modules"]
+  "include": ["src"],
+  "exclude": ["node_modules", "src/__tests__"]
 }

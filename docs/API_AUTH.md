@@ -67,3 +67,38 @@ completing bootstrap are `Session` only: a leaked key must never reach them.
 | admin | `listUsers` | GET | `/api/admin/users` | `SessionOrKey(admin)` | admin | `AdminOnly` | 200 | 401 `Unauthorized`, 403 `Forbidden` |
 | admin | `updateUserRole` | PATCH | `/api/admin/users/:userId/role` | `SessionOrKey(admin)` | admin | `AdminOnly` | 200 | 401 `Unauthorized`, 403 `Forbidden`, 404 `NotFound`, 409 `Conflict` |
 | admin | `getUser` | GET | `/api/admin/users/:userId` | `SessionOrKey(admin)` | admin | `AdminOnly` | 200 | 401 `Unauthorized`, 403 `Forbidden`, 404 `NotFound` |
+
+## Implementation rules (Phase 3)
+
+The contract declares the credentials; packages/auth implements them. These rules follow from how
+effect 4.0.0-rc.112's `HttpApiBuilder` runs security middlewares and from better-auth's cookie handling.
+
+1. **Schemes run in declaration order and a missing cookie is not a failure.** `HttpApiBuilder` tries a
+   middleware's `security` entries in the order they were declared (`session` first, then `apiKey`) and
+   `securityDecode` yields `Redacted("")` for a cookie that is absent rather than failing. The `session`
+   scheme implementation therefore ignores the decoded credential and calls better-auth
+   `getSession({ headers })` on the raw request; an empty or invalid cookie ends in 401 `Unauthorized`.
+2. **Bearer takes precedence.** When an `Authorization: Bearer gmk_…` header is present the `session`
+   scheme refuses (fails with `Unauthorized`) instead of looking at the cookie, so an invalid, expired
+   or revoked key can never fall through to a valid cookie in the same request.
+3. **A bearer on a `Session`-only endpoint is `Forbidden(scope)`.** `Session` declares the cookie scheme
+   only; its implementation answers 403 `Forbidden({ reason: "scope" })` when a bearer header is present,
+   never 401, so the client learns the credential kind is wrong rather than missing.
+4. **The declared cookie name is the non-secure one.** OpenAPI shows `better-auth.session_token`. In
+   secure stages (https base URL: staging, production) better-auth writes `__Secure-better-auth.session_token`,
+   which the implementation reads from the raw `Cookie` header; `sessionCookieName(secure)` in
+   `packages/domain/src/security.ts` is the one place that spells both.
+5. **Role checks read D1, not the cookie cache.** `AdminOnly` reads `user.role` and `WorkspaceRole(min)`
+   reads the membership from D1 once per request with better-auth's cookie cache bypassed, so demoting a
+   user or removing a membership takes effect on their next request, not when the cookie expires.
+6. **The security middleware is declared last.** `HttpApiBuilder` wraps the handler with each middleware in
+   insertion order, so the last one declared runs outermost. `.middleware(AdminOnly).middleware(SessionOrKey("admin"))`
+   is the only order in which the role check sees the `CurrentUser` the credential provided; the
+   api.test.ts contract test asserts `securityIsOutermost` for every non-public endpoint.
+
+## Decisions
+
+- `auth.session` (`GET /api/auth/session`) is public: an anonymous caller gets `{ user: null, credential: null }`
+  rather than 401, so the client can render signed-out state from one request.
+- `settings.deleteAccount` by a workspace owner cascades the workspace (memberships, invites, subscription,
+  usage). Documented here, not signalled: there is no `Conflict` for it.

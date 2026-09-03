@@ -21,6 +21,15 @@ export interface EndpointInfo {
   readonly roles: ReadonlyArray<string>;
   /** Keys of the security middlewares (the ones with a scheme). */
   readonly securityMiddlewares: ReadonlyArray<string>;
+  /**
+   * `true` when a security middleware is the *last* entry of the endpoint's
+   * middleware list. rc.112's `HttpApiBuilder` (`applyMiddleware`) wraps the
+   * handler with each middleware in insertion order, so the last one runs
+   * outermost: only then does the credential middleware run before the role
+   * checks that `require` the `CurrentUser` it provides. `false` for public
+   * endpoints (nothing to be outermost).
+   */
+  readonly securityIsOutermost: boolean;
   readonly successStatus: number;
   readonly errors: ReadonlyArray<{
     readonly status: number;
@@ -82,7 +91,11 @@ export const inspectApi = (api: HttpApi.Top): ReadonlyArray<EndpointInfo> => {
     onEndpoint: ({ group, endpoint, middleware, successes, errors }) => {
       const security: Array<string> = [];
       const roles: Array<string> = [];
-      for (const service of middleware) {
+      const ordered = [...middleware];
+      const last = ordered[ordered.length - 1];
+      const securityIsOutermost =
+        last !== undefined && HttpApiMiddleware.isSecurity(last);
+      for (const service of ordered) {
         if (HttpApiMiddleware.isSecurity(service)) {
           security.push(service.key);
           continue;
@@ -105,6 +118,7 @@ export const inspectApi = (api: HttpApi.Top): ReadonlyArray<EndpointInfo> => {
         ...describeCredential(security),
         roles,
         securityMiddlewares: security,
+        securityIsOutermost,
         successStatus,
         errors: errorRows,
       });

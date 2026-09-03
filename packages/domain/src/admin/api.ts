@@ -59,8 +59,9 @@ export class AdminApi extends HttpApiGroup.make("admin")
       params: { id: WaitlistEntryId },
       payload: ReviewWaitlistEntry,
       success: WaitlistEntry,
-      // Conflict: the entry is no longer pending (guarded write), or the
-      // approval's allowlist row already exists.
+      // Conflict("waitlist-status-changed"): the entry's status is no longer
+      // what the reviewer read (optimistic guard on the write);
+      // Conflict("allowlist-exists"): the approval's allowlist row exists.
       error: [NotFound, Conflict],
     })
       .middleware(AdminOnly)

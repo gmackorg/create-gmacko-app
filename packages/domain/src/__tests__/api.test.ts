@@ -74,11 +74,30 @@ describe("AppApi", () => {
       expect(row.credential, route(row)).not.toBe("public");
       expect(row.roles.length, route(row)).toBe(1);
     }
+    for (const row of rows.filter((r) => r.credential === "public")) {
+      expect(row.securityIsOutermost, route(row)).toBe(false);
+    }
     expect(
       rows
         .filter((r) => r.path.startsWith("/api/admin/"))
         .every((r) => r.roles.includes("AdminOnly")),
     ).toBe(true);
+  });
+
+  /**
+   * rc.112 wraps middlewares in insertion order (last declared runs
+   * outermost), so `.middleware(AdminOnly).middleware(SessionOrKey(...))` is
+   * the only order in which the role check sees a `CurrentUser`.
+   */
+  it("declares the security middleware last, so it wraps the role checks", () => {
+    const withRoles = rows.filter((row) => row.roles.length > 0);
+    expect(withRoles.length).toBeGreaterThan(0);
+    for (const row of withRoles) {
+      expect(row.securityIsOutermost, route(row)).toBe(true);
+    }
+    for (const row of rows.filter((r) => r.credential !== "public")) {
+      expect(row.securityIsOutermost, route(row)).toBe(true);
+    }
   });
 
   it("matches the committed OpenAPI document", async () => {

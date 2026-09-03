@@ -73,7 +73,8 @@ export const ConflictReason = Schema.Literals([
   "owner-invite-unsupported",
   "bootstrap-already-completed",
   "bootstrap-already-started",
-  "waitlist-not-pending",
+  /** Optimistic guard: the entry's status is no longer what the reviewer read. */
+  "waitlist-status-changed",
   "self-demotion",
 ]);
 export type ConflictReason = typeof ConflictReason.Type;
@@ -102,6 +103,12 @@ export class RateLimited extends Schema.TaggedError<RateLimited>()(
  * Anything unexpected. Carries no fields on purpose: the cause goes to the
  * log and the trace, never to the client (AGENTS.md: health endpoints and
  * errors never leak internals).
+ *
+ * No endpoint declares it. Phase 4 attaches it once, through an api-level
+ * middleware (`HttpApi.middleware`, declared with `error: InternalError`)
+ * placed in api.ts *before* `.add(HealthApi)`: `HttpApi.middleware` only
+ * reaches the endpoints present when it is called, so the health probes keep
+ * their own 503 shapes and never gain a 500 that could carry detail.
  */
 export class InternalError extends Schema.TaggedError<InternalError>()(
   "InternalError",
