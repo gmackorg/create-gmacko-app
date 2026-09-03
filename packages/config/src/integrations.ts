@@ -9,6 +9,9 @@ export const integrations = {
     enabled: false,
     provider: "none" as "resend" | "sendgrid" | "none",
   },
+  // Node-only (ioredis + BullMQ): unsupported on the web lane, which runs on
+  // Cloudflare Workers. Enable it only for a Node service on a VPS node; see
+  // packages/realtime/README.md.
   realtime: {
     enabled: false,
     provider: "none" as "redis" | "none",

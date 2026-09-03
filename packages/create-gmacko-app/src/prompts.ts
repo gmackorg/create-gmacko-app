@@ -331,6 +331,7 @@ async function promptCustomIntegrations(): Promise<IntegrationConfig> {
       {
         value: "realtime",
         label: "Realtime + Jobs (Redis + BullMQ)",
+        hint: "Node services only; not supported on the Workers web lane",
       },
       { value: "storage", label: "Storage" },
     ],
