@@ -1147,7 +1147,7 @@ describe("create-gmacko-app scaffold", () => {
       const sourceFiles = [
         "apps/nextjs/src/trpc/react.tsx",
         "apps/nextjs/src/trpc/server.tsx",
-        "apps/web/src/lib/url.ts",
+        "apps/web/src/lib/api.ts",
         "packages/api-client/src/client.ts",
         "packages/ui/src/theme.tsx",
       ].map((file) => readFile(result.appPath, file));

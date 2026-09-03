@@ -320,8 +320,8 @@ export const EXPECTED_FILES = {
   ],
   withWeb: ["apps/nextjs/package.json", "apps/nextjs/next.config.js"],
   withStorybook: [
-    "apps/nextjs/.storybook/main.ts",
-    "apps/nextjs/.storybook/preview.tsx",
+    "packages/ui/.storybook/main.ts",
+    "packages/ui/.storybook/preview.tsx",
     "packages/ui/src/button.stories.tsx",
   ],
   withMobile: ["apps/expo/package.json", "apps/expo/app.config.ts"],
