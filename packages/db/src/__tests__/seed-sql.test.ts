@@ -5,6 +5,7 @@
  * ship without regenerating it (Node-only: it reads the file from disk).
  */
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import { Effect, ManagedRuntime } from "effect";
 import { expect, it } from "vitest";
@@ -13,7 +14,9 @@ import { Database } from "../database";
 import { seedSql } from "../seed";
 import { layerTest } from "../testing";
 
-const committed = new URL("../../seed/seed.sql", import.meta.url);
+const committed = fileURLToPath(
+  new URL("../../seed/seed.sql", import.meta.url),
+);
 
 it("seed/seed.sql matches seedSql(...) byte-for-byte", async () => {
   const runtime = ManagedRuntime.make(layerTest);
