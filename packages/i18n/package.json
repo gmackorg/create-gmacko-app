@@ -28,6 +28,8 @@
     "dev": "tsc",
     "format": "biome check .",
     "lint": "oxlint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
@@ -40,9 +42,13 @@
     "@gmacko/tsconfig": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:react19",
+    "@types/react-dom": "catalog:react19",
     "expo-localization": "~56.0.6",
     "oxlint": "catalog:",
-    "typescript": "catalog:"
+    "react": "catalog:react19",
+    "react-dom": "catalog:react19",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "expo-localization": ">=17.0.0",
