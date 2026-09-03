@@ -35,6 +35,7 @@
     "check": "drizzle-kit check",
     "migrate:local": "wrangler d1 migrations apply DB --local --config ../../apps/web/wrangler.jsonc",
     "migrate:remote": "wrangler d1 migrations apply DB --remote --config ../../apps/web/wrangler.jsonc",
+    "migrate:list": "wrangler d1 migrations list DB --remote --config ../../apps/web/wrangler.jsonc",
     "seed:sql": "tsx scripts/seed-sql.ts",
     "seed:local": "pnpm seed:sql && wrangler d1 execute DB --local --file seed/seed.sql --config ../../apps/web/wrangler.jsonc",
     "studio": "drizzle-kit studio",
