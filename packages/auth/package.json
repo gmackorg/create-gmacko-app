@@ -16,7 +16,7 @@
   "scripts": {
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "format": "biome check .",
-    "generate": "pnpx auth@1.7.2 generate --config script/auth-cli.ts --output ../db/src/auth-schema.ts -y",
+    "generate": "mkdir -p ../db/.cache && pnpx auth@1.7.2 generate --config script/auth-cli.ts --output ../db/.cache/auth-schema.generated.ts -y && echo \"Wrote packages/db/.cache/auth-schema.generated.ts. Reconcile it into packages/db/src/auth-schema.ts by hand (see that file's header); the committed schema is never overwritten.\"",
     "lint": "oxlint .",
     "test": "vitest run",
     "test:watch": "vitest",

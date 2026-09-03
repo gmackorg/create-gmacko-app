@@ -1,7 +1,8 @@
 /**
  * better-auth's tables (1.7.2), hand-maintained on top of `auth generate`:
- * `pnpm -F @gmacko/auth generate` writes the CLI's version here; reconcile it
- * against this file rather than committing it verbatim. Deliberate
+ * `pnpm -F @gmacko/auth generate` writes the CLI's version to
+ * `packages/db/.cache/auth-schema.generated.ts` (never here); reconcile it
+ * against this file rather than copying it verbatim. Deliberate
  * differences from the generated output:
  *   - column helpers (`bool`, `timestampMs`) instead of inline `integer(...)`;
  *   - `role` is NOT NULL DEFAULT 'user' (the CLI emits it nullable);
