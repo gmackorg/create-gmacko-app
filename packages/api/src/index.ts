@@ -3,12 +3,10 @@
  * (@gmacko/domain). Framework-free: only `effect/unstable/httpapi` knows
  * HTTP, and only the app knows the platform.
  */
+
+export { httpServerDuration } from "@gmacko/telemetry";
 export { Background, type BackgroundShape } from "./background";
-export {
-  httpServerDuration,
-  RequestTrace,
-  type RequestTraceShape,
-} from "./boundary";
+export { RequestTrace, type RequestTraceShape } from "./boundary";
 export {
   AppConfig,
   type AppConfigShape,

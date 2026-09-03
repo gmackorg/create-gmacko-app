@@ -12,10 +12,9 @@ import {
   sessionCookieName,
   WaitlistSubmit,
 } from "@gmacko/domain";
+import { httpServerDuration } from "@gmacko/telemetry";
 import { Context, Effect, Exit, Layer, Metric, Option } from "effect";
 import { afterAll, describe, expect, it } from "vitest";
-
-import { httpServerDuration } from "./boundary";
 import { REQUEST_ID_HEADER, TRACE_ID_HEADER } from "./handler";
 import { defaultRateLimits, RateLimiter } from "./rate-limit";
 import {

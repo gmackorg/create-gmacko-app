@@ -35,7 +35,7 @@
     "@gmacko/config": "workspace:*",
     "@gmacko/legacy-auth": "workspace:*",
     "@gmacko/legacy-db": "workspace:*",
-    "@gmacko/telemetry": "workspace:*",
+    "@opentelemetry/api": "^1.9.1",
     "@trpc/server": "catalog:",
     "superjson": "catalog:",
     "zod": "catalog:"

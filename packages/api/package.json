@@ -26,6 +26,7 @@
     "@gmacko/config": "workspace:*",
     "@gmacko/db": "workspace:*",
     "@gmacko/domain": "workspace:*",
+    "@gmacko/telemetry": "workspace:*",
     "drizzle-orm": "catalog:",
     "effect": "catalog:"
   },

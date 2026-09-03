@@ -1,3 +1,9 @@
+/**
+ * Node OpenTelemetry SDK bootstrap for the legacy Next.js app. This is the
+ * former `@gmacko/telemetry` `initTelemetry`, kept here because that package
+ * is now the Worker's fetch-based OTLP layer (Effect) and no longer ships a
+ * Node SDK. Deleted with apps/nextjs in Phase 8.
+ */
 import { integrations } from "@gmacko/config";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
@@ -18,62 +24,49 @@ let initialized = false;
 export function initTelemetry(): void {
   if (initialized) return;
   if (!integrations.forgegraph) return;
-  if (process.env.OTEL_ENABLED === "false") return;
+  const env = process.env;
+  if (env.OTEL_ENABLED === "false") return;
 
   const endpoint =
-    process.env.OTEL_EXPORTER_OTLP_ENDPOINT ||
-    (process.env.FG_APP ? "https://otlp.forgegraf.com" : "");
+    env.OTEL_EXPORTER_OTLP_ENDPOINT ||
+    (env.FG_APP ? "https://otlp.forgegraf.com" : "");
   if (!endpoint) return;
 
   initialized = true;
 
   try {
     const serviceName =
-      process.env.FG_APP ||
-      process.env.OTEL_SERVICE_NAME ||
-      process.env.SERVICE_NAME ||
-      "gmacko-app";
+      env.FG_APP || env.OTEL_SERVICE_NAME || env.SERVICE_NAME || "gmacko-app";
 
     const resource = resourceFromAttributes({
       [ATTR_SERVICE_NAME]: serviceName,
       [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]:
-        process.env.FG_STAGE || process.env.NODE_ENV || "development",
+        env.FG_STAGE || env.NODE_ENV || "development",
       [ATTR_SERVICE_VERSION]:
-        process.env.FG_COMMIT_HASH ||
-        process.env.npm_package_version ||
-        "0.0.0",
-      ...(process.env.FG_NODE && { "host.name": process.env.FG_NODE }),
-    });
-
-    const traceExporter = new OTLPTraceExporter({
-      url: `${endpoint}/v1/traces`,
-    });
-    const metricExporter = new OTLPMetricExporter({
-      url: `${endpoint}/v1/metrics`,
+        env.FG_COMMIT_HASH || env.npm_package_version || "0.0.0",
+      ...(env.FG_NODE && { "host.name": env.FG_NODE }),
     });
 
     const sdk = new NodeSDK({
       resource,
-      traceExporter,
+      traceExporter: new OTLPTraceExporter({ url: `${endpoint}/v1/traces` }),
       metricReader: new PeriodicExportingMetricReader({
-        exporter: metricExporter,
+        exporter: new OTLPMetricExporter({ url: `${endpoint}/v1/metrics` }),
         exportIntervalMillis: 60_000,
       }),
       instrumentations: [new HttpInstrumentation(), new FetchInstrumentation()],
     });
 
     sdk.start();
-
-    const hostMetrics = new HostMetrics();
-    hostMetrics.start();
+    new HostMetrics().start();
 
     const shutdown = () => {
       sdk.shutdown().catch(() => {});
     };
-
     process.once("SIGTERM", shutdown);
     process.once("SIGINT", shutdown);
   } catch (error) {
+    // oxlint-disable-next-line no-console -- the SDK is not up, so nothing else can report this
     console.error("[telemetry] Failed to initialize OTel SDK:", error);
   }
 }

@@ -14,6 +14,7 @@ import {
   EndpointBoundary,
   InternalError,
 } from "@gmacko/domain";
+import { httpServerDuration } from "@gmacko/telemetry";
 import {
   Cause,
   Context,
@@ -51,12 +52,6 @@ export class RequestTrace extends Context.Service<
 // ---------------------------------------------------------------------------
 // Endpoint boundary
 // ---------------------------------------------------------------------------
-
-/** Milliseconds per endpoint; attribute `endpoint` = `group.endpoint`. */
-export const httpServerDuration = Metric.histogram("http.server.duration", {
-  description: "API endpoint duration in milliseconds",
-  boundaries: Metric.exponentialBoundaries({ start: 1, factor: 2, count: 14 }),
-});
 
 const pathOf = (url: string): string => {
   const query = url.indexOf("?");

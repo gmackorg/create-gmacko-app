@@ -2,7 +2,7 @@ import { integrations } from "@gmacko/config";
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
-    const { initTelemetry } = await import("@gmacko/telemetry");
+    const { initTelemetry } = await import("./env/telemetry");
     initTelemetry();
   }
 

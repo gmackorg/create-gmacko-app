@@ -1,11 +1,11 @@
 import { and, eq, isNull } from "@gmacko/legacy-db";
 import { db } from "@gmacko/legacy-db/client";
 import { apiKeys, user } from "@gmacko/legacy-db/schema";
-import { getMetrics, SpanStatusCode, trace } from "@gmacko/telemetry";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { createHash } from "crypto";
 import superjson from "superjson";
 import { ZodError, z } from "zod/v4";
+import { getMetrics, SpanStatusCode, trace } from "./telemetry";
 
 export type ApiKeyPermission = "read" | "write" | "delete" | "admin";
 

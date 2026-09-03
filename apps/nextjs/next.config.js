@@ -21,7 +21,6 @@ const config = {
     "@gmacko/i18n",
     "@gmacko/logging",
     "@gmacko/monitoring",
-    "@gmacko/telemetry",
     "@gmacko/ui",
     "@gmacko/validators",
   ],
