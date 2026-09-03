@@ -132,6 +132,7 @@ export const layerTest: Layer.Layer<Database> = Layer.effect(Database)(
       // The only transaction in the package: sqlite-node has no `batch`, so
       // D1's all-or-nothing semantics are emulated here and nowhere else.
       runBatch: (statements) =>
+        // gmacko-standards-disable-next-line no-db-transaction -- emulates D1 batch on sqlite-node; never reaches D1
         client.withTransaction(
           Effect.forEach(statements, (statement) => statement),
         ),

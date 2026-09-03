@@ -48,6 +48,7 @@
     "lint:ws": "pnpm dlx sherif@latest",
     "knip": "knip",
     "check:standards": "node scripts/check-app-standards.mjs",
+    "test:standards": "vitest run --config scripts/vitest.config.ts",
     "check:fast": "pnpm lint && pnpm typecheck && pnpm check:standards",
     "check": "pnpm check:fast && pnpm test && pnpm build",
     "test:emulate": "vitest run --config test/vitest.config.ts",

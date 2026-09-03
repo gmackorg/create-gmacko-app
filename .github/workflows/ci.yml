@@ -43,6 +43,9 @@ jobs:
       - name: App standards
         run: pnpm check:standards
 
+      - name: App standards rules (fixture tests)
+        run: pnpm test:standards
+
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest

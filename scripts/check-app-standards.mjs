@@ -247,11 +247,113 @@ function checkAccountDeletion() {
   }
 }
 
+// ── Rule: no-db-transaction ──────────────────────────────────────────────────
+// D1 has no interactive transactions: `@effect/sql-d1` turns `withTransaction`
+// into a defect and the Database service removes `db.transaction`, so a call
+// only "works" on the sqlite-node test layer and dies in production. Use
+// `Database.batch` (atomic multi-statement) or a guarded write (`updateWhere`).
+// Scope: the Effect packages and the Worker app; the legacy Postgres stack
+// (`packages/legacy-*`, `apps/nextjs`) keeps its transactions until Phase 8.
+const EFFECT_STACK_SCOPE = /^(packages\/(db|auth|api|domain)|apps\/web)\/src\//;
+// A line that is only a comment: `//`, `*` (docblock body), or `/*`.
+const isCommentLine = (ln) => /^\s*(\/\/|\*|\/\*)/.test(ln);
+function checkDbTransaction() {
+  for (const f of codeFiles) {
+    const r = rel(f);
+    if (!EFFECT_STACK_SCOPE.test(r)) continue;
+    const lines = linesOf(read(f));
+    lines.forEach((ln, i) => {
+      if (isCommentLine(ln)) return;
+      if (
+        /\.transaction\(|\bwithTransaction\b/.test(ln) &&
+        !isDisabled(lines, i, "no-db-transaction")
+      ) {
+        add(
+          "no-db-transaction",
+          f,
+          i + 1,
+          "Interactive transaction in D1-backed code (dies at runtime on D1).",
+          "Use `Database.batch([...])` for atomic multi-statement writes or a guarded write (`Database.updateWhere`, precondition in the WHERE clause) for read-check-write.",
+        );
+      }
+    });
+  }
+}
+
+// ── Rule: no-plain-drizzle-in-api ────────────────────────────────────────────
+// `Database.plain` is the promise-based drizzle that exists only because
+// better-auth's adapter is promise-based. Anything else that uses it bypasses
+// the `DatabaseError` mapping, spans, and the transaction-free surface, and
+// silently diverges between sqlite-node and D1. Only `packages/auth` (the
+// adapter) may touch it; `packages/db` defines it.
+const PLAIN_RULE_SCOPE = /^(packages\/(api|domain)|apps\/web)\/src\//;
+function checkPlainDrizzle() {
+  for (const f of codeFiles) {
+    const r = rel(f);
+    if (!PLAIN_RULE_SCOPE.test(r)) continue;
+    const lines = linesOf(read(f));
+    lines.forEach((ln, i) => {
+      if (isCommentLine(ln)) return;
+      if (
+        (/\.plain\b(?![\w-])/.test(ln) ||
+          /\{[^}]*\bplain\b[^}]*\}\s*(=|\))/.test(ln)) &&
+        !isDisabled(lines, i, "no-plain-drizzle-in-api")
+      ) {
+        add(
+          "no-plain-drizzle-in-api",
+          f,
+          i + 1,
+          "`Database.plain` (promise drizzle) used outside packages/auth.",
+          "Go through `Database.db` (the Effect query API) so failures are `DatabaseError` and the call is traced; `plain` exists for better-auth's adapter only.",
+        );
+      }
+    });
+  }
+}
+
+// ── Rule: no-d1-table-rebuild ────────────────────────────────────────────────
+// D1 runs each migration file as one batch and ignores `PRAGMA
+// foreign_keys=OFF` inside it (`packages/db/src/__tests__/migrations.workers.
+// test.ts` pins this), so drizzle-kit's rebuild recipe (`CREATE TABLE
+// __new_x`, copy, `DROP TABLE x`, rename) runs the DROP with foreign keys ON
+// and cascade-deletes every referencing row. Every migration after the two
+// pre-provisioning ones must be expand/contract only.
+const D1_MIGRATION = /^packages\/db\/migrations\/[^/]+\.sql$/;
+const D1_REBUILD_EXEMPT = new Set([
+  "packages/db/migrations/20260903030938_init.sql",
+  "packages/db/migrations/20260903035551_auth_1_7_issuer.sql",
+]);
+function checkD1TableRebuild() {
+  for (const f of allFiles) {
+    const r = rel(f);
+    if (!D1_MIGRATION.test(r) || D1_REBUILD_EXEMPT.has(r)) continue;
+    const lines = linesOf(read(f));
+    lines.forEach((ln, i) => {
+      const rebuild = /__new_/.test(ln);
+      const pragmaOff = /pragma\s+foreign_keys\s*=\s*off/i.test(ln);
+      if (rebuild || pragmaOff) {
+        add(
+          "no-d1-table-rebuild",
+          f,
+          i + 1,
+          rebuild
+            ? "drizzle-kit table rebuild (`__new_` table) in a D1 migration."
+            : "`PRAGMA foreign_keys=OFF` in a D1 migration (a no-op inside D1's batch).",
+          "Rewrite as expand/contract: add a nullable/defaulted column, backfill, tighten later; add a new table and copy instead of drop-and-recreate. See docs/drizzle-migrations.md.",
+        );
+      }
+    });
+  }
+}
+
 checkRawProcessEnv();
 checkHostIncludes();
 checkCommittedCredentials();
 checkDebugRoutes();
 checkAccountDeletion();
+checkDbTransaction();
+checkPlainDrizzle();
+checkD1TableRebuild();
 
 const asJson = process.argv.includes("--json");
 if (asJson) {

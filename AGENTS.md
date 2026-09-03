@@ -72,6 +72,21 @@ line with `// gmacko-standards-disable-next-line <rule>` and a reason.
   the auth `user` (which cascades sessions/accounts/apikeys via the schema), not
   just an app-specific table — App Store 5.1.1(v). Route deletion through
   `settings.deleteAccount`; don't hand-roll a partial delete.
+- **No interactive transactions on D1** (`no-db-transaction`). In
+  `packages/{db,auth,api,domain}/src` and `apps/web/src`, `db.transaction(...)`
+  and `withTransaction` die at runtime on D1 (`@effect/sql-d1` has none). Use
+  `Database.batch([...])` for atomic multi-statement writes and a guarded write
+  (`Database.updateWhere`, precondition in the WHERE clause, 0 rows = Conflict)
+  for read-check-write. The legacy Postgres stack is exempt until Phase 8.
+- **`Database.plain` is for better-auth only** (`no-plain-drizzle-in-api`). The
+  promise-based drizzle bypasses the `DatabaseError` mapping and tracing; only
+  `packages/auth` (the adapter) may use it. Everything else goes through
+  `Database.db`.
+- **D1 migrations are expand/contract only** (`no-d1-table-rebuild`). D1 ignores
+  `PRAGMA foreign_keys=OFF` inside a migration batch, so drizzle-kit's `__new_`
+  table rebuild cascade-deletes referencing rows. Any file under
+  `packages/db/migrations` (after the two pre-provisioning ones) containing
+  `__new_` or `PRAGMA foreign_keys=OFF` fails; see `docs/drizzle-migrations.md`.
 - **Observability is part of boot validation** — the Expo boot check above treats
   a missing Sentry DSN / PostHog key as a hard error in preview/production, so a
   store build with no telemetry fails fast rather than shipping blind. This is
