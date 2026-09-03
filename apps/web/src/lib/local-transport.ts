@@ -8,7 +8,11 @@
  * rendered for and nothing else. `authorization` is deliberately not in the
  * set: a bearer token on the page request (an API key, a proxy credential)
  * must not be replayed against every endpoint a loader happens to call.
+ *
+ * `context` is the render's per-request services (its `RequestContext`),
+ * passed through to every dispatch so they share one session read.
  */
+import type { Context } from "effect";
 import { Effect } from "effect";
 import {
   HttpClient,
@@ -21,8 +25,12 @@ import {
 export const FORWARDED_HEADERS: ReadonlyArray<string> = ["cookie"];
 
 export const localTransport = (
-  handler: (request: Request) => Promise<Response>,
+  handler: (
+    request: Request,
+    context?: Context.Context<never>,
+  ) => Promise<Response>,
   incoming: Headers,
+  context?: Context.Context<never>,
 ): HttpClient.HttpClient =>
   HttpClient.make((request, url, signal) =>
     HttpClientRequest.toWeb(request, { signal }).pipe(
@@ -40,7 +48,7 @@ export const localTransport = (
         }
         const forwarded = new Request(web, { headers });
         return Effect.tryPromise({
-          try: () => handler(forwarded),
+          try: () => handler(forwarded, context),
           catch: (cause) =>
             new HttpClientError.HttpClientError({
               reason: new HttpClientError.TransportError({ request, cause }),

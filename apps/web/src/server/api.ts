@@ -1,4 +1,6 @@
-import { Auth } from "@gmacko/auth/service";
+import { SecurityLive } from "@gmacko/auth/middleware";
+import type { AuthSecurityConfig } from "@gmacko/auth/security-config";
+import { type Auth, CurrentUser } from "@gmacko/auth/service";
 import { Database, type DatabaseError } from "@gmacko/db";
 import {
   ForgeHealth,
@@ -10,7 +12,8 @@ import {
   Unhealthy,
   UnhealthyReport,
 } from "@gmacko/domain/health";
-import { Effect, FileSystem, Layer, Path, Schema } from "effect";
+import { Session } from "@gmacko/domain/security";
+import { type Context, Effect, FileSystem, Layer, Path, Schema } from "effect";
 import {
   Etag,
   HttpMiddleware,
@@ -36,16 +39,17 @@ export const SessionUser = Schema.Struct({
 });
 
 export const Me = Schema.Struct({
-  user: Schema.NullOr(SessionUser),
+  user: SessionUser,
 });
 
 /**
- * Who the request's cookie belongs to. Spike C's proof that a session cookie
- * survives the in-process transport from an SSR loader; TODO(Phase 4): replace
- * with the `Session` middleware + `CurrentUser` from packages/domain.
+ * Who the request's cookie belongs to, through the contract's `Session`
+ * middleware: anonymous is 401, a bearer is 403 `Forbidden(scope)`. Spike
+ * C's proof that a session survives the in-process transport from an SSR
+ * loader; TODO(Phase 4): superseded by `AppApi`'s `auth.session`.
  */
 export class SessionApi extends HttpApiGroup.make("session")
-  .add(HttpApiEndpoint.get("me", "/me", { success: Me }))
+  .add(HttpApiEndpoint.get("me", "/me", { success: Me }).middleware(Session))
   .prefix("/session") {}
 
 /**
@@ -204,24 +208,16 @@ export const SessionHandlers = HttpApiBuilder.group(
   GmackoApi,
   "session",
   (handlers) =>
-    Effect.gen(function* () {
-      const auth = yield* Auth;
-      return handlers.handle("me", ({ request }) =>
-        auth.currentUser(new Headers(request.headers)).pipe(
-          Effect.map((user) => ({
-            user: user
-              ? {
-                  id: user.id,
-                  name: user.name,
-                  email: user.email,
-                  // Declared optional in better-auth's inference; the column is NOT NULL DEFAULT 'user'.
-                  role: user.role ?? "user",
-                }
-              : null,
-          })),
-        ),
-      );
-    }),
+    handlers.handle("me", () =>
+      Effect.map(CurrentUser, (user) => ({
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        },
+      })),
+    ),
 );
 
 /**
@@ -235,25 +231,38 @@ const PlatformLive = Layer.mergeAll(
 );
 
 /**
- * Every HttpApi handler group; needs `Database | AppConfig | Auth` from the
- * app and the router (+ its phantom request requirement) from
+ * Every HttpApi handler group plus the security middlewares they declare;
+ * needs `Database | AppConfig | Auth | AuthSecurityConfig` from the app and
+ * the router (+ its phantom request requirement) from
  * `HttpRouter.toWebHandler`, so the type is left to inference.
  */
 export const ApiLive = HttpApiBuilder.layer(GmackoApi).pipe(
   Layer.provide(Layer.mergeAll(HealthHandlers, SessionHandlers)),
+  Layer.provide(SecurityLive),
   Layer.provide(PlatformLive),
 );
+
+/** The per-request services an entry point may hand the API (`RequestContext`, for one). */
+export type RequestServices = Context.Context<never>;
+
+/** A fetch-style handler that also accepts the request's services. */
+export type ApiHandler = (
+  request: Request,
+  context?: RequestServices,
+) => Promise<Response>;
 
 /**
  * The fetch-style handler for `/api/*` and `/.well-known/forge-health`, over
  * the given services. `runtime.ts` passes the production layers (sharing its
  * memo map); tests pass the sqlite-node ones. One `http.server` span per
- * request.
+ * request. The handler's optional second argument is merged into the request
+ * fiber's services: the SSR path uses it to share one `RequestContext`
+ * across every call a render makes.
  */
 export const makeApiHandler = (
-  services: Layer.Layer<Database | AppConfig | Auth>,
+  services: Layer.Layer<Database | AppConfig | Auth | AuthSecurityConfig>,
   options?: { readonly memoMap?: Layer.MemoMap },
-) =>
+): { readonly handler: ApiHandler; readonly dispose: () => Promise<void> } =>
   HttpRouter.toWebHandler(ApiLive.pipe(Layer.provideMerge(services)), {
     ...options,
     middleware: HttpMiddleware.tracer,

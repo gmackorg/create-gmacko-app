@@ -10,7 +10,7 @@ import { Effect, Layer } from "effect";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { AppConfig, makeApiHandler } from "~/server/api";
-import { makeAuthOptions } from "~/server/auth";
+import { AuthSecurityConfigLive, makeAuthOptions } from "~/server/auth";
 
 const config = (stage: string) =>
   AppConfig.fromBindings(
@@ -47,6 +47,7 @@ const services = (stage: string, database: Layer.Layer<Database>) => {
         magicLink: { send: async () => {} },
       }),
     ).pipe(Layer.provide(Layer.mergeAll(appConfig, database))),
+    AuthSecurityConfigLive.pipe(Layer.provide(appConfig)),
   );
 };
 

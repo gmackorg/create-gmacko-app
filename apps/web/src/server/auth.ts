@@ -4,12 +4,25 @@
  * because it is a framework concern, not an auth-package one.
  */
 import { type AuthOptions, logMagicLink, type MagicLink } from "@gmacko/auth";
+import { AuthSecurityConfig } from "@gmacko/auth/security-config";
 import { Auth } from "@gmacko/auth/service";
 import type { Database } from "@gmacko/db";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { Effect, Layer } from "effect";
 
 import { AppConfig, type AppConfigShape } from "./config";
+
+/** What the credential middlewares need from `AppConfig`: the Origin allowlist and the stage. */
+export const AuthSecurityConfigLive: Layer.Layer<
+  AuthSecurityConfig,
+  never,
+  AppConfig
+> = Layer.effect(AuthSecurityConfig)(
+  Effect.map(AppConfig, (config) => ({
+    allowedOrigins: config.allowedOrigins,
+    stage: config.stage,
+  })),
+);
 
 /**
  * TODO(Phase 6): deliver through the Resend-backed email service. Until then

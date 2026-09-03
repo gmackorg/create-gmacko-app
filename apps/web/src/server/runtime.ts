@@ -5,12 +5,13 @@
  * ManagedRuntime built below. Module scope does no I/O.
  */
 import { env, waitUntil } from "cloudflare:workers";
+import { RequestContext } from "@gmacko/auth/request-context";
 import { Auth } from "@gmacko/auth/service";
 import { Database } from "@gmacko/db";
-import { Effect, Layer, ManagedRuntime } from "effect";
+import { Context, Effect, Layer, ManagedRuntime } from "effect";
 
-import { AppConfig, makeApiHandler } from "./api";
-import { AuthLive } from "./auth";
+import { type ApiHandler, AppConfig, makeApiHandler } from "./api";
+import { AuthLive, AuthSecurityConfigLive } from "./auth";
 import { Background } from "./background";
 import { flushTelemetry, Observability } from "./observability";
 
@@ -31,6 +32,7 @@ const ServicesLive = Layer.mergeAll(
   Background.layer(waitUntil),
   DatabaseLive,
   AuthLive.pipe(Layer.provide(Layer.mergeAll(AppConfigLive, DatabaseLive))),
+  AuthSecurityConfigLive.pipe(Layer.provide(AppConfigLive)),
   Observability.layer({
     endpoint: config.otlp.endpoint,
     headers: config.otlp.headers,
@@ -47,10 +49,10 @@ export const runtime = ManagedRuntime.make(ServicesLive);
  * exported even though the isolate idles right after the response.
  */
 const flushAfter =
-  (respond: (request: Request) => Promise<Response>) =>
-  async (request: Request): Promise<Response> => {
+  (respond: ApiHandler): ApiHandler =>
+  async (request, context) => {
     try {
-      return await respond(request);
+      return await respond(request, context);
     } finally {
       await runtime.runPromise(flushTelemetry);
     }
@@ -59,10 +61,25 @@ const flushAfter =
 // Share the memo map so the services above are built once, not per layer.
 const api = makeApiHandler(ServicesLive, { memoMap: runtime.memoMap });
 
-/** Fetch-style handler for everything under /api/* (except /api/auth). */
-export const apiHandler: (request: Request) => Promise<Response> = flushAfter(
-  api.handler,
-);
+/**
+ * Fetch-style handler for everything under /api/* (except /api/auth). A
+ * direct API request comes without `context`: the security middleware then
+ * builds the request's `RequestContext` itself. The SSR path passes
+ * `renderContext(...)` so every call of one render shares it.
+ */
+export const apiHandler: ApiHandler = flushAfter(api.handler);
+
+/**
+ * The per-request services for one incoming page request: its
+ * `RequestContext`, built once and handed to every in-process API dispatch
+ * the render makes (see lib/api.ts).
+ */
+export const renderContext = (
+  headers: Headers,
+): Promise<Context.Context<never>> =>
+  runtime
+    .runPromise(RequestContext.make(headers))
+    .then((context) => Context.make(RequestContext, context));
 
 /** better-auth's handler for /api/auth/*. */
 export const authHandler: (request: Request) => Promise<Response> = flushAfter(
