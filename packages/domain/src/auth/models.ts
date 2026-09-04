@@ -5,22 +5,15 @@
  */
 import { Schema } from "effect";
 
+import { UserModel } from "../models/auth";
+import { UserId } from "../models/ids";
 import { Email, id } from "../primitives";
-import { Credential, UserRole } from "../roles";
+import { Credential } from "../roles";
 
-export const UserId = id("UserId");
-export type UserId = typeof UserId.Type;
+export { UserId };
 
-export class User extends Schema.Class<User>("User")({
-  id: UserId,
-  name: Schema.String,
-  email: Schema.String,
-  emailVerified: Schema.Boolean,
-  image: Schema.NullOr(Schema.String),
-  role: UserRole,
-  createdAt: Schema.Date,
-  updatedAt: Schema.Date,
-}) {}
+/** The `user` row as the API returns it: `UserModel.json`, named. */
+export class User extends Schema.Class<User>("User")(UserModel.json.fields) {}
 
 export const SessionId = id("SessionId");
 export type SessionId = typeof SessionId.Type;

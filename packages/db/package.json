@@ -54,6 +54,7 @@
     "@cloudflare/vitest-pool-workers": "catalog:",
     "@cloudflare/workers-types": "catalog:",
     "@effect/sql-sqlite-node": "catalog:",
+    "@gmacko/domain": "workspace:*",
     "@gmacko/tsconfig": "workspace:*",
     "@types/node": "catalog:",
     "drizzle-kit": "catalog:",

@@ -11,7 +11,8 @@
     "./posts": "./src/posts/index.ts",
     "./settings": "./src/settings/index.ts",
     "./admin": "./src/admin/index.ts",
-    "./health": "./src/health/index.ts"
+    "./health": "./src/health/index.ts",
+    "./models": "./src/models/index.ts"
   },
   "license": "MIT",
   "scripts": {

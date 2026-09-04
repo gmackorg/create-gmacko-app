@@ -1,124 +1,96 @@
 /**
  * Everything a signed-in user (or an operator key) reads and writes about
  * their own account, workspace and billing, plus the public launch state and
- * waitlist. Row models mirror @gmacko/db's tables one to one; response
- * shapes mirror what the legacy procedures returned, typed where they were
- * `string`.
+ * waitlist. The row-shaped classes are `Schema.Class`es over the `json`
+ * variant of the `Model.Class` declarations in `../models`, so they mirror
+ * @gmacko/db's tables one to one minus the columns marked
+ * `Model.Sensitive`; response shapes mirror what the legacy procedures
+ * returned, typed where they were `string`.
  */
 import { Effect, Schema } from "effect";
-
-import { UserId } from "../auth/models";
-import { boundedString, Email, id, stringBetween } from "../primitives";
+import {
+  BillingPlanLimitModel,
+  BillingPlanModel,
+  UsageMeterModel,
+  UsageRollupModel,
+  WorkspaceSubscriptionModel,
+} from "../models/billing";
+import {
+  AnnouncementTone,
+  BillingInterval,
+  BillingLimitPeriod,
+  BillingProvider,
+  Theme,
+  UsageAggregation,
+  WaitlistSource,
+  WaitlistStatus,
+  WorkspaceSubscriptionStatus,
+} from "../models/enums";
+import {
+  ApiKeyId,
+  BillingPlanId,
+  BillingPlanLimitId,
+  InviteId,
+  UsageMeterId,
+  UsageRollupId,
+  UserId,
+  UserPreferencesId,
+  WaitlistEntryId,
+  WorkspaceId,
+  WorkspaceMembershipId,
+  WorkspaceSubscriptionId,
+} from "../models/ids";
+import {
+  ApiKeyModel,
+  WaitlistEntryModel,
+  WorkspaceInviteModel,
+  WorkspaceMembershipModel,
+  WorkspaceModel,
+} from "../models/settings";
+import { boundedString, Email, stringBetween } from "../primitives";
 import { ApiKeyScope, UserRole, WorkspaceMemberRole } from "../roles";
 
 // ---------------------------------------------------------------------------
-// Enums
+// Enums and ids (declared in ../models so the row models can import them)
 // ---------------------------------------------------------------------------
 
-export const WaitlistSource = Schema.Literals([
-  "landing",
-  "contact",
-  "referral",
-  "blocked-signup",
-]);
-export type WaitlistSource = typeof WaitlistSource.Type;
-
-export const WaitlistStatus = Schema.Literals([
-  "pending",
-  "contacted",
-  "approved",
-  "dismissed",
-]);
-export type WaitlistStatus = typeof WaitlistStatus.Type;
-
-export const BillingInterval = Schema.Literals(["month", "year"]);
-export type BillingInterval = typeof BillingInterval.Type;
-
-export const WorkspaceSubscriptionStatus = Schema.Literals([
-  "free",
-  "trialing",
-  "active",
-  "past_due",
-  "canceled",
-  "incomplete",
-]);
-export type WorkspaceSubscriptionStatus =
-  typeof WorkspaceSubscriptionStatus.Type;
-
-export const BillingProvider = Schema.Literals(["manual", "stripe"]);
-export type BillingProvider = typeof BillingProvider.Type;
-
-export const BillingLimitPeriod = Schema.Literals(["day", "month", "all_time"]);
-export type BillingLimitPeriod = typeof BillingLimitPeriod.Type;
-
-export const UsageAggregation = Schema.Literals(["sum", "max"]);
-export type UsageAggregation = typeof UsageAggregation.Type;
-
-/**
- * `application_settings.announcement_tone` is free text in D1; Phase 4's
- * repository maps or validates the column into this literal set (falling
- * back to `info`) before it reaches `LaunchState`.
- */
-export const AnnouncementTone = Schema.Literals([
-  "info",
-  "warning",
-  "critical",
-]);
-export type AnnouncementTone = typeof AnnouncementTone.Type;
-
-/**
- * `user_preferences.theme` is free text in D1; Phase 4's repository maps or
- * validates the column into this literal set (falling back to `system`)
- * before it reaches `UserPreferences`.
- */
-export const Theme = Schema.Literals(["light", "dark", "system"]);
-export type Theme = typeof Theme.Type;
+export {
+  AnnouncementTone,
+  ApiKeyId,
+  BillingInterval,
+  BillingLimitPeriod,
+  BillingPlanId,
+  BillingPlanLimitId,
+  BillingProvider,
+  InviteId,
+  Theme,
+  UsageAggregation,
+  UsageMeterId,
+  UsageRollupId,
+  UserPreferencesId,
+  WaitlistEntryId,
+  WaitlistSource,
+  WaitlistStatus,
+  WorkspaceId,
+  WorkspaceMembershipId,
+  WorkspaceSubscriptionId,
+  WorkspaceSubscriptionStatus,
+};
 
 /** The roles an invite may grant; owners are never invited. */
 export const InviteRole = Schema.Literals(["admin", "member"]);
 export type InviteRole = typeof InviteRole.Type;
 
 // ---------------------------------------------------------------------------
-// Ids
-// ---------------------------------------------------------------------------
-
-export const WorkspaceId = id("WorkspaceId");
-export type WorkspaceId = typeof WorkspaceId.Type;
-export const WorkspaceMembershipId = id("WorkspaceMembershipId");
-export type WorkspaceMembershipId = typeof WorkspaceMembershipId.Type;
-export const InviteId = id("InviteId");
-export type InviteId = typeof InviteId.Type;
-export const UserPreferencesId = id("UserPreferencesId");
-export type UserPreferencesId = typeof UserPreferencesId.Type;
-export const ApiKeyId = id("ApiKeyId");
-export type ApiKeyId = typeof ApiKeyId.Type;
-export const WaitlistEntryId = id("WaitlistEntryId");
-export type WaitlistEntryId = typeof WaitlistEntryId.Type;
-export const BillingPlanId = id("BillingPlanId");
-export type BillingPlanId = typeof BillingPlanId.Type;
-export const BillingPlanLimitId = id("BillingPlanLimitId");
-export type BillingPlanLimitId = typeof BillingPlanLimitId.Type;
-export const WorkspaceSubscriptionId = id("WorkspaceSubscriptionId");
-export type WorkspaceSubscriptionId = typeof WorkspaceSubscriptionId.Type;
-export const UsageMeterId = id("UsageMeterId");
-export type UsageMeterId = typeof UsageMeterId.Type;
-export const UsageRollupId = id("UsageRollupId");
-export type UsageRollupId = typeof UsageRollupId.Type;
-
-/** `createdAt` set on insert, `updatedAt` only once a row has been updated. */
-const timestamps = {
-  createdAt: Schema.Date,
-  updatedAt: Schema.NullOr(Schema.Date),
-} as const;
-
-// ---------------------------------------------------------------------------
-// Row models
+// Row models (the `json` variant of ../models, named for the OpenAPI document)
 // ---------------------------------------------------------------------------
 
 /**
  * The caller's preferences. `getPreferences` answers the defaults without
  * writing a row, so `id`, `createdAt` and `updatedAt` are `null` until the
- * first `updatePreferences`; the other fields always carry a value.
+ * first `updatePreferences`; the other fields always carry a value. This is
+ * the one row class that is not `Model.json`: the columns are all NOT NULL,
+ * the unwritten default response is not.
  */
 export class UserPreferences extends Schema.Class<UserPreferences>(
   "UserPreferences",
@@ -138,16 +110,9 @@ export class UserPreferences extends Schema.Class<UserPreferences>(
 }) {}
 
 /** An API key as listed: never the hash, never the plaintext. */
-export class ApiKey extends Schema.Class<ApiKey>("ApiKey")({
-  id: ApiKeyId,
-  name: Schema.String,
-  /** First 12 characters of the key, for recognising it in a list. */
-  keyPrefix: Schema.String,
-  permissions: Schema.Array(ApiKeyScope),
-  lastUsedAt: Schema.NullOr(Schema.Date),
-  expiresAt: Schema.NullOr(Schema.Date),
-  createdAt: Schema.Date,
-}) {}
+export class ApiKey extends Schema.Class<ApiKey>("ApiKey")(
+  ApiKeyModel.json.fields,
+) {}
 
 /** The one response that carries the plaintext key; shown once, never stored. */
 export class ApiKeyCreated extends Schema.Class<ApiKeyCreated>("ApiKeyCreated")(
@@ -161,109 +126,43 @@ export class ApiKeyCreated extends Schema.Class<ApiKeyCreated>("ApiKeyCreated")(
   },
 ) {}
 
-export class Workspace extends Schema.Class<Workspace>("Workspace")({
-  id: WorkspaceId,
-  name: Schema.String,
-  slug: Schema.String,
-  ownerUserId: UserId,
-  ...timestamps,
-}) {}
+export class Workspace extends Schema.Class<Workspace>("Workspace")(
+  WorkspaceModel.json.fields,
+) {}
 
 export class WorkspaceMembership extends Schema.Class<WorkspaceMembership>(
   "WorkspaceMembership",
-)({
-  id: WorkspaceMembershipId,
-  workspaceId: WorkspaceId,
-  userId: UserId,
-  role: WorkspaceMemberRole,
-  ...timestamps,
-}) {}
+)(WorkspaceMembershipModel.json.fields) {}
 
 /** An allowlist entry: the email may sign up and joins the workspace with `role`. */
 export class WorkspaceInvite extends Schema.Class<WorkspaceInvite>(
   "WorkspaceInvite",
-)({
-  id: InviteId,
-  workspaceId: WorkspaceId,
-  email: Schema.String,
-  role: WorkspaceMemberRole,
-  invitedByUserId: UserId,
-  ...timestamps,
-}) {}
+)(WorkspaceInviteModel.json.fields) {}
 
 export class WaitlistEntry extends Schema.Class<WaitlistEntry>("WaitlistEntry")(
-  {
-    id: WaitlistEntryId,
-    email: Schema.String,
-    source: WaitlistSource,
-    status: WaitlistStatus,
-    message: Schema.NullOr(Schema.String),
-    referralCode: Schema.NullOr(Schema.String),
-    reviewedByUserId: Schema.NullOr(UserId),
-    reviewedAt: Schema.NullOr(Schema.Date),
-    ...timestamps,
-  },
+  WaitlistEntryModel.json.fields,
 ) {}
 
-export class BillingPlan extends Schema.Class<BillingPlan>("BillingPlan")({
-  id: BillingPlanId,
-  key: Schema.String,
-  name: Schema.String,
-  description: Schema.NullOr(Schema.String),
-  interval: BillingInterval,
-  amountInCents: Schema.Int,
-  currency: Schema.String,
-  isDefault: Schema.Boolean,
-  active: Schema.Boolean,
-  ...timestamps,
-}) {}
+export class BillingPlan extends Schema.Class<BillingPlan>("BillingPlan")(
+  BillingPlanModel.json.fields,
+) {}
 
 export class BillingPlanLimit extends Schema.Class<BillingPlanLimit>(
   "BillingPlanLimit",
-)({
-  id: BillingPlanLimitId,
-  planId: BillingPlanId,
-  key: Schema.String,
-  /** `null` means unlimited. */
-  value: Schema.NullOr(Schema.Int),
-  period: BillingLimitPeriod,
-  ...timestamps,
-}) {}
+)(BillingPlanLimitModel.json.fields) {}
 
-/** The Stripe customer/subscription ids stay server-side; `customerPortalAvailable` is derived from them. */
+/** The Stripe customer/subscription ids stay server-side (`Model.Sensitive`); `customerPortalAvailable` is derived from them. */
 export class WorkspaceSubscription extends Schema.Class<WorkspaceSubscription>(
   "WorkspaceSubscription",
-)({
-  id: WorkspaceSubscriptionId,
-  workspaceId: WorkspaceId,
-  planId: Schema.NullOr(BillingPlanId),
-  status: WorkspaceSubscriptionStatus,
-  provider: BillingProvider,
-  currentPeriodStart: Schema.NullOr(Schema.Date),
-  currentPeriodEnd: Schema.NullOr(Schema.Date),
-  cancelAtPeriodEnd: Schema.Boolean,
-  ...timestamps,
-}) {}
+)(WorkspaceSubscriptionModel.json.fields) {}
 
-export class UsageMeter extends Schema.Class<UsageMeter>("UsageMeter")({
-  id: UsageMeterId,
-  key: Schema.String,
-  name: Schema.String,
-  description: Schema.NullOr(Schema.String),
-  aggregation: UsageAggregation,
-  unit: Schema.String,
-  ...timestamps,
-}) {}
+export class UsageMeter extends Schema.Class<UsageMeter>("UsageMeter")(
+  UsageMeterModel.json.fields,
+) {}
 
-export class UsageRollup extends Schema.Class<UsageRollup>("UsageRollup")({
-  id: UsageRollupId,
-  workspaceId: WorkspaceId,
-  meterId: UsageMeterId,
-  periodStart: Schema.Date,
-  periodEnd: Schema.Date,
-  quantity: Schema.Int,
-  ...timestamps,
-}) {}
+export class UsageRollup extends Schema.Class<UsageRollup>("UsageRollup")(
+  UsageRollupModel.json.fields,
+) {}
 
 // ---------------------------------------------------------------------------
 // Launch state and waitlist (public)

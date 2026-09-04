@@ -1,17 +1,13 @@
 import { Schema } from "effect";
 
-import { boundedString, id, stringBetween } from "../primitives";
+import { PostId } from "../models/ids";
+import { PostModel } from "../models/posts";
+import { boundedString, stringBetween } from "../primitives";
 
-export const PostId = id("PostId");
-export type PostId = typeof PostId.Type;
+export { PostId };
 
-export class Post extends Schema.Class<Post>("Post")({
-  id: PostId,
-  title: Schema.String,
-  content: Schema.String,
-  createdAt: Schema.Date,
-  updatedAt: Schema.NullOr(Schema.Date),
-}) {}
+/** The `post` row as the API returns it: `PostModel.json`, named. */
+export class Post extends Schema.Class<Post>("Post")(PostModel.json.fields) {}
 
 /** Title 1..256 (the old zod schema allowed empty; the form never should have), content up to 256. */
 export class CreatePost extends Schema.Class<CreatePost>("CreatePost")({

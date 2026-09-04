@@ -5,7 +5,9 @@
 import { Effect, Schema } from "effect";
 
 import { User, UserId } from "../auth/models";
-import { boundedString, id, stringBetween } from "../primitives";
+import { ApplicationSettingsModel } from "../models/admin";
+import { ApplicationSettingsId } from "../models/ids";
+import { boundedString, stringBetween } from "../primitives";
 import { UserRole } from "../roles";
 import {
   AnnouncementTone,
@@ -15,25 +17,12 @@ import {
   WorkspaceId,
 } from "../settings/models";
 
-export const ApplicationSettingsId = id("ApplicationSettingsId");
-export type ApplicationSettingsId = typeof ApplicationSettingsId.Type;
+export { ApplicationSettingsId };
 
-/** The single `application_settings` row. */
+/** The single `application_settings` row (`ApplicationSettingsModel.json`, named). */
 export class ApplicationSettings extends Schema.Class<ApplicationSettings>(
   "ApplicationSettings",
-)({
-  id: ApplicationSettingsId,
-  setupCompletedAt: Schema.NullOr(Schema.Date),
-  setupCompletedByUserId: Schema.NullOr(UserId),
-  initialWorkspaceId: Schema.NullOr(WorkspaceId),
-  maintenanceMode: Schema.Boolean,
-  signupEnabled: Schema.Boolean,
-  announcementMessage: Schema.NullOr(Schema.String),
-  announcementTone: AnnouncementTone,
-  allowedEmailDomains: Schema.Array(Schema.String),
-  createdAt: Schema.Date,
-  updatedAt: Schema.NullOr(Schema.Date),
-}) {}
+)(ApplicationSettingsModel.json.fields) {}
 
 export class LaunchControls extends Schema.Class<LaunchControls>(
   "LaunchControls",
