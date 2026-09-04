@@ -15,6 +15,12 @@ import {
   CallTrace,
   freshTrace,
   type HeadersProvider,
+  // `makeApiClient` is this package's composition root: it is the one place
+  // that turns `ApiClientOptions` into the `HttpClient` the generated client
+  // runs on, and no Layer exists to yield it from — `makeHttpClient` is a
+  // plain factory over a `Transport`, not a dependency-bearing Effect
+  // service constructor. Every other module takes the built `ApiClient`.
+  // oxlint-disable-next-line anti-slop-effect/no-service-constructor-imports
   makeHttpClient,
   type Transport,
 } from "./transport";
@@ -64,11 +70,16 @@ const statusOf = (error: HttpClientError.HttpClientError): number | undefined =>
 const describe = (cause: unknown): string =>
   cause instanceof Error ? cause.message : String(cause);
 
-/** The rejection for a failed exit. */
-const toThrown = (
-  cause: Cause.Cause<unknown>,
+/**
+ * The rejection for a failed exit: the contract's own error, when the cause
+ * carries one, and an `ApiClientError` for everything the contract does not
+ * describe (no response, an undeclared status, a body that did not decode,
+ * an interruption, a defect).
+ */
+const toThrown = <E>(
+  cause: Cause.Cause<E>,
   trace: RequestTrace,
-): unknown => {
+): ApiClientError | E => {
   const failed = Cause.findErrorOption(cause);
   if (failed._tag === "Some") {
     const error = failed.value;
@@ -131,9 +142,9 @@ const toThrown = (
         trace,
       });
     }
-    if (typeof error === "object" && error !== null) {
-      recordTrace(error, trace);
-    }
+    // Every error the contract decodes is a `Schema.TaggedError`, so it is
+    // an `Error` — the trace table's key type.
+    if (error instanceof Error) recordTrace(error, trace);
     return error;
   }
   if (Cause.hasInterrupts(cause)) {

@@ -1,8 +1,8 @@
 import {
-  type ApiKeyId,
+  ApiKeyId,
   CreateApiKey,
   CreateInvite,
-  type InviteId,
+  InviteId,
   UpdatePreferences,
   WaitlistSubmit,
 } from "@gmacko/domain";
@@ -87,7 +87,7 @@ export const settingsMutations = (api: ApiClient) => ({
       mutationFn: (inviteId: string) =>
         api.run((c) =>
           c.settings.acceptInvite({
-            params: { inviteId: inviteId as InviteId },
+            params: { inviteId: InviteId.make(inviteId) },
           }),
         ),
       meta: invalidates("settings.acceptInvite"),
@@ -118,7 +118,7 @@ export const settingsMutations = (api: ApiClient) => ({
       mutationKey: [...queryKeys.settings.all, "revokeApiKey"],
       mutationFn: (id: string) =>
         api.run((c) =>
-          c.settings.revokeApiKey({ params: { id: id as ApiKeyId } }),
+          c.settings.revokeApiKey({ params: { id: ApiKeyId.make(id) } }),
         ),
       meta: invalidates("settings.revokeApiKey"),
     }),

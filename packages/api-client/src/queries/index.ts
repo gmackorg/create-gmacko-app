@@ -11,6 +11,7 @@ import {
   QueryClient,
   type QueryClientConfig,
 } from "@tanstack/react-query";
+import { Schema } from "effect";
 
 import type { ApiClient } from "../client";
 import { ApiClientError } from "../errors";
@@ -35,6 +36,7 @@ export {
   invalidates,
   invalidation,
   type MutationId,
+  type RemovedKeys,
   removal,
 } from "./invalidation";
 export {
@@ -75,11 +77,13 @@ export type Mutations = ReturnType<typeof makeMutations>;
 /** How many times a retryable failure is retried before the query settles as an error. */
 export const MAX_RETRIES = 3;
 
-/** A contract error: a `Schema.TaggedError` instance decoded from the response. */
-const isDomainError = (error: unknown): boolean =>
-  typeof error === "object" &&
-  error !== null &&
-  typeof (error as { _tag?: unknown })._tag === "string";
+/**
+ * A contract error decodes into a `Schema.TaggedError` instance, and every
+ * one of those carries its `_tag`. `ApiClientError` carries one too, which
+ * is why `shouldRetry` matches it first.
+ */
+const DomainErrorShape = Schema.Struct({ _tag: Schema.String });
+const isDomainError = Schema.is(DomainErrorShape);
 
 /**
  * The default `queries.retry` of `makeQueryClient`, for apps that own their
@@ -91,7 +95,7 @@ const isDomainError = (error: unknown): boolean =>
  * proxy's 502, a cold Worker), and errors this client did not produce
  * (TanStack's own default).
  */
-export const shouldRetry = (failureCount: number, error: unknown): boolean => {
+export const shouldRetry = (failureCount: number, error: Error): boolean => {
   if (failureCount >= MAX_RETRIES) return false;
   if (error instanceof ApiClientError) {
     switch (error.kind) {
@@ -105,6 +109,13 @@ export const shouldRetry = (failureCount: number, error: unknown): boolean => {
   }
   return !isDomainError(error);
 };
+
+/**
+ * The mutation cache hands a success's variables over untyped. `removes`
+ * needs the id a deletion was called with, and only that: this is the one
+ * line where the cache's opaque value is decoded into it.
+ */
+const isRemovedId = Schema.is(Schema.String);
 
 /**
  * A `QueryClient` whose queries retry per `shouldRetry` and whose mutation
@@ -125,8 +136,12 @@ export const makeQueryClient = (
     mutationCache:
       config.mutationCache ??
       new MutationCache({
-        onSuccess: (_data, variables, _context, mutation) =>
-          applyInvalidation(queryClient, mutation.meta, variables),
+        onSuccess: (_data, variables, _onMutateResult, mutation) =>
+          applyInvalidation(
+            queryClient,
+            mutation.meta,
+            isRemovedId(variables) ? variables : undefined,
+          ),
       }),
   });
   return queryClient;

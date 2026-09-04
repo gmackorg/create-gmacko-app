@@ -1,4 +1,4 @@
-import { CreatePost, type PostId } from "@gmacko/domain";
+import { CreatePost, PostId } from "@gmacko/domain";
 import { mutationOptions, queryOptions } from "@tanstack/react-query";
 
 import type { ApiClient } from "../client";
@@ -19,7 +19,7 @@ export const postsQueries = (api: ApiClient) => ({
     queryOptions({
       queryKey: queryKeys.posts.byId(id),
       queryFn: () =>
-        api.run((c) => c.posts.byId({ params: { id: id as PostId } })),
+        api.run((c) => c.posts.byId({ params: { id: PostId.make(id) } })),
     }),
 });
 
@@ -35,7 +35,7 @@ export const postsMutations = (api: ApiClient) => ({
     mutationOptions({
       mutationKey: [...queryKeys.posts.all, "remove"],
       mutationFn: (id: string) =>
-        api.run((c) => c.posts.remove({ params: { id: id as PostId } })),
+        api.run((c) => c.posts.remove({ params: { id: PostId.make(id) } })),
       meta: invalidates("posts.remove"),
     }),
 });

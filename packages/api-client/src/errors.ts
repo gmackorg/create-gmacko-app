@@ -59,14 +59,30 @@ export class ApiClientError extends Error {
  * rejects with (a domain error instance or an `ApiClientError`). Kept in a
  * side table so the contract's error classes stay exactly what the schema
  * decodes.
+ *
+ * `Error` is the whole key space: `ApiClientError` extends it, and so does
+ * every contract error, because `Schema.TaggedError` builds on it.
  */
-const traces = new WeakMap<object, RequestTrace>();
+const traces = new WeakMap<Error, RequestTrace>();
 
-export const recordTrace = (error: object, trace: RequestTrace): void => {
+export const recordTrace = (error: Error, trace: RequestTrace): void => {
   if (trace.requestId !== undefined || trace.traceId !== undefined) {
     traces.set(error, trace);
   }
 };
 
+/** Whether a caught rejection is an error the trace table can key on. */
+const isTraceable = (error: unknown): error is Error => error instanceof Error;
+
+/**
+ * The trace recorded for a rejection, if it carries one. Callers hand this
+ * whatever `catch` (or TanStack Query's `error`) gave them.
+ *
+ * The parameter stays `unknown` because this *is* the boundary the rule
+ * asks for rather than a signature dodging one: a promise rejection is
+ * `unknown` in JavaScript itself, no schema can be run before it is caught,
+ * and `isTraceable` narrows it to the table's key type on the next line.
+ */
+// oxlint-disable-next-line anti-slop/no-unknown-parameters
 export const traceOf = (error: unknown): RequestTrace | undefined =>
-  typeof error === "object" && error !== null ? traces.get(error) : undefined;
+  isTraceable(error) ? traces.get(error) : undefined;

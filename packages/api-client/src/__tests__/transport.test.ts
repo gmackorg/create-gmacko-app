@@ -44,7 +44,9 @@ describe("transport", () => {
     });
     const ready = await local.run((c) => c.health.ready());
     expect(ready.status).toBe("ok");
-    expect(typeof ready.latencyMs).toBe("number");
+    // `latencyMs` is a `Schema.Number` in the contract, so the decode already
+    // pins its type; what the probe owes is a real measurement.
+    expect(ready.latencyMs).toBeGreaterThanOrEqual(0);
     expect(calls).toBe(1);
   });
 

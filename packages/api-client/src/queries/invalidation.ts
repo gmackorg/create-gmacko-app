@@ -8,7 +8,11 @@
  * entries (`removal`): an invalidated `posts.byId` would refetch a 404 into
  * the cache; a removed one is simply gone.
  */
-import type { QueryClient, QueryKey } from "@tanstack/react-query";
+import type {
+  MutationMeta,
+  QueryClient,
+  QueryKey,
+} from "@tanstack/react-query";
 
 import { queryKeys as k } from "./keys";
 
@@ -62,13 +66,19 @@ export const invalidation = {
 export type MutationId = keyof typeof invalidation;
 
 /**
+ * The keys a deletion drops outright, from the id it was called with. Every
+ * deleting endpoint of the contract takes exactly that id as its variables
+ * (`posts.remove(id)`), so one signature covers them all; the test suite
+ * pins the set of mutations that declare one.
+ */
+export type RemovedKeys = (id: string) => ReadonlyArray<QueryKey>;
+
+/**
  * Keys a mutation removes from the cache outright, computed from its
  * variables: the deleted resource's own detail entry, which must not be
  * refetched (it would 404) and must not linger as stale-but-present data.
  */
-export const removal: {
-  readonly [Id in MutationId]?: (variables: never) => ReadonlyArray<QueryKey>;
-} = {
+export const removal: Partial<Record<MutationId, RemovedKeys>> = {
   "posts.remove": (id: string) => [k.posts.byId(id)],
 };
 
@@ -79,44 +89,47 @@ export const removal: {
  */
 export type InvalidationMeta = {
   readonly invalidates: ReadonlyArray<InvalidationTarget>;
-  /** Keys to remove, from the mutation's variables (`removal`); absent when the mutation deletes nothing. */
-  readonly removes?:
-    | ((variables: unknown) => ReadonlyArray<QueryKey>)
-    | undefined;
+  /** Keys to remove, from the id the mutation was called with (`removal`); absent when the mutation deletes nothing. */
+  readonly removes?: RemovedKeys | undefined;
 };
 
 export const invalidates = (id: MutationId): InvalidationMeta => {
-  const removes = removal[id] as
-    | ((variables: unknown) => ReadonlyArray<QueryKey>)
-    | undefined;
+  const removes = removal[id];
   return removes === undefined
     ? { invalidates: invalidation[id] }
     : { invalidates: invalidation[id], removes };
 };
 
-const isInvalidationMeta = (meta: unknown): meta is InvalidationMeta =>
-  typeof meta === "object" &&
-  meta !== null &&
-  Array.isArray((meta as { invalidates?: unknown }).invalidates);
+/**
+ * Whether a mutation's `meta` is one `invalidates` built: it carries the
+ * array of targets and, when the mutation deletes something, the function
+ * that turns the deleted id into the keys to drop.
+ */
+const isInvalidationMeta = (
+  meta: MutationMeta | undefined,
+): meta is MutationMeta & InvalidationMeta =>
+  meta !== undefined &&
+  Array.isArray(meta.invalidates) &&
+  (meta.removes === undefined || meta.removes instanceof Function);
 
 /**
- * Applies a mutation's `meta.invalidates` (and, given its `variables`, its
- * `meta.removes`) to `queryClient`; a no-op for other meta. `CLEAR_ALL`
- * removes every query but leaves the mutation cache, and the mutation
- * whose success is being handled, in place.
+ * Applies a mutation's `meta.invalidates` (and, given the id it was called
+ * with, its `meta.removes`) to `queryClient`; a no-op for other meta.
+ * `CLEAR_ALL` removes every query but leaves the mutation cache, and the
+ * mutation whose success is being handled, in place.
  */
 export const applyInvalidation = async (
   queryClient: QueryClient,
-  meta: unknown,
-  variables?: unknown,
+  meta: MutationMeta | undefined,
+  removedId?: string,
 ): Promise<void> => {
   if (!isInvalidationMeta(meta)) return;
   if (meta.invalidates.includes(CLEAR_ALL)) {
     queryClient.removeQueries();
     return;
   }
-  if (typeof meta.removes === "function") {
-    for (const queryKey of meta.removes(variables)) {
+  if (meta.removes !== undefined && removedId !== undefined) {
+    for (const queryKey of meta.removes(removedId)) {
       queryClient.removeQueries({ queryKey, exact: true });
     }
   }

@@ -9,7 +9,7 @@ import { Conflict, Forbidden, NotFound, Unauthorized } from "@gmacko/domain";
 import { MutationCache, QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 
-import { type ApiClient, ApiClientError } from "../index";
+import { ApiClientError, makeApiClient } from "../index";
 import {
   applyInvalidation,
   CLEAR_ALL,
@@ -27,6 +27,21 @@ const clientError = (
   kind: ApiClientError["kind"],
   status?: number,
 ): ApiClientError => new ApiClientError({ kind, message: kind, status });
+
+/**
+ * The error a call must reject with. `fetchQuery` rejects with the error the
+ * query function produced; a query that resolves fails here rather than
+ * silently comparing `undefined`.
+ */
+const rejection = async (call: Promise<unknown>): Promise<Error> => {
+  try {
+    await call;
+  } catch (thrown) {
+    if (thrown instanceof Error) return thrown;
+    throw new Error(`rejected with a non-Error: ${String(thrown)}`);
+  }
+  throw new Error("expected the query to reject, but it resolved");
+};
 
 describe("shouldRetry", () => {
   it("never retries a domain error: the answer will not change", () => {
@@ -75,9 +90,9 @@ describe("shouldRetry", () => {
 
 describe("makeQueryClient", () => {
   const fetchFailing = async (
-    error: unknown,
+    error: Error,
     overrides: Parameters<typeof makeQueryClient>[0] = {},
-  ): Promise<{ calls: number; thrown: unknown }> => {
+  ): Promise<{ calls: number; thrown: Error }> => {
     let calls = 0;
     const queryClient = makeQueryClient({
       ...overrides,
@@ -86,15 +101,15 @@ describe("makeQueryClient", () => {
         queries: { retryDelay: 0, ...overrides.defaultOptions?.queries },
       },
     });
-    const thrown = await queryClient
-      .fetchQuery({
+    const thrown = await rejection(
+      queryClient.fetchQuery({
         queryKey: ["t", String(calls)],
         queryFn: () => {
           calls += 1;
           return Promise.reject(error);
         },
-      })
-      .catch((e: unknown) => e);
+      }),
+    );
     queryClient.clear();
     return { calls, thrown };
   };
@@ -139,26 +154,29 @@ describe("listUsers keys", () => {
   });
 
   it("requests the normalised page and keeps the previous page while loading", async () => {
-    const seen: Array<unknown> = [];
-    const api = {
-      run: (f: (c: unknown) => unknown) =>
-        Promise.resolve(
-          f({
-            admin: {
-              listUsers: (input: unknown) => {
-                seen.push(input);
-                return { users: [], total: 0 };
-              },
-            },
-          }),
-        ),
-    } as unknown as ApiClient;
-    const queries = makeQueries(api);
-    const options = queries.admin.listUsers({});
+    // A real client over a transport that records what reached the wire: the
+    // normalisation is only worth anything if it survives URL encoding.
+    const requested: Array<string> = [];
+    const api = makeApiClient({
+      baseUrl: "https://api.example.com",
+      transport: async (request) => {
+        requested.push(request.url);
+        return Response.json({ users: [], total: 0, hasMore: false });
+      },
+    });
+    const options = makeQueries(api).admin.listUsers({});
     expect(options.queryKey).toEqual(queryKeys.admin.listUsers());
     expect(options.placeholderData).toBeTypeOf("function");
-    await options.queryFn?.({} as never);
-    expect(seen).toEqual([{ query: { limit: 20, offset: 0 } }]);
+
+    await new QueryClient().fetchQuery(options);
+
+    expect(requested).toHaveLength(1);
+    const url = new URL(requested[0] ?? "");
+    expect(url.pathname).toBe("/api/admin/users");
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      limit: "20",
+      offset: "0",
+    });
   });
 });
 

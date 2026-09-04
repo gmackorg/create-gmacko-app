@@ -3,8 +3,8 @@ import {
   ReviewWaitlistEntry,
   UpdateLaunchControls,
   UpdateUserRole,
-  type UserId,
-  type WaitlistEntryId,
+  UserId,
+  WaitlistEntryId,
 } from "@gmacko/domain";
 import {
   keepPreviousData,
@@ -75,7 +75,7 @@ export const adminQueries = (api: ApiClient) => ({
       queryKey: queryKeys.admin.getUser(userId),
       queryFn: () =>
         api.run((c) =>
-          c.admin.getUser({ params: { userId: userId as UserId } }),
+          c.admin.getUser({ params: { userId: UserId.make(userId) } }),
         ),
     }),
 });
@@ -98,7 +98,7 @@ export const adminMutations = (api: ApiClient) => ({
       mutationFn: (input: { id: string } & ReviewWaitlistEntryInput) =>
         api.run((c) =>
           c.admin.reviewWaitlistEntry({
-            params: { id: input.id as WaitlistEntryId },
+            params: { id: WaitlistEntryId.make(input.id) },
             payload: new ReviewWaitlistEntry({ status: input.status }),
           }),
         ),
@@ -120,7 +120,7 @@ export const adminMutations = (api: ApiClient) => ({
       mutationFn: (input: { userId: string } & UpdateUserRoleInput) =>
         api.run((c) =>
           c.admin.updateUserRole({
-            params: { userId: input.userId as UserId },
+            params: { userId: UserId.make(input.userId) },
             payload: new UpdateUserRole({ role: input.role }),
           }),
         ),

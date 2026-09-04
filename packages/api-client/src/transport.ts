@@ -26,16 +26,23 @@ export const REQUEST_ID_HEADER = "x-request-id";
 export const TRACE_ID_HEADER = "x-trace-id";
 
 /**
+ * A `RequestTrace` while the call is still open: the response's trace
+ * headers are written into it as they arrive, and it is read back as the
+ * readonly `RequestTrace` once the call has settled.
+ */
+export type OpenTrace = {
+  -readonly [K in keyof RequestTrace]: RequestTrace[K];
+};
+
+/**
  * Where the trace headers of the last response land. `run` provides a fresh
  * record per call; a `Reference` has a default, so reading it adds no
  * requirement to the client's effect types.
  */
-export const CallTrace = Context.Reference<{
-  requestId: string | undefined;
-  traceId: string | undefined;
-}>("@gmacko/api-client/CallTrace", {
-  defaultValue: () => ({ requestId: undefined, traceId: undefined }),
-});
+export const CallTrace = Context.Reference<OpenTrace>(
+  "@gmacko/api-client/CallTrace",
+  { defaultValue: () => ({ requestId: undefined, traceId: undefined }) },
+);
 
 /**
  * Only the named headers of `source`, lower-cased, present ones only. For an
@@ -46,14 +53,13 @@ export const CallTrace = Context.Reference<{
 export const pickHeaders = (
   source: Headers,
   names: ReadonlyArray<string>,
-): Record<string, string> => {
-  const picked: Record<string, string> = {};
-  for (const name of names) {
-    const value = source.get(name);
-    if (value !== null) picked[name.toLowerCase()] = value;
-  }
-  return picked;
-};
+): Record<string, string> =>
+  Object.fromEntries(
+    names.flatMap((name) => {
+      const value = source.get(name);
+      return value === null ? [] : [[name.toLowerCase(), value] as const];
+    }),
+  );
 
 /**
  * The incoming request headers an in-process dispatch carries over, and no
@@ -72,13 +78,13 @@ export const FORWARDED_HEADERS: ReadonlyArray<string> = [
 export const forwardedHeaders = (incoming: Headers): Record<string, string> =>
   pickHeaders(incoming, FORWARDED_HEADERS);
 
-const present = (headers: HeadersRecord): Record<string, string> => {
-  const out: Record<string, string> = {};
-  for (const [name, value] of Object.entries(headers)) {
-    if (value !== undefined) out[name] = value;
-  }
-  return out;
-};
+/** The entries of `headers` that carry a value; `undefined` ones are dropped. */
+const present = (headers: HeadersRecord): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(headers).flatMap(([name, value]) =>
+      value === undefined ? [] : [[name, value] as const],
+    ),
+  );
 
 export interface HttpClientOptions {
   readonly transport: Transport;
@@ -147,9 +153,8 @@ export const makeHttpClient = (
   );
 };
 
-export const freshTrace = (): {
-  -readonly [K in keyof RequestTrace]: RequestTrace[K];
-} => ({
+/** The trace record `run` provides for one call, before any response. */
+export const freshTrace = (): OpenTrace => ({
   requestId: undefined,
   traceId: undefined,
 });

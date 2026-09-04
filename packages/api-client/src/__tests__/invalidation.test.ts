@@ -5,10 +5,11 @@
  * typo in the invalidation map cannot silently leave a screen stale.
  */
 import { AppApi } from "@gmacko/domain";
+import type { MutationMeta, QueryKey } from "@tanstack/react-query";
 import { HttpApi } from "effect/unstable/httpapi";
 import { describe, expect, it } from "vitest";
 
-import type { ApiClient } from "../index";
+import { makeApiClient } from "../index";
 import {
   CLEAR_ALL,
   invalidation,
@@ -32,30 +33,81 @@ const endpoints = (() => {
   return { reads, writes };
 })();
 
-/** A client that never runs: the factories only need it as a value. */
-const never = {
-  run: () => Promise.reject(new Error("not called")),
-} as unknown as ApiClient;
+/** A client whose transport never answers: the factories only need it as a value. */
+const never = makeApiClient({
+  baseUrl: "http://localhost",
+  transport: () => Promise.reject(new Error("not called")),
+});
 
-const sampleArgs: Record<string, ReadonlyArray<unknown>> = {
-  "posts.byId": ["post_1"],
-  "admin.getUser": ["user_1"],
-  "admin.listUsers": [{ limit: 10, offset: 0 }],
-};
+/**
+ * The arguments the parameterised entries are walked with, per
+ * `group.endpoint`: the id or page each one's own signature declares.
+ */
+const sampleArgs = new Map<string, ReadonlyArray<unknown>>([
+  ["posts.byId", ["post_1"]],
+  ["admin.getUser", ["user_1"]],
+  ["admin.listUsers", [{ limit: 10, offset: 0 }]],
+]);
+
+/**
+ * Calls one entry of a registry with its sample arguments. The walks below
+ * see every factory through a single shape, so their differing parameter
+ * lists collapse to `never` and the arguments have to be handed back.
+ */
+const withSample = <R>(
+  factory: (...args: ReadonlyArray<never>) => R,
+  id: string,
+): R =>
+  // SAFETY: `sampleArgs` holds, for each parameterised endpoint, exactly the
+  // argument list that endpoint's own factory declares (`posts.byId(string)`,
+  // `admin.getUser(string)`, `admin.listUsers(ListUsersInput)`); a wrong one
+  // fails the `queryKey` comparisons below. Every other entry takes none.
+  factory(...((sampleArgs.get(id) ?? []) as ReadonlyArray<never>));
+
+/** A `queryKeys` entry: a key tuple, or the factory that builds one. */
+type KeyEntry =
+  | ReadonlyArray<unknown>
+  | ((...args: ReadonlyArray<never>) => ReadonlyArray<unknown>);
 
 /** Every key the registry can produce, by `group.endpoint`, plus each group's `all`. */
-const registeredKeys = (): Map<string, ReadonlyArray<unknown>> => {
+const registeredKeysOf = (
+  groups: Readonly<Record<string, Readonly<Record<string, KeyEntry>>>>,
+): Map<string, ReadonlyArray<unknown>> => {
   const keys = new Map<string, ReadonlyArray<unknown>>();
-  for (const [group, entries] of Object.entries(queryKeys)) {
-    for (const [name, key] of Object.entries(entries)) {
-      const value =
-        typeof key === "function"
-          ? key(...(sampleArgs[`${group}.${name}`] ?? []))
-          : key;
-      keys.set(`${group}.${name}`, value);
+  for (const [group, entries] of Object.entries(groups)) {
+    for (const [name, entry] of Object.entries(entries)) {
+      const id = `${group}.${name}`;
+      keys.set(id, entry instanceof Function ? withSample(entry, id) : entry);
     }
   }
   return keys;
+};
+
+const registeredKeys = (): Map<string, ReadonlyArray<unknown>> =>
+  registeredKeysOf(queryKeys);
+
+/** A `queryOptions` factory as the completeness walk calls it. */
+type QueryFactory = (...args: ReadonlyArray<never>) => {
+  readonly queryKey: QueryKey;
+  readonly queryFn?: unknown;
+};
+
+/** A `mutationOptions` factory as the completeness walk calls it. */
+type MutationFactory = (...args: ReadonlyArray<never>) => {
+  readonly meta?: MutationMeta | undefined;
+};
+
+/** The factories of `makeQueries`/`makeMutations`, flattened to `group.endpoint`. */
+const factoriesOf = <F>(
+  groups: Readonly<Record<string, Readonly<Record<string, F>>>>,
+): Map<string, F> => {
+  const factories = new Map<string, F>();
+  for (const [group, entries] of Object.entries(groups)) {
+    for (const [name, factory] of Object.entries(entries)) {
+      factories.set(`${group}.${name}`, factory);
+    }
+  }
+  return factories;
 };
 
 const sameKey = (a: ReadonlyArray<unknown>, b: ReadonlyArray<unknown>) =>
@@ -87,31 +139,21 @@ describe("query keys", () => {
 
 describe("query factories", () => {
   it("has a queryOptions factory for every GET endpoint and nothing else", () => {
-    const queries = makeQueries(never);
-    const ids = Object.entries(queries).flatMap(([group, entries]) =>
-      Object.keys(entries).map((name) => `${group}.${name}`),
-    );
-    expect(ids.sort()).toEqual([...endpoints.reads].sort());
+    const factories = factoriesOf<QueryFactory>(makeQueries(never));
+    expect([...factories.keys()].sort()).toEqual([...endpoints.reads].sort());
     for (const id of endpoints.reads) {
-      const [group, name] = id.split(".") as [string, string];
-      const factory = (queries as Record<string, Record<string, unknown>>)[
-        group
-      ]?.[name] as (...args: ReadonlyArray<unknown>) => {
-        queryKey: ReadonlyArray<unknown>;
-        queryFn: unknown;
-      };
-      const options = factory(...(sampleArgs[id] ?? []));
-      expect(options.queryKey, id).toEqual(registeredKeys().get(id));
-      expect(typeof options.queryFn, id).toBe("function");
+      const factory = factories.get(id);
+      expect(factory, `queries.${id}`).toBeDefined();
+      const options =
+        factory === undefined ? undefined : withSample(factory, id);
+      expect(options?.queryKey, id).toEqual(registeredKeys().get(id));
+      expect(options?.queryFn, id).toBeTypeOf("function");
     }
   });
 
   it("has a mutationOptions factory for every non-GET endpoint and nothing else", () => {
-    const mutations = makeMutations(never);
-    const ids = Object.entries(mutations).flatMap(([group, entries]) =>
-      Object.keys(entries).map((name) => `${group}.${name}`),
-    );
-    expect(ids.sort()).toEqual([...endpoints.writes].sort());
+    const factories = factoriesOf<MutationFactory>(makeMutations(never));
+    expect([...factories.keys()].sort()).toEqual([...endpoints.writes].sort());
   });
 });
 
@@ -137,17 +179,14 @@ describe("invalidation map", () => {
   });
 
   it("is carried on each mutation's meta, so a cache can apply it", () => {
-    const mutations = makeMutations(never);
+    const factories = factoriesOf<MutationFactory>(makeMutations(never));
+    const removalById = new Map(Object.entries(removal));
     for (const [id, targets] of Object.entries(invalidation)) {
-      const [group, name] = id.split(".") as [string, string];
-      const factory = (mutations as Record<string, Record<string, unknown>>)[
-        group
-      ]?.[name] as () => {
-        meta?: { invalidates?: unknown; removes?: unknown };
-      };
-      const meta = factory().meta;
+      const factory = factories.get(id);
+      expect(factory, `mutations.${id}`).toBeDefined();
+      const meta = factory?.().meta;
       expect(meta?.invalidates, id).toEqual(targets);
-      expect(meta?.removes, id).toBe(removal[id as keyof typeof removal]);
+      expect(meta?.removes, id).toBe(removalById.get(id));
     }
   });
 
@@ -157,7 +196,7 @@ describe("invalidation map", () => {
     // Removing a post drops its own entry (a refetch would 404) and
     // stales the list.
     expect(invalidation["posts.remove"]).toEqual([k.posts.list()]);
-    expect(removal["posts.remove"]?.("post_1" as never)).toEqual([
+    expect(removal["posts.remove"]?.("post_1")).toEqual([
       k.posts.byId("post_1"),
     ]);
     expect(Object.keys(removal)).toEqual(["posts.remove"]);
