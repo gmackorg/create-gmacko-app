@@ -64,4 +64,13 @@ resend:
 # No `postgres:` / `redis:` sections: emulate starts only the services listed
 # here, and the web app (apps/web) runs on a local D1 (`pnpm db:migrate:local`),
 # with no Redis. `@gmacko/realtime` (Node-only) is the one consumer of Redis and
-# is not part of the web lane.
+# is not part of the web lane. (Denying redis-memory-server's postinstall in
+# pnpm-workspace.yaml follows from that: nothing here starts a Redis.)
+#
+# No `cloudflare:` section either. emulate 0.11's Cloudflare D1 + R2 emulator
+# needs no seed and is not part of `pnpm dev` — it is started on demand, on its
+# own port, to rehearse the commands that would otherwise need a Cloudflare
+# account: `pnpm db:rehearse:remote`, or by hand with
+# `npx @gmacko/emulate start --service cloudflare`. Point wrangler at it with
+# CLOUDFLARE_API_BASE_URL (which must end in `/client/v4`); see
+# docs/drizzle-migrations.md → "Rehearsing a remote migration".

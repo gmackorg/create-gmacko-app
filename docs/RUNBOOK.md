@@ -103,11 +103,24 @@ pnpm db:generate
 pnpm db:migrate:local
 pnpm -F @gmacko/db test:workers
 
+# Rehearse the --remote path with no Cloudflare account: starts the local D1
+# emulator and runs the real `wrangler d1 migrations apply DB --remote`
+pnpm db:rehearse:remote
+
 # Apply to the stage's database — before `wrangler deploy`, in the same stage
 pnpm db:migrate:remote --env staging
 # ...or the whole stage sequence (migrate, abort on failure, deploy):
 pnpm deploy:staging
 ```
+
+`pnpm db:rehearse:remote` is the dry run for a migration you are nervous
+about. It exercises the same command a deploy runs, against Miniflare/workerd
+SQLite (the engine D1 runs on), and asserts that `d1_migrations` records every
+file, that no `__new_<table>` survived, and that re-applying is a no-op.
+`CLOUDFLARE_API_BASE_URL` must end in `/client/v4`; the recipe and the gaps
+(`seed:remote`/`reset:remote` cannot be rehearsed — they use the four-phase
+import protocol the emulator does not implement) are in
+`docs/drizzle-migrations.md` → "Rehearsing a remote migration".
 
 The deploy lane (migrate-then-deploy, expand/contract, preview databases,
 secrets) is documented in `docs/DEPLOYMENT.md`; the D1 procedures below are

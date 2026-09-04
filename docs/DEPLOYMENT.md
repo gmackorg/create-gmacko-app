@@ -46,6 +46,16 @@ The order is what makes the expand/contract rule safe: the new schema is in
 place before the new code reads it, and the old code (still serving during
 the deploy) only sees additions.
 
+Step 1 can be rehearsed before it ever meets a stage database:
+`pnpm db:rehearse:remote` runs the same
+`wrangler d1 migrations apply DB --remote` against the local Cloudflare D1
+emulator (`@gmacko/emulate --service cloudflare`, Miniflare over workerd
+SQLite), with no Cloudflare account. CI runs it on every PR. The one setting
+that matters is `CLOUDFLARE_API_BASE_URL`, which **must end in `/client/v4`**
+— see `docs/drizzle-migrations.md` → "Rehearsing a remote migration" for the
+recipe and for what it does not cover (`seed:remote`/`reset:remote` use the
+four-phase import protocol, which the emulator does not implement).
+
 ### Expand/contract
 
 A release may **add** columns (nullable or defaulted), tables and indexes. It
@@ -96,6 +106,17 @@ wrangler and record its id in `wrangler.jsonc`:
 pnpm -F @gmacko/web exec wrangler d1 create gmacko-web-staging
 pnpm -F @gmacko/web exec wrangler d1 create gmacko-web
 pnpm -F @gmacko/web exec wrangler d1 create gmacko-web-preview
+```
+
+To see what those commands do before running them against a real account,
+point `CLOUDFLARE_API_BASE_URL` at the local D1 emulator (it must end in
+`/client/v4`) and run them there — `wrangler d1 create` is supported:
+
+```bash
+npx @gmacko/emulate start --service cloudflare --port 4111 &
+CLOUDFLARE_API_BASE_URL=http://127.0.0.1:4111/client/v4 \
+CLOUDFLARE_ACCOUNT_ID=d1-rehearsal CLOUDFLARE_API_TOKEN=d1-rehearsal-token \
+  pnpm -F @gmacko/web exec wrangler d1 create gmacko-web-staging
 ```
 
 ## Secrets

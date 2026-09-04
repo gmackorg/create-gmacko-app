@@ -118,6 +118,41 @@ jobs:
             packages/*/coverage
           retention-days: 7
 
+  migrate-rehearsal:
+    name: D1 Remote Migration Rehearsal
+    runs-on: ubuntu-latest
+    # `pnpm db:migrate:remote` is what a deploy runs against a real stage
+    # database, and it had never been executed in CI because it needed a
+    # Cloudflare account. @gmacko/emulate 0.11's Cloudflare service answers the
+    # D1 REST API over Miniflare (workerd SQLite, the engine production D1
+    # runs on), so the exact `wrangler d1 migrations apply DB --remote` command
+    # runs here with no credentials.
+    #
+    # This is not a second copy of `test:workers`: that applies the migration
+    # files the way *local* wrangler does (wrangler splits on `;` and sends the
+    # statements). `--remote` POSTs each file's SQL to the D1 HTTP API, which
+    # splits it server side and runs it as one atomic batch — a different
+    # execution path, and the one a deploy uses.
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Rehearse migrate:remote against the D1 emulator
+        run: pnpm db:rehearse:remote
+
   fault:
     name: Fault Injection
     runs-on: ubuntu-latest

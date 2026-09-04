@@ -21,6 +21,7 @@
     "db:migrate:remote": "pnpm -F @gmacko/db migrate:remote",
     "db:check": "pnpm -F @gmacko/db check",
     "db:seed": "pnpm -F @gmacko/db seed:local",
+    "db:rehearse:remote": "node scripts/d1-remote-rehearsal.mjs",
     "db:studio": "pnpm -F @gmacko/db studio",
     "forge:init": "forge init --full",
     "forge:doctor": "forge doctor",

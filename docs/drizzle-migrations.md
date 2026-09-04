@@ -15,6 +15,7 @@ pnpm db:migrate:remote    # wrangler d1 migrations apply DB --remote  (the stage
 pnpm db:check             # drizzle-kit check: snapshots in drizzle/ are consistent
 pnpm db:seed              # seed:sql + wrangler d1 execute --local --file seed/seed.sql
 pnpm db:studio            # drizzle-kit studio over the d1-http driver (needs the CF credentials)
+pnpm db:rehearse:remote   # migrate:remote against the local D1 emulator (no CF account)
 pnpm -F @gmacko/db test:workers   # the migration set + Database suite on a real (Miniflare) D1
 ```
 
@@ -60,6 +61,71 @@ Binding and paths come from `apps/web/wrangler.jsonc` (`d1_databases[].binding
    before `wrangler deploy` in the same stage; a failed migration aborts the
    deploy. Migrations are recorded in the `d1_migrations` table, so re-running
    `apply` is a no-op for files already applied.
+
+## Rehearsing a remote migration
+
+`migrate:remote`, `seed:remote`, `reset:remote` and `wrangler d1 create` all
+talk to Cloudflare's REST API, so until recently none of them could be run
+without an account — the paths that touch a *production* database were the
+only paths with no local rehearsal. `@gmacko/emulate` 0.11 ships a Cloudflare
+D1 + R2 emulator backed by Miniflare, which is workerd's SQLite: the same
+engine production D1 runs on, quirks included.
+
+One variable redirects wrangler. **It must end in `/client/v4`** — that is the
+only prefix `api.cloudflare.com` serves, and the emulator serves nothing else,
+on purpose:
+
+```bash
+npx @gmacko/emulate start --service cloudflare --port 4111 &
+
+export CLOUDFLARE_API_BASE_URL="http://127.0.0.1:4111/client/v4"
+export CLOUDFLARE_ACCOUNT_ID="d1-rehearsal"       # any string; the emulator namespaces by it
+export CLOUDFLARE_API_TOKEN="d1-rehearsal-token"  # any string; nothing is checked
+
+cd packages/db
+pnpm exec wrangler d1 create d1-rehearsal
+pnpm exec wrangler d1 migrations apply DB --remote --config <config pointing at that database>
+pnpm exec wrangler d1 execute DB --remote --command "select count(*) from d1_migrations"
+```
+
+Drop the `/client/v4` and every call fails with Cloudflare's own envelope —
+`code: 7003, "Could not route to …"` plus a second error naming the missing
+prefix — rather than quietly working against a different route shape.
+
+`pnpm db:rehearse:remote` (`scripts/d1-remote-rehearsal.mjs`) is that sequence
+wired up: it starts the emulator, creates a throwaway database, writes a
+temporary wrangler config (the committed one points `database_id` at a
+placeholder uuid the emulator has never seen), applies the whole migration set
+through `--remote`, and then asserts that
+
+- `d1_migrations` records every file in `packages/db/migrations`,
+- no `__new_<table>` survived (the rebuild recipe below),
+- re-applying is a no-op, which is what makes a failed deploy safe to retry.
+
+CI runs it on every PR (`.github/workflows/ci.yml`, the
+`D1 Remote Migration Rehearsal` job). It is **not** a second copy of
+`pnpm -F @gmacko/db test:workers`: that suite applies the files the way *local*
+wrangler does — wrangler reads each file, splits it on `;` and sends the
+statements itself. `--remote` POSTs the file's SQL to the D1 HTTP API, which
+splits it server side and runs the result as one atomic batch. Different
+execution path, and it is the one a deploy uses.
+
+### What the rehearsal does not cover
+
+- **`seed:remote` and `reset:remote`.** Both are
+  `wrangler d1 execute --remote --file`, which uses Cloudflare's four-phase
+  import protocol; the emulator answers that with an explicit
+  `not implemented` envelope (`code: 7500`). `--remote --command` works, and is
+  what the assertions use. The seed and reset SQL are exercised against the
+  local database (`pnpm db:seed`) instead.
+- **drizzle-kit against the emulator.** The `d1-http` driver hardcodes
+  `https://api.cloudflare.com` with no base-URL override, so
+  `drizzle-kit push`/`migrate`/`studio`/`introspect` cannot be pointed at it.
+  That is why the supported path is `drizzle-kit generate` (offline) plus
+  `wrangler d1 migrations apply` — what `pnpm db:generate` and this rehearsal
+  do — and why `db:studio` still needs real credentials.
+- **Time Travel, `d1 export`, `d1 import`.** Not implemented by the emulator;
+  they answer with an explanatory `success: false` envelope.
 
 ## Forward-only, expand/contract
 
