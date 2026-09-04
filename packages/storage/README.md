@@ -44,8 +44,8 @@ ceiling has to rise.
 
 ## What moving off a managed uploader costs
 
-This package used to wrap UploadThing. R2 is a bucket, not a service, and the
-things the service did are now the app's job:
+R2 is a bucket, not a service. Everything a managed uploader would have done
+for you is now the app's job:
 
 | | a managed uploader | R2, here |
 | --- | --- | --- |

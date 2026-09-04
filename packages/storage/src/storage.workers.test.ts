@@ -269,7 +269,7 @@ describe("putLarge", () => {
 });
 
 /**
- * The handlers own what UploadThing used to: who may upload, what they may
+ * The handlers own the entire upload policy: who may upload, what they may
  * upload, and how much of it. Every case below is a refusal that has to
  * happen before the bytes reach the bucket.
  */

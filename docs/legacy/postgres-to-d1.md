@@ -122,7 +122,7 @@ confirm `select count(*)` matches per table before you unfreeze.
 ## What it will not do
 
 - **`bytea`, arrays, composite types.** No mapping; the row is reported and
-  skipped. Move those out of band (files to R2 or UploadThing, arrays to a
+  skipped. Move those out of band (files to R2, arrays to a
   JSON column) before dumping.
 - **better-auth's `account.issuer`.** Present from better-auth 1.7, absent
   before it. A dump from an older database has no `issuer` value and the
