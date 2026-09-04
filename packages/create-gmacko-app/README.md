@@ -45,7 +45,7 @@ create-gmacko-app is a CLI tool that bootstraps a production-ready, full-stack a
 | `--forgegraph-production-domain <domain>`| Write the production domain placeholder into `.forgegraph.yaml`                                                     |
 | `--integrations <list>`                  | Comma-separated list of integrations (sentry, posthog, stripe, revenuecat, notifications, email, realtime, storage) |
 | `--email-provider <provider>`            | Email provider (resend, sendgrid)                                                                                   |
-| `--storage-provider <provider>`          | Storage provider (uploadthing)                                                                                      |
+| `--storage-provider <provider>`          | Storage provider (r2)                                                                                               |
 | `--package-scope <scope>`                | Package scope (default: @gmacko)                                                                                    |
 
 `realtime` (Redis + BullMQ) is Node-only and cannot run on the Workers web app; it is off in every preset except "everything", and the scaffolder warns when it is enabled.
@@ -194,7 +194,7 @@ pnpm --filter @gmacko/ui storybook
 - **Mobile Subscriptions**: RevenueCat (mobile)
 - **Communication**: Push notifications (Expo) and Email (Resend/SendGrid)
 - **Realtime Data**: Redis + BullMQ, Node services only
-- **File Storage**: UploadThing
+- **File Storage**: Cloudflare R2 (an `r2_buckets` binding on the app's own Worker; upload and download routes at `/api/storage`)
 
 ## Repository
 

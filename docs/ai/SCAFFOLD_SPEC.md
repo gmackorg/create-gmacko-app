@@ -37,7 +37,7 @@
 - `--integrations <comma-list>` overrides integration toggles entirely
   - accepted keys: `sentry,posthog,stripe,revenuecat,notifications,email,realtime,storage`
 - `--email-provider <resend|none>` (default: `none`)
-- `--storage-provider <uploadthing|none>` (default: `none`)
+- `--storage-provider <r2|none>` (default: `none`)
 - `--forgegraph` (emit `.forgegraph.yaml` and the ForgeGraph scripts; default on)
 - `--forgegraph-server <url>`, `--forgegraph-preview-domain <host>`, `--forgegraph-production-domain <host>` (replace the ForgeGraph placeholders)
 - `--package-scope <@your-scope>` (default: `@gmacko`)
@@ -88,17 +88,17 @@ There is no `--db`, no `--auth`, and no `--tanstack-start` (the pre-migration Cl
   - Notifications (Expo push) **[default OFF]**
   - Email **[default OFF]**
   - Realtime **[default OFF]** — enabling prints a warning: `@gmacko/realtime` is Node-only (ioredis + BullMQ) and does not run on the Worker
-  - Storage **[default OFF]**
+  - Storage (Cloudflare R2) **[default OFF]**
 
 #### Prompt 6 — Email provider (only if Email enabled)
 - **Question:** "Email provider?"
 - **Choices:** Resend
 - **Default:** Resend
 
-#### Prompt 7 — Storage provider (only if Storage enabled)
-- **Question:** "Storage provider?"
-- **Choices:** UploadThing
-- **Default:** UploadThing
+#### Prompt 7 — Storage provider
+There is none. R2 is the only provider, and it is a binding on the app's own
+Worker: no account, no token, nothing to paste. Selecting Storage sets
+`provider: "r2"` and the scaffolder asks nothing further.
 
 #### Prompt 8 — ForgeGraph
 - **Question:** "Emit ForgeGraph repo metadata (.forgegraph.yaml + forge scripts)?"
@@ -379,11 +379,25 @@ Email is two-dimensional: enabled + provider.
 
 **When ON**
 - `packages/storage`
-- UploadThing: the provider token (see `.env.example`)
-- Wiring into the Worker is left to the app (experimental on the web lane)
+- An `r2_buckets` binding named `BUCKET` in all four scopes of
+  `apps/web/wrangler.jsonc` (top level, `env.preview`, `env.staging`,
+  `env.production` — Cloudflare environments do not inherit bindings), plus
+  `BUCKET: R2Bucket` in the generated `worker-configuration.d.ts`
+- `apps/web/src/routes/api.storage.$.ts` (upload + download) over the policy in
+  `apps/web/src/server/storage.ts`
+- `apps/web/fault/r2-upload.fault.ts` and the fault lane's own `BUCKET` bucket
+- No env: R2 reaches the Worker as a binding, so there is no secret to push.
+  Each stage's bucket has to exist (`wrangler r2 bucket create <name>`), the
+  way each stage's D1 database does
 
 **When OFF**
 - No storage package referenced
+- `apps/web/src/server/storage.ts` is replaced by a stub whose handlers answer
+  404, so the route (named by the committed `src/routeTree.gen.ts`) keeps
+  working without the package
+- The `r2_buckets` bindings, the `BUCKET` type, the R2 scenario and the fault
+  lane's bucket are all removed, so `pnpm check:cf-types` and a deploy both
+  stay honest
 - Env not required
 
 ---

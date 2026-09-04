@@ -1996,6 +1996,81 @@ describe("create-gmacko-app scaffold", () => {
           }
         }
       }
+
+      // Storage is gone, but the route is not: `src/routeTree.gen.ts` names
+      // it and regenerating it needs a Vite build. It keeps working because
+      // `src/server/storage.ts` — the app's only `@gmacko/storage` importer —
+      // is replaced by a stub of the same shape.
+      expect(
+        fileExists(result.appPath, "apps/web/src/routes/api.storage.$.ts"),
+      ).toBe(true);
+      const storageStub = readFile(
+        result.appPath,
+        "apps/web/src/server/storage.ts",
+      );
+      expect(storageStub).toContain("createStorageHandlers");
+      // The docblock still names the package it tells you to restore; what
+      // must be gone is the import, because the package is.
+      expect(storageStub).not.toContain('from "@gmacko/storage"');
+      expect(
+        readFile(result.appPath, "apps/web/src/server/runtime.ts"),
+      ).toContain("createStorageHandlers(undefined, storageIdentity)");
+
+      // A binding to a bucket nothing writes to would still make the deploy
+      // demand the bucket exists, and would put the generated types out of
+      // step with wrangler.jsonc (the app's own `pnpm check:cf-types`).
+      expect(readFile(result.appPath, "apps/web/wrangler.jsonc")).not.toContain(
+        "r2_buckets",
+      );
+      expect(
+        readFile(result.appPath, "apps/web/worker-configuration.d.ts"),
+      ).not.toContain("BUCKET: R2Bucket");
+      expect(
+        fileExists(result.appPath, "apps/web/fault/r2-upload.fault.ts"),
+      ).toBe(false);
+      expect(
+        readFile(result.appPath, "apps/web/vitest.fault.config.ts"),
+      ).not.toContain("r2Buckets");
+    }, 120000);
+
+    it("keeps the R2 binding in all four wrangler scopes when storage is selected", async () => {
+      const appName = generateAppName("with-storage");
+      const result = await runCli({
+        appName,
+        flags: [
+          "--yes",
+          "--no-install",
+          "--no-git",
+          "--no-mobile",
+          "--no-ai",
+          "--prune",
+          "--integrations",
+          "storage",
+        ],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+      expect(result.exitCode).toBe(0);
+      expect(fileExists(result.appPath, "packages/storage")).toBe(true);
+
+      // Cloudflare environments do not inherit bindings, so the binding is
+      // restated in each: top level, preview, staging, production.
+      const wrangler = readFile(result.appPath, "apps/web/wrangler.jsonc");
+      expect(wrangler.match(/"r2_buckets":/g)).toHaveLength(4);
+      expect(wrangler).toContain(`"bucket_name": "${appName}-web"`);
+      expect(wrangler).toContain(`"bucket_name": "${appName}-web-preview"`);
+      expect(wrangler).toContain(`"bucket_name": "${appName}-web-staging"`);
+
+      const integrationsContent = readFile(
+        result.appPath,
+        "packages/config/src/integrations.ts",
+      );
+      expect(integrationsContent).toContain(
+        'export type StorageProvider = "r2" | "none"',
+      );
+      expect(integrationsContent).toContain('provider: "r2"');
+      expect(integrationsContent).not.toContain("uploadthing");
     }, 120000);
   });
 

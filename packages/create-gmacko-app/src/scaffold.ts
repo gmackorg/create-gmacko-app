@@ -296,8 +296,8 @@ function updateIntegrationsConfig(
 export type EmailProvider = "resend" | "sendgrid" | "none";
 /** The pub/sub + queue backend \`@gmacko/realtime\` talks to. */
 export type RealtimeProvider = "redis" | "none";
-/** The file storage service \`@gmacko/storage\` uploads through. */
-export type StorageProvider = "uploadthing" | "none";
+/** The object store \`@gmacko/storage\` writes to. */
+export type StorageProvider = "r2" | "none";
 
 // Each provider-bearing integration is declared through its own contract
 // rather than written inline under \`as const\`, which would pin \`provider\` to
@@ -1149,6 +1149,10 @@ function pruneIntegrations(
     pruneWebStripeFiles(targetDir);
   }
 
+  if (!integrations.storage.enabled) {
+    pruneWebStorageFiles(targetDir);
+  }
+
   // Only rewrite the Expo files for a package that is actually gone; an
   // integration that is merely off is handled at runtime by `integrations`.
   if (!integrations.posthog || pruneMonitoring) {
@@ -1480,6 +1484,146 @@ export const handleStripeWebhook = async (
     `${WEB_APP_DIR}/fault/helpers/stripe.ts`,
   ]) {
     fs.removeSync(path.join(targetDir, file));
+  }
+}
+
+/**
+ * Removes every `r2_buckets` binding from wrangler.jsonc.
+ *
+ * There are four — the top level plus one per environment, because
+ * environments do not inherit bindings — and each is written before its
+ * `d1_databases` neighbour precisely so it always carries a trailing comma
+ * and can be cut without leaving a dangling one behind.
+ */
+function removeR2Bindings(source: string): string {
+  return (
+    source
+      .replace(/\n[ \t]*(?:\/\/[^\n]*\n[ \t]*)*"r2_buckets": \[[^\]]*\],/g, "")
+      // The prose above `env` lists what is not inherited, and names a step
+      // that no longer applies.
+      .replace(
+        "`vars`, `d1_databases`, `r2_buckets` and `ratelimits` are not",
+        "`vars`, `d1_databases` and `ratelimits` are not",
+      )
+      .replace(
+        "`, and create each bucket with `wrangler r2 bucket create`.",
+        "`.",
+      )
+  );
+}
+
+/**
+ * Storage was not selected, so `packages/storage` is gone. The route files and
+ * `src/server/runtime.ts` stay — `src/routeTree.gen.ts` names the routes, and
+ * regenerating it needs a Vite build — so `src/server/storage.ts`, the app's
+ * only importer of the package, is replaced by a stub of the same shape whose
+ * handlers answer 404. That is what a disabled storage integration answers
+ * anyway, so the routes behave exactly as they would with the package present
+ * and the flag off.
+ */
+function pruneWebStorageFiles(targetDir: string): void {
+  const storagePath = path.join(
+    targetDir,
+    `${WEB_APP_DIR}/src/server/storage.ts`,
+  );
+  if (!fs.existsSync(storagePath)) return;
+
+  fs.writeFileSync(
+    storagePath,
+    `/**
+ * \`/api/storage\`: file storage was pruned at scaffold time, so the route
+ * answers 404 — the same answer \`@gmacko/storage\` gives when the integration
+ * is off. Restore \`packages/storage\`, add an \`r2_buckets\` binding named
+ * \`BUCKET\` to every scope in wrangler.jsonc, and put the policy back here.
+ */
+
+/** Returns the caller's identity, or null to refuse with a 401. */
+export type Authorize = (
+  request: Request,
+) => Promise<{ readonly id: string } | null>;
+
+/** The two fetch handlers \`routes/api.storage.$.ts\` mounts. */
+export interface StorageHandlers {
+  readonly upload: (request: Request) => Promise<Response>;
+  readonly download: (request: Request) => Promise<Response>;
+}
+
+const notEnabled = (): Promise<Response> =>
+  Promise.resolve(
+    Response.json({ error: "storage is not enabled" }, { status: 404 }),
+  );
+
+export const createStorageHandlers = (
+  _bucket: unknown,
+  _authorize: Authorize,
+): StorageHandlers => ({ upload: notEnabled, download: notEnabled });
+`,
+  );
+
+  // `src/server/runtime.ts` is not pruned and is the only caller. Its
+  // `env.BUCKET` would dangle once the binding is out of wrangler.jsonc and
+  // the generated worker-configuration.d.ts, so the argument goes with them.
+  const runtimePath = path.join(
+    targetDir,
+    `${WEB_APP_DIR}/src/server/runtime.ts`,
+  );
+  if (fs.existsSync(runtimePath)) {
+    fs.writeFileSync(
+      runtimePath,
+      fs
+        .readFileSync(runtimePath, "utf8")
+        .replace(
+          "createStorageHandlers(env.BUCKET, storageIdentity)",
+          "createStorageHandlers(undefined, storageIdentity)",
+        ),
+    );
+  }
+
+  // The generated types must agree with wrangler.jsonc or the app's own
+  // `pnpm check:cf-types` fails on its first CI run.
+  const cfTypesPath = path.join(
+    targetDir,
+    `${WEB_APP_DIR}/worker-configuration.d.ts`,
+  );
+  if (fs.existsSync(cfTypesPath)) {
+    fs.writeFileSync(
+      cfTypesPath,
+      fs
+        .readFileSync(cfTypesPath, "utf8")
+        .replace(/^[ \t]*BUCKET: R2Bucket;\r?\n/gm, ""),
+    );
+  }
+
+  // The R2 scenario and the bucket the fault lane gives it. The rest of the
+  // lane is storage-agnostic and stays.
+  fs.removeSync(
+    path.join(targetDir, `${WEB_APP_DIR}/fault/r2-upload.fault.ts`),
+  );
+
+  const faultConfigPath = path.join(
+    targetDir,
+    `${WEB_APP_DIR}/vitest.fault.config.ts`,
+  );
+  if (fs.existsSync(faultConfigPath)) {
+    fs.writeFileSync(
+      faultConfigPath,
+      fs
+        .readFileSync(faultConfigPath, "utf8")
+        .replace(
+          /\n *\/\/ The upload scenario[\s\S]*?\n *r2Buckets: \["BUCKET"\],/,
+          "",
+        ),
+    );
+  }
+
+  // A binding to a bucket nothing writes to is a bucket the deploy still
+  // insists exists, so it goes with the code that used it.
+  const wranglerPath = path.join(targetDir, `${WEB_APP_DIR}/wrangler.jsonc`);
+  if (fs.existsSync(wranglerPath)) {
+    fs.writeFileSync(
+      wranglerPath,
+      removeR2Bindings(fs.readFileSync(wranglerPath, "utf8")),
+    );
   }
 }
 

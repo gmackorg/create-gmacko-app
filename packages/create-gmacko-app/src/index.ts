@@ -98,7 +98,7 @@ program
     "--forgegraph",
     "Enable ForgeGraph integrations (health, logging, OTEL)",
   )
-  .option("--storage-provider <provider>", "Storage provider (uploadthing)")
+  .option("--storage-provider <provider>", "Storage provider (r2)")
   .option("--package-scope <scope>", "Package scope (default: @gmacko)")
   .option(
     "--forgegraph-server <url>",
@@ -213,7 +213,7 @@ function parseIntegrations(
     },
     storage: {
       enabled: set.has("storage"),
-      provider: set.has("storage") ? "uploadthing" : "none",
+      provider: set.has("storage") ? "r2" : "none",
     },
   };
 }

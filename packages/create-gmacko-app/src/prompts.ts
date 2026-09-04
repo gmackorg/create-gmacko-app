@@ -341,7 +341,7 @@ async function promptCustomIntegrations(): Promise<IntegrationConfig> {
         label: "Realtime + Jobs (Redis + BullMQ)",
         hint: "Node services only; not supported on the Workers web app",
       },
-      { value: "storage", label: "Storage" },
+      { value: "storage", label: "Storage (Cloudflare R2)" },
     ],
     initialValues: ["sentry", "posthog", "forgegraph"],
     required: false,
@@ -371,9 +371,11 @@ async function promptCustomIntegrations(): Promise<IntegrationConfig> {
     emailProvider = provider;
   }
 
-  let storageProvider: "uploadthing" | "none" = "none";
+  // R2 is the only provider: it is a binding on the app's own Worker, so
+  // there is nothing to sign up for and no key to paste. No prompt to ask.
+  let storageProvider: "r2" | "none" = "none";
   if (selectedSet.has("storage")) {
-    storageProvider = "uploadthing";
+    storageProvider = "r2";
   }
 
   return {

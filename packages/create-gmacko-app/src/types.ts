@@ -12,7 +12,8 @@ export interface IntegrationConfig {
    * the scaffolder warns.
    */
   realtime: { enabled: boolean; provider: "redis" | "none" };
-  storage: { enabled: boolean; provider: "uploadthing" | "none" };
+  /** Cloudflare R2, through an `r2_buckets` binding on apps/web's Worker. */
+  storage: { enabled: boolean; provider: "r2" | "none" };
 }
 
 /**
@@ -88,5 +89,5 @@ export const EVERYTHING_INTEGRATIONS: IntegrationConfig = {
   notifications: true,
   email: { enabled: true, provider: "resend" },
   realtime: { enabled: true, provider: "redis" },
-  storage: { enabled: true, provider: "uploadthing" },
+  storage: { enabled: true, provider: "r2" },
 };

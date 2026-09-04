@@ -65,7 +65,7 @@ a store/provider interface instead of importing it directly.
 |---------|---------------|-----------------|
 | `@gmacko/email` | `@gmacko/config` for provider flag, `@gmacko/logging` | Accept `{ provider: "resend", apiKey, baseUrl? }` in the constructor. Templates stay in the package (generic SaaS emails). |
 | `@gmacko/payments` | `@gmacko/config`, `@gmacko/logging` | Accept `StripeConfig` (already supports `host`/`protocol`/`port`); keep the fetch HTTP client and SubtleCrypto webhook verification so it stays Worker-safe. |
-| `@gmacko/storage` | `@gmacko/config` for provider flag | Accept `{ provider: "uploadthing", token }` in the constructor. |
+| `@gmacko/storage` | `@gmacko/config` for the enabled flag | Already takes the `R2Bucket` as an argument (`createStorage(bucket, options)`), so the only coupling left is the flag; accept `{ enabled }` alongside it. |
 | `@gmacko/realtime` | `@gmacko/config`, `@gmacko/logging` | Node-only (ioredis + BullMQ). Accept `{ redisUrl }`; never part of the Worker bundle. |
 | `@gmacko/api-client` | `@gmacko/domain` | Already generic over the contract: `makeApiClient(api, options)` and the query layer depend on the `HttpApi` type only. Could ship as a generator over any Effect `HttpApi`. |
 | `@gmacko/operator-core` | `@gmacko/api-client`, `@gmacko/domain` | Generic operator commands over a client; accept the client instead of building one. |
