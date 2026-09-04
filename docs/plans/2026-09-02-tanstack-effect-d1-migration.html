@@ -923,6 +923,9 @@ packages/
     </tbody>
   </table>
 
+  <h2>After the plan: anti-slop <span class="badge done">Done</span></h2>
+  <p>Not part of the migration plan, added on top of it (2026-09-04, commits 50859cf..4bce465). <a href="https://github.com/dmmulroy/anti-slop">dmmulroy/anti-slop</a> is vendored at <code>tools/oxlint/anti-slop/</code> with its upstream SHA recorded: opinionated oxlint rules that reject low-evidence TypeScript, plus the Effect rule group. <code>.oxlintrc.json</code> became <code>oxlint.config.ts</code> (the JS-plugin format), proven equivalent by diffing finding sets before deleting it, and generated apps inherit the plugin. It found <strong>712 violations, now zero</strong>: 56 assertions carry a stated invariant, 14 disables sit at composition roots, and one rule (<code>no-shape-in-symbol-names</code>) is off because it fires on Effect's own <code>Shape</code> vocabulary. Real defects it surfaced: a converter writing the literal <code>NaN</code> into SQL, a script throwing on a null entry, a partial type predicate, fifteen tests whose <code>.catch(e =&gt; e)</code> passed when the call succeeded, and <code>cloudflare:workers</code> reaching the browser bundle through a refactor typecheck had accepted. A deterministic Playwright failure found while verifying was also fixed: after the OAuth redirect the suite clicked sign-out on un-hydrated markup, so the server function never ran.</p>
+
   <h2>Risks &amp; Mitigations</h2>
   <table>
     <thead><tr><th>Risk</th><th>Severity</th><th>Mitigation</th></tr></thead>
