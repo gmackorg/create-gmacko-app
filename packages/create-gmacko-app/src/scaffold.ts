@@ -1423,7 +1423,10 @@ export interface StripeWebhookOptions {
   readonly onEvent?: ((type: string, id: string) => void) | undefined;
 }
 
-const json = (status: number, body: unknown): Response =>
+/** The one body this endpoint answers with while payments are pruned. */
+type WebhookResponseBody = { readonly error: string };
+
+const json = (status: number, body: WebhookResponseBody): Response =>
   Response.json(body, { status });
 
 export const handleStripeWebhook = async (
