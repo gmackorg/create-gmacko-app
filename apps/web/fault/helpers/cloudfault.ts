@@ -6,15 +6,7 @@
  * file changes instead of every scenario. `fault/run.mjs` is what makes these
  * specifiers resolve while the package is unpublished.
  */
-export {
-  checksFailed,
-  createFailureArtifact,
-  exploreScenarios,
-  invariant,
-  renderFailureArtifact,
-  runCheckers,
-  ScenarioController,
-} from "@gmacko/cloudfault";
+
 export type {
   CheckResult,
   ExplorationResult,
@@ -25,6 +17,15 @@ export type {
   Perturbation,
   RunResult,
   Scenario,
+} from "@gmacko/cloudfault";
+export {
+  checksFailed,
+  createFailureArtifact,
+  exploreScenarios,
+  invariant,
+  renderFailureArtifact,
+  runCheckers,
+  ScenarioController,
 } from "@gmacko/cloudfault";
 export {
   createD1FaultProxy,

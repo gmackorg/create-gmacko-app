@@ -69,8 +69,14 @@ const linkLocalCheckout = (src) => {
   for (const [subpath, pkg] of Object.entries(SUBPATHS)) {
     const name = subpath === "." ? "index" : subpath.slice(2);
     const from = join(src, "packages", pkg, "dist", "index.js");
-    writeFileSync(join(dir, `${name}.js`), `export * from ${JSON.stringify(from)};\n`);
-    writeFileSync(join(dir, `${name}.d.ts`), `export * from ${JSON.stringify(from)};\n`);
+    writeFileSync(
+      join(dir, `${name}.js`),
+      `export * from ${JSON.stringify(from)};\n`,
+    );
+    writeFileSync(
+      join(dir, `${name}.d.ts`),
+      `export * from ${JSON.stringify(from)};\n`,
+    );
     exports[subpath] = { types: `./${name}.d.ts`, import: `./${name}.js` };
   }
   writeFileSync(
@@ -84,6 +90,7 @@ const src = process.env.CLOUDFAULT_SRC;
 if (!resolves()) {
   if (src) {
     const dir = linkLocalCheckout(resolve(src));
+    // oxlint-disable-next-line no-console -- lane runner output
     console.log(`[fault] linked @gmacko/cloudfault -> ${dir} (CLOUDFAULT_SRC)`);
   } else {
     const message =
@@ -92,9 +99,11 @@ if (!resolves()) {
       "[fault]   local dev:   CLOUDFAULT_SRC=/path/to/cloudfault pnpm test:fault\n" +
       "[fault] See docs/FAULT_TESTING.md.";
     if (process.env.CLOUDFAULT_REQUIRED === "1") {
+      // oxlint-disable-next-line no-console -- lane runner output
       console.error(message);
       process.exit(1);
     }
+    // oxlint-disable-next-line no-console -- lane runner output
     console.log(message);
     process.exit(0);
   }
@@ -103,6 +112,10 @@ if (!resolves()) {
 const { status } = spawnSync(
   "vitest",
   ["run", "--config", "vitest.fault.config.ts", ...process.argv.slice(2)],
-  { cwd: resolve(import.meta.dirname, ".."), stdio: "inherit", shell: process.platform === "win32" },
+  {
+    cwd: resolve(import.meta.dirname, ".."),
+    stdio: "inherit",
+    shell: process.platform === "win32",
+  },
 );
 process.exit(status ?? 1);

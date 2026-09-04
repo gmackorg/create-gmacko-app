@@ -49,3 +49,9 @@ export {
   rateLimitedResponse,
   rateLimitsFor,
 } from "./rate-limit";
+export {
+  type WebhookClaim,
+  type WebhookEventRef,
+  WebhookEvents,
+  type WebhookEventsShape,
+} from "./webhook-events";

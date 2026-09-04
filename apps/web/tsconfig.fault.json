@@ -1,0 +1,14 @@
+{
+  // The CloudFault lane, typechecked separately.
+  //
+  // `fault/` is excluded from tsconfig.json because it imports
+  // `@gmacko/cloudfault`, which is not on npm yet: including it would make
+  // `pnpm typecheck` fail on a clean checkout. Run this project once the
+  // package resolves (`pnpm -F @gmacko/web typecheck:fault`, which
+  // fault/run.mjs's link step also satisfies). When the dependency lands in
+  // package.json, delete this file and drop "fault" from tsconfig.json's
+  // `exclude` so the lane joins the default typecheck.
+  "extends": "./tsconfig.json",
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules"]
+}

@@ -293,4 +293,37 @@ export const rateLimitWindow = sqliteTable(
   (table) => [index("rate_limit_window_expires_at_idx").on(table.expiresAt)],
 );
 
+/**
+ * One row per Stripe webhook event id: the idempotency ledger behind
+ * `POST /api/webhooks/stripe`. Stripe delivers at least once — "Occasionally,
+ * the same event is sent more than once" — so an endpoint with side effects
+ * has to dedupe on `event.id` or apply them twice.
+ *
+ * Two columns, not one, because a lost response is not a lost write. A
+ * delivery *claims* the event (guarded insert), runs its effect, then marks
+ * `completed_at`. A redelivery that finds `completed_at` set is a true
+ * duplicate and does nothing; one that finds it NULL is retrying a claim
+ * whose effect provably never finished, and runs it. Claim-and-forget (a
+ * single column) turns "the response was lost" into "the effect is lost
+ * forever", which is what apps/web/fault/stripe-webhook.fault.ts checks.
+ *
+ * Like `rate_limit_window` this is infrastructure: no row model in
+ * @gmacko/domain, never part of the contract. The nightly Cron tick is the
+ * right place to prune rows older than Stripe's retry window.
+ */
+export const stripeWebhookEvent = sqliteTable(
+  "stripe_webhook_event",
+  {
+    /** Stripe's own `evt_...` id; the dedupe key, so it is the primary key. */
+    eventId: text("event_id").primaryKey(),
+    type: text().notNull(),
+    receivedAt: timestampMs("received_at").notNull(),
+    /** Set once the delivery's side effect finished; NULL while in flight. */
+    completedAt: timestampMs("completed_at"),
+  },
+  (table) => [
+    index("stripe_webhook_event_received_at_idx").on(table.receivedAt),
+  ],
+);
+
 export * from "./auth-schema";

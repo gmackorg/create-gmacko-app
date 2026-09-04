@@ -10,6 +10,7 @@ delete from "billing_plan";
 delete from "post";
 delete from "rate_limit_window";
 delete from "session";
+delete from "stripe_webhook_event";
 delete from "workspace_usage_rollup";
 delete from "usage_meter";
 delete from "user_preferences";

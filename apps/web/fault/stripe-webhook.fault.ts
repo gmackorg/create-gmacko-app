@@ -21,11 +21,28 @@ import { beforeAll, expect, it } from "vitest";
 // Relative, not `~/`: fault/ sits outside the app tsconfig's include
 // (see docs/FAULT_TESTING.md), so the `~/*` path mapping does not reach here.
 import { handleStripeWebhook } from "../src/server/stripe-webhook";
-import type { Fault, FaultPoint, RunResult, Scenario } from "./helpers/cloudfault";
-import { invariant, runCheckers, ScenarioController } from "./helpers/cloudfault";
-import { explore, minimalFailureSetIds, searchDepth } from "./helpers/explore";
+import type {
+  FaultPoint,
+  Perturbation,
+  RunResult,
+  Scenario,
+} from "./helpers/cloudfault";
 import {
-  duplicateCount,
+  invariant,
+  runCheckers,
+  ScenarioController,
+} from "./helpers/cloudfault";
+import {
+  assertActivated,
+  explore,
+  minimalFailureSetIds,
+  searchDepth,
+} from "./helpers/explore";
+import { ledgerRows, perturbedLedger, resetLedger } from "./helpers/ledger";
+import {
+  deliveryCount,
+  ledgerCommitThenTimeout,
+  ledgerTransientError,
   webhookDuplicateDelivery,
   webhookTripleDelivery,
 } from "./helpers/perturbations";
@@ -40,6 +57,11 @@ interface WebhookState {
   /** The status of every delivery, in order. */
   readonly acknowledged: ReadonlyArray<number>;
   readonly deliveries: number;
+  /** What the ledger actually holds, read through the unproxied binding. */
+  readonly ledger: ReadonlyArray<{
+    event_id: string;
+    completed_at: number | null;
+  }>;
 }
 
 /**
@@ -49,7 +71,7 @@ interface WebhookState {
  * the activation, so the history shows the fault the same way a proxied call
  * would.
  */
-const activeDeliveryFaults = (controller: ScenarioController): ReadonlyArray<Fault> => {
+const deliveriesFor = (controller: ScenarioController): number => {
   const plan = controller.begin({
     id: `stripe:webhook.delivery:${EVENT.id}`,
     name: "webhook.delivery",
@@ -57,23 +79,30 @@ const activeDeliveryFaults = (controller: ScenarioController): ReadonlyArray<Fau
     target: "stripe",
     resource: `event:${EVENT.id}`,
   });
-  const active: Fault[] = [];
+  const active: Perturbation[] = [];
   for (;;) {
     const perturbation = controller.take(plan, "delivery");
     if (!perturbation) break;
-    active.push(perturbation as Fault);
+    active.push(perturbation);
   }
-  controller.complete(plan, "info", { copies: 1 + duplicateCount(active) }, {
-    actual: "committed",
-    observed: "success",
-  });
-  return active;
+  const copies = deliveryCount(active);
+  controller.complete(
+    plan,
+    "info",
+    { copies },
+    { actual: "committed", observed: "success" },
+  );
+  return copies;
 };
 
-const execute = async (scenario: Scenario): Promise<RunResult<WebhookState>> => {
+const execute = async (
+  scenario: Scenario,
+): Promise<RunResult<WebhookState>> => {
   const started = Date.now();
   const controller = new ScenarioController(scenario);
-  const copies = 1 + duplicateCount(activeDeliveryFaults(controller));
+  const copies = deliveriesFor(controller);
+  await resetLedger();
+  const ledger = perturbedLedger(controller);
 
   const applied: string[] = [];
   const acknowledged: number[] = [];
@@ -91,28 +120,45 @@ const execute = async (scenario: Scenario): Promise<RunResult<WebhookState>> => 
     try {
       const response = await handleStripeWebhook(delivery.clone(), {
         secret: SECRET,
+        events: ledger.events,
         onEvent: (_type, id) => {
           applied.push(id);
         },
       });
       acknowledged.push(response.status);
-      controller.complete(operation, response.ok ? "ok" : "fail", { status: response.status }, {
-        actual: "committed",
-        observed: response.ok ? "success" : "definite-failure",
-      });
+      controller.complete(
+        operation,
+        response.ok ? "ok" : "fail",
+        { status: response.status },
+        {
+          actual: "committed",
+          observed: response.ok ? "success" : "definite-failure",
+        },
+      );
     } catch (error) {
       // An unhandled throw is a 500 to Stripe, which retries. Whether the
       // write behind it landed is CloudFault's business, not the caller's:
       // the D1 proxy already recorded `actual` in the history.
       acknowledged.push(500);
-      controller.complete(operation, "fail", { error: String(error) }, {
-        actual: "unknown",
-        observed: "definite-failure",
-      });
+      controller.complete(
+        operation,
+        "fail",
+        { error: String(error) },
+        {
+          actual: "unknown",
+          observed: "definite-failure",
+        },
+      );
     }
   }
 
-  const state: WebhookState = { applied, acknowledged, deliveries: copies };
+  await ledger.dispose();
+  const state: WebhookState = {
+    applied,
+    acknowledged,
+    deliveries: copies,
+    ledger: await ledgerRows(),
+  };
   const checks = await runCheckers(
     [
       invariant<WebhookState>(
@@ -127,6 +173,14 @@ const execute = async (scenario: Scenario): Promise<RunResult<WebhookState>> => 
           !seen.acknowledged.includes(200) || seen.applied.length >= 1,
         () =>
           `The endpoint answered 200 for ${EVENT.id} but never ran its side effect: Stripe will not redeliver an acknowledged event.`,
+      ),
+      invariant<WebhookState>(
+        "stripe-webhook-ledger-records-every-acknowledged-event",
+        ({ state: seen }) =>
+          !seen.acknowledged.includes(200) ||
+          seen.ledger.some((row) => row.event_id === EVENT.id),
+        () =>
+          `The endpoint answered 200 for ${EVENT.id} without a ledger row: the next delivery would apply the effect again.`,
       ),
     ],
     { history: controller.history.snapshot(), state },
@@ -147,6 +201,15 @@ const faultPoints: ReadonlyArray<FaultPoint> = [
     target: "stripe",
     choices: [webhookDuplicateDelivery, webhookTripleDelivery],
   },
+  {
+    // The ledger write is the one durable thing this endpoint does, so it is
+    // the one worth perturbing. `commit-then-timeout` is the case unit tests
+    // structurally cannot reach: the row lands and the caller is told it did
+    // not.
+    id: "stripe-webhook-ledger-write",
+    target: "DB",
+    choices: [ledgerCommitThenTimeout, ledgerTransientError],
+  },
 ];
 
 beforeAll(async () => {
@@ -162,4 +225,8 @@ it("delivers a signed Stripe event exactly once under every bounded delivery per
   expect(result.baseline?.state?.applied).toEqual([EVENT.id]);
   expect(minimalFailureSetIds(result)).toEqual([]);
   expect(result.runs.length).toBeGreaterThanOrEqual(searchDepth());
+  // A green fault lane is worthless if the faults never fired. This is the
+  // check that would have caught the first version of this scenario, whose
+  // D1 fault selected an operation name the driver never emits.
+  assertActivated(result, faultPoints);
 });

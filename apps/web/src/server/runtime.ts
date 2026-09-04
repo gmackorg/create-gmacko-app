@@ -18,6 +18,7 @@ import {
   RateLimiter,
   rateLimitedResponse,
   rateLimitsFor,
+  WebhookEvents,
 } from "@gmacko/api";
 import { RequestContext } from "@gmacko/auth/request-context";
 import { Auth } from "@gmacko/auth/service";
@@ -29,6 +30,7 @@ import { Context, Effect, Layer, ManagedRuntime } from "effect";
 import { env as clientEnv } from "~/env";
 import { AuthLive } from "./auth";
 import { fromBindings, webFromBindings } from "./config";
+import type { StripeWebhookLedger } from "./stripe-webhook";
 
 /**
  * Deliberately fails fast at module load: a misconfigured STAGE should stop
@@ -86,6 +88,8 @@ const ServicesLive = Layer.mergeAll(
   AuthLive.pipe(Layer.provide(Layer.mergeAll(AppConfigLive, DatabaseLive))),
   // The Cron Trigger's work (worker.ts `scheduled`).
   Jobs.layer.pipe(Layer.provide(DatabaseLive)),
+  // The Stripe webhook idempotency ledger (src/routes/api.webhooks.stripe.ts).
+  WebhookEvents.layer.pipe(Layer.provide(DatabaseLive)),
   RateLimiterLive,
   // JSON console logging (Workers Logs) plus, with an endpoint, OTLP export
   // of traces, logs and metrics; flushed after every request (below).
@@ -197,6 +201,22 @@ export const guardAuthRequest = (
       ),
     ),
   );
+
+/**
+ * The Stripe webhook ledger, bound to this isolate's runtime. The route is
+ * not an Effect handler (it is a raw fetch handler), so the two effects are
+ * run here rather than threaded through it.
+ */
+export const stripeWebhookEvents: StripeWebhookLedger = {
+  claim: (event) =>
+    runtime.runPromise(
+      Effect.flatMap(WebhookEvents, (events) => events.claim(event)),
+    ),
+  complete: (id) =>
+    runtime.runPromise(
+      Effect.flatMap(WebhookEvents, (events) => events.complete(id)),
+    ),
+};
 
 /** better-auth's server API, for the sign-out server function (src/server/actions.ts). */
 export const authApi = () =>

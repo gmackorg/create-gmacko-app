@@ -26,6 +26,7 @@
     "test:fault": "node ./fault/run.mjs",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
+    "typecheck:fault": "tsc --noEmit -p tsconfig.fault.json",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "e2e:headed": "playwright test --headed",

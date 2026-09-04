@@ -13,6 +13,7 @@ const expectedTables = [
   "post",
   "rate_limit_window",
   "session",
+  "stripe_webhook_event",
   "usage_meter",
   "user",
   "user_preferences",
@@ -32,7 +33,7 @@ describe("migrations", () => {
   });
   afterAll(() => runtime.dispose());
 
-  it("creates exactly the 18 expected tables", async () => {
+  it("creates exactly the 19 expected tables", async () => {
     const names = await runtime.runPromise(
       Effect.gen(function* () {
         const { sql } = yield* Database;
@@ -45,7 +46,7 @@ describe("migrations", () => {
         return rows.map((row) => row.name);
       }),
     );
-    expect(names).toHaveLength(18);
+    expect(names).toHaveLength(19);
     expect(names).toEqual([...expectedTables].sort());
   });
 

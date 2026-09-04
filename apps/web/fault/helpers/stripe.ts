@@ -9,9 +9,15 @@
  * published `@gmacko/cloudfault` surface, and this is eight lines.)
  */
 const hex = (value: ArrayBuffer): string =>
-  Array.from(new Uint8Array(value), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  Array.from(new Uint8Array(value), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
 
-const sign = async (payload: string, secret: string, timestamp: number): Promise<string> => {
+const sign = async (
+  payload: string,
+  secret: string,
+  timestamp: number,
+): Promise<string> => {
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),
@@ -59,7 +65,11 @@ export const signedDelivery = async (
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "stripe-signature": await sign(event.payload, secret, Math.floor(Date.now() / 1000)),
+      "stripe-signature": await sign(
+        event.payload,
+        secret,
+        Math.floor(Date.now() / 1000),
+      ),
     },
     body: event.payload,
   });

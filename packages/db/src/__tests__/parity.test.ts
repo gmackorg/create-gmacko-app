@@ -119,9 +119,16 @@ describe.each(Object.entries(pairs))("%s", (_name, { table, model }) => {
 
 it("covers every table in the schema that a row model mirrors", () => {
   const modelled = Object.keys(pairs).sort();
-  // better-auth's three tables, and `rate_limit_window`, which is
-  // infrastructure rather than contract (see schema.ts).
-  const exempt = ["account", "rate_limit_window", "session", "verification"];
+  // better-auth's three tables, plus `rate_limit_window` and
+  // `stripe_webhook_event`, which are infrastructure rather than contract
+  // (see schema.ts).
+  const exempt = [
+    "account",
+    "rate_limit_window",
+    "session",
+    "stripe_webhook_event",
+    "verification",
+  ];
   // Widened by annotation, not asserted: the union of `schema`'s export types
   // is not a supertype of `Table`, so the refinement below needs an element
   // type that is. `is(value, Table)` is what decides membership.
