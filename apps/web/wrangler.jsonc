@@ -75,8 +75,9 @@
   "env": {
     // One Worker for every PR preview: .github/workflows/preview.yml uploads a
     // *version* of it (`wrangler versions upload`), which gets its own preview
-    // URL and inherits these bindings. All open PRs share this database until
-    // Phase 9 gives each PR its own.
+    // URL and inherits these bindings. All open PRs share this database on
+    // purpose (docs/DEPLOYMENT.md, "One preview database, not one per PR");
+    // the workflow's `reset` job empties and re-seeds it weekly and on demand.
     "preview": {
       "name": "gmacko-web-preview",
       "vars": { "STAGE": "preview" },

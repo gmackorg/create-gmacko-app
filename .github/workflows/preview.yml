@@ -7,12 +7,34 @@ name: Preview Deploy
 # URL, and takes no production traffic until someone deploys it — so there is
 # nothing to create and nothing to delete when the PR closes.
 #
+# Phase 9 decision (2026-09-04): the preview database stays SHARED. The plan
+# had called for `wrangler d1 create gmacko-web-preview-<pr>` per PR; on the
+# versions-based lane that costs more than it buys:
+#
+#  * A per-PR database has to be a binding on the version that uses it, so
+#    every PR would need either its own Worker or a generated per-PR config.
+#    A Worker per PR starts with NO secrets (AUTH_SECRET, STRIPE_*, SENTRY_DSN
+#    …), so the workflow would have to push the whole preview secret set to a
+#    fresh Worker on every PR — a CI token with secret-write and N copies of
+#    the secrets, to review a diff.
+#  * The reason to isolate is that one PR's schema change could break another
+#    PR's preview. Expand/contract already prevents that, and it is enforced,
+#    not merely documented: `pnpm check:standards` (`no-d1-table-rebuild`)
+#    refuses a migration that rebuilds a table, and an additive migration is
+#    compatible with older code by construction.
+#  * Previews are for human QA. The automated suites run against local
+#    Miniflare D1, never against this database, so nothing in CI depends on
+#    its contents.
+#
+# What replaces the isolation, and the honest cost: shared preview data can
+# drift (a half-finished flow, a test workspace someone left behind). The
+# `reset` job below empties and re-seeds the database — weekly on a schedule,
+# and on demand from the Actions tab when a PR needs a clean slate. Revisit
+# this if previews ever need per-PR fixtures or if two PRs' data genuinely
+# collide; the alternative then is a dispatch namespace, not a Worker per PR.
+#
 # Pending migrations are applied to the shared preview D1 first, in a step of
-# its own; expand/contract (docs/drizzle-migrations.md) keeps that one
-# database compatible with every open PR. Phase 9 gives each PR its own D1 —
-# revisit this workflow then: a per-PR database cannot be a binding on the
-# shared Worker, so previews would go back to a Worker (or a dispatch
-# namespace) per PR, and the close job would come back with it.
+# its own (docs/drizzle-migrations.md).
 #
 # `wrangler versions upload` is run through `pnpm -F @gmacko/web
 # preview:upload` = `CLOUDFLARE_ENV=preview vite build && wrangler versions
@@ -27,9 +49,18 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [main]
+  # Reset the shared preview database: weekly, and on demand.
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      reset:
+        description: "Empty and re-seed the shared preview database"
+        type: boolean
+        default: false
 
 concurrency:
-  group: preview-${{ github.event.pull_request.number }}
+  group: preview-${{ github.event.pull_request.number || github.ref }}
   # Never cancel a run in flight: it may be inside `migrate:remote` against
   # the shared preview D1, and a half-applied migration is not something a
   # rerun can reason about.
@@ -42,6 +73,7 @@ env:
 jobs:
   preview:
     name: Upload preview version
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -116,7 +148,7 @@ jobs:
             | Version | \`${version}\` |
             | URL | ${link} |
             | Commit | \`${sha}\` |
-            | Database | shared \`gmacko-web-preview\` D1 (per-PR databases: Phase 9) |
+            | Database | shared \`gmacko-web-preview\` D1 ([why](../blob/main/.github/workflows/preview.yml)) |
 
             Health: ${url ? `${url}/.well-known/forge-health` : "n/a"}
             `;
@@ -143,3 +175,52 @@ jobs:
                 body,
               });
             }
+
+  reset:
+    name: Reset the shared preview database
+    if: >-
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && inputs.reset)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Skip without Cloudflare credentials
+        id: creds
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN is not set; skipping the preview reset"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # `--env preview` is hard-coded in all three steps. seed/reset.sql
+      # empties every table; it must never be pointed at another stage.
+      - name: Apply pending migrations
+        if: steps.creds.outputs.ok == 'true'
+        run: pnpm -F @gmacko/db migrate:remote --env preview
+
+      - name: Empty every table
+        if: steps.creds.outputs.ok == 'true'
+        run: pnpm -F @gmacko/db reset:remote --env preview
+
+      - name: Re-seed the defaults
+        if: steps.creds.outputs.ok == 'true'
+        run: pnpm -F @gmacko/db seed:remote --env preview

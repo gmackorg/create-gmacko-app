@@ -38,6 +38,8 @@
     "migrate:list": "wrangler d1 migrations list DB --remote --config ../../apps/web/wrangler.jsonc",
     "seed:sql": "tsx scripts/seed-sql.ts",
     "seed:local": "pnpm seed:sql && wrangler d1 execute DB --local --file seed/seed.sql --config ../../apps/web/wrangler.jsonc",
+    "seed:remote": "wrangler d1 execute DB --remote --file seed/seed.sql --config ../../apps/web/wrangler.jsonc",
+    "reset:remote": "wrangler d1 execute DB --remote --file seed/reset.sql --config ../../apps/web/wrangler.jsonc",
     "studio": "drizzle-kit studio",
     "test": "vitest run",
     "test:watch": "vitest",

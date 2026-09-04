@@ -171,12 +171,47 @@ without taking any traffic, so there is no per-PR Worker to create and
 nothing to delete when the PR closes. `cancel-in-progress` is off: a run may
 be inside `migrate:remote`.
 
-All open PRs share that database, which the expand/contract rule keeps
-compatible; Phase 9 gives each PR its own — and that is the point to revisit
-this workflow, since a per-PR database cannot be a binding on the shared
-Worker. The workflow needs the `CLOUDFLARE_API_TOKEN` and
-`CLOUDFLARE_ACCOUNT_ID` secrets and posts the URL wrangler prints; without
-the secrets it skips with a warning rather than failing the PR.
+The workflow needs the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`
+secrets and posts the URL wrangler prints; without the secrets it skips with a
+warning rather than failing the PR.
+
+### One preview database, not one per PR
+
+All open PRs share the `gmacko-web-preview` database. Phase 9 reconsidered the
+per-PR database the migration plan had called for and kept the shared one:
+
+- A per-PR database has to be a binding on the version that uses it, so every
+  PR would need its own Worker (or a generated per-PR config). **A Worker per
+  PR starts with no secrets**, so the workflow would have to push the whole
+  preview secret set to a fresh Worker on every PR — a CI token with
+  secret-write, and N copies of the secrets, to review a diff.
+- The isolation would be guarding against one PR's schema change breaking
+  another PR's preview. Expand/contract already prevents that, and it is
+  *enforced*: `pnpm check:standards` (`no-d1-table-rebuild`) refuses a
+  migration that rebuilds a table, and an additive migration is compatible
+  with older code by construction.
+- Nothing automated depends on this database. The suites run against local
+  Miniflare D1.
+
+The cost is data drift: a half-finished flow or a leftover test workspace
+stays until someone clears it. The **reset job** in the same workflow is the
+answer — it runs weekly (Mondays 04:00 UTC) and on demand from the Actions tab
+(*Run workflow* → tick *Empty and re-seed the shared preview database*), and
+does migrate → empty → seed:
+
+```bash
+pnpm -F @gmacko/db migrate:remote --env preview
+pnpm -F @gmacko/db reset:remote   --env preview   # seed/reset.sql: DESTRUCTIVE
+pnpm -F @gmacko/db seed:remote    --env preview   # seed/seed.sql: idempotent
+```
+
+`seed/reset.sql` is generated from the schema by `pnpm -F @gmacko/db seed:sql`
+(children before parents, so no foreign key is tripped; `delete from`, never a
+drop). It empties **every** table — the workflow hard-codes `--env preview` in
+all three steps and there is no equivalent script for another stage. Revisit
+the shared database if previews ever need per-PR fixtures, or if two PRs' data
+genuinely collide; the alternative then is a Workers dispatch namespace, not a
+Worker per PR.
 
 `pnpm -F @gmacko/web preview:upload:dry-run` runs the same build and
 `wrangler versions upload --dry-run` locally, needing no Cloudflare

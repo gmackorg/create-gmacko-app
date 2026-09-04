@@ -7,6 +7,8 @@ declare global {
     interface Env {
       DB: D1Database;
       TEST_MIGRATIONS: D1Migration[];
+      /** Mirrors apps/web/wrangler.jsonc; declared in vitest.workers.config.ts. */
+      RATE_LIMIT_CONTACT: RateLimit;
     }
   }
 }
