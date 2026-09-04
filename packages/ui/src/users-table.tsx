@@ -17,8 +17,15 @@ export interface UserRowData {
   readonly createdAt: Date;
 }
 
+// UTC, not the runtime's zone: these render on the Worker (UTC) and
+// again in the browser (the viewer's zone), and between UTC midnight and
+// local midnight an unpinned formatter prints two different dates and
+// fails hydration.
 const formatDate = (value: Date) =>
-  new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(value);
+  new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeZone: "UTC",
+  }).format(value);
 
 export function RoleBadge({ role }: { role: PlatformRole }) {
   return (

@@ -10,11 +10,15 @@ function formatMoney(amountInCents: number, currency: string) {
   }).format(amountInCents / 100);
 }
 
+// UTC, not the runtime's zone: this renders on the Worker (UTC) and again in
+// the browser (the viewer's zone), and between UTC midnight and local midnight
+// an unpinned formatter prints two different dates and fails hydration.
 function formatDate(value: Date | null) {
   if (!value) return "Not set";
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(
-    value,
-  );
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeZone: "UTC",
+  }).format(value);
 }
 
 /** The billing and usage panels; each hides itself when its feature is off. */

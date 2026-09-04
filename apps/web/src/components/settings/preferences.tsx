@@ -13,6 +13,17 @@ const themes: ReadonlyArray<Theme> = ["light", "dark", "system"];
  * Theme and notification switches. `getPreferences` answers defaults with
  * `id: null` until the first write; that is a normal state, not an error.
  */
+// UTC, not the runtime's zone: this renders on the Worker (UTC) and again
+// in the browser (the viewer's zone), and between UTC midnight and local
+// midnight an unpinned formatter prints two different dates and fails
+// hydration.
+const formatSavedAt = (value: Date) =>
+  new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "UTC",
+  }).format(value);
+
 export function PreferencesSection() {
   const { data: preferences } = useSuspenseQuery(
     queries.settings.getPreferences(),
@@ -79,7 +90,7 @@ export function PreferencesSection() {
         <p className="text-muted-foreground text-xs">
           {preferences.id === null
             ? "Using the defaults; your first change saves them."
-            : `Saved${preferences.updatedAt ? ` ${new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(preferences.updatedAt)}` : ""}.`}
+            : `Saved${preferences.updatedAt ? ` ${formatSavedAt(preferences.updatedAt)}` : ""}.`}
         </p>
       </div>
     </SettingsCard>

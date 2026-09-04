@@ -143,6 +143,16 @@ function Waitlist() {
   );
 }
 
+// UTC, not the runtime's zone: this renders on the Worker (UTC) and again
+// in the browser (the viewer's zone), and between UTC midnight and local
+// midnight an unpinned formatter prints two different dates and fails
+// hydration.
+const formatSetupDate = (value: Date) =>
+  new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeZone: "UTC",
+  }).format(value);
+
 function Bootstrap() {
   const { data: status } = useSuspenseQuery(queries.admin.bootstrapStatus());
   return (
@@ -150,7 +160,7 @@ function Bootstrap() {
       <SettingsPanel>
         <p className="text-sm">
           {status.isInitialized
-            ? `Setup completed${status.setupCompletedAt ? ` on ${new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(status.setupCompletedAt)}` : ""}.`
+            ? `Setup completed${status.setupCompletedAt ? ` on ${formatSetupDate(status.setupCompletedAt)}` : ""}.`
             : "Setup has not been completed: the first signed-in user to finish it becomes the platform admin."}
         </p>
         <p className="text-muted-foreground mt-1 text-sm">

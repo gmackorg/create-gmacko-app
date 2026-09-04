@@ -20,10 +20,15 @@ const statusClasses: Record<WaitlistStatus, string> = {
   dismissed: "bg-muted text-muted-foreground",
 };
 
+// UTC, not the runtime's zone: these render on the Worker (UTC) and
+// again in the browser (the viewer's zone), and between UTC midnight and
+// local midnight an unpinned formatter prints two different dates and
+// fails hydration.
 const formatDate = (value: Date) =>
   new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: "UTC",
   }).format(value);
 
 /** The waitlist queue with the review actions an admin takes on each entry. */
