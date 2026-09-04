@@ -1,4 +1,3 @@
-import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { UserId } from "../auth";
@@ -42,7 +41,13 @@ import {
   WorkspaceSubscription,
   WorkspaceSubscriptionId,
 } from "../settings";
-import { inspectGroup, json, roundTrip, routeTable } from "./helpers";
+import {
+  inspectGroup,
+  json,
+  roundTrip,
+  routeTable,
+  type ServicelessCodec,
+} from "./helpers";
 
 const at = (iso: string) => new Date(iso);
 const t0 = at("2026-01-01T00:00:00.000Z");
@@ -58,6 +63,10 @@ describe("payloads", () => {
     expect(Object.keys(decoded)).toEqual(["emailNotifications"]);
     expect(decoded.emailNotifications).toBe(false);
     expect(Object.keys(new UpdatePreferences({}))).toEqual([]);
+    // SAFETY: deliberately out of contract. `Theme` is
+    // `Schema.Literals(["light", "dark", "system"])`, so "sepia" is not a
+    // `Theme`; `as never` silences only the compile-time half of the rejection
+    // this line asserts at run time.
     expect(() => new UpdatePreferences({ theme: "sepia" as never })).toThrow();
     expect(() => new UpdatePreferences({ language: "x".repeat(11) })).toThrow();
     expect(() => new UpdatePreferences({ timezone: "x".repeat(51) })).toThrow();
@@ -94,6 +103,10 @@ describe("payloads", () => {
     expect(
       () => new CreateApiKey({ name: "", permissions: ["read"] }),
     ).toThrow();
+    // SAFETY: deliberately out of contract. `CreateApiKey.permissions` is
+    // `Schema.NonEmptyArray(ApiKeyScope)`, whose type is `[ApiKeyScope,
+    // ...ApiKeyScope[]]`; the empty array inhabits no such tuple, which is
+    // exactly the emptiness this line asserts the constructor rejects.
     expect(
       () => new CreateApiKey({ name: "ci", permissions: [] as never }),
     ).toThrow();
@@ -136,7 +149,7 @@ describe("payloads", () => {
 });
 
 describe("row models round-trip through JSON", () => {
-  it.each<[string, Schema.Top, unknown]>([
+  it.each<[string, ServicelessCodec, unknown]>([
     [
       "UserPreferences",
       UserPreferences,
@@ -436,17 +449,7 @@ describe("row models round-trip through JSON", () => {
       new InviteAccepted({ workspaceId, role: "member" }),
     ],
   ])("%s", (_name, schema, value) => {
-    expect(
-      roundTrip(
-        schema as unknown as Schema.ConstraintCodec<
-          unknown,
-          unknown,
-          never,
-          never
-        >,
-        value,
-      ),
-    ).toEqual(value);
+    expect(roundTrip(schema, value)).toEqual(value);
   });
 });
 

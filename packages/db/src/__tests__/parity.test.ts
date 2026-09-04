@@ -50,7 +50,7 @@ interface Pair {
  * `verification`; the contract has no model for them (only `SessionRecord`,
  * which is a response shape rather than the row), so they are not listed.
  */
-const pairs: Readonly<Record<string, Pair>> = {
+const pairs = {
   user: { table: schema.user, model: UserModel },
   post: { table: schema.Post, model: PostModel },
   user_preferences: {
@@ -86,10 +86,14 @@ const pairs: Readonly<Record<string, Pair>> = {
     table: schema.workspaceUsageRollup,
     model: UsageRollupModel,
   },
-};
+} satisfies Readonly<Record<string, Pair>>;
 
 /** `true` when the field's decoded type admits `null`. */
 const acceptsNull = (field: Schema.Top): boolean =>
+  // SAFETY: `Schema.Top` is the supertype of every `Schema.Codec<T, E, RD, RE>`
+  // and `Schema.is` reads only the AST, which `Top` already declares; the
+  // parameter is `Codec<unknown>` so that `is` returns a predicate over
+  // `unknown`, which is what `null` is being tested against here.
   Schema.is(field as Schema.Codec<unknown>)(null);
 
 describe.each(Object.entries(pairs))("%s", (_name, { table, model }) => {
@@ -118,7 +122,11 @@ it("covers every table in the schema that a row model mirrors", () => {
   // better-auth's three tables, and `rate_limit_window`, which is
   // infrastructure rather than contract (see schema.ts).
   const exempt = ["account", "rate_limit_window", "session", "verification"];
-  const all = (Object.values(schema) as ReadonlyArray<unknown>)
+  // Widened by annotation, not asserted: the union of `schema`'s export types
+  // is not a supertype of `Table`, so the refinement below needs an element
+  // type that is. `is(value, Table)` is what decides membership.
+  const exports: ReadonlyArray<unknown> = Object.values(schema);
+  const all = exports
     .filter((value): value is Table => is(value, Table))
     .map((table) => getTableName(table))
     .filter((name) => !exempt.includes(name))

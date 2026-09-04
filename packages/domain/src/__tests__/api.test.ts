@@ -4,13 +4,13 @@
  * document pinned as a snapshot so a change to the contract is a visible
  * diff.
  */
-import { HttpApi, OpenApi } from "effect/unstable/httpapi";
+import { OpenApi } from "effect/unstable/httpapi";
 import { describe, expect, it } from "vitest";
 
 import { AppApi } from "../api";
 import { inspectApi } from "../inspect";
 
-const rows = inspectApi(AppApi as unknown as HttpApi.Top);
+const rows = inspectApi(AppApi);
 const route = (row: { method: string; path: string }) =>
   `${row.method} ${row.path}`;
 

@@ -7,8 +7,6 @@
 import { writeFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import type { HttpApi } from "effect/unstable/httpapi";
-
 import { AppApi } from "../src/api";
 import { type EndpointInfo, inspectApi } from "../src/inspect";
 
@@ -17,6 +15,13 @@ export const API_AUTH_PATH = fileURLToPath(
 );
 
 const GROUP_ORDER = ["health", "auth", "posts", "settings", "admin"] as const;
+
+/**
+ * The same order, widened by annotation rather than asserted at each use:
+ * `EndpointInfo.group` is the group's declared identifier, a plain `string`,
+ * and a group missing from this list sorts to the front on `-1`.
+ */
+const groupOrder: ReadonlyArray<string> = GROUP_ORDER;
 
 const cell = (value: string) => value.replaceAll("|", "\\|");
 
@@ -94,13 +99,9 @@ const DECISIONS = [
   "  accept of the consumed invite is 404 `NotFound`.",
 ];
 
-export const renderApiAuthMatrix = (
-  api: HttpApi.Top = AppApi as unknown as HttpApi.Top,
-): string => {
+export const renderApiAuthMatrix = (api = AppApi): string => {
   const rows = [...inspectApi(api)].sort(
-    (a, b) =>
-      GROUP_ORDER.indexOf(a.group as (typeof GROUP_ORDER)[number]) -
-      GROUP_ORDER.indexOf(b.group as (typeof GROUP_ORDER)[number]),
+    (a, b) => groupOrder.indexOf(a.group) - groupOrder.indexOf(b.group),
   );
   const counts = GROUP_ORDER.map(
     (group) => `${group} ${rows.filter((r) => r.group === group).length}`,

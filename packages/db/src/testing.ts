@@ -16,6 +16,12 @@ import * as Reactivity from "effect/unstable/reactivity/Reactivity";
 import type { SqlClient } from "effect/unstable/sql/SqlClient";
 import type { SqlError } from "effect/unstable/sql/SqlError";
 
+// This module is the composition root for the sqlite-node flavour of
+// `Database`: it *builds* the Layer that `makeDatabase` exists to be called
+// from, exactly as `Database.layer` does for D1. There is no Layer to yield
+// the service from here -- this file is where one comes from -- so the rule's
+// "import the owning Layer instead" has nothing to point at.
+// oxlint-disable-next-line anti-slop-effect/no-service-constructor-imports
 import { Database, makeDatabase, type PlainDatabase } from "./database";
 import { relations } from "./relations";
 
@@ -102,9 +108,7 @@ const applyMigrations = (sql: SqlClient): Effect.Effect<void, SqlError> =>
 const makePlain = (client: SqliteClient.SqliteClient): PlainDatabase =>
   drizzleProxy(
     async (query, params, method) => {
-      const rows = await Effect.runPromise(
-        client.unsafe(query, params as ReadonlyArray<unknown>).values,
-      );
+      const rows = await Effect.runPromise(client.unsafe(query, params).values);
       // The proxy driver expects one row (a value array) for `get`, all rows
       // for `all`/`values`, and ignores the result of `run`.
       if (method === "get") return { rows: [...(rows[0] ?? [])] };

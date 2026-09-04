@@ -1,4 +1,5 @@
 export {
+  type BackendQueryEffectHKT,
   type BatchItem,
   type BatchResult,
   type BatchRow,
@@ -13,6 +14,7 @@ export {
   type GuardedWriteProjection,
   makeDatabase,
   type PlainDatabase,
+  type SqliteValue,
   toDatabaseError,
 } from "./database";
 export { type Relations, relations } from "./relations";

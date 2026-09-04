@@ -3,6 +3,7 @@
  * that each scope has exactly one tag identity, and which are *security*
  * middlewares (the ones the credential-matrix and OpenAPI count).
  */
+import { Context } from "effect";
 import { HttpApiMiddleware } from "effect/unstable/httpapi";
 import { describe, expect, it } from "vitest";
 
@@ -17,8 +18,20 @@ import {
   WorkspaceRole,
 } from "../security";
 
-/** `isSecurity` is typed against `AnyService`, which the class type does not name structurally. */
-const isSecurity = (middleware: object) =>
+/**
+ * What every middleware in this package is, and all `isSecurity` reads: a
+ * context key. `Context.Key` is covariant in both parameters, so `unknown`
+ * here accepts each of the four keys the suite probes.
+ */
+type MiddlewareKey = Context.Key<unknown, unknown>;
+
+const isSecurity = (middleware: MiddlewareKey): boolean =>
+  // SAFETY: rc.112's `HttpApiMiddleware.ServiceClass` declares `[TypeId]`,
+  // `error` and `requiredForClient` as statics but not `provides`, which
+  // `AnyService` requires -- so no middleware class is structurally an
+  // `AnyService`, even though `HttpApi.reflect` hands these very objects out
+  // as `ReadonlySet<AnyService>`. `isSecurity` reads only the `SecurityTypeId`
+  // brand, which `ServiceClass` does declare when `security` is non-empty.
   HttpApiMiddleware.isSecurity(middleware as HttpApiMiddleware.AnyService);
 
 describe("sessionCookieName", () => {

@@ -3,12 +3,19 @@ import { HttpApi, type HttpApiGroup } from "effect/unstable/httpapi";
 
 import { type EndpointInfo, inspectApi } from "../inspect";
 
+/**
+ * Any schema whose JSON codec needs no services -- what `json` and `roundTrip`
+ * take, and the column type of the `it.each` tables that drive them.
+ */
+export type ServicelessCodec = Schema.ConstraintCodec<
+  unknown,
+  unknown,
+  never,
+  never
+>;
+
 /** JSON codec helpers for round-trip tests. */
-export const json = <
-  S extends Schema.ConstraintCodec<unknown, unknown, never, never>,
->(
-  schema: S,
-) => {
+export const json = <S extends ServicelessCodec>(schema: S) => {
   const codec = Schema.toCodecJson(schema);
   return {
     encode: Schema.encodeUnknownSync(codec),
@@ -17,9 +24,7 @@ export const json = <
 };
 
 /** Encodes then decodes; the result must equal the input. */
-export const roundTrip = <
-  S extends Schema.ConstraintCodec<unknown, unknown, never, never>,
->(
+export const roundTrip = <S extends ServicelessCodec>(
   schema: S,
   value: S["Type"],
 ): S["Type"] => {
@@ -30,8 +35,7 @@ export const roundTrip = <
 /** Reflects one group as if it were the whole API (no `/api` prefix). */
 export const inspectGroup = (
   group: HttpApiGroup.Constraint,
-): ReadonlyArray<EndpointInfo> =>
-  inspectApi(HttpApi.make("probe").add(group) as unknown as HttpApi.Top);
+): ReadonlyArray<EndpointInfo> => inspectApi(HttpApi.make("probe").add(group));
 
 /** The columns a contract test asserts on. */
 export const routeTable = (rows: ReadonlyArray<EndpointInfo>) =>

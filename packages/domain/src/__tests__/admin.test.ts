@@ -18,7 +18,13 @@ import {
 } from "../admin";
 import { User, UserId } from "../auth";
 import { Workspace, WorkspaceId } from "../settings";
-import { inspectGroup, json, roundTrip, routeTable } from "./helpers";
+import {
+  inspectGroup,
+  json,
+  roundTrip,
+  routeTable,
+  type ServicelessCodec,
+} from "./helpers";
 
 const t0 = new Date("2026-01-01T00:00:00.000Z");
 const userId = UserId.make("u1");
@@ -68,6 +74,10 @@ describe("payloads", () => {
     expect(
       () => new UpdateLaunchControls({ allowedEmailDomains: [""] }),
     ).toThrow();
+    // SAFETY: deliberately out of contract. `AnnouncementTone` is
+    // `Schema.Literals(["info", "warning", "critical"])`, so "loud" is not an
+    // `AnnouncementTone` and `as never` only silences the compile-time half of
+    // that -- the runtime rejection is what this line asserts.
     expect(
       () => new UpdateLaunchControls({ announcementTone: "loud" as never }),
     ).toThrow();
@@ -99,15 +109,21 @@ describe("payloads", () => {
   });
 
   it("ReviewWaitlistEntry and UpdateUserRole take the enum only", () => {
+    // SAFETY: deliberately out of contract. `WaitlistStatus` is
+    // `Schema.Literals(["pending", "contacted", "approved", "dismissed"])`, so
+    // "archived" is not one; `as never` silences only the compile-time half of
+    // the rejection this line asserts at run time.
     expect(
       () => new ReviewWaitlistEntry({ status: "archived" as never }),
     ).toThrow();
+    // SAFETY: same, for `UserRole`, which is
+    // `Schema.Literals(["user", "admin"])` -- "root" is not a `UserRole`.
     expect(() => new UpdateUserRole({ role: "root" as never })).toThrow();
   });
 });
 
 describe("responses round-trip through JSON", () => {
-  it.each<[string, Schema.Top, unknown]>([
+  it.each<[string, ServicelessCodec, unknown]>([
     ["ApplicationSettings", ApplicationSettings, settings],
     [
       "LaunchControls",
@@ -173,17 +189,7 @@ describe("responses round-trip through JSON", () => {
       new UserList({ users: [user], total: 1, hasMore: false }),
     ],
   ])("%s", (_name, schema, value) => {
-    expect(
-      roundTrip(
-        schema as unknown as Schema.ConstraintCodec<
-          unknown,
-          unknown,
-          never,
-          never
-        >,
-        value,
-      ),
-    ).toEqual(value);
+    expect(roundTrip(schema, value)).toEqual(value);
   });
 });
 

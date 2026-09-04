@@ -109,7 +109,7 @@ export const databaseSuite = (
         );
         expect(row.title).toBe("hello");
         expect(row.createdAt).toBeInstanceOf(Date);
-        expect(typeof row.id).toBe("string");
+        expect(row.id).toBeTypeOf("string");
       });
 
       it("fails with the caller's typed error on zero rows", async () => {
@@ -330,14 +330,18 @@ export const databaseSuite = (
       const db = await run(Effect.map(Database, (d) => d.db));
       // @ts-expect-error transaction is removed from the service's db type
       const attempt = db.transaction;
-      expect(typeof attempt).toBe("function");
-      await expect(
-        run(
-          (attempt as (f: () => Effect.Effect<void>) => Effect.Effect<void>)(
-            () => Effect.void,
-          ),
-        ),
-      ).rejects.toThrow(/interactive transactions/);
+      expect(attempt).toBeTypeOf("function");
+      // SAFETY: the assertion above has just established that `attempt` is a
+      // function, and `rewire` installed it as the arity-1 thunk-taker that
+      // `Effect.die`s -- the very shape this call proves at runtime. It has no
+      // static type because the service's `db` deliberately omits
+      // `transaction` (hence the `@ts-expect-error` above).
+      const call = attempt as (
+        f: () => Effect.Effect<void>,
+      ) => Effect.Effect<void>;
+      await expect(run(call(() => Effect.void))).rejects.toThrow(
+        /interactive transactions/,
+      );
     });
   });
 };

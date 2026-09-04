@@ -57,7 +57,11 @@ describe("User", () => {
 
   it("rejects an unknown role", () => {
     const { decode } = json(User);
-    const encoded = json(User).encode(user) as Record<string, unknown>;
+    // SAFETY: `toCodecJson` types every encoded value as `Json`, whose union
+    // includes primitives; a `Schema.Class` encodes to the object arm of that
+    // union -- its struct fields, keyed by name -- which is what makes the
+    // spread below well-formed.
+    const encoded = json(User).encode(user) as Schema.JsonObject;
     expect(() => decode({ ...encoded, role: "superuser" })).toThrow();
   });
 });

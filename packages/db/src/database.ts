@@ -32,6 +32,7 @@ import {
   Effect,
   Layer,
   Option,
+  Predicate,
   Schema,
 } from "effect";
 import * as Reactivity from "effect/unstable/reactivity/Reactivity";
@@ -76,29 +77,32 @@ export class DatabaseError extends Schema.TaggedError<DatabaseError>()(
   },
 ) {}
 
-const isDrizzleQueryError = (u: unknown): u is EffectDrizzleQueryError =>
-  typeof u === "object" &&
-  u !== null &&
-  "_tag" in u &&
-  u._tag === "EffectDrizzleQueryError";
+const isDrizzleQueryError = (
+  cause: unknown,
+): cause is EffectDrizzleQueryError =>
+  Predicate.isTagged(cause, "EffectDrizzleQueryError");
 
-const findSqlError = (u: unknown): SqlError | undefined => {
-  if (isSqlError(u)) return u;
-  if (Cause.isCause(u)) {
-    const error = Cause.findErrorOption(u);
+const findSqlError = (cause: unknown): SqlError | undefined => {
+  if (isSqlError(cause)) return cause;
+  if (Cause.isCause(cause)) {
+    const error = Cause.findErrorOption(cause);
     return Option.isSome(error) ? findSqlError(error.value) : undefined;
   }
-  if (isDrizzleQueryError(u)) return findSqlError(u.cause);
+  if (isDrizzleQueryError(cause)) return findSqlError(cause.cause);
   return undefined;
 };
 
 /** Every `message` down the `cause` chain, joined; sqlite's text is stable. */
-const messagesOf = (u: unknown, depth = 0): string => {
-  if (depth > 5 || typeof u !== "object" || u === null) return "";
+const messagesOf = (cause: unknown, depth = 0): string => {
+  if (depth > 5) return "";
   const message =
-    "message" in u && typeof u.message === "string" ? u.message : "";
-  const cause = "cause" in u ? messagesOf(u.cause, depth + 1) : "";
-  return `${message}\n${cause}`;
+    Predicate.hasProperty(cause, "message") && Predicate.isString(cause.message)
+      ? cause.message
+      : "";
+  const nested = Predicate.hasProperty(cause, "cause")
+    ? messagesOf(cause.cause, depth + 1)
+    : "";
+  return `${message}\n${nested}`;
 };
 
 /**
@@ -131,12 +135,12 @@ const reasonOf = (error: SqlError | undefined): DatabaseErrorReason => {
 };
 
 /** Idempotent: a `DatabaseError` passes through untouched. */
-export const toDatabaseError = (error: unknown): DatabaseError =>
-  error instanceof DatabaseError
-    ? error
+export const toDatabaseError = (cause: unknown): DatabaseError =>
+  cause instanceof DatabaseError
+    ? cause
     : new DatabaseError({
-        reason: reasonOf(findSqlError(error)),
-        cause: error,
+        reason: reasonOf(findSqlError(cause)),
+        cause,
       });
 
 // ---------------------------------------------------------------------------
@@ -151,6 +155,19 @@ export const toDatabaseError = (error: unknown): DatabaseError =>
  */
 export interface DatabaseQueryEffectHKT extends QueryEffectHKTBase {
   readonly error: DatabaseError;
+  readonly context: never;
+}
+
+/**
+ * The same HKT one step earlier: what both drivers already produce before
+ * `rewire` (`EffectSQLiteD1QueryEffectHKT` and its sqlite-node twin are this,
+ * spelled in their own packages). `DatabaseBackend` is written against this
+ * rather than `QueryEffectHKTBase`, whose `context` is `unknown` -- a
+ * requirement no driver has, and one that makes every backend type
+ * incomparable with `DatabaseDrizzle`.
+ */
+export interface BackendQueryEffectHKT extends QueryEffectHKTBase {
+  readonly error: EffectDrizzleQueryError;
   readonly context: never;
 }
 
@@ -178,8 +195,23 @@ export interface BatchItem {
     readonly params: ReadonlyArray<unknown>;
   };
 }
+/**
+ * One column value exactly as a driver hands it back, before any drizzle
+ * result mapping: SQLite's five storage classes and nothing else. NULL is
+ * `null`; INTEGER and REAL are both `number`; TEXT is `string`; BLOB is
+ * `ArrayBuffer` on D1's binding and `Uint8Array` on `node:sqlite`. Both BLOB
+ * arms are unreachable through this schema — `migrations/*.sql` declares only
+ * `text` and `integer` columns — and are named so a hand-written `batch`
+ * statement (`randomblob()`, `zeroblob()`) stays inside the contract.
+ *
+ * Cloudflare's own `D1Result<T = unknown>` leaves this open; the guarantee is
+ * SQLite's, not the binding's, which is why it is stated here rather than
+ * borrowed.
+ */
+export type SqliteValue = null | number | string | ArrayBuffer | Uint8Array;
+
 /** D1 returns batch rows keyed by column name, un-mapped by drizzle. */
-export type BatchRow = Record<string, unknown>;
+export type BatchRow = Record<string, SqliteValue>;
 export type BatchResult<Items extends ReadonlyArray<BatchItem>> = {
   readonly [K in keyof Items]: ReadonlyArray<BatchRow>;
 };
@@ -242,7 +274,7 @@ export interface DatabaseShape {
 
 /** The pieces that differ between the D1 layer and the sqlite-node test layer. */
 export interface DatabaseBackend {
-  readonly db: SQLiteEffectDatabase<QueryEffectHKTBase, unknown, Relations>;
+  readonly db: SQLiteEffectDatabase<BackendQueryEffectHKT, unknown, Relations>;
   readonly sql: SqlClient;
   /** Runs the statements atomically; the test layer emulates this with a transaction. */
   readonly runBatch: (
@@ -269,7 +301,12 @@ const leaves = ["run", "all", "get", "values"] as const;
  * drizzle's prototypes or proxying builders.
  */
 const rewire = (backend: DatabaseBackend["db"]): DatabaseDrizzle => {
-  const session = backend._.session as unknown as SessionLike;
+  // SAFETY: every SQLiteEffectSession declares `prepareQuery(query, mode,
+  // prepare, executeMethod?, mapper?, metadata?, cacheConfig?)` returning a
+  // prepared query with `run`/`all`/`get`/`values`. `SessionLike` names only
+  // that method, with its arguments left opaque because they are passed
+  // straight through to the original below and never inspected.
+  const session: SessionLike = backend._.session as SessionLike;
   const prepareQuery = session.prepareQuery;
   session.prepareQuery = function (this: SessionLike, ...args) {
     const prepared = prepareQuery.call(this, ...args);
@@ -295,6 +332,17 @@ const rewire = (backend: DatabaseBackend["db"]): DatabaseDrizzle => {
       ),
     writable: false,
   });
+  // The chain is the seam, not a shortcut past one. `DatabaseDrizzle` differs
+  // from the backend type in exactly one place -- the HKT's `error`, which is
+  // `DatabaseError` instead of drizzle's `EffectDrizzleQueryError` -- and the
+  // two are disjoint classes, so no single assertion is comparable. What makes
+  // it true is the patch above, which is a runtime fact: `session.prepareQuery`
+  // now maps every leaf's error through `toDatabaseError`, and every builder,
+  // `db.query.*` and `db.run/all/get/values` executes through it.
+  // SAFETY: `backend` is the same object, with `prepareQuery` patched to map
+  // every failure through `toDatabaseError`; `transaction` is removed both
+  // here (defineProperty above) and in the type.
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions
   return backend as unknown as DatabaseDrizzle;
 };
 
@@ -315,11 +363,10 @@ export const makeDatabase = (backend: DatabaseBackend): DatabaseShape => {
     db,
     sql,
     first: (query, orFail) =>
-      Effect.flatMap(query, (rows) =>
-        rows.length > 0
-          ? Effect.succeed(rows[0] as (typeof rows)[number])
-          : Effect.fail(orFail()),
-      ),
+      Effect.flatMap(query, (rows) => {
+        const [row] = rows;
+        return row === undefined ? Effect.fail(orFail()) : Effect.succeed(row);
+      }),
     batch: (items) =>
       backend
         .runBatch(
@@ -329,9 +376,17 @@ export const makeDatabase = (backend: DatabaseBackend): DatabaseShape => {
           }),
         )
         .pipe(
-          Effect.map(
-            (results) => results as unknown as BatchResult<typeof items>,
-          ),
+          Effect.map((results) => {
+            // SAFETY: `runBatch` answers one row array per statement in the
+            // order it was given (D1's `batch` contract; the sqlite-node layer
+            // emulates it with `Effect.forEach` over the same array), and
+            // `items.map` above preserved `Items`'s length and index order.
+            // `BatchResult<Items>` is `Items` mapped index-for-index onto
+            // `ReadonlyArray<BatchRow>`, which is what `results` holds -- only
+            // the length, which `Array.prototype.map` does not carry into the
+            // type of its result, is beyond what tsc can see.
+            return results as BatchResult<typeof items>;
+          }),
           Effect.mapError(toDatabaseError),
         ),
     updateWhere: (write) =>

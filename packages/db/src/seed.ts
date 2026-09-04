@@ -330,10 +330,14 @@ export const seedSql = (db: DatabaseDrizzle): string => {
 // ---------------------------------------------------------------------------
 
 /** Every table this schema owns; D1's own `d1_migrations` is not one of them. */
-const schemaTables = (): ReadonlyArray<SQLiteTable> =>
-  (Object.values(schema) as ReadonlyArray<unknown>).filter(
-    (value): value is SQLiteTable => is(value, Table),
-  );
+const schemaTables = (): ReadonlyArray<SQLiteTable> => {
+  // Widened by annotation, not asserted: `schema`'s exports are tables,
+  // relations and column helpers, and `is(value, Table)` is what decides
+  // which. The union of the module's export types is not a supertype of
+  // `SQLiteTable`, so the refinement needs an element type that is.
+  const exports: ReadonlyArray<unknown> = Object.values(schema);
+  return exports.filter((value): value is SQLiteTable => is(value, Table));
+};
 
 /**
  * Table names with every table ordered after the tables that reference it, so

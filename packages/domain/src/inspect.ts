@@ -4,8 +4,12 @@
  * The credential matrix in docs/API_AUTH.md and the contract tests are both
  * derived from this, so neither can drift from the declarations.
  */
-import { Context } from "effect";
-import { HttpApi, HttpApiMiddleware } from "effect/unstable/httpapi";
+import { Context, Predicate, type Schema } from "effect";
+import {
+  HttpApi,
+  type HttpApiGroup,
+  HttpApiMiddleware,
+} from "effect/unstable/httpapi";
 
 import { type RateLimitScope, RateLimitScopeAnnotation } from "./middleware";
 import { ApiKeyScope } from "./roles";
@@ -49,19 +53,24 @@ const SESSION_OR_KEY_PREFIX = "@gmacko/domain/SessionOrKey/";
 const ADMIN_ONLY_KEY = "@gmacko/domain/AdminOnly";
 const WORKSPACE_ROLE_PREFIX = "@gmacko/domain/WorkspaceRole/";
 
+/** The credential columns of an `EndpointInfo`, which is where these land. */
+type EndpointCredential = Pick<EndpointInfo, "credential" | "scope">;
+
+/** The scope suffix of a `SessionOrKey` middleware key, when it names one. */
+const apiKeyScopes: ReadonlyArray<string> = ApiKeyScope.literals;
+const isApiKeyScope = (value: string): value is ApiKeyScope =>
+  apiKeyScopes.includes(value);
+
 const describeCredential = (
   securityKeys: ReadonlyArray<string>,
-): { credential: string; scope: ApiKeyScope | null } => {
+): EndpointCredential => {
   if (securityKeys.length === 0) return { credential: "public", scope: null };
   const [key] = securityKeys;
   if (key === SESSION_KEY) return { credential: "Session", scope: null };
   if (key?.startsWith(SESSION_OR_KEY_PREFIX)) {
     const scope = key.slice(SESSION_OR_KEY_PREFIX.length);
-    if (ApiKeyScope.literals.includes(scope as ApiKeyScope)) {
-      return {
-        credential: `SessionOrKey(${scope})`,
-        scope: scope as ApiKeyScope,
-      };
+    if (isApiKeyScope(scope)) {
+      return { credential: `SessionOrKey(${scope})`, scope };
     }
   }
   return { credential: securityKeys.join(" + "), scope: null };
@@ -80,18 +89,24 @@ const describeRole = (key: string): string | null => {
  * from the AST, because an endpoint's `error` option wraps the class in a
  * JSON codec that keeps the annotations but not the class statics.
  */
-const nameOf = (schema: {
-  readonly ast: { readonly annotations?: unknown };
-}): string => {
-  const annotations = schema.ast.annotations as
-    | { readonly identifier?: unknown }
-    | undefined;
-  return typeof annotations?.identifier === "string"
-    ? annotations.identifier
-    : "(anonymous)";
+const nameOf = (schema: Schema.Top): string => {
+  const identifier = schema.ast.annotations?.identifier;
+  return Predicate.isString(identifier) ? identifier : "(anonymous)";
 };
 
-export const inspectApi = (api: HttpApi.Top): ReadonlyArray<EndpointInfo> => {
+/**
+ * Generic over `Id`/`Groups` exactly as `HttpApi.reflect` is, and for the same
+ * reason: `HttpApi.Top` is invariant in its groups (a group's `prefix()`
+ * returns its own type, so `Groups` sits in both positions), which makes no
+ * concrete `AppApi` assignable to it. Taking the api the way `reflect` does
+ * keeps that assertion out of every caller.
+ */
+export const inspectApi = <
+  Id extends string,
+  Groups extends HttpApiGroup.Constraint,
+>(
+  api: HttpApi.HttpApi<Id, Groups>,
+): ReadonlyArray<EndpointInfo> => {
   const rows: Array<EndpointInfo> = [];
   HttpApi.reflect(api, {
     onGroup: () => {},
