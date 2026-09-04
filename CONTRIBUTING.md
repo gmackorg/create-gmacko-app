@@ -173,8 +173,51 @@ Add or update stories in `packages/ui/src/**/*.stories.tsx`; run `pnpm --filter 
 ## Code Style
 
 - Formatting and import sorting are handled by biome (runs via the lefthook pre-commit hook)
-- Linting uses oxlint
+- Linting uses oxlint, configured in `oxlint.config.ts` at the repo root
 - TypeScript strict mode is enabled across all packages
+
+### Evidence rules (`anti-slop`)
+
+On top of oxlint's own rules, `pnpm lint:ox` runs
+[`anti-slop`](https://github.com/dmmulroy/anti-slop) — a small oxlint plugin
+that rejects **low-evidence TypeScript**: code that type-checks cleanly while
+carrying no actual evidence about what it holds. `unknown` parameters and
+returns, `Record<string, unknown>` dictionaries, `as` assertions with nothing
+behind them, `x as unknown as T`, ad hoc `typeof` narrowing instead of parsing
+at the boundary, `...(cond ? { a } : {})`, and module mocking instead of a real
+seam. `tsc` accepts all of it; none of it tells the next reader anything.
+
+The Effect group (`anti-slop-effect`) is on too, since the server, domain and
+db packages are Effect 4. Its one rule stops runtime code importing a
+`makeFoo` service constructor instead of the owning `Layer`.
+
+One rule is deliberately off — `no-shape-in-symbol-names`. `Context.Key<Id,
+Shape>` and `Context.Service.Shape<T>` are Effect's own vocabulary, so
+`DatabaseShape` here is borrowed precision, not vagueness. The reason lives in
+`oxlint.config.ts` next to the `"off"`.
+
+**The plugin is vendored**, at `tools/oxlint/anti-slop/`. Upstream publishes no
+npm package and intends it to be copied. That directory is a verbatim copy of
+upstream `src/` — do not edit rules in place, because a local edit is invisible
+in the next re-sync diff. `tools/oxlint/anti-slop/README.md` records the
+upstream commit and the re-sync recipe. Note the version lockstep:
+`@oxlint/plugins` must be **exactly** the resolved `oxlint` version, so both are
+pinned exact in the `pnpm-workspace.yaml` catalog and bump together.
+
+**Suppression convention.** Default to fixing the code; these rules are about
+design, not style. Where a suppression is genuinely right:
+
+- `require-safety-comment-for-type-assertion` has its own convention — put
+  `// SAFETY: <invariant>` immediately above the assertion, naming the thing
+  that actually guarantees the type (the schema that decoded it, the branch
+  that narrowed it, the column type D1 returns). "cast needed" and "TS can't
+  infer this" are not invariants.
+- Any other rule takes `// oxlint-disable-next-line anti-slop/<rule>` **plus** a
+  sentence saying why the smell is not a smell here.
+
+A bare disable with no stated invariant is a review defect. If a rule turns out
+to be systematically wrong for this codebase, switch that one rule off in
+`oxlint.config.ts` with a written reason — do not scatter suppressions.
 
 ### Dead code (`pnpm knip`)
 

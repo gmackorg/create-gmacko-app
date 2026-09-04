@@ -129,6 +129,34 @@ observability) and by the health tests (`packages/api/src/health/health.test.ts`
   `api/health/ready`, and `.well-known/forge-health` return a generic message when
   `NODE_ENV === "production"`; raw error detail is dev-only.
 
+## Evidence Rules (enforced by `pnpm lint:ox`)
+
+Separate from the nine invariants above, `pnpm lint:ox` runs the vendored
+[`anti-slop`](https://github.com/dmmulroy/anti-slop) oxlint plugin
+(`tools/oxlint/anti-slop/`, registered in `oxlint.config.ts`). It rejects
+**low-evidence TypeScript** — the class of code that passes `tsc` while
+carrying no evidence: `unknown` parameters and returns,
+`Record<string, unknown>` dictionaries, unjustified `as`, `x as unknown as T`,
+ad hoc `typeof` narrowing instead of parsing at the boundary,
+`...(cond ? { a } : {})`, and `vi.mock`/`jest.mock` instead of a real seam.
+The Effect group also stops runtime code importing a `makeFoo` service
+constructor instead of the owning `Layer`.
+
+These rules ship to generated apps. Agents working in a generated app will hit
+them. **Fix the code — do not suppress by default.** When a suppression is
+genuinely correct it must carry a stated invariant:
+
+- assertions: `// SAFETY: <what actually guarantees this type>` immediately
+  above the `as` — name the schema, branch, or column type, never "cast needed";
+- everything else: `// oxlint-disable-next-line anti-slop/<rule>` plus a
+  sentence saying why the smell is not a smell here.
+
+A bare disable is a review defect. `no-shape-in-symbol-names` is the one rule
+turned off, with its reason in `oxlint.config.ts`. If another rule is
+systematically wrong for the app, turn that one rule off there with a written
+reason rather than scattering suppressions. Do not edit
+`tools/oxlint/anti-slop/` — it is a verbatim vendored copy; see its README.
+
 ## Agent-Specific Notes
 
 ### Codex

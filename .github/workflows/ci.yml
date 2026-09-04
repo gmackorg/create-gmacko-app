@@ -37,6 +37,13 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      # `pnpm lint` is `turbo run lint`, so it only reaches files inside a
+      # workspace package. This sweeps the whole tree from the root config —
+      # scripts/, turbo/generators, test/ and the root dotfiles included — and
+      # is the same command the lefthook pre-commit hook runs.
+      - name: Lint (root sweep, incl. anti-slop plugin rules)
+        run: pnpm lint:ox
+
       - name: Format check
         run: pnpm format
 

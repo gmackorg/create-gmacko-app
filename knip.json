@@ -1,11 +1,18 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreExportsUsedInFile": true,
-  "ignore": [".claude/**", "sdks/generated/**"],
+  // `tools/oxlint/anti-slop/**` is a verbatim vendored copy of an oxlint
+  // plugin (see its README). oxlint loads it by path from oxlint.config.ts,
+  // which knip cannot see, so every rule module reads as unused.
+  "ignore": [".claude/**", "sdks/generated/**", "tools/oxlint/anti-slop/**"],
   // `postgres` is imported dynamically by scripts/pg-to-d1.mjs and is
   // deliberately NOT a dependency: that script runs once, against a legacy
   // database, and is invoked with `pnpm dlx --package=postgres`.
-  "ignoreDependencies": ["cloudflare", "postgres"],
+  // `@oxlint/plugins` is imported only by the vendored anti-slop rules, which
+  // are ignored above, so knip cannot see the edge. It is a real dependency:
+  // oxlint loads those rules into its own process and they `import
+  // { defineRule } from "@oxlint/plugins"`.
+  "ignoreDependencies": ["@oxlint/plugins", "cloudflare", "postgres"],
   "ignoreBinaries": ["expo", "eas", "maestro", "generate"],
   "workspaces": {
     ".": {
