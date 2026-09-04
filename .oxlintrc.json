@@ -3,6 +3,58 @@
   "rules": {
     "no-console": "warn"
   },
+  "overrides": [
+    {
+      // Mirrors the `no-cloudflare-env-outside-runtime` app standard
+      // (scripts/check-app-standards.mjs) so the editor and the pre-commit
+      // hook say it before CI does. `cloudflare:workers` is the Worker's
+      // ambient environment; exactly one module turns it into Effect
+      // services, and everything else takes those services.
+      //
+      // Only this one of the nine standards is expressible here. oxlint has
+      // `no-restricted-imports` and `no-restricted-globals` and no
+      // `no-restricted-syntax`/`no-restricted-properties`, so:
+      //   - no-raw-process-env — the scope is the set of workspace packages
+      //     reachable from apps/web's package.json, computed per run so a new
+      //     dependency joins it on its own. A static glob here would drift
+      //     from that graph in both directions.
+      //   - no-db-transaction, no-plain-drizzle-in-api — member expressions
+      //     (`db.transaction(`, `Database.plain`), which needs a syntax
+      //     selector.
+      //   - no-server-fn-for-data — a call expression outside one file.
+      //   - no-d1-table-rebuild — `.sql` files, which oxlint does not parse.
+      //   - no-dev-vars — the existence of a file.
+      //   - no-committed-credentials, no-partial-account-deletion — content
+      //     patterns and a cross-file completeness check.
+      // `pnpm check:standards` remains the authority for all nine, and
+      // scripts/__tests__/check-app-standards.test.ts is what pins them.
+      "files": ["apps/*/src/**", "packages/*/src/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "cloudflare:workers",
+                "message": "Read bindings through the services apps/web/src/server/runtime.ts builds (AppConfig, Database, Background); only that module touches the Worker's ambient environment."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // The one importer, and the Workers suites, which read `env` on purpose.
+      "files": [
+        "apps/web/src/server/runtime.ts",
+        "**/*.workers.test.ts",
+        "**/*.d.ts"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ],
   "ignorePatterns": [
     ".claude/**",
     "**/.git/**",

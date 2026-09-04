@@ -7,7 +7,13 @@
  * the sanctioned shape" case.
  */
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -540,5 +546,60 @@ describe("no-d1-table-rebuild", () => {
         "ALTER TABLE `post` ADD `author_id` text REFERENCES `user`(`id`);\n",
     });
     expect(rules(violations)).toEqual([]);
+  });
+});
+
+/**
+ * `.oxlintrc.json` mirrors exactly one of the standards
+ * (`no-cloudflare-env-outside-runtime`) so the editor and the pre-commit hook
+ * report it before CI does. Two sources of truth for one rule drift, so this
+ * pins them to each other: the allow-list in the script and the "off"
+ * override in the oxlint config must name the same module.
+ */
+describe("the oxlint mirror of no-cloudflare-env-outside-runtime", () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const source = readFileSync(
+    join(root, "scripts", "check-app-standards.mjs"),
+    "utf8",
+  );
+  // `.oxlintrc.json` is JSONC (oxlint sets `allowComments`); drop the
+  // whole-line comments so `JSON.parse` can read it.
+  const oxlint = JSON.parse(
+    readFileSync(join(root, ".oxlintrc.json"), "utf8")
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("//"))
+      .join("\n"),
+  ) as {
+    readonly overrides: ReadonlyArray<{
+      readonly files: ReadonlyArray<string>;
+      readonly rules: Record<string, unknown>;
+    }>;
+  };
+
+  it("restricts cloudflare:workers across app and package source", () => {
+    const restricting = oxlint.overrides.find(
+      (override) => override.rules["no-restricted-imports"] !== "off",
+    );
+    expect(restricting?.files).toEqual(["apps/*/src/**", "packages/*/src/**"]);
+    expect(JSON.stringify(restricting?.rules)).toContain("cloudflare:workers");
+  });
+
+  it("exempts the same module the script's allow-list names", () => {
+    // `const CF_ENV_ALLOWED = new Set(["apps/web/src/server/runtime.ts"]);`
+    const allowed = [
+      ...source.matchAll(/CF_ENV_ALLOWED = new Set\(\[([^\]]*)\]\)/g),
+    ]
+      .flatMap((match) => (match[1] ?? "").split(","))
+      .map((entry) => entry.trim().replace(/^["']|["']$/g, ""))
+      .filter((entry) => entry.length > 0);
+    expect(allowed).toEqual(["apps/web/src/server/runtime.ts"]);
+
+    const exempting = oxlint.overrides.find(
+      (override) => override.rules["no-restricted-imports"] === "off",
+    );
+    for (const file of allowed) expect(exempting?.files).toContain(file);
+    // Plus the shapes the script exempts by pattern, not by name.
+    expect(exempting?.files).toContain("**/*.workers.test.ts");
+    expect(exempting?.files).toContain("**/*.d.ts");
   });
 });

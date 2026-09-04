@@ -10,6 +10,12 @@
  * Exit non-zero if any violation is found. `--fix` is intentionally NOT offered;
  * these need human judgement, not codemods.
  *
+ * This script is the authority for all nine rules. `.oxlintrc.json` mirrors
+ * exactly one of them (`no-cloudflare-env-outside-runtime`, as
+ * `no-restricted-imports`) so the editor and the pre-commit hook report it
+ * first; that config explains why the other eight are not expressible in
+ * oxlint, and __tests__/check-app-standards.test.ts pins the two in step.
+ *
  * Usage: node scripts/check-app-standards.mjs [--json] [--graph]
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";

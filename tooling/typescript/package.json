@@ -4,5 +4,8 @@
   "files": [
     "*.json"
   ],
-  "scripts": {}
+  "scripts": {},
+  "dependencies": {
+    "@effect/language-service": "catalog:"
+  }
 }

@@ -12,6 +12,10 @@ catalog:
   '@cloudflare/workers-types': 5.20260903.1
   '@commitlint/cli': ^20.5.0
   '@commitlint/config-conventional': ^20.5.0
+  # Editor-only TypeScript language-service plugin (tooling/typescript/base.json
+  # `plugins`): Effect-aware diagnostics, quick fixes and hovers. It never runs
+  # under `tsc`, so it cannot change what CI accepts.
+  '@effect/language-service': ^0.87.2
   '@effect/sql-d1': 4.0.0-rc.112
   '@effect/sql-sqlite-node': 4.0.0-rc.112
   '@playwright/test': ^1.58.2

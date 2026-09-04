@@ -33,5 +33,11 @@
   },
   "linter": {
     "enabled": false
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["tooling/typescript/*.json", "knip.json"],
+      "json": { "parser": { "allowComments": true } }
+    }
+  ]
 }
