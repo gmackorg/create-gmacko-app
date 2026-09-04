@@ -129,6 +129,47 @@ observability) and by the health tests (`packages/api/src/health/health.test.ts`
   `api/health/ready`, and `.well-known/forge-health` return a generic message when
   `NODE_ENV === "production"`; raw error detail is dev-only.
 
+## Runtime Invariants (checked by `pnpm test:fault`)
+
+The invariants above are *static*: a grep-level rule says a pattern must not
+appear. These are *behavioural*: a property that must hold while the app runs,
+under perturbations the infrastructure is documented to produce. They are
+checked by the CloudFault lane (`apps/web/fault/`, `docs/FAULT_TESTING.md`),
+which perturbs a workload systematically and reduces any failure to the
+smallest set of perturbations that reproduces it.
+
+Checked today:
+
+- **A Stripe webhook's side effect runs at most once per `event.id`**
+  (`stripe-webhook-effect-at-most-once`). Stripe delivers at least once; the
+  ledger in `@gmacko/api`'s `WebhookEvents` is what makes a redelivery a
+  no-op. This is the invariant the lane was built to catch a violation of.
+- **A 200 from the webhook endpoint means the effect ran**
+  (`stripe-webhook-ack-implies-effect`). Stripe does not redeliver an
+  acknowledged event, so acknowledging one you dropped loses it. This is why
+  the ledger claim has two phases: a claim that commits while the Worker
+  loses the result must not make the redelivery skip an effect that never ran.
+- **A 200 implies a ledger row** (`stripe-webhook-ledger-records-every-acknowledged-event`).
+
+Derived from the code and *not* yet checked here, with the reason:
+
+- `completeBootstrap` and `reviewWaitlistEntry` — two concurrent callers yield
+  exactly one success and one `Conflict`. Already covered as a logical race by
+  `packages/api/src/admin/admin.workers.test.ts`; the infrastructure-fault
+  version needs a mid-batch fault, which CloudFault cannot inject (see below).
+- `acceptInvite` and `deleteAccount` — no partial membership/allowlist rows,
+  and the cascade leaves no orphans. Same reason: both are `Database.batch`.
+- API-key scopes (a `read` key cannot mutate) and the deleted-user session
+  invariant — enforced before any write, so no infrastructure fault changes
+  the answer; `packages/auth/src/__tests__/middleware.test.ts` covers them.
+- The sign-up rate limiter fails **open**: a D1 outage must let the call
+  through, never lock every caller out. Expressible today and worth adding.
+
+**The gap that bounds all of this**: `Database.batch([...])` is unperturbed.
+`@effect/sql-d1` implements it with `db.batch()`, and CloudFault's D1 proxy
+interposes on `prepare().bind().first/all/run/raw` only. Every guarded-write
+service in `packages/api` is therefore out of reach of a mid-write fault.
+
 ## Evidence Rules (enforced by `pnpm lint:ox`)
 
 Separate from the nine invariants above, `pnpm lint:ox` runs the vendored

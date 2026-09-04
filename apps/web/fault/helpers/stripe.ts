@@ -1,37 +1,13 @@
 /**
  * Signed Stripe deliveries for the lane.
  *
- * The signature is computed the way Stripe computes it —
- * `v1 = HMAC-SHA256(secret, "<timestamp>.<payload>")` — so the workload goes
- * through the real `constructWebhookEvent` verification rather than around
- * it. (CloudFault ships the same helper as `stripeWebhookSigner` in
- * `@cloudfault/adapter-sdk/signers`; that sub-subpath is not part of the
- * published `@gmacko/cloudfault` surface, and this is eight lines.)
+ * The signature comes from CloudFault's own `stripeWebhookSigner`
+ * (`@gmacko/cloudfault/adapter-sdk/signers`), which computes it the way
+ * Stripe does — `v1 = HMAC-SHA256(secret, "<timestamp>.<payload>")` — so the
+ * workload goes through the real `constructWebhookEvent` verification rather
+ * than around it, and the lane does not carry its own crypto.
  */
-const hex = (value: ArrayBuffer): string =>
-  Array.from(new Uint8Array(value), (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("");
-
-const sign = async (
-  payload: string,
-  secret: string,
-  timestamp: number,
-): Promise<string> => {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const mac = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    new TextEncoder().encode(`${timestamp}.${payload}`),
-  );
-  return `t=${timestamp},v1=${hex(mac)}`;
-};
+import { stripeWebhookSigner } from "./cloudfault";
 
 export interface StripeEventFixture {
   readonly id: string;
@@ -65,11 +41,7 @@ export const signedDelivery = async (
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "stripe-signature": await sign(
-        event.payload,
-        secret,
-        Math.floor(Date.now() / 1000),
-      ),
+      ...(await stripeWebhookSigner(secret).headers(event.payload)),
     },
     body: event.payload,
   });

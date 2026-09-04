@@ -1401,7 +1401,10 @@ function pruneExpoErrorBoundary(targetDir: string): void {
  * Stripe off + prune: the webhook route keeps its path (it is part of the
  * generated route tree) but no longer verifies deliveries through
  * `@gmacko/payments`; it answers 503 until the payments package is added
- * back. Its signature test goes with the package.
+ * back. Its signature test goes with the package, and so does the CloudFault
+ * scenario that perturbs its delivery — the fault lane itself stays (its
+ * config, runner and helpers are payment-agnostic), so the generated app has
+ * a working lane to add the first scenario to.
  */
 function pruneWebStripeFiles(targetDir: string): void {
   const webhookPath = path.join(
@@ -1420,7 +1423,24 @@ function pruneWebStripeFiles(targetDir: string): void {
 export interface StripeWebhookOptions {
   /** \`STRIPE_WEBHOOK_SECRET\`; unset means the endpoint is not configured. */
   readonly secret: string | undefined;
-  readonly onEvent?: ((type: string, id: string) => void) | undefined;
+  /**
+   * The idempotency ledger (\`@gmacko/api\`'s \`WebhookEvents\`). Declared but
+   * unused while payments are pruned, so the route below still typechecks;
+   * Stripe delivers at least once, and a restored handler must dedupe on
+   * \`event.id\` before it runs any side effect.
+   */
+  readonly events?:
+    | {
+        readonly claim: (event: {
+          readonly id: string;
+          readonly type: string;
+        }) => Promise<"first" | "duplicate" | "retry">;
+        readonly complete: (id: string) => Promise<void>;
+      }
+    | undefined;
+  readonly onEvent?:
+    | ((type: string, id: string) => void | Promise<void>)
+    | undefined;
 }
 
 /** The one body this endpoint answers with while payments are pruned. */
@@ -1446,6 +1466,18 @@ export const handleStripeWebhook = async (
       `${WEB_APP_DIR}/src/server/__tests__/stripe-webhook.test.ts`,
     ),
   );
+  // The CloudFault scenario and the two helpers only it uses. The lane's
+  // runner, config and search driver stay: `vitest.fault.config.ts` sets
+  // `passWithNoTests`, so `pnpm test:fault` is green on an app that has not
+  // written its first scenario yet.
+  for (const file of [
+    `${WEB_APP_DIR}/fault/stripe-webhook.fault.ts`,
+    `${WEB_APP_DIR}/fault/helpers/ledger.ts`,
+    `${WEB_APP_DIR}/fault/helpers/stripe.ts`,
+    `${WEB_APP_DIR}/fault/helpers/perturbations.ts`,
+  ]) {
+    fs.removeSync(path.join(targetDir, file));
+  }
 }
 
 function getAllFiles(dir: string): string[] {

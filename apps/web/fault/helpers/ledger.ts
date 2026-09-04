@@ -21,6 +21,7 @@ import { Database } from "@gmacko/db";
 import { Effect, Layer, ManagedRuntime } from "effect";
 
 import type { StripeWebhookLedger } from "../../src/server/stripe-webhook";
+import type { D1DatabaseLike } from "./cloudfault";
 import { createD1FaultProxy, ScenarioController } from "./cloudfault";
 
 export interface LedgerFixture {
@@ -32,14 +33,24 @@ export interface LedgerFixture {
 export const perturbedLedger = (
   controller: ScenarioController,
 ): LedgerFixture => {
-  const database = createD1FaultProxy(env.DB, {
+  // SAFETY: CloudFault's `D1DatabaseLike` names the same methods as
+  // `@cloudflare/workers-types`' `D1Database` with looser result types, so the
+  // binding satisfies it at runtime; the two are not mutually assignable only
+  // because `run`/`all` are declared to return `D1Result<T>` on one side and
+  // `T`/`unknown` on the other.
+  const binding = env.DB as D1DatabaseLike;
+  const wrapped = createD1FaultProxy(binding, {
     controller,
     target: "DB",
     process: "worker",
     callsite: "webhook-events",
   });
+  // SAFETY: `createD1FaultProxy` is a `Proxy` that forwards everything except
+  // the terminal statement methods, so what comes back is the same binding
+  // object with the same runtime surface it was handed.
+  const proxied = wrapped as D1Database;
   const runtime = ManagedRuntime.make(
-    WebhookEvents.layer.pipe(Layer.provide(Database.layer(database))),
+    WebhookEvents.layer.pipe(Layer.provide(Database.layer(proxied))),
   );
   return {
     events: {

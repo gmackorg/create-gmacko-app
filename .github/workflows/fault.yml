@@ -1,0 +1,64 @@
+name: Fault Injection (deep)
+
+# The scheduled half of the CloudFault lane. CI's `fault` job runs depth 1 on
+# every PR — each declared perturbation on its own, ~1 minute. This one runs
+# depth 3: every pair and triple of perturbations, which is where the bugs
+# that no single fault exposes live (a ledger write that commits while the
+# Worker loses the result *and* a redelivery, for instance).
+#
+# Nightly rather than per-PR because the scenario count grows combinatorially
+# and each scenario replays the whole workload; the minimisation pass then
+# re-runs the failing scenario once per perturbation it tries to remove.
+on:
+  schedule:
+    # 04:10 UTC daily, after the deploy window.
+    - cron: "10 4 * * *"
+  workflow_dispatch:
+    inputs:
+      depth:
+        description: "Search depth (1-4)"
+        required: false
+        default: "3"
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
+jobs:
+  deep:
+    name: Deep search
+    runs-on: ubuntu-latest
+    # Generous, because this job exists to spend time the PR gate cannot. If
+    # it starts approaching the budget, split scenarios across a matrix rather
+    # than lowering the depth: depth is the thing that finds combination bugs.
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # `CLOUDFAULT_REQUIRED: 0` makes a missing package a skip rather than a
+      # failure. Flip it (here and in ci.yml) in the same commit that adds
+      # `@gmacko/cloudfault` to apps/web/package.json, so that from then on a
+      # lane that cannot run is a red build rather than a silent no-op.
+      # See docs/FAULT_TESTING.md.
+      - name: Run fault scenarios
+        run: pnpm test:fault
+        env:
+          CLOUDFAULT_DEPTH: ${{ inputs.depth || '3' }}
+          CLOUDFAULT_REQUIRED: 0

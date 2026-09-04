@@ -42,6 +42,10 @@ export default defineConfig(async () => {
     ],
     test: {
       include: ["fault/**/*.fault.ts"],
+      // An app that has not written its first scenario yet still has a
+      // working lane; the scaffolder removes the sample scenario when
+      // payments are pruned.
+      passWithNoTests: true,
       // A systematic search runs the workload once per scenario; the default
       // 5s is a unit-test budget, not a search budget.
       testTimeout: 120_000,

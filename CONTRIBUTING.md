@@ -92,6 +92,7 @@ tooling/
 | `pnpm test:workers` | Run the Workers (Miniflare D1) suites |
 | `pnpm test:watch` | Run tests in watch mode |
 | `pnpm test:coverage` | Run tests with coverage |
+| `pnpm test:fault` | Run the CloudFault fault-injection scenarios (`docs/FAULT_TESTING.md`) |
 | `pnpm e2e:web` | Run Playwright E2E tests |
 | `pnpm db:generate` | Generate a D1 migration from the schema (drizzle-kit + flatten) |
 | `pnpm db:migrate:local` | Apply migrations to the local D1 (`wrangler d1 migrations apply --local`) |
@@ -168,6 +169,14 @@ Add or update stories in `packages/ui/src/**/*.stories.tsx`; run `pnpm --filter 
 - Unit tests use [Vitest](https://vitest.dev/) with shared config from `tooling/vitest`
 - API tests run the `HttpApi` in-process against an in-memory SQLite (`makeTestApi` in `packages/api/src/testing.ts`); `*.workers.test.ts` suites run on Miniflare D1 (`pnpm test:workers`)
 - E2E tests use [Playwright](https://playwright.dev/) for web (`apps/web/e2e`), [Maestro](https://maestro.mobile.dev/) for mobile (`apps/expo/.maestro`)
+- Fault-injection scenarios live in `apps/web/fault` and run on workerd with a
+  real Miniflare D1 through [CloudFault](https://github.com/gmackie/cloudfault)
+  (`pnpm test:fault`). They cover what a single call cannot: duplicate
+  delivery, a write that commits while the caller is told it did not, and
+  combinations of the two. `docs/FAULT_TESTING.md` explains how to read a
+  minimal failure set and how to add a scenario or an invariant.
+  **The lane needs `@gmacko/cloudfault`, which is not on npm yet**; until it
+  is, `pnpm test:fault` reports itself unavailable and exits 0.
 - Place test files next to source: `my-file.ts` → `my-file.test.ts`
 
 ## Code Style

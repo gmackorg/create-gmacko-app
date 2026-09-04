@@ -1,13 +1,15 @@
 /**
  * Perturbations this repo declares itself, rather than importing.
  *
- * CloudFault ships the same three records as `webhookFaults()` in
- * `@cloudfault/adapter-sdk/capabilities`, but that sub-subpath is not part of
- * the published `@gmacko/cloudfault` surface (which exposes one subpath per
- * internal package). A `Fault` is a data record, not code, so declaring it
- * here costs nothing and keeps the lane off an unpublished specifier. If the
- * package later exports `@gmacko/cloudfault/adapter-sdk/capabilities`, delete
- * this file and import `webhookFaults` instead.
+ * `@gmacko/cloudfault/adapter-sdk/capabilities` exports `webhookFaults()`,
+ * whose `webhook-duplicate` record is byte-identical to the one below — same
+ * id, same phase, same outcomes. The lane declares its own anyway because the
+ * shipped set does not fit this workload: it has no two-extra-copies variant,
+ * and its `webhook-delay` and `webhook-reorder` records only mean something
+ * for a workload with more than one event, which this one is not. A `Fault`
+ * is a data record, not code, so the cost of declaring it is a literal.
+ * Keeping the ids identical is what matters: a minimal failure set from this
+ * repo reads the same as one from any other CloudFault project.
  */
 import type { Fault, Perturbation } from "./cloudfault";
 

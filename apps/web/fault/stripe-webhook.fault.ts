@@ -106,7 +106,6 @@ const execute = async (
 
   const applied: string[] = [];
   const acknowledged: number[] = [];
-  const delivery = await signedDelivery(EVENT, SECRET);
 
   for (let attempt = 1; attempt <= copies; attempt += 1) {
     const operation = controller.begin({
@@ -118,13 +117,18 @@ const execute = async (
       attempt,
     });
     try {
-      const response = await handleStripeWebhook(delivery.clone(), {
-        secret: SECRET,
-        events: ledger.events,
-        onEvent: (_type, id) => {
-          applied.push(id);
+      // Signed per attempt, as Stripe signs each delivery attempt: the
+      // request body is identical, the signature header is not.
+      const response = await handleStripeWebhook(
+        await signedDelivery(EVENT, SECRET),
+        {
+          secret: SECRET,
+          events: ledger.events,
+          onEvent: (_type, id) => {
+            applied.push(id);
+          },
         },
-      });
+      );
       acknowledged.push(response.status);
       controller.complete(
         operation,

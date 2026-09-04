@@ -118,6 +118,42 @@ jobs:
             packages/*/coverage
           retention-days: 7
 
+  fault:
+    name: Fault Injection
+    runs-on: ubuntu-latest
+    # A bounded depth-1 pass: every declared perturbation on its own, against
+    # the real Worker code on workerd with a real Miniflare D1. Pairs and
+    # deeper combinations are the scheduled job's business
+    # (.github/workflows/fault.yml), because the scenario count grows
+    # combinatorially and a PR gate has to stay under a couple of minutes.
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Reports the lane unavailable and exits 0 until `@gmacko/cloudfault`
+      # is on npm and listed in apps/web/package.json. Set
+      # CLOUDFAULT_REQUIRED=1 in the same commit that adds the dependency, so
+      # a missing package becomes a failure instead of a silent skip.
+      # See docs/FAULT_TESTING.md.
+      - name: Run fault scenarios (depth 1)
+        run: pnpm test:fault
+        env:
+          CLOUDFAULT_DEPTH: 1
+          CLOUDFAULT_REQUIRED: 0
+
   build:
     name: Build
     runs-on: ubuntu-latest

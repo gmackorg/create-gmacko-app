@@ -21,7 +21,6 @@
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 import process from "node:process";
 
@@ -35,12 +34,16 @@ const SUBPATHS = {
   "./fast-check": "fast-check",
 };
 
-const require_ = createRequire(import.meta.url);
 const repoRoot = resolve(import.meta.dirname, "../../..");
 
+/**
+ * ESM resolution, not `require.resolve`: the package is ESM-only, so its
+ * export map has no `require` condition and CJS resolution would report a
+ * package that is installed and working as missing.
+ */
 const resolves = () => {
   try {
-    require_.resolve("@gmacko/cloudfault");
+    import.meta.resolve("@gmacko/cloudfault");
     return true;
   } catch {
     return false;
@@ -95,8 +98,9 @@ if (!resolves()) {
   } else {
     const message =
       "[fault] lane unavailable: @gmacko/cloudfault is not installed.\n" +
-      "[fault]   published:   add @gmacko/cloudfault to apps/web devDependencies\n" +
-      "[fault]   local dev:   CLOUDFAULT_SRC=/path/to/cloudfault pnpm test:fault\n" +
+      "[fault]   published:   pnpm -F @gmacko/web add -D @gmacko/cloudfault@^0.1.0\n" +
+      "[fault]   a tarball:   pnpm -F @gmacko/web add -D ./gmacko-cloudfault-0.1.0.tgz\n" +
+      "[fault]   a checkout:  CLOUDFAULT_SRC=/path/to/cloudfault pnpm test:fault\n" +
       "[fault] See docs/FAULT_TESTING.md.";
     if (process.env.CLOUDFAULT_REQUIRED === "1") {
       // oxlint-disable-next-line no-console -- lane runner output

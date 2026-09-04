@@ -1949,6 +1949,28 @@ describe("create-gmacko-app scaffold", () => {
           "apps/web/src/server/__tests__/stripe-webhook.test.ts",
         ),
       ).toBe(false);
+      // The pruned stub still accepts `events`, because the route passes it.
+      expect(stripeWebhook).toContain("readonly events?:");
+      // The CloudFault scenario goes with the handler it perturbs, but the
+      // lane itself stays so the app has somewhere to put its first scenario.
+      for (const gone of [
+        "apps/web/fault/stripe-webhook.fault.ts",
+        "apps/web/fault/helpers/ledger.ts",
+        "apps/web/fault/helpers/stripe.ts",
+        "apps/web/fault/helpers/perturbations.ts",
+      ]) {
+        expect(fileExists(result.appPath, gone), gone).toBe(false);
+      }
+      for (const kept of [
+        "apps/web/fault/run.mjs",
+        "apps/web/fault/helpers/cloudfault.ts",
+        "apps/web/fault/helpers/explore.ts",
+        "apps/web/vitest.fault.config.ts",
+        "docs/FAULT_TESTING.md",
+        ".github/workflows/fault.yml",
+      ]) {
+        expect(fileExists(result.appPath, kept), kept).toBe(true);
+      }
 
       // No remaining workspace package may still declare a pruned dependency.
       for (const dir of ["apps", "packages", "tooling"]) {

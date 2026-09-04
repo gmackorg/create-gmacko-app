@@ -13,6 +13,7 @@ import { env } from "cloudflare:workers";
 import type {
   ExplorationResult,
   FaultPoint,
+  Perturbation,
   RunResult,
   Scenario,
 } from "./cloudfault";
