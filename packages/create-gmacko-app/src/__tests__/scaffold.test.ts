@@ -1949,8 +1949,11 @@ describe("create-gmacko-app scaffold", () => {
           "apps/web/src/server/__tests__/stripe-webhook.test.ts",
         ),
       ).toBe(false);
-      // The pruned stub still accepts `events`, because the route passes it.
+      // The pruned stub still accepts `events`, because the route passes it,
+      // and still exports `StripeWebhookLedger`, because src/server/runtime.ts
+      // is not pruned and imports that type.
       expect(stripeWebhook).toContain("readonly events?:");
+      expect(stripeWebhook).toContain("export interface StripeWebhookLedger");
       // The CloudFault scenario goes with the handler it perturbs, but the
       // lane itself stays so the app has somewhere to put its first scenario.
       for (const gone of [

@@ -1422,24 +1422,26 @@ function pruneWebStripeFiles(targetDir: string): void {
  * route only acknowledges that no webhook is configured. Restore
  * \`packages/payments\` and its \`constructWebhookEvent\` to verify deliveries.
  */
+/**
+ * The idempotency ledger (\`@gmacko/api\`'s \`WebhookEvents\`), as a promise-shaped
+ * interface. Declared but unused while payments are pruned, so that
+ * \`src/server/runtime.ts\` — which is NOT pruned and imports this type to bind
+ * the ledger to the isolate's runtime — still typechecks. Stripe delivers at
+ * least once, so a restored handler must dedupe on \`event.id\` before it runs
+ * any side effect.
+ */
+export interface StripeWebhookLedger {
+  readonly claim: (event: {
+    readonly id: string;
+    readonly type: string;
+  }) => Promise<"first" | "duplicate" | "retry">;
+  readonly complete: (id: string) => Promise<void>;
+}
+
 export interface StripeWebhookOptions {
   /** \`STRIPE_WEBHOOK_SECRET\`; unset means the endpoint is not configured. */
   readonly secret: string | undefined;
-  /**
-   * The idempotency ledger (\`@gmacko/api\`'s \`WebhookEvents\`). Declared but
-   * unused while payments are pruned, so the route below still typechecks;
-   * Stripe delivers at least once, and a restored handler must dedupe on
-   * \`event.id\` before it runs any side effect.
-   */
-  readonly events?:
-    | {
-        readonly claim: (event: {
-          readonly id: string;
-          readonly type: string;
-        }) => Promise<"first" | "duplicate" | "retry">;
-        readonly complete: (id: string) => Promise<void>;
-      }
-    | undefined;
+  readonly events?: StripeWebhookLedger | undefined;
   readonly onEvent?:
     | ((type: string, id: string) => void | Promise<void>)
     | undefined;
