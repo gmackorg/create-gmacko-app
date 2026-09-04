@@ -454,13 +454,15 @@ function updatePackageScope(targetDir: string, scope: string): void {
     try {
       const content = fs.readFileSync(file, "utf-8");
       if (!content.includes("@gmacko/")) continue;
-      // Rename internal workspace packages only. @gmacko/emulate is an
-      // external published dev dependency — renaming it to @scope/emulate
-      // makes `pnpm install` 404. Preserve it (and any future external
-      // @gmacko/* deps added here).
+      // Rename internal workspace packages only. @gmacko/emulate and
+      // @gmacko/cloudfault are external published dev dependencies — renaming
+      // either to @scope/… makes `pnpm install` 404, and for cloudfault it
+      // would also rewrite the import specifiers in apps/web/fault, which
+      // `pnpm typecheck` now covers. Add any future external @gmacko/* dep
+      // to this list.
       fs.writeFileSync(
         file,
-        content.replace(/@gmacko\/(?!emulate\b)/g, `${scope}/`),
+        content.replace(/@gmacko\/(?!(?:emulate|cloudfault)\b)/g, `${scope}/`),
       );
     } catch {
       // Skip files that can't be read

@@ -2042,6 +2042,93 @@ describe("create-gmacko-app scaffold", () => {
       );
       expect(rootPkg.devDependencies?.["@gmacko/emulate"]).toBeDefined();
       expect(rootPkg.devDependencies?.["@myorg/emulate"]).toBeUndefined();
+
+      // So is @gmacko/cloudfault, and it is worse than a 404 if renamed: the
+      // fault lane's import specifiers would be rewritten too, and
+      // `pnpm typecheck` covers that directory now.
+      const webDevPkg = readJson<{ devDependencies?: Record<string, string> }>(
+        result.appPath,
+        "apps/web/package.json",
+      );
+      expect(webDevPkg.devDependencies?.["@gmacko/cloudfault"]).toBeDefined();
+      expect(webDevPkg.devDependencies?.["@myorg/cloudfault"]).toBeUndefined();
+      expect(
+        readFile(result.appPath, "apps/web/fault/helpers/cloudfault.ts"),
+      ).toContain('from "@gmacko/cloudfault"');
+      expect(
+        readFile(result.appPath, "apps/web/fault/helpers/cloudfault.ts"),
+      ).not.toContain("@myorg/cloudfault");
+    }, 120000);
+  });
+
+  describe("fault lane", () => {
+    it("ships un-gated: a declared dependency, the ordinary typecheck, and required in CI", async () => {
+      const appName = generateAppName("fault-lane");
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-install", "--no-git"],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+      expect(result.exitCode).toBe(0);
+
+      // The dependency is declared, so `pnpm install` is the whole setup.
+      const webPkg = readJson<{
+        scripts?: Record<string, string>;
+        devDependencies?: Record<string, string>;
+      }>(result.appPath, "apps/web/package.json");
+      expect(webPkg.devDependencies?.["@gmacko/cloudfault"]).toBeDefined();
+      expect(webPkg.scripts?.["test:fault"]).toBe("node ./fault/run.mjs");
+
+      // No side tsconfig: `pnpm typecheck` covers fault/ like any other source.
+      expect(fileExists(result.appPath, "apps/web/tsconfig.fault.json")).toBe(
+        false,
+      );
+      expect(webPkg.scripts?.["typecheck:fault"]).toBeUndefined();
+      const webTsconfig = readJson<{ exclude?: string[] }>(
+        result.appPath,
+        "apps/web/tsconfig.json",
+      );
+      expect(webTsconfig.exclude).not.toContain("fault");
+
+      // knip audits the dependency instead of ignoring it.
+      expect(readFile(result.appPath, "knip.json")).not.toContain(
+        "@gmacko/cloudfault",
+      );
+
+      // A lane that cannot start is a red build in both workflows.
+      for (const workflow of [
+        ".github/workflows/ci.yml",
+        ".github/workflows/fault.yml",
+      ]) {
+        expect(readFile(result.appPath, workflow), workflow).toContain(
+          "CLOUDFAULT_REQUIRED: 1",
+        );
+      }
+    }, 120000);
+  });
+
+  describe("pnpm build approvals", () => {
+    it("decides every postinstall so `pnpm install` is silent", async () => {
+      const appName = generateAppName("build-approvals");
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-install", "--no-git"],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+      expect(result.exitCode).toBe(0);
+
+      // pnpm warns (and, with strict-dep-builds, fails) about every build it
+      // skipped that is in neither list. redis-memory-server arrives with
+      // @gmacko/emulate and workerd with wrangler, so a generated app hits
+      // both on its very first install.
+      const workspace = readFile(result.appPath, "pnpm-workspace.yaml");
+      expect(workspace).toContain("ignoredBuiltDependencies:");
+      expect(workspace).toContain("- redis-memory-server");
+      expect(workspace).toContain("- workerd");
     }, 120000);
   });
 

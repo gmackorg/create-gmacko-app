@@ -571,8 +571,16 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
       }
 
       // `@gmacko/emulate` is a published package, not a workspace one: it
-      // keeps its name or `pnpm install` 404s.
+      // keeps its name or `pnpm install` 404s. Same for `@gmacko/cloudfault`,
+      // where a rename would also break the fault lane's import specifiers —
+      // which `pnpm typecheck` (the next test) now compiles.
       expect(readFile(appPath, "package.json")).toContain("@gmacko/emulate");
+      expect(readFile(appPath, "apps/web/package.json")).toContain(
+        "@gmacko/cloudfault",
+      );
+      expect(
+        readFile(appPath, "apps/web/fault/helpers/cloudfault.ts"),
+      ).toContain('"@gmacko/cloudfault"');
     });
 
     it("should pass typecheck with custom scope", () => {
