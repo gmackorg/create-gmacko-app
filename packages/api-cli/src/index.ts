@@ -76,7 +76,12 @@ async function main() {
   console.log(output);
 }
 
-function parseFlags(argv: string[]): Record<string, boolean | string> {
+/**
+ * `--key value` / `--flag` tokens as the argument bag `executeOperatorTool`
+ * coerces against each tool's contract schema. The accumulated key set is the
+ * caller's, so the return type is left to inference rather than restated.
+ */
+function parseFlags(argv: string[]) {
   const parsed: Record<string, boolean | string> = {};
 
   for (let index = 0; index < argv.length; index += 1) {

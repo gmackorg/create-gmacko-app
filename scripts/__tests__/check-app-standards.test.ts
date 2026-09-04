@@ -54,16 +54,30 @@ const writeTree = (files: Record<string, string>): string => {
   return root;
 };
 
+/** The payload `check-app-standards.mjs --json` prints on stdout. */
+interface StandardsReport {
+  readonly ok: boolean;
+  readonly violations: readonly Violation[];
+}
+
+/** The payload `check-app-standards.mjs --graph --json` prints on stdout. */
+interface GraphReport {
+  readonly webBundle: readonly string[];
+}
+
 /** Writes `files` (relative path → contents) into a fresh temp repo and runs the script there. */
 const check = (files: Record<string, string>): ReadonlyArray<Violation> => {
   const result = spawnSync(process.execPath, [script, "--json"], {
     cwd: writeTree(files),
     encoding: "utf8",
   });
-  const parsed = JSON.parse(result.stdout) as {
-    ok: boolean;
-    violations: Violation[];
-  };
+  // SAFETY: the script's only `--json` output is
+  // `JSON.stringify({ ok, webBundle, violations })` (the `if (asJson)` block
+  // at the end of scripts/check-app-standards.mjs). Any other exit path
+  // prints nothing, so `JSON.parse` would throw before this type is used —
+  // and the exit-status expectation below re-checks `ok` against the script's
+  // own contract.
+  const parsed = JSON.parse(result.stdout) as StandardsReport;
   expect(result.status).toBe(parsed.ok ? 0 : 1);
   return parsed.violations;
 };
@@ -78,7 +92,11 @@ const graph = (files: Record<string, string>): ReadonlyArray<string> => {
     encoding: "utf8",
   });
   expect(result.status).toBe(0);
-  return (JSON.parse(result.stdout) as { webBundle: string[] }).webBundle;
+  // SAFETY: exit status 0 (asserted above) with `--graph --json` is reachable
+  // only through the `if (process.argv.includes("--graph"))` block in
+  // scripts/check-app-standards.mjs, whose sole stdout write is
+  // `JSON.stringify({ webBundle })`.
+  return (JSON.parse(result.stdout) as GraphReport).webBundle;
 };
 
 const pkg = (name: string, deps: Record<string, string> = {}) =>
@@ -607,13 +625,17 @@ describe("oxlint.config.ts", () => {
   });
 
   describe("the vendored anti-slop plugin", () => {
-    const specifiers = (oxlintConfig.jsPlugins ?? []).map((plugin) =>
-      typeof plugin === "string" ? plugin : plugin.specifier,
+    // A `jsPlugins` entry is either a bare specifier or a `{ name, specifier }`
+    // record; only the record form carries a separate name, and a bare entry is
+    // its own specifier.
+    const jsPlugins = oxlintConfig.jsPlugins ?? [];
+    const specifiers = jsPlugins.map((plugin) =>
+      plugin instanceof Object ? plugin.specifier : plugin,
     );
 
     it("registers both plugin groups", () => {
-      const names = (oxlintConfig.jsPlugins ?? []).map((plugin) =>
-        typeof plugin === "string" ? plugin : plugin.name,
+      const names = jsPlugins.map((plugin) =>
+        plugin instanceof Object ? plugin.name : plugin,
       );
       expect(names).toEqual(["anti-slop", "anti-slop-effect"]);
     });

@@ -37,7 +37,10 @@ const getBundleId = (): string => {
   }
 };
 
-const getSentryConfig = () => {
+/** One entry of `ExpoConfig["plugins"]`: a plugin id, optionally with options. */
+type ExpoPlugin = NonNullable<ExpoConfig["plugins"]>[number];
+
+const getSentryConfig = (): ExpoPlugin | null => {
   if (!SENTRY_DSN) return null;
 
   return [
@@ -71,7 +74,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   ];
 
   if (sentryPlugin) {
-    plugins.push(sentryPlugin as [string, Record<string, unknown>]);
+    plugins.push(sentryPlugin);
   }
 
   return {

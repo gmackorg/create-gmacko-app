@@ -11,14 +11,14 @@ import {
   makeQueryClient,
 } from "@gmacko/api-client/queries";
 
-import { makeHeaders } from "./api-headers";
+import { headersFromCookie } from "./api-headers";
 import { authClient } from "./auth";
 import { getBaseUrl } from "./base-url";
 
 export const api = makeApiClient({
   baseUrl: getBaseUrl(),
   // @better-auth/expo 1.7 reads SecureStore asynchronously.
-  headers: makeHeaders(() => authClient.getCookie()),
+  headers: headersFromCookie(() => authClient.getCookie()),
 });
 
 export const queries = makeQueries(api);

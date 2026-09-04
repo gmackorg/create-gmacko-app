@@ -208,14 +208,19 @@ export const toSqliteLiteral = (raw, type) => {
 export const valueToSqliteLiteral = (value, type) => {
   if (value === null || value === undefined) return "null";
   if (type === "integer") {
-    if (typeof value === "boolean") return value ? "1" : "0";
+    if (value === true) return "1";
+    if (value === false) return "0";
     if (value instanceof Date) return String(value.getTime());
-    if (typeof value === "number") return String(Math.trunc(value));
-    if (typeof value === "bigint") return String(value);
+    if (Number.isFinite(value)) return String(Math.trunc(value));
+    // Everything else — bigint, numeric strings, timestamp strings — goes
+    // through the literal mapper, which rejects what it cannot map rather
+    // than emitting `NaN`.
     return toSqliteLiteral(String(value), type);
   }
   if (type === "text") {
-    if (typeof value === "object") return quote(JSON.stringify(value));
+    // Objects and arrays (json/jsonb columns read through the driver) are
+    // stored as their JSON encoding; `null` was handled above.
+    if (value instanceof Object) return quote(JSON.stringify(value));
     return quote(String(value));
   }
   return toSqliteLiteral(String(value), type);

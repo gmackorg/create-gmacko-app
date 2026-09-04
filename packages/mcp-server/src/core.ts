@@ -5,6 +5,15 @@ import {
   type OperatorClientOptions,
 } from "@gmacko/operator-core";
 
+/**
+ * The argument bag a tool call carries. Owned by `executeOperatorTool`, which
+ * coerces it and decodes it against that tool's contract schema before any
+ * request goes out — so the value type is that decoder's, not this module's.
+ */
+type OperatorToolArguments = NonNullable<
+  Parameters<typeof executeOperatorTool>[2]
+>;
+
 const PROTECTED_TOOL_ERROR =
   "GMACKO_API_KEY environment variable is required for protected operator tools";
 
@@ -27,7 +36,7 @@ export function createOperatorExecutor(options: {
   });
 
   return {
-    callTool(name: string, args: Record<string, unknown> = {}) {
+    callTool(name: string, args: OperatorToolArguments = {}) {
       if (!options.apiKey && name !== "auth_help") {
         throw new Error(PROTECTED_TOOL_ERROR);
       }

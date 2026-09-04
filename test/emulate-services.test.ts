@@ -162,6 +162,6 @@ describe("resend emulator", () => {
     });
     expect(status).toBe(200);
     expect(body.id).toBeDefined();
-    expect(typeof body.id).toBe("string");
+    expect(body.id).toEqual(expect.any(String));
   });
 });

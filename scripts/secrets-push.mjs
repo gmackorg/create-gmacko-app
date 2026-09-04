@@ -82,6 +82,14 @@ const forge = (forgeArgs, options = {}) => {
   return result.stdout;
 };
 
+/**
+ * One entry of `forge secret list --json`. JSON gives two shapes here: a bare
+ * name, or a record carrying the name under `key` or `name`. A record with
+ * neither field names no secret and is dropped by the caller's `filter`.
+ */
+const secretName = (item) =>
+  item instanceof Object ? (item.key ?? item.name ?? "") : String(item ?? "");
+
 /** `forge secret list --json` returns either an array of names or objects with a `key`/`name`. */
 const parseKeys = (stdout) => {
   try {
@@ -89,11 +97,7 @@ const parseKeys = (stdout) => {
     const items = Array.isArray(parsed)
       ? parsed
       : (parsed.secrets ?? parsed.keys ?? parsed.items ?? []);
-    return items
-      .map((item) =>
-        typeof item === "string" ? item : (item.key ?? item.name ?? ""),
-      )
-      .filter(Boolean);
+    return items.map(secretName).filter(Boolean);
   } catch {
     // Plain listing: one key per line.
     return stdout
