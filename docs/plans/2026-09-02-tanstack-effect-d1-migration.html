@@ -105,7 +105,7 @@
 <header class="hero">
   <div class="hero-inner">
     <div class="kicker">migration design</div>
-    <h1>Next.js <span class="arrow">→</span> TanStack Start + Effect + D1 <span class="badge draft">In review · Phases 0–8 done</span></h1>
+    <h1>Next.js <span class="arrow">→</span> TanStack Start + Effect + D1 <span class="badge done">Complete · awaiting merge</span></h1>
     <p class="meta">
       <span>2026-09-02</span>
       <span>repo: <code>gmackorg/create-gmacko-app</code> @ <code>fix/mobile-e2e-ios-scheme</code></span>
@@ -126,7 +126,7 @@
   </div>
 
   <div class="progress" aria-label="Phase progress">
-    <i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="active"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    <i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i>
   </div>
 
   <h2>Overview</h2>
@@ -722,7 +722,7 @@ packages/
     <li class="done"><b>Phase 6 — Clients</b> · ~3 days · api-client, Expo, CLI, MCP, OpenAPI SDK.</li>
     <li class="done"><b>Phase 7 — Platform &amp; CI</b> · ~7 days · observability, wrangler, secrets bridge, rate limiting, preview databases, workflows, emulate, deploy lane.</li>
     <li class="done"><b>Phase 8 — Scaffolder, docs, delete Next</b> · ~4 days · the flag day: one merge of the migration branch.</li>
-    <li class="active"><b>Phase 9 — Post-cutover hardening</b> · ~5 days · Model.Class, rate-limit binding, preview databases, storage, data-migration recipe; ships as 0.2.1.</li>
+    <li class="done"><b>Phase 9 — Post-cutover hardening</b> · ~5 days · Model.Class, rate-limit binding, preview databases, storage, data-migration recipe; ships as 0.2.1.</li>
   </ul>
 
   <h2>Phase 0 — Spike &amp; pin <span class="badge done">Done</span></h2>
@@ -907,15 +907,15 @@ packages/
     </tbody>
   </table>
 
-  <h2>Phase 9 — Post-cutover hardening <span class="badge todo">Todo</span></h2>
-  <p>Everything here improves the result but does not block running the app on Workers. Moved off the critical path so Phase 8's cutover lands about a week earlier and the two-web-apps window stays short. Lands as ordinary PRs on <code>main</code>; ships as <code>create-gmacko-app</code> 0.2.1.</p>
+  <h2>Phase 9 — Post-cutover hardening <span class="badge done">Done</span></h2>
+  <p>Everything here improves the result but does not block running the app on Workers. Moved off the critical path so the cutover landed first. <strong>Outcome (2026-09-03, commits bc7efa7..2f9daf1):</strong> row models are <code>Model.Class</code> declarations with <code>Sensitive</code> fields and generated-column variants, and the OpenAPI snapshot came out byte-identical; a parity test fails when the Drizzle schema and the models drift; rate limiting runs on Cloudflare bindings for the burst scopes and a D1 counter for signup, proven on workerd, with allowances chosen by stage; storage moved to UploadThing's Workers adapter (it had been importing <code>next/server</code> since the cutover); a Postgres-to-D1 converter and procedure ship for downstream apps; the Effect language service and the one standard oxlint can mirror are wired. Both changesets are unreleased, so <code>changeset version</code> yields 0.2.0 carrying both note sets.</p>
   <table>
     <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
     <tbody>
       <tr><td>Adopt <code>Model.Class</code> (from <code>effect/unstable/sql</code>, no Drizzle) for row-shaped models in <code>packages/domain</code>, replacing the hand-written Schema classes; contract exposes the <code>json</code> variant, services accept <code>insert</code>/<code>update</code></td><td><code>packages/domain/src/models/*</code>, <code>src/*/api.ts</code></td><td>OpenAPI snapshot unchanged except component names; spike from Phase 0 becomes the first test</td><td><span class="badge done">Done</span></td></tr>
       <tr><td>Drizzle column ↔ domain model parity test</td><td><code>packages/db/src/__tests__/parity.test.ts</code></td><td>Fails when a column is added to one side only</td><td><span class="badge done">Done</span></td></tr>
       <tr><td>Rate Limiting binding and <code>RateLimiter</code> live layer (the Phase 4 interface and in-memory layer already gate the five scopes); Cron Trigger <code>scheduled</code> export with the <code>Jobs</code> stub</td><td><code>apps/web/wrangler.jsonc</code>, <code>src/server/runtime.ts</code>, <code>packages/api/src/rate-limit.cloudflare.ts</code></td><td>429 observed on <code>wrangler dev</code>; cron fires locally with <code>--test-scheduled</code></td><td><span class="badge done">Done</span></td></tr>
-      <tr><td>Preview D1 per PR: <code>preview.yml</code> creates <code>gmacko-preview-&lt;pr&gt;</code>, applies migrations, seeds, deploys with a generated <code>wrangler</code> env; a close job deletes the DB and Worker; weekly cron prunes orphans</td><td><code>.github/workflows/preview.yml</code>, <code>scripts/preview-d1.mjs</code></td><td>PR preview URL works; resources gone after close</td><td><span class="badge done">Done</span></td></tr>
+      <tr><td><strong>Superseded by the Phase 9 decision:</strong> one shared preview database, not one per PR. A per-PR database must be a binding on the version that uses it, so each PR would need its own Worker, and a fresh Worker has no secrets: CI would push the whole preview secret set per PR to review a diff. Expand/contract already guarantees an additive migration is compatible with older code, and nothing automated reads that database. Instead <code>preview.yml</code> gains a reset job (weekly cron plus manual dispatch) that migrates, empties, and reseeds.</td><td><code>.github/workflows/preview.yml</code>, <code>packages/db</code> (<code>seed:remote</code>, <code>reset:remote</code>, <code>seed/reset.sql</code>)</td><td>Reset SQL pinned by tests (children before parents); <code>actionlint</code> clean; the workflow header and <code>docs/DEPLOYMENT.md</code> carry the reasoning</td><td><span class="badge done">Done</span></td></tr>
       <tr><td>Storage decision applied (keep UploadThing, or swap to an R2 layer in <code>packages/storage</code>)</td><td><code>packages/storage</code></td><td>Upload round trip on staging</td><td><span class="badge done">Done</span></td></tr>
       <tr><td>Documented Postgres → D1 data migration recipe for already-deployed apps (<code>pg_dump</code> → SQLite via script → <code>wrangler d1 execute --file</code>)</td><td><code>docs/legacy/postgres-to-d1.md</code>, <code>scripts/pg-to-d1.mjs</code></td><td>Script converts the seed dataset round-trip</td><td><span class="badge done">Done</span></td></tr>
       <tr><td><code>@effect/language-service</code> in root tsconfig; oxlint rules mirroring the new standards</td><td><code>tooling/typescript/*.json</code>, <code>.oxlintrc.json</code></td><td>Editor shows Effect diagnostics</td><td><span class="badge done">Done</span></td></tr>
