@@ -23,6 +23,7 @@ import { Route as AdminIndexRouteImport } from "./routes/admin.index";
 import { Route as AdminUsersRouteImport } from "./routes/admin.users";
 import { Route as ApiSplatRouteImport } from "./routes/api.$";
 import { Route as ApiAuthSplatRouteImport } from "./routes/api/auth.$";
+import { Route as ApiStorageSplatRouteImport } from "./routes/api.storage.$";
 import { Route as ApiWebhooksStripeRouteImport } from "./routes/api.webhooks.stripe";
 
 const IndexRoute = IndexRouteImport.update({
@@ -95,6 +96,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: "/api/auth/$",
   getParentRoute: () => rootRouteImport,
 } as any);
+const ApiStorageSplatRoute = ApiStorageSplatRouteImport.update({
+  id: "/api/storage/$",
+  path: "/api/storage/$",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const ApiWebhooksStripeRoute = ApiWebhooksStripeRouteImport.update({
   id: "/api/webhooks/stripe",
   path: "/api/webhooks/stripe",
@@ -116,6 +122,7 @@ export interface FileRoutesByFullPath {
   "/api/$": typeof ApiSplatRoute;
   "/admin/": typeof AdminIndexRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
+  "/api/storage/$": typeof ApiStorageSplatRoute;
   "/api/webhooks/stripe": typeof ApiWebhooksStripeRoute;
 }
 export interface FileRoutesByTo {
@@ -132,6 +139,7 @@ export interface FileRoutesByTo {
   "/api/$": typeof ApiSplatRoute;
   "/admin": typeof AdminIndexRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
+  "/api/storage/$": typeof ApiStorageSplatRoute;
   "/api/webhooks/stripe": typeof ApiWebhooksStripeRoute;
 }
 export interface FileRoutesById {
@@ -150,6 +158,7 @@ export interface FileRoutesById {
   "/api/$": typeof ApiSplatRoute;
   "/admin/": typeof AdminIndexRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
+  "/api/storage/$": typeof ApiStorageSplatRoute;
   "/api/webhooks/stripe": typeof ApiWebhooksStripeRoute;
 }
 export interface FileRouteTypes {
@@ -169,6 +178,7 @@ export interface FileRouteTypes {
     | "/api/$"
     | "/admin/"
     | "/api/auth/$"
+    | "/api/storage/$"
     | "/api/webhooks/stripe";
   fileRoutesByTo: FileRoutesByTo;
   to:
@@ -185,6 +195,7 @@ export interface FileRouteTypes {
     | "/api/$"
     | "/admin"
     | "/api/auth/$"
+    | "/api/storage/$"
     | "/api/webhooks/stripe";
   id:
     | "__root__"
@@ -202,6 +213,7 @@ export interface FileRouteTypes {
     | "/api/$"
     | "/admin/"
     | "/api/auth/$"
+    | "/api/storage/$"
     | "/api/webhooks/stripe";
   fileRoutesById: FileRoutesById;
 }
@@ -218,6 +230,7 @@ export interface RootRouteChildren {
   DotwellKnownForgeHealthRoute: typeof DotwellKnownForgeHealthRoute;
   ApiSplatRoute: typeof ApiSplatRoute;
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute;
+  ApiStorageSplatRoute: typeof ApiStorageSplatRoute;
   ApiWebhooksStripeRoute: typeof ApiWebhooksStripeRoute;
 }
 
@@ -321,6 +334,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ApiAuthSplatRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/api/storage/$": {
+      id: "/api/storage/$";
+      path: "/api/storage/$";
+      fullPath: "/api/storage/$";
+      preLoaderRoute: typeof ApiStorageSplatRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/api/webhooks/stripe": {
       id: "/api/webhooks/stripe";
       path: "/api/webhooks/stripe";
@@ -356,6 +376,7 @@ const rootRouteChildren: RootRouteChildren = {
   DotwellKnownForgeHealthRoute: DotwellKnownForgeHealthRoute,
   ApiSplatRoute: ApiSplatRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiStorageSplatRoute: ApiStorageSplatRoute,
   ApiWebhooksStripeRoute: ApiWebhooksStripeRoute,
 };
 export const routeTree = rootRouteImport

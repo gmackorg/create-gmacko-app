@@ -17,8 +17,9 @@ import { defineConfig } from "vitest/config";
  * Miniflare options are inline for the same reason as
  * `vitest.workers.config.ts`: `wrangler: { configPath }` would take
  * wrangler.jsonc's `main` (the TanStack Start server entry) as the test
- * worker. Keep the `DB` binding name and the compatibility date in step with
- * apps/web/wrangler.jsonc and packages/db/vitest.workers.config.ts by hand.
+ * worker. Keep the `DB` and `BUCKET` binding names and the compatibility date
+ * in step with apps/web/wrangler.jsonc and packages/db/vitest.workers.config.ts
+ * by hand.
  */
 export default defineConfig(async () => {
   const migrations = await readD1Migrations(
@@ -31,6 +32,10 @@ export default defineConfig(async () => {
           compatibilityDate: "2026-08-22",
           compatibilityFlags: ["nodejs_compat"],
           d1Databases: ["DB"],
+          // The upload scenario wraps this in `createR2FaultProxy`, so it has
+          // to be a genuine bucket. Keep the name in step with
+          // apps/web/wrangler.jsonc's `r2_buckets`.
+          r2Buckets: ["BUCKET"],
           bindings: {
             STAGE: "development",
             TEST_MIGRATIONS: migrations,

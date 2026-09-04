@@ -42,6 +42,7 @@
     "@gmacko/domain": "workspace:*",
     "@gmacko/monitoring": "workspace:*",
     "@gmacko/payments": "workspace:*",
+    "@gmacko/storage": "workspace:*",
     "@gmacko/telemetry": "workspace:*",
     "@gmacko/ui": "workspace:*",
     "@t3-oss/env-core": "^0.13.10",

@@ -35,6 +35,20 @@
       "migrations_dir": "../../packages/db/migrations"
     }
   ],
+  // The object store behind `@gmacko/storage` (src/routes/api.storage.$.ts).
+  // Uploads go THROUGH the Worker rather than to a presigned URL, so this
+  // binding is the single place they can be authorized, size-checked against
+  // the bytes actually sent, and fault-injected (apps/web/fault/r2-upload).
+  // Create the buckets with `wrangler r2 bucket create <name>`; local dev and
+  // the pool-workers suites get a Miniflare bucket from this declaration
+  // alone. Like `d1_databases` this is NOT inherited and is restated in every
+  // environment below.
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "gmacko-web"
+    }
+  ],
   // Cloudflare Rate Limiting bindings, one per scope the HttpApi annotates
   // (@gmacko/domain `RateLimitScope`); `signup` deliberately has none, so it
   // falls through to the global `rate_limit_window` counter in D1
@@ -77,8 +91,9 @@
   // `pnpm -F @gmacko/db migrate:remote --env <env>`, and push the stage's
   // secrets with `pnpm secrets:push --stage <env>`. Environments inherit
   // `main`, `compatibility_date`, `observability` and `triggers` from the
-  // top level; `vars`, `d1_databases` and `ratelimits` are not inherited and
-  // are restated. Replace the placeholder ids after `wrangler d1 create`.
+  // top level; `vars`, `d1_databases`, `r2_buckets` and `ratelimits` are not
+  // inherited and are restated. Replace the placeholder ids after `wrangler d1
+  // create`, and create each bucket with `wrangler r2 bucket create`.
   "env": {
     // One Worker for every PR preview: .github/workflows/preview.yml uploads a
     // *version* of it (`wrangler versions upload`), which gets its own preview
@@ -108,6 +123,12 @@
           "name": "RATE_LIMIT_OPERATOR_API",
           "namespace_id": "1004",
           "simple": { "limit": 120, "period": 60 }
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "BUCKET",
+          "bucket_name": "gmacko-web-preview"
         }
       ],
       "d1_databases": [
@@ -144,6 +165,12 @@
           "simple": { "limit": 120, "period": 60 }
         }
       ],
+      "r2_buckets": [
+        {
+          "binding": "BUCKET",
+          "bucket_name": "gmacko-web-staging"
+        }
+      ],
       "d1_databases": [
         {
           "binding": "DB",
@@ -176,6 +203,12 @@
           "name": "RATE_LIMIT_OPERATOR_API",
           "namespace_id": "1004",
           "simple": { "limit": 120, "period": 60 }
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "BUCKET",
+          "bucket_name": "gmacko-web"
         }
       ],
       "d1_databases": [

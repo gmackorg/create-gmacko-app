@@ -30,6 +30,7 @@ import { Context, Effect, Layer, ManagedRuntime } from "effect";
 import { env as clientEnv } from "~/env";
 import { AuthLive } from "./auth";
 import { fromBindings, webFromBindings } from "./config";
+import { createStorageHandlers } from "./storage";
 import type { StripeWebhookLedger } from "./stripe-webhook";
 
 /**
@@ -201,6 +202,36 @@ export const guardAuthRequest = (
       ),
     ),
   );
+
+/**
+ * Who is uploading or downloading, read the same way every other route reads
+ * its caller: better-auth's session for the request's cookies, validated
+ * against the `user` row (`RequestContext`). A request without one gets a 401
+ * from the handler; the user's id is what namespaces their object keys, so a
+ * caller can neither overwrite nor read another's file.
+ */
+const storageIdentity = (request: Request): Promise<{ id: string } | null> =>
+  runtime.runPromise(
+    RequestContext.make(request.headers).pipe(
+      Effect.flatMap((context) => context.session),
+      Effect.map((session) =>
+        session === null ? null : { id: session.user.id },
+      ),
+    ),
+  );
+
+/**
+ * The two halves of src/routes/api.storage.$.ts. Built here because
+ * `env.BUCKET` is a binding and this is the module that reads bindings; the
+ * policy and the composition are in ./storage.
+ */
+const storage = createStorageHandlers(env.BUCKET, storageIdentity);
+
+export const storageUploadHandler: (request: Request) => Promise<Response> =
+  flushed(storage.upload);
+
+export const storageDownloadHandler: (request: Request) => Promise<Response> =
+  flushed(storage.download);
 
 /**
  * The Stripe webhook ledger, bound to this isolate's runtime. The route is

@@ -67,10 +67,32 @@ resend:
 # is not part of the web lane. (Denying redis-memory-server's postinstall in
 # pnpm-workspace.yaml follows from that: nothing here starts a Redis.)
 #
-# No `cloudflare:` section either. emulate 0.11's Cloudflare D1 + R2 emulator
-# needs no seed and is not part of `pnpm dev` — it is started on demand, on its
-# own port, to rehearse the commands that would otherwise need a Cloudflare
-# account: `pnpm db:rehearse:remote`, or by hand with
-# `npx @gmacko/emulate start --service cloudflare`. Point wrangler at it with
-# CLOUDFLARE_API_BASE_URL (which must end in `/client/v4`); see
+# No `cloudflare:` section either, and this is the part that surprises people:
+# the app's local D1 (`DB`) and R2 (`BUCKET`) bindings do NOT come from
+# emulate. `pnpm dev` runs the Cloudflare Vite plugin, which runs its own
+# Miniflare from apps/web/wrangler.jsonc, and that is what materialises both —
+# under apps/web/.wrangler/state/v3/{d1,r2}. Declaring the binding is the whole
+# of the local setup; there is nothing to configure here for an upload to work.
+#
+# What emulate's Cloudflare service covers is the surface a binding does not:
+# the REST API behind `wrangler d1 create`, `wrangler r2 bucket create`,
+# `wrangler r2 object put --remote` and S3 SDK clients, all redirected with
+# CLOUDFLARE_API_BASE_URL (which must end in `/client/v4`). It is started on
+# demand, on its own port — `pnpm db:rehearse:remote` (scripts/d1-remote-rehearsal.mjs)
+# starts its own and creates what it needs over that API, so it reads nothing
+# from this file — or by hand with
+# `npx @gmacko/emulate start --service cloudflare`. See
 # docs/drizzle-migrations.md → "Rehearsing a remote migration".
+#
+# A section here would be started by `pnpm dev` too, which is why there isn't
+# one: an extra process every dev session for something nothing reads. If you
+# do add one, the seed nests under each service's own key, and a `port:` inside
+# it overrides `--port` on the command line:
+#
+#   cloudflare:
+#     d1:
+#       databases:
+#         - name: gmacko-web
+#     r2:
+#       buckets:
+#         - name: gmacko-web
