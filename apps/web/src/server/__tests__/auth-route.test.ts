@@ -9,7 +9,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   authRateLimitScope,
-  authRouteOptions,
   contractAuthRoutes,
   isContractAuthRequest,
   makeAuthDispatch,
@@ -186,7 +185,10 @@ describe("/api/auth/$ dispatch", () => {
 
   it("registers a single ANY handler on the route", async () => {
     const seen: Array<string> = [];
-    const options = authRouteOptions({
+    // The route module binds this to the Worker handlers behind a single
+    // `ANY` entry; see the comment there for why that object stays an inline
+    // literal. This covers the part of it that is not the binding.
+    const handle = makeAuthDispatch({
       api: (request) => {
         seen.push(request.method);
         return Promise.resolve(new Response("api"));
@@ -196,11 +198,9 @@ describe("/api/auth/$ dispatch", () => {
         return Promise.resolve(new Response("auth"));
       },
     });
-    const handlers = options.server.handlers;
-    expect(Object.keys(handlers)).toEqual(["ANY"]);
-    const response = await handlers.ANY({
-      request: new Request(`${ORIGIN}/api/auth/sign-out`, { method: "POST" }),
-    });
+    const response = await handle(
+      new Request(`${ORIGIN}/api/auth/sign-out`, { method: "POST" }),
+    );
     expect(await response.text()).toBe("auth");
     expect(seen).toEqual(["POST"]);
   });

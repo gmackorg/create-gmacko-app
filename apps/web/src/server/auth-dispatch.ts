@@ -117,26 +117,3 @@ export const makeAuthDispatch =
     }
     return handlers.auth(request);
   };
-
-/**
- * The route options `routes/api/auth.$.ts` registers: a single `ANY` handler,
- * because better-auth answers what the contract does not claim (its own 404
- * or 405), so nothing falls through to /api/$.
- */
-export interface AuthRouteOptions {
-  readonly server: {
-    readonly handlers: {
-      readonly ANY: (context: {
-        readonly request: Request;
-      }) => Promise<Response>;
-    };
-  };
-}
-
-/** Builds those options over `makeAuthDispatch(handlers)`. */
-export const authRouteOptions = (
-  handlers: AuthDispatchHandlers,
-): AuthRouteOptions => {
-  const handle = makeAuthDispatch(handlers);
-  return { server: { handlers: { ANY: ({ request }) => handle(request) } } };
-};
