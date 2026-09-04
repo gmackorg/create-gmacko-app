@@ -145,6 +145,14 @@ window start), incremented by a single guarded upsert
 RETURNING count`), which needs no transaction. The nightly Cron Trigger
 deletes closed windows (`Jobs.pruneRateLimitWindows`).
 
+Development runs the same code path with different numbers:
+`developmentRateLimits` (the deployed allowances × 20), because that stage is
+driven by the Playwright suite, which signs in and creates keys dozens of
+times a minute from one address. Those numbers are the **top-level**
+`ratelimits` in `wrangler.jsonc`; every `env` block restates the real ones,
+and `rateLimitsFor(stage)` picks the matching set for the D1 counter and the
+`Retry-After`. Change one and change the other.
+
 Changing a binding's `namespace_id` resets its counters; `simple.period` must
 be 10 or 60 and must agree with the scope's `windowMs` in `defaultRateLimits`
 (`packages/api/src/rate-limit.ts`), because a binding reports no reset time

@@ -17,6 +17,7 @@ import {
   type RateLimitBindings,
   RateLimiter,
   rateLimitedResponse,
+  rateLimitsFor,
 } from "@gmacko/api";
 import { RequestContext } from "@gmacko/auth/request-context";
 import { Auth } from "@gmacko/auth/service";
@@ -72,6 +73,9 @@ const rateLimitBindings: RateLimitBindings = {
  */
 const RateLimiterLive = RateLimiter.layerCloudflare({
   bindings: rateLimitBindings,
+  // The D1 scope's allowance and the `Retry-After` on a refusal; the
+  // bindings' own numbers are in wrangler.jsonc and must agree with these.
+  limits: rateLimitsFor(config.stage),
 }).pipe(Layer.provide(DatabaseLive));
 
 /** Every service the app provides, independent of HTTP. Shared by all handlers. */

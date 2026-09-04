@@ -39,6 +39,7 @@ export { Posts, type PostsShape } from "./posts/service";
 export {
   consumeForRequest,
   defaultRateLimits,
+  developmentRateLimits,
   type RateLimitBinding,
   type RateLimitBindings,
   RateLimiter,
@@ -46,4 +47,5 @@ export {
   type RateLimitPolicy,
   type RateLimits,
   rateLimitedResponse,
+  rateLimitsFor,
 } from "./rate-limit";

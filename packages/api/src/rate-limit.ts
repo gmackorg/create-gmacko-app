@@ -43,6 +43,8 @@ import {
   HttpServerResponse,
 } from "effect/unstable/http";
 
+import type { Stage } from "./config";
+
 export interface RateLimitPolicy {
   /** Calls allowed per window. */
   readonly limit: number;
@@ -53,7 +55,7 @@ export type RateLimits = Readonly<Record<RateLimitScope, RateLimitPolicy>>;
 
 const MINUTE = 60_000;
 
-/** Per client, per minute. */
+/** Per client, per minute. What every deployed stage uses. */
 export const defaultRateLimits: RateLimits = {
   auth: { limit: 20, windowMs: MINUTE },
   contact: { limit: 5, windowMs: MINUTE },
@@ -61,6 +63,31 @@ export const defaultRateLimits: RateLimits = {
   "api-keys": { limit: 10, windowMs: MINUTE },
   "operator-api": { limit: 120, windowMs: MINUTE },
 };
+
+/**
+ * Development: the same allowances × 20. Not a relaxation for its own sake —
+ * the development stage is driven by the Playwright suite, which signs in,
+ * creates keys and submits the contact form dozens of times a minute from one
+ * address, so an allowance sized for one human is simply the wrong number
+ * there. It is still a limit, so a runaway loop is still caught.
+ *
+ * These must stay in step with the top-level `ratelimits` in
+ * apps/web/wrangler.jsonc, which is the development configuration (the
+ * per-stage `env` blocks carry `defaultRateLimits`).
+ */
+export const developmentRateLimits: RateLimits = Object.fromEntries(
+  Object.entries(defaultRateLimits).map(([scope, policy]) => [
+    scope,
+    { limit: policy.limit * 20, windowMs: policy.windowMs },
+  ]),
+) as RateLimits;
+
+/**
+ * The policies a stage runs with. Alongside `canAutoCreateAccounts`: a value
+ * chosen by stage, not a different code path.
+ */
+export const rateLimitsFor = (stage: Stage): RateLimits =>
+  stage === "development" ? developmentRateLimits : defaultRateLimits;
 
 export interface RateLimiterShape {
   /** Counts one call for `client` against `scope`; `RateLimited` once over the allowance. */
