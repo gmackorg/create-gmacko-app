@@ -461,9 +461,6 @@ importers:
       better-auth:
         specifier: 'catalog:'
         version: 1.7.2(0363dc87c55f8407a44888c28af8f156)
-      drizzle-orm:
-        specifier: 'catalog:'
-        version: 1.0.0-rc.5-169397b(@cloudflare/workers-types@5.20260903.1)(@effect/sql-d1@4.0.0-rc.112(effect@4.0.0-rc.112))(@effect/sql-sqlite-node@4.0.0-rc.112(effect@4.0.0-rc.112))(@neondatabase/serverless@1.0.2)(@opentelemetry/api@1.9.1)(@planetscale/database@1.19.0)(@types/better-sqlite3@7.6.13)(@types/pg@8.18.0)(@vercel/postgres@0.10.0(utf-8-validate@6.0.4))(arktype@2.1.20)(better-sqlite3@12.8.0)(effect@4.0.0-rc.112)(mysql2@3.11.3)(pg@8.20.0)(postgres@3.4.8)(valibot@1.0.0-beta.15(typescript@5.9.3))(zod@4.3.6)
       effect:
         specifier: 'catalog:'
         version: 4.0.0-rc.112
@@ -19102,6 +19099,7 @@ snapshots:
       postgres: 3.4.8
       valibot: 1.0.0-beta.15(typescript@5.9.3)
       zod: 4.3.6
+    optional: true
 
   drizzle-orm@1.0.0-rc.5-169397b(@cloudflare/workers-types@5.20260903.1)(@effect/sql-d1@4.0.0-rc.112(effect@4.0.0-rc.112))(@effect/sql-sqlite-node@4.0.0-rc.112(effect@4.0.0-rc.112))(@neondatabase/serverless@1.0.2)(@opentelemetry/api@1.9.1)(@planetscale/database@1.19.0)(@types/better-sqlite3@7.6.13)(@types/pg@8.18.0)(@vercel/postgres@0.10.0(utf-8-validate@6.0.4))(arktype@2.1.20)(better-sqlite3@12.8.0)(effect@4.0.0-rc.112)(mysql2@3.11.3)(pg@8.20.0)(postgres@3.4.8)(valibot@1.0.0-beta.15(typescript@5.9.3))(zod@4.5.4):
     optionalDependencies:
