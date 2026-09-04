@@ -1587,6 +1587,21 @@ describe("create-gmacko-app scaffold", () => {
     expect(e2eWorkflow).not.toContain("legacy-");
   });
 
+  /**
+   * `tooling/typescript/*.json` and `.oxlintrc.json` are JSONC: TypeScript has
+   * always allowed comments in a tsconfig, oxlint declares `allowComments`, and
+   * biome parses both through the override in biome.json. The assertions below
+   * are that the file still parses once the comments are gone, which is what
+   * the tools do.
+   */
+  const parseJsonc = (source: string): unknown =>
+    JSON.parse(
+      source
+        .split("\n")
+        .filter((line) => !line.trim().startsWith("//"))
+        .join("\n"),
+    );
+
   it("keeps repo formatting focused on first-party files", () => {
     const biomeConfig = JSON.parse(
       fs.readFileSync(path.resolve(process.cwd(), "../../biome.json"), "utf8"),
@@ -1614,8 +1629,11 @@ describe("create-gmacko-app scaffold", () => {
 
     expect(biomeConfig.files?.includes).toContain("!**/.claude");
     expect(biomeConfig.css?.parser?.tailwindDirectives).toBe(true);
-    expect(() => JSON.parse(compiledTsconfig)).not.toThrow();
-    expect(() => JSON.parse(baseTsconfig)).not.toThrow();
+    expect(() => parseJsonc(compiledTsconfig)).not.toThrow();
+    expect(() => parseJsonc(baseTsconfig)).not.toThrow();
+    // The Effect language-service plugin is editor-only but must be declared
+    // once, in the base config every package extends.
+    expect(baseTsconfig).toContain("@effect/language-service");
   });
 
   it("keeps local release artifacts out of git status", () => {
@@ -1628,7 +1646,7 @@ describe("create-gmacko-app scaffold", () => {
   });
 
   it("keeps repo lint noise focused on first-party files", () => {
-    const oxlintConfig = JSON.parse(
+    const oxlintConfig = parseJsonc(
       fs.readFileSync(
         path.resolve(process.cwd(), "../../.oxlintrc.json"),
         "utf8",
