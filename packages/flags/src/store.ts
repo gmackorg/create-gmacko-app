@@ -50,6 +50,36 @@ function hashToPercentage(input: string): number {
 }
 
 /**
+ * The value an allowlisted or rolled-in identifier sees. A boolean flag's
+ * "on" state is `true`; every other flag has one value, its default.
+ */
+function enabledValue<T>(flagDef: FlagDefinition<T>): T {
+  if (flagDef.defaultValue !== false) return flagDef.defaultValue;
+  // SAFETY: this line is reached only when `defaultValue` is the `false`
+  // literal, so the definition is a `FlagDefinition<boolean>` and `true`
+  // inhabits its value type `T`.
+  return true as T;
+}
+
+/**
+ * Parse a deployment-supplied `FLAG_*` override string into the flag's own
+ * value type, which is fixed by the type of its default value.
+ */
+function parseOverride<T>(flagDef: FlagDefinition<T>, raw: string): T {
+  const isBoolean =
+    flagDef.defaultValue === true || flagDef.defaultValue === false;
+  // `Number.isFinite` is true for numbers only; it never coerces its argument.
+  const isNumber = Number.isFinite(flagDef.defaultValue);
+  // SAFETY: each branch produces a value of the same JavaScript type as
+  // `flagDef.defaultValue` — boolean for a boolean default, number for a
+  // numeric one, the raw string otherwise — and `FlagDefinition<T>` says that
+  // type is `T`.
+  return (
+    isBoolean ? raw === "true" || raw === "1" : isNumber ? Number(raw) : raw
+  ) as T;
+}
+
+/**
  * Evaluate a flag with rollout configuration
  */
 function evaluateRollout<T>(
@@ -74,12 +104,8 @@ function evaluateRollout<T>(
 
   // Check allowlist
   if (identifier && rollout.allowlist?.includes(identifier)) {
-    // For boolean flags, return true; otherwise return the non-default "enabled" state
-    const enabledValue = (
-      typeof flagDef.defaultValue === "boolean" ? true : flagDef.defaultValue
-    ) as T;
     return {
-      value: enabledValue,
+      value: enabledValue(flagDef),
       reason: "allowlist",
       flagName,
     };
@@ -89,11 +115,8 @@ function evaluateRollout<T>(
   if (identifier) {
     const bucket = hashToPercentage(`${flagName}:${identifier}`);
     if (bucket < rollout.percentage) {
-      const enabledValue = (
-        typeof flagDef.defaultValue === "boolean" ? true : flagDef.defaultValue
-      ) as T;
       return {
-        value: enabledValue,
+        value: enabledValue(flagDef),
         reason: "rollout",
         flagName,
       };
@@ -163,6 +186,10 @@ export function createFlagStore<T extends FlagDefinitions>(
     flagName: K,
     context?: FlagContext,
   ): FlagEvaluationResult<FlagValue<T[K]>> {
+    // SAFETY: `T[K]` is a `FlagDefinition<V>` (the `FlagDefinitions`
+    // constraint), and `FlagValue<T[K]>` is defined as exactly that inferred
+    // `V`. The two are the same type; TypeScript cannot evaluate the
+    // conditional in `FlagValue` while `K` is an unresolved type parameter.
     const flagDef = definitions[flagName] as
       | FlagDefinition<FlagValue<T[K]>>
       | undefined;
@@ -173,8 +200,13 @@ export function createFlagStore<T extends FlagDefinitions>(
 
     // 1. Check for runtime override
     if (overrides.has(flagName)) {
+      // SAFETY: `setOverride<K>` is the only writer of `overrides`, and it
+      // accepts exactly `FlagValue<T[K]>` for the key `flagName: K`, so the
+      // value stored under this key has that type. The map is heterogeneous
+      // across flags, which is why it cannot say so itself.
+      const override = overrides.get(flagName) as FlagValue<T[K]>;
       return {
-        value: overrides.get(flagName) as FlagValue<T[K]>,
+        value: override,
         reason: "override",
         flagName,
       };
@@ -184,17 +216,8 @@ export function createFlagStore<T extends FlagDefinitions>(
     // Format: FLAG_[FLAGNAME] (uppercase, hyphens to underscores)
     const envValue = supplied[flagOverrideKey(flagName)];
     if (envValue !== undefined) {
-      // Parse the override based on default value type
-      let parsedValue: unknown;
-      if (typeof flagDef.defaultValue === "boolean") {
-        parsedValue = envValue === "true" || envValue === "1";
-      } else if (typeof flagDef.defaultValue === "number") {
-        parsedValue = Number(envValue);
-      } else {
-        parsedValue = envValue;
-      }
       return {
-        value: parsedValue as FlagValue<T[K]>,
+        value: parseOverride(flagDef, envValue),
         reason: "override",
         flagName,
       };
@@ -204,7 +227,7 @@ export function createFlagStore<T extends FlagDefinitions>(
     const envSpecificValue = flagDef.environments?.[currentEnvironment];
     if (envSpecificValue !== undefined) {
       return {
-        value: envSpecificValue as FlagValue<T[K]>,
+        value: envSpecificValue,
         reason: "environment",
         flagName,
       };
@@ -240,11 +263,15 @@ export function createFlagStore<T extends FlagDefinitions>(
   function getAllFlags(
     context?: FlagContext,
   ): Record<FlagName<T>, FlagValue<T[FlagName<T>]>> {
-    const result = {} as Record<FlagName<T>, FlagValue<T[FlagName<T>]>>;
-    for (const flagName of Object.keys(definitions) as FlagName<T>[]) {
-      result[flagName] = getFlagValue(flagName, context);
-    }
-    return result;
+    // SAFETY: `Object.keys` returns an object's own enumerable string keys, so
+    // for `definitions: T` they are exactly `keyof T & string`, which is
+    // `FlagName<T>`. Its `string[]` signature cannot express that.
+    const flagNames = Object.keys(definitions) as Array<FlagName<T>>;
+    // SAFETY: the entries below are one per key of `definitions`, i.e. one per
+    // `FlagName<T>`, so the record they build has every key of the result type.
+    return Object.fromEntries(
+      flagNames.map((flagName) => [flagName, getFlagValue(flagName, context)]),
+    ) as Record<FlagName<T>, FlagValue<T[FlagName<T>]>>;
   }
 
   /**

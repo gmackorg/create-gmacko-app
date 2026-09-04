@@ -19,7 +19,7 @@ import {
   PostId,
   UpdatePreferences,
 } from "@gmacko/domain";
-import { Schema } from "effect";
+import { Option, Schema } from "effect";
 
 export interface OperatorClientOptions {
   /** Origin of the API, e.g. `http://localhost:3001` (`GMACKO_API_URL`). */
@@ -33,13 +33,22 @@ export interface OperatorClientOptions {
 
 export type OperatorClient = ApiClient;
 
-/** JSON Schema (draft 2020-12) for a tool's arguments, as the MCP tool list carries it. */
-export interface OperatorToolInputSchema {
+/**
+ * JSON Schema (draft 2020-12) for a tool's arguments, as the MCP tool list
+ * carries it: a JSON object with the three keywords a tool list must spell
+ * out, plus whatever else the generator emitted (`$defs`, `title`, …).
+ */
+export interface OperatorToolInputSchema extends Schema.JsonObject {
   readonly type: "object";
-  readonly properties: Readonly<Record<string, unknown>>;
+  readonly properties: Schema.JsonObject;
   readonly required: ReadonlyArray<string>;
-  readonly [key: string]: unknown;
 }
+
+/**
+ * The arguments a tool is called with, before validation: CLI flag values
+ * (always strings) or an MCP client's `arguments` object, which is JSON.
+ */
+export type OperatorToolArguments = Readonly<Record<string, Schema.Json>>;
 
 export interface OperatorToolDefinition {
   readonly name: string;
@@ -75,10 +84,24 @@ const NO_INPUT_SCHEMA: OperatorToolInputSchema = {
 const PostIdInput = Schema.Struct({ id: PostId });
 const ApiKeyIdInput = Schema.Struct({ id: ApiKeyId });
 
-type JsonObject = Readonly<Record<string, unknown>>;
-
-const isJsonObject = (value: unknown): value is JsonObject =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
+/**
+ * A JSON Schema document is JSON, so it is read back through JSON schemas
+ * rather than probed with `typeof`. `asJsonObject` throws on anything that is
+ * not an object, which for the generator's own output cannot happen.
+ */
+const asJsonObject = Schema.decodeUnknownSync(Schema.JsonObject);
+/** The generator emits a bare `$ref` root for a class-backed contract schema. */
+const readRootRef = Schema.decodeUnknownOption(
+  Schema.Struct({ $ref: Schema.String }),
+);
+/** The keywords a tool's root node must carry for the tool list. */
+const readObjectNode = Schema.decodeUnknownOption(
+  Schema.Struct({
+    type: Schema.Literal("object"),
+    properties: Schema.optional(Schema.JsonObject),
+    required: Schema.optional(Schema.Array(Schema.String)),
+  }),
+);
 
 /**
  * The contract schema's JSON Schema, with its root definition inlined (the
@@ -88,68 +111,81 @@ const isJsonObject = (value: unknown): value is JsonObject =>
 const inputSchemaOf = (schema: Schema.Top): OperatorToolInputSchema => {
   if (schema === NoInput) return NO_INPUT_SCHEMA;
   const document = Schema.toJsonSchemaDocument(schema);
-  const definitions: Record<string, unknown> = { ...document.definitions };
-  let root: unknown = document.schema;
-  const ref = isJsonObject(root) ? root.$ref : undefined;
-  if (typeof ref === "string" && ref.startsWith("#/$defs/")) {
-    const name = ref.slice("#/$defs/".length);
-    root = definitions[name];
-    delete definitions[name];
+  const definitions = new Map<string, Schema.Json>(
+    Object.entries(asJsonObject(document.definitions)),
+  );
+  let root: Schema.Json = asJsonObject(document.schema);
+  const ref = readRootRef(root);
+  if (Option.isSome(ref) && ref.value.$ref.startsWith("#/$defs/")) {
+    const name = ref.value.$ref.slice("#/$defs/".length);
+    root = definitions.get(name) ?? null;
+    definitions.delete(name);
   }
-  if (!isJsonObject(root) || root.type !== "object") {
+  const node = readObjectNode(root);
+  if (Option.isNone(node)) {
     throw new Error("operator tool input schemas must be objects");
   }
-  const properties = isJsonObject(root.properties) ? root.properties : {};
-  const required = Array.isArray(root.required)
-    ? (root.required as ReadonlyArray<string>)
-    : [];
-  return {
-    ...root,
+  const { properties = {}, required = [] } = node.value;
+  const inputSchema: OperatorToolInputSchema = {
+    ...asJsonObject(root),
     type: "object",
     properties,
     required,
-    ...(Object.keys(definitions).length > 0 ? { $defs: definitions } : {}),
   };
+  return definitions.size === 0
+    ? inputSchema
+    : { ...inputSchema, $defs: Object.fromEntries(definitions) };
+};
+
+/** The JSON Schema `type` keywords a CLI string is coerced through. */
+const readCoercibleNode = Schema.decodeUnknownOption(
+  Schema.Struct({
+    type: Schema.Literals(["array", "boolean", "integer", "number"]),
+  }),
+);
+/** MCP clients send typed JSON; only CLI flag values arrive as strings. */
+const readString = Schema.decodeUnknownOption(Schema.String);
+
+/** One CLI flag value, read as the JSON type its property declares. */
+const coerceValue = (
+  value: string,
+  type: "array" | "boolean" | "integer" | "number",
+): Schema.Json => {
+  switch (type) {
+    case "array":
+      return value
+        .split(",")
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0);
+    case "boolean":
+      return value === "true" ? true : value === "false" ? false : value;
+    case "integer":
+    case "number": {
+      const parsed = Number(value.trim());
+      return value.trim() !== "" && Number.isFinite(parsed) ? parsed : value;
+    }
+  }
 };
 
 /**
  * CLI flags arrive as strings (`--permissions read,write`,
  * `--expiresInDays 30`); MCP clients send JSON. Strings are coerced to what
  * the property's JSON Schema says (array, integer/number, boolean) before
- * validation, so both callers use the same argument names.
+ * validation, so both callers use the same argument names. A value the
+ * property does not declare a coercible type for is passed through untouched.
  */
 const coerceArguments = (
   schema: OperatorToolInputSchema,
-  args: JsonObject,
-): JsonObject => {
-  const coerced: Record<string, unknown> = {};
+  args: OperatorToolArguments,
+) => {
+  const coerced: Record<string, Schema.Json> = {};
   for (const [key, value] of Object.entries(args)) {
-    const property = schema.properties[key];
-    if (typeof value !== "string" || !isJsonObject(property)) {
-      coerced[key] = value;
-      continue;
-    }
-    switch (property.type) {
-      case "array":
-        coerced[key] = value
-          .split(",")
-          .map((item) => item.trim())
-          .filter((item) => item.length > 0);
-        break;
-      case "integer":
-      case "number": {
-        const parsed = Number(value.trim());
-        coerced[key] =
-          value.trim() !== "" && Number.isFinite(parsed) ? parsed : value;
-        break;
-      }
-      case "boolean":
-        coerced[key] =
-          value === "true" ? true : value === "false" ? false : value;
-        break;
-      default:
-        coerced[key] = value;
-    }
+    const text = readString(value);
+    const property = readCoercibleNode(schema.properties[key]);
+    coerced[key] =
+      Option.isSome(text) && Option.isSome(property)
+        ? coerceValue(text.value, property.value.type)
+        : value;
   }
   return coerced;
 };
@@ -158,7 +194,13 @@ const coerceArguments = (
 // Tools
 // ---------------------------------------------------------------------------
 
-interface Tool<S extends Schema.Top> {
+/**
+ * A contract schema a tool's arguments can be decoded through: it decodes
+ * from `unknown` and needs no services to do it.
+ */
+type ToolInput = Schema.Top & Schema.ConstraintDecoder<unknown>;
+
+interface Tool<S extends ToolInput> {
   readonly name: string;
   readonly description: string;
   readonly input: S;
@@ -168,17 +210,48 @@ interface Tool<S extends Schema.Top> {
   ) => Promise<string>;
 }
 
-const tool = <S extends Schema.Top>(definition: Tool<S>): Tool<S> => definition;
+/**
+ * A tool with its input schema derived and its own decoder closed over, so
+ * the payload type never has to be recovered from the list at call time.
+ */
+interface OperatorTool extends OperatorToolDefinition {
+  readonly run: (
+    client: OperatorClient,
+    args: OperatorToolArguments,
+  ) => Promise<string>;
+}
 
-const pretty = (value: unknown): string => JSON.stringify(value, null, 2);
+const tool = <S extends ToolInput>(definition: Tool<S>): OperatorTool => {
+  const inputSchema = inputSchemaOf(definition.input);
+  const decode = Schema.decodeUnknownSync(definition.input, {
+    onExcessProperty: "error",
+  });
+  return {
+    name: definition.name,
+    description: definition.description,
+    inputSchema,
+    run: (client, args) => {
+      let input: S["Type"];
+      try {
+        input = decode(coerceArguments(inputSchema, args));
+      } catch (cause) {
+        const detail = cause instanceof Error ? cause.message : String(cause);
+        throw new Error(`Invalid arguments for ${definition.name}: ${detail}`);
+      }
+      return definition.execute(client, input);
+    },
+  };
+};
+
+const pretty = <A>(value: A): string => JSON.stringify(value, null, 2);
 
 /** `NotFound` for the tool's own resource becomes a message; anything else propagates. */
 const notFoundAs =
   (resource: NotFound["resource"], message: string) =>
-  (error: unknown): string => {
-    if (error instanceof NotFound && error.resource === resource)
+  (cause: unknown): string => {
+    if (cause instanceof NotFound && cause.resource === resource)
       return message;
-    throw error;
+    throw cause;
   };
 
 const operatorTools = [
@@ -283,17 +356,7 @@ const operatorTools = [
         .run((c) => c.settings.updatePreferences({ payload }))
         .then((preferences) => `Preferences updated: ${pretty(preferences)}`),
   }),
-] as const;
-
-type AnyTool = (typeof operatorTools)[number];
-
-const definitions: ReadonlyArray<OperatorToolDefinition & { tool: AnyTool }> =
-  operatorTools.map((entry) => ({
-    name: entry.name,
-    description: entry.description,
-    inputSchema: inputSchemaOf(entry.input),
-    tool: entry,
-  }));
+];
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -313,7 +376,7 @@ export const createOperatorClient = (
   });
 
 export const listOperatorTools = (): Array<OperatorToolDefinition> =>
-  definitions.map(({ name, description, inputSchema }) => ({
+  operatorTools.map(({ name, description, inputSchema }) => ({
     name,
     description,
     inputSchema,
@@ -329,19 +392,9 @@ export const listOperatorTools = (): Array<OperatorToolDefinition> =>
 export const executeOperatorTool = async (
   client: OperatorClient,
   name: string,
-  args: Readonly<Record<string, unknown>> = {},
+  args: OperatorToolArguments = {},
 ): Promise<string> => {
-  const definition = definitions.find((entry) => entry.name === name);
-  if (definition === undefined) throw new Error(`Unknown tool: ${name}`);
-  const { tool: entry, inputSchema } = definition;
-  let input: unknown;
-  try {
-    input = Schema.decodeUnknownSync(entry.input, {
-      onExcessProperty: "error",
-    })(coerceArguments(inputSchema, args));
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    throw new Error(`Invalid arguments for ${name}: ${detail}`);
-  }
-  return (entry.execute as Tool<Schema.Top>["execute"])(client, input);
+  const entry = operatorTools.find((candidate) => candidate.name === name);
+  if (entry === undefined) throw new Error(`Unknown tool: ${name}`);
+  return entry.run(client, args);
 };

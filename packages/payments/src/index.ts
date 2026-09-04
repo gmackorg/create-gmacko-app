@@ -33,17 +33,18 @@ export function initStripe(config: StripeConfig): Stripe | null {
   }
 
   if (!stripeClient) {
-    stripeClient = new Stripe(config.secretKey, {
+    const options: Stripe.StripeConfig = {
       apiVersion: config.apiVersion,
       httpClient: httpClient(),
-      ...(config.host
-        ? {
-            host: config.host,
-            protocol: config.protocol ?? "https",
-            port: config.port ?? 443,
-          }
-        : {}),
-    });
+    };
+    // A host is only supplied by the local emulator; without one the SDK keeps
+    // its own defaults, which are not the same as `api.stripe.com:443`.
+    if (config.host) {
+      options.host = config.host;
+      options.protocol = config.protocol ?? "https";
+      options.port = config.port ?? 443;
+    }
+    stripeClient = new Stripe(config.secretKey, options);
   }
 
   return stripeClient;

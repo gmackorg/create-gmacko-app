@@ -42,9 +42,7 @@ export function createI18n(
 ): I18nInstance {
   const instance = createInstance();
   instance.use(initReactI18next);
-  const resources: Record<string, { translation: Messages }> = {
-    [locale]: { translation: messages },
-  };
+  const resources = { [locale]: { translation: messages } };
   if (fallbackMessages !== undefined && locale !== defaultLocale) {
     resources[defaultLocale] = { translation: fallbackMessages };
   }
@@ -133,16 +131,30 @@ const detachedInstance = (): I18nInstance => {
   return detached;
 };
 
-/** The provider's instance when there is one, else the detached one. Hooks stay unconditional. */
+/**
+ * The provider's instance when there is one, else the detached one. Hooks stay
+ * unconditional. react-i18next types the context as always carrying an `i18n`,
+ * but its default value is empty until a provider mounts, so the binding is
+ * annotated for what the context actually holds outside one.
+ */
 const useInstance = (): I18nInstance => {
-  const context = useContext(I18nContext) as { i18n?: I18nInstance } | null;
+  const context: { i18n?: I18nInstance } | undefined = useContext(I18nContext);
   return context?.i18n ?? detachedInstance();
 };
+
+/**
+ * The values an interpolated message substitutes: `t("greeting", { name })`
+ * renders `{{name}}`. i18next stringifies each one, so only values with a
+ * meaningful string form belong here.
+ */
+export type TranslationValues = Readonly<
+  Record<string, string | number | boolean | Date>
+>;
 
 /** `t` for one namespace of the nested messages; the key itself when i18n is off. */
 export function useTranslations(
   namespace?: string,
-): (key: string, values?: Record<string, unknown>) => string {
+): (key: string, values?: TranslationValues) => string {
   const { t } = useTranslation(undefined, { i18n: useInstance() });
   if (!integrations.i18n) {
     return (key: string) => key;
@@ -183,15 +195,17 @@ export function getPathWithLocale(pathname: string, locale: Locale): string {
 }
 
 export async function loadMessages(locale: Locale): Promise<Messages> {
+  // A template-literal specifier makes TypeScript type the import `any`; the
+  // annotations state what `messages/*.json` are — two-level string maps.
   try {
-    const messages = (await import(`../../messages/${locale}.json`)) as {
-      default: Messages;
-    };
+    const messages: { default: Messages } = await import(
+      `../../messages/${locale}.json`
+    );
     return messages.default;
   } catch {
-    const fallback = (await import(`../../messages/${defaultLocale}.json`)) as {
-      default: Messages;
-    };
+    const fallback: { default: Messages } = await import(
+      `../../messages/${defaultLocale}.json`
+    );
     return fallback.default;
   }
 }

@@ -96,8 +96,14 @@ describe("listOperatorTools", () => {
 });
 
 describe("executeOperatorTool", () => {
-  it("answers auth_help without a client and names the admin scope keys need", async () => {
-    const help = await executeOperatorTool(undefined as never, "auth_help");
+  it("answers auth_help without a request and names the admin scope keys need", async () => {
+    const offline = createOperatorClient({
+      baseUrl: api.baseUrl,
+      transport: () => {
+        throw new Error("auth_help must answer without calling the API");
+      },
+    });
+    const help = await executeOperatorTool(offline, "auth_help");
     expect(help).toContain("GMACKO_API_KEY");
     expect(help).toContain("admin");
     expect(help).toContain("HTTP API");
@@ -140,12 +146,12 @@ describe("executeOperatorTool", () => {
         expiresInDays: "30",
       },
     );
-    const parsed = JSON.parse(created) as {
+    const parsed: {
       id: string;
       key: string;
       permissions: ReadonlyArray<string>;
       expiresAt: string | null;
-    };
+    } = JSON.parse(created);
     expect(parsed.key).toMatch(/^gmk_/);
     expect(parsed.permissions).toEqual(["read", "write"]);
     expect(parsed.expiresAt).toEqual(expect.any(String));
@@ -197,9 +203,10 @@ describe("executeOperatorTool", () => {
       content: "World",
     });
     expect(created).toContain("Post created");
-    const id = (
-      JSON.parse(created.slice(created.indexOf("{"))) as { id: string }
-    ).id;
+    const post: { id: string } = JSON.parse(
+      created.slice(created.indexOf("{")),
+    );
+    const id = post.id;
 
     await expect(
       executeOperatorTool(client(), "list_posts"),

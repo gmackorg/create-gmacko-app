@@ -10,14 +10,18 @@ import type { ReactNode } from "react";
 
 import { supportedLocales, useLocale } from "./index";
 
-const localeLabels: Record<string, string> = {
-  en: "English",
-  es: "Espanol",
-  fr: "Francais",
-  de: "Deutsch",
-  ja: "Japanese",
-  zh: "Chinese",
-};
+/**
+ * The label each supported locale is listed under. A locale in
+ * `supportedLocales` with no entry here falls back to its own code.
+ */
+const localeLabels = new Map<string, string>([
+  ["en", "English"],
+  ["es", "Espanol"],
+  ["fr", "Francais"],
+  ["de", "Deutsch"],
+  ["ja", "Japanese"],
+  ["zh", "Chinese"],
+]);
 
 interface LocaleSwitcherProps {
   className?: string | undefined;
@@ -46,7 +50,7 @@ export function LocaleSwitcher({
     >
       {supportedLocales.map((loc) => (
         <option key={loc} value={loc}>
-          {localeLabels[loc] ?? loc}
+          {localeLabels.get(loc) ?? loc}
         </option>
       ))}
     </select>

@@ -113,9 +113,14 @@ export function LaunchControlsForm(props: {
             id="announcementTone"
             name="announcementTone"
             value={announcementTone}
-            onChange={(event) =>
-              setAnnouncementTone(event.target.value as AnnouncementTone)
-            }
+            onChange={(event) => {
+              // The `<option>`s below are exactly `tones`, so anything else
+              // came from outside the form and is not a tone.
+              const tone = tones.find(
+                (candidate) => candidate === event.target.value,
+              );
+              if (tone !== undefined) setAnnouncementTone(tone);
+            }}
             disabled={props.submitting}
             className="w-full"
           >

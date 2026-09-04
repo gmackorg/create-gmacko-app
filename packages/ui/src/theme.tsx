@@ -75,8 +75,8 @@ const getNextTheme = (current: ThemeMode): ThemeMode => {
 export const themeDetectorScript = (function () {
   function themeFn() {
     const isValidTheme = (theme: string): theme is ThemeMode => {
-      const validThemes = ["light", "dark", "auto"] as const;
-      return validThemes.includes(theme as ThemeMode);
+      const validThemes: string[] = ["light", "dark", "auto"];
+      return validThemes.includes(theme);
     };
 
     const storedTheme = localStorage.getItem("theme-mode") ?? "auto";

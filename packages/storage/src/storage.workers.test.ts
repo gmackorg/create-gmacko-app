@@ -27,6 +27,21 @@ const token = btoa(
   }),
 );
 
+/**
+ * One file type's limits, as `f({ image: { … } })` declares them and the GET
+ * route serialises them back.
+ */
+interface FileTypeConfig {
+  readonly maxFileSize?: string;
+  readonly maxFileCount?: number;
+}
+
+/** One entry of the GET route's body: a file route and its permissions. */
+interface RouteConfigEntry {
+  readonly slug: string;
+  readonly config: Readonly<Record<string, FileTypeConfig>>;
+}
+
 const f = createUploadthing();
 
 const router = {
@@ -60,10 +75,7 @@ describe("uploadthing on workerd", () => {
     const response = await handler(
       new Request("https://example.com/api/uploadthing"),
     );
-    const body = (await response.json()) as ReadonlyArray<{
-      readonly slug: string;
-      readonly config: Record<string, unknown>;
-    }>;
+    const body: ReadonlyArray<RouteConfigEntry> = await response.json();
     expect(body.map((route) => route.slug)).toEqual(["avatar"]);
     expect(body[0]?.config).toHaveProperty("image");
   });

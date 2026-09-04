@@ -83,6 +83,18 @@ export interface FlagEvaluationResult<T = boolean> {
 }
 
 /**
+ * What a flag can evaluate to over the wire. A provider's flag state is sent
+ * to clients and cached, so every value it returns is JSON.
+ */
+export type SerializableFlagValue =
+  | string
+  | number
+  | boolean
+  | null
+  | Array<SerializableFlagValue>
+  | { readonly [key: string]: SerializableFlagValue };
+
+/**
  * Interface for flag providers (for future extensibility)
  * Implement this to integrate with LaunchDarkly, Flagsmith, etc.
  */
@@ -92,7 +104,9 @@ export interface FlagProvider {
   /** Get a flag value */
   getFlag<T>(flagName: string, context?: FlagContext): Promise<T>;
   /** Get all flags */
-  getAllFlags(context?: FlagContext): Promise<Record<string, unknown>>;
+  getAllFlags(
+    context?: FlagContext,
+  ): Promise<Record<string, SerializableFlagValue>>;
   /** Clean up resources */
   destroy(): Promise<void>;
 }

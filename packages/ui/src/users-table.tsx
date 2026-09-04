@@ -7,6 +7,13 @@ import { Select } from "./select";
 
 export type PlatformRole = "user" | "admin";
 
+/** The roles the role `<select>` offers, and the only ones it can report. */
+const platformRoles: ReadonlyArray<PlatformRole> = ["user", "admin"];
+
+/** The selected `<option>`'s value as a role, or `null` if it is not one. */
+const toPlatformRole = (value: string): PlatformRole | null =>
+  platformRoles.find((role) => role === value) ?? null;
+
 export interface UserRowData {
   readonly id: string;
   readonly name: string;
@@ -183,8 +190,8 @@ function UserRow({
             value={user.role}
             disabled={disabled}
             onChange={(event) => {
-              const next = event.target.value as PlatformRole;
-              if (next !== user.role) setPendingRole(next);
+              const next = toPlatformRole(event.target.value);
+              if (next !== null && next !== user.role) setPendingRole(next);
             }}
             className="h-8 px-2"
           >

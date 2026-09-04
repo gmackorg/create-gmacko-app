@@ -60,7 +60,9 @@ export function createGuardedRouter<T extends FileRouter>(
   routerFn: () => T,
 ): T | Record<string, never> {
   if (!integrations.storage.enabled) {
-    return {} as Record<string, never>;
+    /** No file routes at all, so `routerFn` is never evaluated. */
+    const noRoutes: Record<string, never> = {};
+    return noRoutes;
   }
   return routerFn();
 }
