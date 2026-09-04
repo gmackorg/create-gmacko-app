@@ -72,52 +72,62 @@ export const deliveryCount = (active: readonly Perturbation[]): number =>
   );
 
 /**
- * D1 faults for the ledger write, selected by *target only*.
+ * D1 write faults, selected by *target only*.
  *
- * CloudFault's `d1CommitThenTimeout(target, operation)` defaults to
- * `d1.run`, and this stack issues neither `run` nor `all`: drizzle's Effect
- * driver executes through `@effect/sql`'s `executeValues`, i.e.
+ * CloudFault's `d1CommitThenTimeout(target, operation)` defaults to `d1.run`,
+ * and this stack issues neither `run` nor `all`: drizzle's Effect driver
+ * executes through `@effect/sql`'s `executeValues`, i.e.
  * `prepare(sql).bind(...).raw()`. Pinning the operation name would couple the
  * lane to that detail and — worse — would silently stop activating if the
  * driver changed, leaving the scenario passing for no reason. A target-only
  * selector matches whichever terminal the driver picks; `assertActivated` in
  * explore.ts is the backstop that catches a fault that stops firing anyway.
+ *
+ * `name` only distinguishes the ids, so a minimal failure set says which
+ * write it was talking about.
  */
-const ledgerFault = (
-  kind: string,
-  description: string,
-  extra: Pick<Fault, "phase" | "actualOutcome" | "observedOutcome">,
-): Fault => ({
-  id: `DB:stripe-webhook-ledger:${kind}`,
-  target: "DB",
-  kind,
-  description,
-  category: "cloudflare",
-  selector: { target: "DB" },
-  ...extra,
-});
+export interface D1WriteFaults {
+  /**
+   * The write commits and the caller is told it did not. This is the case
+   * unit tests structurally cannot reach.
+   */
+  readonly commitThenTimeout: Fault;
+  /** The write never reaches D1: a definite failure the caller can trust. */
+  readonly transientError: Fault;
+}
 
-/**
- * The write commits and the caller is told it did not. This is the case unit
- * tests structurally cannot reach and the reason the ledger has two phases.
- */
-export const ledgerCommitThenTimeout: Fault = ledgerFault(
-  "commit-then-timeout",
-  "The ledger write commits but the Worker loses the result",
-  {
-    phase: "after-commit-before-response",
-    actualOutcome: "committed",
-    observedOutcome: "indeterminate",
-  },
-);
-
-/** The write never reaches D1: a definite failure, and the endpoint must not ack. */
-export const ledgerTransientError: Fault = ledgerFault(
-  "transient-network-error",
-  "The ledger write fails before it commits",
-  {
-    phase: "before-commit",
-    actualOutcome: "not-committed",
-    observedOutcome: "definite-failure",
-  },
-);
+export const d1WriteFaults = (name: string): D1WriteFaults => {
+  const base = (
+    kind: string,
+    description: string,
+    extra: Pick<Fault, "phase" | "actualOutcome" | "observedOutcome">,
+  ): Fault => ({
+    id: `DB:${name}:${kind}`,
+    target: "DB",
+    kind,
+    description,
+    category: "cloudflare",
+    selector: { target: "DB" },
+    ...extra,
+  });
+  return {
+    commitThenTimeout: base(
+      "commit-then-timeout",
+      `The ${name} write commits but the Worker loses the result`,
+      {
+        phase: "after-commit-before-response",
+        actualOutcome: "committed",
+        observedOutcome: "indeterminate",
+      },
+    ),
+    transientError: base(
+      "transient-network-error",
+      `The ${name} write fails before it commits`,
+      {
+        phase: "before-commit",
+        actualOutcome: "not-committed",
+        observedOutcome: "definite-failure",
+      },
+    ),
+  };
+};

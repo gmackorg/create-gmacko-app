@@ -84,11 +84,12 @@ layout into `node_modules/@gmacko/cloudfault`, so import specifiers in
 apps/web/fault/
   run.mjs                    the lane's entry point (resolution + vitest)
   workers-env.d.ts           bindings vitest.fault.config.ts adds
-  stripe-webhook.fault.ts    a scenario
+  stripe-webhook.fault.ts    a scenario: at-least-once webhook delivery
+  signup-rate-limit.fault.ts a scenario: the D1 counter fails, sign-up must not
   helpers/
     cloudfault.ts            every @gmacko/cloudfault import in the repo
     explore.ts               the search driver and its safety checks
-    ledger.ts                the app stack over a CloudFault-proxied env.DB
+    ledger.ts                the webhook ledger over a proxied env.DB
     perturbations.ts         fault records this repo declares
     stripe.ts                signed delivery fixtures
 ```

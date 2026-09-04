@@ -1957,7 +1957,6 @@ describe("create-gmacko-app scaffold", () => {
         "apps/web/fault/stripe-webhook.fault.ts",
         "apps/web/fault/helpers/ledger.ts",
         "apps/web/fault/helpers/stripe.ts",
-        "apps/web/fault/helpers/perturbations.ts",
       ]) {
         expect(fileExists(result.appPath, gone), gone).toBe(false);
       }
@@ -1965,6 +1964,8 @@ describe("create-gmacko-app scaffold", () => {
         "apps/web/fault/run.mjs",
         "apps/web/fault/helpers/cloudfault.ts",
         "apps/web/fault/helpers/explore.ts",
+        "apps/web/fault/helpers/perturbations.ts",
+        "apps/web/fault/signup-rate-limit.fault.ts",
         "apps/web/vitest.fault.config.ts",
         "docs/FAULT_TESTING.md",
         ".github/workflows/fault.yml",

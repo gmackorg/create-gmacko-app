@@ -1466,15 +1466,14 @@ export const handleStripeWebhook = async (
       `${WEB_APP_DIR}/src/server/__tests__/stripe-webhook.test.ts`,
     ),
   );
-  // The CloudFault scenario and the two helpers only it uses. The lane's
-  // runner, config and search driver stay: `vitest.fault.config.ts` sets
-  // `passWithNoTests`, so `pnpm test:fault` is green on an app that has not
-  // written its first scenario yet.
+  // The Stripe scenario and the two helpers only it uses. The rest of the
+  // lane is payment-agnostic and stays, including the sign-up rate-limit
+  // scenario, so the generated app still has a working fault lane and a
+  // worked example to copy.
   for (const file of [
     `${WEB_APP_DIR}/fault/stripe-webhook.fault.ts`,
     `${WEB_APP_DIR}/fault/helpers/ledger.ts`,
     `${WEB_APP_DIR}/fault/helpers/stripe.ts`,
-    `${WEB_APP_DIR}/fault/helpers/perturbations.ts`,
   ]) {
     fs.removeSync(path.join(targetDir, file));
   }

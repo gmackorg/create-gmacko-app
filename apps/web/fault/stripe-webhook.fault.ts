@@ -40,12 +40,14 @@ import {
 } from "./helpers/explore";
 import { ledgerRows, perturbedLedger, resetLedger } from "./helpers/ledger";
 import {
+  d1WriteFaults,
   deliveryCount,
-  ledgerCommitThenTimeout,
-  ledgerTransientError,
   webhookDuplicateDelivery,
   webhookTripleDelivery,
 } from "./helpers/perturbations";
+
+const ledgerFaults = d1WriteFaults("stripe-webhook-ledger");
+
 import { signedDelivery, stripeEvent } from "./helpers/stripe";
 
 const SECRET = "whsec_cloudfault_lane_signing_secret";
@@ -212,7 +214,7 @@ const faultPoints: ReadonlyArray<FaultPoint> = [
     // not.
     id: "stripe-webhook-ledger-write",
     target: "DB",
-    choices: [ledgerCommitThenTimeout, ledgerTransientError],
+    choices: [ledgerFaults.commitThenTimeout, ledgerFaults.transientError],
   },
 ];
 
