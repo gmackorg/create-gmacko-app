@@ -126,6 +126,11 @@ jobs:
     # deeper combinations are the scheduled job's business
     # (.github/workflows/fault.yml), because the scenario count grows
     # combinatorially and a PR gate has to stay under a couple of minutes.
+    #
+    # Budget: 10 minutes. Today the search itself is ~150ms and the job is
+    # install plus workerd startup (~2 minutes); the headroom is for the
+    # scenarios that have not been written yet. If this job starts using it,
+    # split scenarios across a matrix rather than dropping the depth.
     timeout-minutes: 10
     steps:
       - name: Checkout

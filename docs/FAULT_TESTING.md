@@ -44,6 +44,11 @@ depth *n* tries every combination of *n* fault points. Scenario count grows
 combinatorially, and a failure then costs one extra run per perturbation the
 minimiser tries to remove.
 
+Today the two scenarios take ~150 ms of actual search at any depth — the
+wall clock is workerd startup. CI budgets 10 minutes for the depth-1 PR job
+and 45 for the nightly depth-3 one; that headroom is for the scenarios that
+have not been written yet, not for these.
+
 ### Installing `@gmacko/cloudfault`
 
 **`@gmacko/cloudfault` is not published to npm yet, so this lane does not run
