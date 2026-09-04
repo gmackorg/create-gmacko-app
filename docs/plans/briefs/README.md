@@ -1,14 +1,15 @@
 # Migration execution briefs
 
-Working notes used to drive the TanStack + Effect + D1 migration
-(`docs/plans/2026-09-02-tanstack-effect-d1-migration.html`) with subagents.
-Not plans themselves; the HTML plan is the source of truth for scope and status.
+Working notes from the TanStack + Effect + D1 migration
+(`docs/plans/2026-09-02-tanstack-effect-d1-migration.html`, published at
+https://ao98zs9lxlq2.postplan.dev). The HTML plan is the source of truth for
+scope, decisions, and status; these are the per-phase task briefs the
+implementation agents worked from, kept for archaeology.
 
-Resume order from the `WIP: Phase 8 cutover, interrupted` commit:
+All ten phases are complete. The only open plan row is the merge of
+`migrate/tanstack-effect-d1` into `main`.
 
-1. `brief-phase-8.md` (finish the cutover; the tree does not build until it is done)
-2. `brief-phase-7-fixes.md` (review fixes queued behind Phase 8)
-3. code review of Phase 8, then `brief-phase-9.md`
-
-`progress.md` is the per-phase log; `api-surface.md`, `api-inventory.md`,
-`auth-otlp-surface.md` are the verified reference notes the briefs cite.
+- `progress.md` — the per-phase log, including every review finding and how it was resolved
+- `api-surface.md`, `auth-otlp-surface.md` — verified API notes for Effect 4 rc, Drizzle rc, better-auth 1.7.2, OTLP
+- `api-inventory.md` — the 31 legacy tRPC procedures the contract was derived from
+- `brief-phase-*.md`, `brief-finish-fixes.md` — the task briefs themselves
