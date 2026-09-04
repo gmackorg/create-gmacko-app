@@ -70,11 +70,11 @@ catalogs:
 
 linkWorkspacePackages: true
 
-# Postinstall scripts pnpm may run. Anything a transitive dependency declares
-# and that is not listed here or in `ignoredBuiltDependencies` makes
-# `pnpm install` exit non-zero with ERR_PNPM_IGNORED_BUILDS, so both lists are
-# maintained deliberately — a scaffolded app must not greet its author with a
-# failed install.
+# Postinstall scripts pnpm is allowed to run. Anything a dependency declares
+# that is in neither this list nor `ignoredBuiltDependencies` makes
+# `pnpm install` print a warning box (and, once `strict-dep-builds` is on by
+# default, fail with ERR_PNPM_IGNORED_BUILDS), so both lists are maintained
+# deliberately rather than left to accumulate.
 onlyBuiltDependencies:
   - '@tailwindcss/oxide'
   - esbuild
