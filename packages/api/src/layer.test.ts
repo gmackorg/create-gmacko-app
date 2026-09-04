@@ -27,10 +27,21 @@ import {
 
 const DRIVER_MESSAGE = "SQLITE_BUSY: database is locked at /very/secret/path";
 
-type Leaf = (...args: ReadonlyArray<unknown>) => unknown;
+/**
+ * One of the four calls drizzle dispatches a prepared query through: each
+ * runs the query, so each yields rows of a shape only the caller's builder
+ * knows, or fails with the mapped `DatabaseError`.
+ */
+type Leaf = (
+  ...args: ReadonlyArray<unknown>
+) => Effect.Effect<unknown, DatabaseError>;
 interface PreparedLike extends Record<"run" | "all" | "get" | "values", Leaf> {}
 interface SessionLike {
   prepareQuery: (...args: ReadonlyArray<unknown>) => PreparedLike;
+}
+/** The drizzle handle's internals, as far as the patched seam reaches. */
+interface DrizzleInternals {
+  readonly _: { session: SessionLike };
 }
 
 /**
@@ -47,8 +58,12 @@ const failingDatabase = Layer.effect(Database)(
       cause: new Error(DRIVER_MESSAGE),
     });
     const fail = () => Effect.fail(failure);
-    const session = (database.db as unknown as { _: { session: SessionLike } })
-      ._.session;
+    // SAFETY: drizzle-orm exposes its runtime internals on `_`, and
+    // `_.session` is the session every builder's prepared query goes
+    // through; `DrizzleInternals` names only that one path, and TypeScript
+    // checks it against the real `DatabaseDrizzle["_"]` here (this is a
+    // single, overlapping assertion, not an `as unknown as` escape).
+    const session = (database.db as DrizzleInternals)._.session;
     const prepareQuery = session.prepareQuery;
     session.prepareQuery = function (this: SessionLike, ...args) {
       const prepared = prepareQuery.call(this, ...args);
@@ -290,9 +305,10 @@ describe("rate limit", () => {
     expect(third._tag).toBe("Failure");
     if (third._tag === "Failure") {
       expect(third.failure).toMatchObject({ _tag: "RateLimited" });
-      expect(
-        (third.failure as { retryAfterSeconds: number }).retryAfterSeconds,
-      ).toBeGreaterThan(0);
+      if (third.failure._tag !== "RateLimited") {
+        throw new Error(`expected RateLimited, got ${third.failure._tag}`);
+      }
+      expect(third.failure.retryAfterSeconds).toBeGreaterThan(0);
     }
     const raw = await api.fetch("/api/waitlist", {
       method: "POST",

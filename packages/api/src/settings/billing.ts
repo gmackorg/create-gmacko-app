@@ -16,7 +16,7 @@ import {
   workspaceSubscription,
   workspaceUsageRollup,
 } from "@gmacko/db/schema";
-import { BillingOverview, type BillingPlanId } from "@gmacko/domain/settings";
+import { BillingOverview, BillingPlanId } from "@gmacko/domain/settings";
 import { asc, desc, eq } from "drizzle-orm";
 import { Context, Effect, Layer } from "effect";
 
@@ -150,7 +150,7 @@ export class Billing extends Context.Service<Billing, BillingShape>()(
                           amountInCents: currentPlan.amountInCents,
                           currency: currentPlan.currency,
                           description: currentPlan.description,
-                          id: currentPlan.id as BillingPlanId,
+                          id: BillingPlanId.make(currentPlan.id),
                           interval: currentPlan.interval,
                           key: currentPlan.key,
                           name: currentPlan.name,
@@ -158,7 +158,7 @@ export class Billing extends Context.Service<Billing, BillingShape>()(
                   plans: plans.map((plan) => ({
                     amountInCents: plan.amountInCents,
                     currency: plan.currency,
-                    id: plan.id as BillingPlanId,
+                    id: BillingPlanId.make(plan.id),
                     interval: plan.interval,
                     isDefault: plan.isDefault,
                     key: plan.key,

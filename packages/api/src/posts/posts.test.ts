@@ -4,7 +4,7 @@
  */
 import { Database } from "@gmacko/db";
 import { Post as PostTable } from "@gmacko/db/schema";
-import { CreatePost, type PostId } from "@gmacko/domain";
+import { CreatePost, PostId } from "@gmacko/domain";
 import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -114,7 +114,7 @@ describe("posts", () => {
     expect(found).toEqual(created);
 
     const missing = await api.failure((client) =>
-      client.posts.byId({ params: { id: "nope" as PostId } }),
+      client.posts.byId({ params: { id: PostId.make("nope") } }),
     );
     expect(missing).toEqual(
       expect.objectContaining({

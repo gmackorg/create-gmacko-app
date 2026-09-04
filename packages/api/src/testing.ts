@@ -54,19 +54,27 @@ import {
   type FeatureFlags,
   type Stage,
 } from "./config";
+// This module is the composition root of the in-process test stack: it builds
+// `Services`, the `ManagedRuntime` over them, and then the handler over both.
+// `makeWebHandler` is that handler's factory (handler.ts), not a service
+// constructor reached around its Layer — there is no Layer above it to import.
+// oxlint-disable-next-line anti-slop-effect/no-service-constructor-imports
 import { type ApiHandler, makeWebHandler } from "./handler";
 import type { AppServices } from "./layer";
-import { defaultRateLimits, RateLimiter, type RateLimits } from "./rate-limit";
+import {
+  defaultRateLimits,
+  mapRateLimits,
+  RateLimiter,
+  type RateLimits,
+} from "./rate-limit";
 
 export const TEST_BASE_URL = "http://localhost:3001";
 
 /** The five scopes with a limit no suite reaches; a test passes its own to hit 429. */
-export const generousRateLimits: RateLimits = Object.fromEntries(
-  Object.entries(defaultRateLimits).map(([scope, policy]) => [
-    scope,
-    { ...policy, limit: 1_000_000 },
-  ]),
-) as RateLimits;
+export const generousRateLimits: RateLimits = mapRateLimits(
+  defaultRateLimits,
+  (policy) => ({ ...policy, limit: 1_000_000 }),
+);
 
 /** A fixed config; tests override the stage or a feature switch. */
 export const testAppConfig = (overrides?: {
@@ -90,11 +98,18 @@ export const testAppConfig = (overrides?: {
   features: { ...defaultFeatures, ...overrides?.features },
 });
 
+/**
+ * Effect's own log-annotation map, taken from the reference that holds it
+ * rather than restated here: `Effect.annotateLogs` accepts any value under
+ * any key, so this is the framework's contract, not a widening of ours.
+ */
+type LogAnnotations = Effect.Success<typeof References.CurrentLogAnnotations>;
+
 export interface RecordedLog {
   readonly level: LogLevel.LogLevel;
   readonly message: unknown;
   readonly cause: Cause.Cause<unknown>;
-  readonly annotations: Readonly<Record<string, unknown>>;
+  readonly annotations: LogAnnotations;
 }
 
 export interface Credentials {
@@ -112,6 +127,12 @@ export interface TestUser {
   readonly role: UserRole;
   /** Both better-auth cookies, as a browser would send them. */
   readonly cookie: string;
+}
+
+/** The `user` columns `createUser` may overwrite after better-auth created the row. */
+interface TestUserPatch {
+  role?: UserRole;
+  name?: string;
 }
 
 export interface TestWorkspace {
@@ -157,7 +178,7 @@ const makeApiClient = (
   HttpApiClient.make(AppApi, {
     baseUrl: TEST_BASE_URL,
     transformClient: HttpClient.mapRequest((request) => {
-      const headers: Record<string, string> = { ...credentials.headers };
+      const headers = { ...credentials.headers };
       if (credentials.cookie !== undefined) {
         headers.cookie = credentials.cookie;
         headers.origin = credentials.origin ?? TEST_BASE_URL;
@@ -236,9 +257,7 @@ export interface TestApi {
   readonly dispose: () => Promise<void>;
 }
 
-const annotationsOf = (
-  fiber: Fiber.Fiber<unknown, unknown>,
-): Readonly<Record<string, unknown>> =>
+const annotationsOf = (fiber: Fiber.Fiber<unknown, unknown>): LogAnnotations =>
   fiber.getRef(References.CurrentLogAnnotations);
 
 export const makeTestApi = (options: TestApiOptions = {}): TestApi => {
@@ -330,16 +349,15 @@ export const makeTestApi = (options: TestApiOptions = {}): TestApi => {
       options.email ??
       `user-${users}-${crypto.randomUUID().slice(0, 8)}@example.com`;
     const cookie = await signInAs({ email });
-    if (options.role !== undefined || options.name !== undefined) {
+    // Only the columns the caller named: an explicit `undefined` in a
+    // drizzle `set()` is a column the update must not mention at all.
+    const patch: TestUserPatch = {};
+    if (options.role !== undefined) patch.role = options.role;
+    if (options.name !== undefined) patch.name = options.name;
+    if (Object.keys(patch).length > 0) {
       await run(
         Effect.flatMap(Database, ({ db }) =>
-          db
-            .update(user)
-            .set({
-              ...(options.role === undefined ? {} : { role: options.role }),
-              ...(options.name === undefined ? {} : { name: options.name }),
-            })
-            .where(eq(user.email, email.toLowerCase())),
+          db.update(user).set(patch).where(eq(user.email, email.toLowerCase())),
         ),
       );
     }

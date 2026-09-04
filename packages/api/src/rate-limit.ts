@@ -53,6 +53,22 @@ export interface RateLimitPolicy {
 
 export type RateLimits = Readonly<Record<RateLimitScope, RateLimitPolicy>>;
 
+/**
+ * The same five scopes with each policy rewritten. Written out key by key
+ * rather than over `Object.entries`, so the return type checks that every
+ * `RateLimitScope` is still present instead of an assertion claiming it.
+ */
+export const mapRateLimits = (
+  limits: RateLimits,
+  f: (policy: RateLimitPolicy) => RateLimitPolicy,
+): RateLimits => ({
+  auth: f(limits.auth),
+  contact: f(limits.contact),
+  signup: f(limits.signup),
+  "api-keys": f(limits["api-keys"]),
+  "operator-api": f(limits["operator-api"]),
+});
+
 const MINUTE = 60_000;
 
 /** Per client, per minute. What every deployed stage uses. */
@@ -75,12 +91,10 @@ export const defaultRateLimits: RateLimits = {
  * apps/web/wrangler.jsonc, which is the development configuration (the
  * per-stage `env` blocks carry `defaultRateLimits`).
  */
-export const developmentRateLimits: RateLimits = Object.fromEntries(
-  Object.entries(defaultRateLimits).map(([scope, policy]) => [
-    scope,
-    { limit: policy.limit * 20, windowMs: policy.windowMs },
-  ]),
-) as RateLimits;
+export const developmentRateLimits: RateLimits = mapRateLimits(
+  defaultRateLimits,
+  (policy) => ({ limit: policy.limit * 20, windowMs: policy.windowMs }),
+);
 
 /**
  * The policies a stage runs with. Alongside `canAutoCreateAccounts`: a value
@@ -115,10 +129,16 @@ export type RateLimitBindings = Partial<
 
 type Consume = RateLimiterShape["consume"];
 
+/** What a fail-open warning records: the scope that could not be counted, and why. */
+interface UncountedScope {
+  readonly scope: RateLimitScope;
+  readonly cause: unknown;
+}
+
 /** Allows the call and says why, for a limiter that could not count. */
 const allowAfter = (
   message: string,
-  fields: Record<string, unknown>,
+  fields: UncountedScope,
 ): Effect.Effect<void> =>
   Effect.andThen(Effect.logWarning(message, fields), Effect.void);
 

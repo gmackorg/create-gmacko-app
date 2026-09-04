@@ -19,10 +19,11 @@ import {
 import {
   CompleteBootstrap,
   ReviewWaitlistEntry,
-  type WaitlistEntryId,
+  WaitlistEntryId,
 } from "@gmacko/domain";
+import { Conflict } from "@gmacko/domain/errors";
 import { eq } from "drizzle-orm";
-import { Effect, Layer, ManagedRuntime } from "effect";
+import { Effect, Layer, ManagedRuntime, Result } from "effect";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { Bootstrap, WaitlistReview } from "./service";
@@ -51,10 +52,13 @@ const seedUser = (id: string) =>
     ),
   );
 
-const outcome = (result: { _tag: string; failure?: unknown }) =>
-  result._tag === "Success"
+/** "success", or the `Conflict.reason` the guarded write refused with. */
+const outcome = <A, E>(result: Result.Result<A, E>): string =>
+  Result.isSuccess(result)
     ? "success"
-    : (result.failure as { _tag: string; reason?: string }).reason;
+    : result.failure instanceof Conflict
+      ? result.failure.reason
+      : `unexpected failure: ${String(result.failure)}`;
 
 beforeAll(async () => {
   await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
@@ -130,7 +134,7 @@ describe("guarded writes on D1", () => {
             Effect.result(
               review.review(
                 "reviewer",
-                entry.id as WaitlistEntryId,
+                WaitlistEntryId.make(entry.id),
                 new ReviewWaitlistEntry({ status: "approved" }),
               ),
             ),
@@ -170,7 +174,7 @@ describe("guarded writes on D1", () => {
         Effect.result(
           review.review(
             "reviewer",
-            entry.id as WaitlistEntryId,
+            WaitlistEntryId.make(entry.id),
             new ReviewWaitlistEntry({ status: "approved" }),
           ),
         ),

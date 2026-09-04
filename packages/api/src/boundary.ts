@@ -63,18 +63,22 @@ const STATUS_ATTRIBUTE = "http.response.status_code";
 const resolveStatus = SchemaAST.resolveAt<number>("httpApiStatus");
 
 /**
- * The status a typed failure will be sent with: the `httpApiStatus`
- * annotation of the error's schema (every contract error carries one, see
- * domain/errors.ts), or 400 for the builder's own request-decoding error.
- * `undefined` for anything else, which the boundary treats as a 500.
+ * A `Schema.Class` instance. Effect puts the class's schema `ast` on the
+ * constructor, and every error the contract declares is such a class (see
+ * domain/errors.ts), so that is where the `httpApiStatus` annotation lives.
  */
-const statusOfError = (error: unknown): number | undefined => {
-  if (HttpApiError.HttpApiSchemaError.is(error)) return 400;
-  const ast = (
-    error as { readonly constructor?: { readonly ast?: SchemaAST.AST } }
-  ).constructor?.ast;
-  return ast === undefined ? undefined : resolveStatus(ast);
-};
+interface SchemaClassInstance {
+  readonly constructor: { readonly ast: SchemaAST.AST };
+}
+
+const isSchemaClassInstance = (error: unknown): error is SchemaClassInstance =>
+  error instanceof Object && "ast" in error.constructor;
+
+/** How the boundary settles one call: the response status, and whether the span ends successfully. */
+interface Settlement {
+  readonly status: number;
+  readonly ok: boolean;
+}
 
 /**
  * Whether the span should end successfully for this exit. A typed failure
@@ -86,14 +90,22 @@ const statusOfError = (error: unknown): number | undefined => {
  */
 const settle = <A extends { readonly status: number }, E>(
   exit: Exit.Exit<A, E>,
-): { readonly status: number; readonly ok: boolean } => {
+): Settlement => {
   if (exit._tag === "Success") return { status: exit.value.status, ok: true };
   const failure = Cause.findError(exit.cause);
   if (Result.isFailure(failure)) return { status: 500, ok: false };
-  if (failure.success instanceof InternalError) {
+  const error = failure.success;
+  if (error instanceof InternalError) {
     return { status: 500, ok: false };
   }
-  const status = statusOfError(failure.success);
+  // The status a typed failure will be sent with: the `httpApiStatus`
+  // annotation on the error's schema, or 400 for the builder's own
+  // request-decoding error. `undefined` for anything else, treated as a 500.
+  const status = HttpApiError.HttpApiSchemaError.is(error)
+    ? 400
+    : isSchemaClassInstance(error)
+      ? resolveStatus(error.constructor.ast)
+      : undefined;
   return status === undefined || status >= 500
     ? { status: status ?? 500, ok: false }
     : { status, ok: true };
@@ -122,6 +134,10 @@ export const EndpointBoundaryLive: Layer.Layer<EndpointBoundary> =
         const started = yield* Effect.clockWith(
           (clock) => clock.currentTimeMillis,
         );
+        const spanAttributes = {
+          "http.request.method": request.method,
+          "url.path": pathOf(request.url),
+        };
 
         // The span wraps the exit, not the effect: a declared 4xx must not
         // end it as a failure (see `settle`), so the exit is inspected inside
@@ -161,13 +177,11 @@ export const EndpointBoundaryLive: Layer.Layer<EndpointBoundary> =
             parent: Option.getOrUndefined(
               HttpTraceContext.fromHeaders(request.headers),
             ),
-            attributes: {
-              "http.request.method": request.method,
-              "url.path": pathOf(request.url),
-              ...(Option.isSome(requestId)
-                ? { "request.id": requestId.value }
-                : {}),
-            },
+            // `request.id` is added only when there is one: an attribute set
+            // to `undefined` is not the same as an absent attribute.
+            attributes: Option.isSome(requestId)
+              ? { ...spanAttributes, "request.id": requestId.value }
+              : spanAttributes,
           }),
           Effect.flatMap((exit) => exit),
         );
@@ -195,6 +209,12 @@ export const EndpointBoundaryLive: Layer.Layer<EndpointBoundary> =
 export const internal = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
 ): Effect.Effect<A, Exclude<E, DatabaseError> | InternalError, R> =>
+  // SAFETY: the refinement handed to `Effect.catchIf` is
+  // `error instanceof DatabaseError`, so every error it catches is exactly
+  // `Extract<E, DatabaseError>` and its handler fails with `InternalError`.
+  // The remaining channel is therefore `Exclude<E, DatabaseError> |
+  // InternalError`; `catchIf` only widens it to `E | InternalError` because
+  // it cannot subtract a refined type from an unresolved generic.
   Effect.catchIf(
     effect,
     (error): error is Extract<E, DatabaseError> =>
@@ -228,12 +248,19 @@ export const withUser = <A, E, R>(
 const toWebHeaders = (
   request: HttpServerRequest.HttpServerRequest,
 ): Headers => {
-  const source = request.source as { readonly headers?: unknown };
-  if (source.headers instanceof Headers) return source.headers;
+  const source = request.source;
+  if (
+    source instanceof Object &&
+    "headers" in source &&
+    source.headers instanceof Headers
+  ) {
+    return source.headers;
+  }
   const headers = new Headers();
   for (const [name, value] of Object.entries(request.headers)) {
-    // The record carries its type id as a `~`-prefixed key; skip it.
-    if (typeof value === "string" && !name.startsWith("~")) {
+    // The record carries its type id as a `~`-prefixed key, and that is the
+    // only entry that is not a header; skip it.
+    if (!name.startsWith("~")) {
       headers.append(name, value);
     }
   }

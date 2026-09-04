@@ -20,6 +20,12 @@ import {
 
 import { RequestTrace, type RequestTraceShape } from "./boundary";
 import { AppConfig, type AppConfigShape } from "./config";
+// This module is the composition root: `makeWebHandler` is where the API's
+// Layer is *built* (`makeApiLive(options).pipe(Layer.provideMerge(services))`)
+// before `HttpRouter.toWebHandler` runs it. `makeApiLive` is a Layer factory
+// parameterised by `ApiLiveOptions`, not a service constructor reached around
+// its Layer — there is no Layer above it to import instead.
+// oxlint-disable-next-line anti-slop-effect/no-service-constructor-imports
 import { type ApiLiveOptions, type AppServices, makeApiLive } from "./layer";
 
 /** The per-request services an entry point may hand the API (`RequestContext`, for one). */
@@ -82,13 +88,17 @@ const corsFor = (config: AppConfigShape) => {
 const traceHeaders = (
   response: HttpServerResponse.HttpServerResponse,
   trace: RequestTraceShape,
-): HttpServerResponse.HttpServerResponse =>
-  HttpServerResponse.setHeaders(response, {
-    [REQUEST_ID_HEADER]: trace.requestId,
-    ...(trace.traceId === undefined
-      ? {}
-      : { [TRACE_ID_HEADER]: trace.traceId }),
-  });
+): HttpServerResponse.HttpServerResponse => {
+  const requestIdHeader = { [REQUEST_ID_HEADER]: trace.requestId };
+  // A response header set to `undefined` is sent as the string "undefined",
+  // so a request with no span is given no `x-trace-id` header at all.
+  return HttpServerResponse.setHeaders(
+    response,
+    trace.traceId === undefined
+      ? requestIdHeader
+      : { ...requestIdHeader, [TRACE_ID_HEADER]: trace.traceId },
+  );
+};
 
 /** The web handler over `services`; the app calls this once at module scope. */
 export const makeWebHandler = (

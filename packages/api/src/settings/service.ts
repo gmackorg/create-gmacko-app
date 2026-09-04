@@ -21,7 +21,7 @@ import {
   workspaceInviteAllowlist,
   workspaceMembership,
 } from "@gmacko/db/schema";
-import type { UserId } from "@gmacko/domain/auth";
+import { UserId } from "@gmacko/domain/auth";
 import { Conflict, NotFound } from "@gmacko/domain/errors";
 import {
   AnnouncementTone,
@@ -34,14 +34,14 @@ import {
   Theme as ThemeSchema,
   type UpdatePreferences,
   UserPreferences,
-  type UserPreferencesId,
-  type WaitlistEntryId,
+  UserPreferencesId,
+  WaitlistEntryId,
   WaitlistSubmission,
   type WaitlistSubmit,
   WorkspaceContext,
-  type WorkspaceId,
+  WorkspaceId,
   WorkspaceInvite,
-  type InviteId as WorkspaceInviteId,
+  InviteId as WorkspaceInviteId,
 } from "@gmacko/domain/settings";
 import { asc, count, eq, sql } from "drizzle-orm";
 import { Context, Effect, Layer } from "effect";
@@ -52,26 +52,32 @@ import { AppConfig, canAutoCreateAccounts } from "../config";
 // Column mapping
 // ---------------------------------------------------------------------------
 
+/**
+ * The contract's literal sets keyed by their own text, so a `text` column
+ * read back from D1 maps to the literal without asserting that it is one.
+ */
+const announcementTones = new Map<string, AnnouncementTone>(
+  AnnouncementTone.literals.map((tone) => [tone, tone] as const),
+);
+const themes = new Map<string, Theme>(
+  ThemeSchema.literals.map((theme) => [theme, theme] as const),
+);
+
 /** Free text in D1; the contract's literal set, defaulting to `info`. */
 export const toAnnouncementTone = (value: string): AnnouncementTone =>
-  (AnnouncementTone.literals as ReadonlyArray<string>).includes(value)
-    ? (value as AnnouncementTone)
-    : "info";
+  announcementTones.get(value) ?? "info";
 
 /** Free text in D1; the contract's literal set, defaulting to `system`. */
-export const toTheme = (value: string): Theme =>
-  (ThemeSchema.literals as ReadonlyArray<string>).includes(value)
-    ? (value as Theme)
-    : "system";
+export const toTheme = (value: string): Theme => themes.get(value) ?? "system";
 
 type InviteRow = typeof workspaceInviteAllowlist.$inferSelect;
 const toInvite = (row: InviteRow): WorkspaceInvite =>
   new WorkspaceInvite({
-    id: row.id as WorkspaceInviteId,
-    workspaceId: row.workspaceId as WorkspaceId,
+    id: WorkspaceInviteId.make(row.id),
+    workspaceId: WorkspaceId.make(row.workspaceId),
     email: row.email,
     role: row.role,
-    invitedByUserId: row.invitedByUserId as UserId,
+    invitedByUserId: UserId.make(row.invitedByUserId),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -79,8 +85,8 @@ const toInvite = (row: InviteRow): WorkspaceInvite =>
 type PreferencesRow = typeof userPreferences.$inferSelect;
 const toPreferences = (row: PreferencesRow): UserPreferences =>
   new UserPreferences({
-    id: row.id as UserPreferencesId,
-    userId: row.userId as UserId,
+    id: UserPreferencesId.make(row.id),
+    userId: UserId.make(row.userId),
     theme: toTheme(row.theme),
     language: row.language,
     timezone: row.timezone,
@@ -191,7 +197,7 @@ export class Waitlist extends Context.Service<Waitlist, WaitlistShape>()(
             Effect.map(
               (row) =>
                 new WaitlistSubmission({
-                  id: row.id as WaitlistEntryId,
+                  id: WaitlistEntryId.make(row.id),
                   email: row.email,
                   source: row.source,
                   status: row.status,
@@ -287,7 +293,7 @@ export class Workspaces extends Context.Service<Workspaces, WorkspacesShape>()(
                 current === null
                   ? null
                   : {
-                      id: current.id as WorkspaceId,
+                      id: WorkspaceId.make(current.id),
                       name: current.name,
                       slug: current.slug,
                     },
@@ -394,7 +400,7 @@ export class Workspaces extends Context.Service<Workspaces, WorkspacesShape>()(
               yield* batch([consume]);
             }
             return new InviteAccepted({
-              workspaceId: invite.workspaceId as WorkspaceId,
+              workspaceId: WorkspaceId.make(invite.workspaceId),
               role: existing?.role ?? invite.role,
             });
           }),
@@ -406,6 +412,15 @@ export class Workspaces extends Context.Service<Workspaces, WorkspacesShape>()(
 // ---------------------------------------------------------------------------
 // Preferences
 // ---------------------------------------------------------------------------
+
+/** The `user_preferences` columns an `UpdatePreferences` patch may set. */
+interface PreferencesFields {
+  theme?: Theme;
+  language?: string;
+  timezone?: string;
+  emailNotifications?: boolean;
+  pushNotifications?: boolean;
+}
 
 export interface PreferencesShape {
   /**
@@ -426,7 +441,7 @@ export interface PreferencesShape {
 const defaultPreferences = (userId: string): UserPreferences =>
   new UserPreferences({
     id: null,
-    userId: userId as UserId,
+    userId: UserId.make(userId),
     theme: "system",
     language: "en",
     timezone: "UTC",
@@ -459,21 +474,20 @@ export class Preferences extends Context.Service<
               ),
             ),
         update: (userId, patch) => {
-          const fields = {
-            ...(patch.theme === undefined ? {} : { theme: patch.theme }),
-            ...(patch.language === undefined
-              ? {}
-              : { language: patch.language }),
-            ...(patch.timezone === undefined
-              ? {}
-              : { timezone: patch.timezone }),
-            ...(patch.emailNotifications === undefined
-              ? {}
-              : { emailNotifications: patch.emailNotifications }),
-            ...(patch.pushNotifications === undefined
-              ? {}
-              : { pushNotifications: patch.pushNotifications }),
-          };
+          // Only the columns the caller sent. A key present with an
+          // `undefined` value is not the same as an absent key here: the
+          // insert below binds every key it is given, so an omitted column
+          // takes its default and a sent one does not.
+          const fields: PreferencesFields = {};
+          if (patch.theme !== undefined) fields.theme = patch.theme;
+          if (patch.language !== undefined) fields.language = patch.language;
+          if (patch.timezone !== undefined) fields.timezone = patch.timezone;
+          if (patch.emailNotifications !== undefined) {
+            fields.emailNotifications = patch.emailNotifications;
+          }
+          if (patch.pushNotifications !== undefined) {
+            fields.pushNotifications = patch.pushNotifications;
+          }
           return first(
             db
               .insert(userPreferences)
@@ -497,6 +511,13 @@ export class Preferences extends Context.Service<
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** The argument `ApiKeys.create` takes, as `toApiKeyCreate` builds it. */
+export interface ApiKeyCreateInput {
+  readonly name: string;
+  readonly permissions: CreateApiKey["permissions"];
+  readonly expiresAt: Date | undefined;
+}
+
 /**
  * The contract's `expiresInDays` (relative, what a form asks for) as the
  * `expiresAt` instant `ApiKeys.create` stores; `undefined` never expires.
@@ -504,11 +525,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const toApiKeyCreate = (
   payload: CreateApiKey,
   now: number = Date.now(),
-): {
-  readonly name: string;
-  readonly permissions: CreateApiKey["permissions"];
-  readonly expiresAt: Date | undefined;
-} => ({
+): ApiKeyCreateInput => ({
   name: payload.name,
   permissions: payload.permissions,
   expiresAt:

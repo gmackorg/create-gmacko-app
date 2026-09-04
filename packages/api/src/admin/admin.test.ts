@@ -19,8 +19,8 @@ import {
   ReviewWaitlistEntry,
   UpdateLaunchControls,
   UpdateUserRole,
-  type UserId,
-  type WaitlistEntryId,
+  UserId,
+  WaitlistEntryId,
 } from "@gmacko/domain";
 import { eq } from "drizzle-orm";
 import { Effect } from "effect";
@@ -241,7 +241,7 @@ describe("admin bootstrap (ported)", () => {
       ),
     );
     const outcomes = results.map((r) =>
-      r._tag === "Success" ? "success" : (r.failure as { _tag: string })._tag,
+      r._tag === "Success" ? "success" : r.failure._tag,
     );
     expect(outcomes.sort()).toEqual(["Conflict", "success"]);
     expect(await db(({ db }) => db.select().from(workspace))).toHaveLength(1);
@@ -340,7 +340,7 @@ describe("admin launch controls (ported)", () => {
     const reviewed = await api.call(
       (client) =>
         client.admin.reviewWaitlistEntry({
-          params: { id: entry.id as WaitlistEntryId },
+          params: { id: WaitlistEntryId.make(entry.id) },
           payload: new ReviewWaitlistEntry({ status: "approved" }),
         }),
       { cookie: avery.cookie },
@@ -505,7 +505,7 @@ describe("admin waitlist review", () => {
     const missing = await api.failure(
       (client) =>
         client.admin.reviewWaitlistEntry({
-          params: { id: "missing" as WaitlistEntryId },
+          params: { id: WaitlistEntryId.make("missing") },
           payload: new ReviewWaitlistEntry({ status: "contacted" }),
         }),
       { cookie: avery.cookie },
@@ -522,7 +522,7 @@ describe("admin waitlist review", () => {
     await api.call(
       (client) =>
         client.admin.reviewWaitlistEntry({
-          params: { id: entry.id as WaitlistEntryId },
+          params: { id: WaitlistEntryId.make(entry.id) },
           payload: new ReviewWaitlistEntry({ status: "contacted" }),
         }),
       { cookie: avery.cookie },
@@ -530,7 +530,7 @@ describe("admin waitlist review", () => {
     const again = await api.failure(
       (client) =>
         client.admin.reviewWaitlistEntry({
-          params: { id: entry.id as WaitlistEntryId },
+          params: { id: WaitlistEntryId.make(entry.id) },
           payload: new ReviewWaitlistEntry({ status: "contacted" }),
         }),
       { cookie: avery.cookie },
@@ -558,7 +558,7 @@ describe("admin waitlist review", () => {
     const reviewed = await api.call(
       (client) =>
         client.admin.reviewWaitlistEntry({
-          params: { id: entry.id as WaitlistEntryId },
+          params: { id: WaitlistEntryId.make(entry.id) },
           payload: new ReviewWaitlistEntry({ status: "approved" }),
         }),
       { cookie: avery.cookie },
@@ -586,7 +586,7 @@ describe("admin waitlist review", () => {
     const reviewed = await api.call(
       (client) =>
         client.admin.reviewWaitlistEntry({
-          params: { id: entry.id as WaitlistEntryId },
+          params: { id: WaitlistEntryId.make(entry.id) },
           payload: new ReviewWaitlistEntry({ status: "approved" }),
         }),
       { cookie: avery.cookie },
@@ -613,7 +613,7 @@ describe("admin waitlist review", () => {
         api.result(
           (client) =>
             client.admin.reviewWaitlistEntry({
-              params: { id: entry.id as WaitlistEntryId },
+              params: { id: WaitlistEntryId.make(entry.id) },
               payload: new ReviewWaitlistEntry({ status: "approved" }),
             }),
           { cookie: avery.cookie },
@@ -621,7 +621,7 @@ describe("admin waitlist review", () => {
       ),
     );
     const outcomes = results.map((r) =>
-      r._tag === "Success" ? "success" : (r.failure as { _tag: string })._tag,
+      r._tag === "Success" ? "success" : r.failure._tag,
     );
     expect(outcomes.sort()).toEqual(["Conflict", "success"]);
     const allowlist = await db(({ db }) =>
@@ -691,7 +691,7 @@ describe("admin users and stats", () => {
     const person = await api.createUser({ name: "Jordan" });
     const found = await api.call(
       (client) =>
-        client.admin.getUser({ params: { userId: person.id as UserId } }),
+        client.admin.getUser({ params: { userId: UserId.make(person.id) } }),
       { cookie: avery.cookie },
     );
     expect(found).toMatchObject({
@@ -701,7 +701,7 @@ describe("admin users and stats", () => {
     });
     const missing = await api.failure(
       (client) =>
-        client.admin.getUser({ params: { userId: "missing" as UserId } }),
+        client.admin.getUser({ params: { userId: UserId.make("missing") } }),
       { cookie: avery.cookie },
     );
     expect(missing).toMatchObject({ _tag: "NotFound", resource: "user" });
@@ -713,7 +713,7 @@ describe("admin users and stats", () => {
     const promoted = await api.call(
       (client) =>
         client.admin.updateUserRole({
-          params: { userId: person.id as UserId },
+          params: { userId: UserId.make(person.id) },
           payload: new UpdateUserRole({ role: "admin" }),
         }),
       { cookie: avery.cookie },
@@ -731,7 +731,7 @@ describe("admin users and stats", () => {
     const self = await api.failure(
       (client) =>
         client.admin.updateUserRole({
-          params: { userId: avery.id as UserId },
+          params: { userId: UserId.make(avery.id) },
           payload: new UpdateUserRole({ role: "user" }),
         }),
       { cookie: avery.cookie },
@@ -741,7 +741,7 @@ describe("admin users and stats", () => {
     const missing = await api.failure(
       (client) =>
         client.admin.updateUserRole({
-          params: { userId: "missing" as UserId },
+          params: { userId: UserId.make("missing") },
           payload: new UpdateUserRole({ role: "user" }),
         }),
       { cookie: avery.cookie },

@@ -6,7 +6,7 @@
 import { Database, type DatabaseError } from "@gmacko/db";
 import { Post as PostTable } from "@gmacko/db/schema";
 import { NotFound } from "@gmacko/domain/errors";
-import { type CreatePost, Post, type PostId } from "@gmacko/domain/posts";
+import { type CreatePost, Post, PostId } from "@gmacko/domain/posts";
 import { desc, eq } from "drizzle-orm";
 import { Context, Effect, Layer } from "effect";
 
@@ -24,7 +24,7 @@ type Row = typeof PostTable.$inferSelect;
 
 const toPost = (row: Row): Post =>
   new Post({
-    id: row.id as PostId,
+    id: PostId.make(row.id),
     title: row.title,
     content: row.content,
     createdAt: row.createdAt,

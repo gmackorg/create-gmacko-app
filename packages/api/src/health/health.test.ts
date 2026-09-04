@@ -5,7 +5,7 @@
  */
 import { Database, DatabaseError } from "@gmacko/db";
 import { layerTest } from "@gmacko/db/testing";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Predicate, Schema } from "effect";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { makeTestApi, type TestApi } from "../testing";
@@ -52,16 +52,34 @@ const start = (...args: Parameters<typeof makeTestApi>) => {
 
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
+/**
+ * The wire form of the two `ForgeHealth` fields this suite reads back as
+ * dates: the contract declares them `Schema.Date`, which is sent as an ISO
+ * string, so the decode below is what pins that they arrive as strings.
+ */
+const forgeWireBody = Schema.decodeUnknownSync(
+  Schema.Struct({
+    timestamp: Schema.String,
+    checks: Schema.Struct({
+      database: Schema.Struct({ checkedAt: Schema.String }),
+    }),
+  }),
+);
+
+/** A response body, decoded once at the boundary into Effect's JSON type. */
+const jsonBody = (response: Response): Promise<Schema.Json> =>
+  response.json().then(Schema.decodeUnknownSync(Schema.Json));
+
 /** Replaces the values that change per run with their kind, for the snapshot. */
-const shape = (value: unknown): unknown => {
+const shape = (value: Schema.Json): Schema.Json => {
   if (Array.isArray(value)) return value.map(shape);
-  if (value !== null && typeof value === "object") {
+  if (value instanceof Object) {
     return Object.fromEntries(
       Object.entries(value).map(([key, entry]) => [key, shape(entry)]),
     );
   }
-  if (typeof value === "string" && ISO.test(value)) return "<iso-date>";
-  if (typeof value === "number") return "<number>";
+  if (Predicate.isString(value) && ISO.test(value)) return "<iso-date>";
+  if (Predicate.isNumber(value)) return "<number>";
   return value;
 };
 
@@ -85,10 +103,7 @@ describe("health probes", () => {
       version: "0.0.0-test",
       checks: { database: { status: "pass" } },
     });
-    const body = (await forge.json()) as {
-      timestamp: string;
-      checks: { database: { checkedAt: string } };
-    };
+    const body = forgeWireBody(await forge.json());
     expect(new Date(body.timestamp).toISOString()).toBe(body.timestamp);
     expect(new Date(body.checks.database.checkedAt).toISOString()).toBe(
       body.checks.database.checkedAt,
@@ -162,7 +177,7 @@ describe("health probes", () => {
         "/api/health/ready",
         "/api/health",
         "/.well-known/forge-health",
-      ].map((path) => api.fetch(path).then((r) => r.json())),
+      ].map((path) => api.fetch(path).then(jsonBody)),
     );
     expect(shape(bodies)).toMatchInlineSnapshot(`
       [
@@ -211,10 +226,10 @@ describe("health probes", () => {
       "/.well-known/forge-health",
     ];
     const ok = await Promise.all(
-      paths.map((path) => healthy.fetch(path).then((r) => r.json())),
+      paths.map((path) => healthy.fetch(path).then(jsonBody)),
     );
     const failed = await Promise.all(
-      paths.map((path) => unhealthy.fetch(path).then((r) => r.json())),
+      paths.map((path) => unhealthy.fetch(path).then(jsonBody)),
     );
     expect(shape({ ok, failed })).toMatchInlineSnapshot(`
       {

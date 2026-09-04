@@ -21,7 +21,7 @@ import {
   AdminStats,
   AdminWorkspace,
   ApplicationSettings,
-  type ApplicationSettingsId,
+  ApplicationSettingsId,
   BootstrapCompleted,
   BootstrapStatus,
   type CompleteBootstrap,
@@ -32,14 +32,14 @@ import {
   type UpdateUserRole,
   UserList,
 } from "@gmacko/domain/admin";
-import { User, type UserId } from "@gmacko/domain/auth";
+import { User, UserId } from "@gmacko/domain/auth";
 import { Conflict, NotFound } from "@gmacko/domain/errors";
 import {
   type PlatformPrimitives,
   WaitlistEntry,
-  type WaitlistEntryId,
+  WaitlistEntryId,
   Workspace,
-  type WorkspaceId,
+  WorkspaceId,
 } from "@gmacko/domain/settings";
 import { asc, count, eq, exists, sql } from "drizzle-orm";
 import { Context, Effect, Layer } from "effect";
@@ -53,10 +53,16 @@ import { toAnnouncementTone } from "../settings/service";
 type SettingsRow = typeof applicationSettings.$inferSelect;
 const toSettings = (row: SettingsRow): ApplicationSettings =>
   new ApplicationSettings({
-    id: row.id as ApplicationSettingsId,
+    id: ApplicationSettingsId.make(row.id),
     setupCompletedAt: row.setupCompletedAt,
-    setupCompletedByUserId: row.setupCompletedByUserId as UserId | null,
-    initialWorkspaceId: row.initialWorkspaceId as WorkspaceId | null,
+    setupCompletedByUserId:
+      row.setupCompletedByUserId === null
+        ? null
+        : UserId.make(row.setupCompletedByUserId),
+    initialWorkspaceId:
+      row.initialWorkspaceId === null
+        ? null
+        : WorkspaceId.make(row.initialWorkspaceId),
     maintenanceMode: row.maintenanceMode,
     signupEnabled: row.signupEnabled,
     announcementMessage: row.announcementMessage,
@@ -69,13 +75,14 @@ const toSettings = (row: SettingsRow): ApplicationSettings =>
 type WaitlistRow = typeof waitlistEntry.$inferSelect;
 const toWaitlistEntry = (row: WaitlistRow): WaitlistEntry =>
   new WaitlistEntry({
-    id: row.id as WaitlistEntryId,
+    id: WaitlistEntryId.make(row.id),
     email: row.email,
     source: row.source,
     status: row.status,
     message: row.message,
     referralCode: row.referralCode,
-    reviewedByUserId: row.reviewedByUserId as UserId | null,
+    reviewedByUserId:
+      row.reviewedByUserId === null ? null : UserId.make(row.reviewedByUserId),
     reviewedAt: row.reviewedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -84,7 +91,7 @@ const toWaitlistEntry = (row: WaitlistRow): WaitlistEntry =>
 type UserRow = typeof user.$inferSelect;
 export const toUser = (row: UserRow): User =>
   new User({
-    id: row.id as UserId,
+    id: UserId.make(row.id),
     name: row.name,
     email: row.email,
     emailVerified: row.emailVerified,
@@ -97,10 +104,10 @@ export const toUser = (row: UserRow): User =>
 type WorkspaceRow = typeof workspace.$inferSelect;
 const toWorkspace = (row: WorkspaceRow): Workspace =>
   new Workspace({
-    id: row.id as WorkspaceId,
+    id: WorkspaceId.make(row.id),
     name: row.name,
     slug: row.slug,
-    ownerUserId: row.ownerUserId as UserId,
+    ownerUserId: UserId.make(row.ownerUserId),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -131,13 +138,22 @@ export interface LaunchControlsShape {
   ) => Effect.Effect<ApplicationSettings, DatabaseError>;
 }
 
+/** The `application_settings` columns an `UpdateLaunchControls` patch may set. */
+interface LaunchControlsFields {
+  maintenanceMode?: UpdateLaunchControls["maintenanceMode"];
+  signupEnabled?: UpdateLaunchControls["signupEnabled"];
+  announcementMessage?: UpdateLaunchControls["announcementMessage"];
+  announcementTone?: UpdateLaunchControls["announcementTone"];
+  allowedEmailDomains?: Array<string>;
+}
+
 /** The launch controls' column defaults, as read when no row exists yet. */
 const launchDefaults = {
   maintenanceMode: false,
   signupEnabled: true,
   announcementMessage: null,
   announcementTone: "info",
-  allowedEmailDomains: [] as ReadonlyArray<string>,
+  allowedEmailDomains: [],
 } as const;
 
 export class LaunchControlsService extends Context.Service<
@@ -179,23 +195,26 @@ export class LaunchControlsService extends Context.Service<
           ),
           update: (patch) =>
             Effect.gen(function* () {
-              const fields = {
-                ...(patch.maintenanceMode === undefined
-                  ? {}
-                  : { maintenanceMode: patch.maintenanceMode }),
-                ...(patch.signupEnabled === undefined
-                  ? {}
-                  : { signupEnabled: patch.signupEnabled }),
-                ...(patch.announcementMessage === undefined
-                  ? {}
-                  : { announcementMessage: patch.announcementMessage }),
-                ...(patch.announcementTone === undefined
-                  ? {}
-                  : { announcementTone: patch.announcementTone }),
-                ...(patch.allowedEmailDomains === undefined
-                  ? {}
-                  : { allowedEmailDomains: [...patch.allowedEmailDomains] }),
-              };
+              // Only the fields the patch carries. Omission is load-bearing
+              // twice below: `{ ...launchDefaults, ...fields }` must not let
+              // an `undefined` value overwrite a default, and the `set()`
+              // must not name a column the caller did not send.
+              const fields: LaunchControlsFields = {};
+              if (patch.maintenanceMode !== undefined) {
+                fields.maintenanceMode = patch.maintenanceMode;
+              }
+              if (patch.signupEnabled !== undefined) {
+                fields.signupEnabled = patch.signupEnabled;
+              }
+              if (patch.announcementMessage !== undefined) {
+                fields.announcementMessage = patch.announcementMessage;
+              }
+              if (patch.announcementTone !== undefined) {
+                fields.announcementTone = patch.announcementTone;
+              }
+              if (patch.allowedEmailDomains !== undefined) {
+                fields.allowedEmailDomains = [...patch.allowedEmailDomains];
+              }
               const [existing] = yield* singleton;
               if (existing === undefined) {
                 // First write: one guarded INSERT … SELECT carrying the patch
@@ -395,7 +414,10 @@ export class Bootstrap extends Context.Service<Bootstrap, BootstrapShape>()(
               hasExistingWorkspace: workspaces.length > 0,
               setupCompletedAt: completedAt,
               initialWorkspaceId:
-                (settings?.initialWorkspaceId as WorkspaceId | null) ?? null,
+                settings?.initialWorkspaceId === undefined ||
+                settings.initialWorkspaceId === null
+                  ? null
+                  : WorkspaceId.make(settings.initialWorkspaceId),
             });
           }),
         ),
@@ -591,10 +613,10 @@ export class AdminUsers extends Context.Service<AdminUsers, AdminUsersShape>()(
               rows.map(
                 (row) =>
                   new AdminWorkspace({
-                    id: row.id as WorkspaceId,
+                    id: WorkspaceId.make(row.id),
                     name: row.name,
                     slug: row.slug,
-                    ownerUserId: row.ownerUserId as UserId,
+                    ownerUserId: UserId.make(row.ownerUserId),
                     membershipCount: row.membershipCount,
                     createdAt: row.createdAt,
                   }),

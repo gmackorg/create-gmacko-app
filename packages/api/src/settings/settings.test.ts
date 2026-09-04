@@ -24,10 +24,10 @@ import {
   workspaceUsageRollup,
 } from "@gmacko/db/schema";
 import {
-  type ApiKeyId,
+  ApiKeyId,
   CreateApiKey,
   CreateInvite,
-  type InviteId,
+  InviteId,
   UpdatePreferences,
   WaitlistSubmit,
 } from "@gmacko/domain";
@@ -65,19 +65,22 @@ const invite = (
   role: "admin" | "member",
   invitedBy: TestUser,
   createdAt?: Date,
-) =>
-  db(({ db }) =>
+) => {
+  // Without a `createdAt` the column must not be named at all, so the row
+  // takes its default; naming it with `undefined` would bind a null.
+  const values = {
+    workspaceId,
+    email,
+    role,
+    invitedByUserId: invitedBy.id,
+  };
+  return db(({ db }) =>
     db
       .insert(workspaceInviteAllowlist)
-      .values({
-        workspaceId,
-        email,
-        role,
-        invitedByUserId: invitedBy.id,
-        ...(createdAt ? { createdAt } : {}),
-      })
+      .values(createdAt === undefined ? values : { ...values, createdAt })
       .returning(),
   ).then((rows) => rows[0]!);
+};
 
 describe("settings workspace context (ported)", () => {
   it("prefers initialWorkspaceId when selecting the visible workspace", async () => {
@@ -298,7 +301,7 @@ describe("settings collaboration invites (ported)", () => {
     const failure = await api.failure(
       (client) =>
         client.settings.acceptInvite({
-          params: { inviteId: pending.id as InviteId },
+          params: { inviteId: InviteId.make(pending.id) },
         }),
       { cookie: invitee.cookie },
     );
@@ -358,7 +361,7 @@ describe("settings collaboration invites (ported)", () => {
       const failure = await api.failure(
         (client) =>
           client.settings.acceptInvite({
-            params: { inviteId: inviteId as InviteId },
+            params: { inviteId: InviteId.make(inviteId) },
           }),
         { cookie: stranger.cookie },
       );
@@ -379,7 +382,7 @@ describe("settings collaboration invites (ported)", () => {
     const accepted = await api.call(
       (client) =>
         client.settings.acceptInvite({
-          params: { inviteId: pending.id as InviteId },
+          params: { inviteId: InviteId.make(pending.id) },
         }),
       { cookie: member.cookie },
     );
@@ -402,14 +405,23 @@ describe("settings collaboration invites (ported)", () => {
         role: "admin",
       }),
     );
-    const stale = {
+    // A request context whose memberships are stale: the row was inserted
+    // after it was built. `acceptInvite` reads only `memberships`; every
+    // other read dies loudly rather than answering with a plausible value.
+    const unread = (name: string) =>
+      Effect.die(new Error(`stale request context: ${name} must not be read`));
+    const stale: RequestContextShape = {
+      session: unread("session"),
+      user: () => unread("user"),
+      role: () => unread("role"),
       memberships: () => Effect.succeed([]),
-    } as unknown as RequestContextShape;
+      workspace: () => unread("workspace"),
+    };
     const accepted = await api.run(
       Effect.flatMap(Workspaces, (workspaces) =>
         workspaces.acceptInvite(
           { id: invitee.id, email: invitee.email },
-          pending.id as InviteId,
+          InviteId.make(pending.id),
           stale,
         ),
       ).pipe(Effect.provide(Workspaces.layer)),
@@ -452,7 +464,7 @@ describe("settings collaboration invites (ported)", () => {
       const failure = await api.failure(
         (client) =>
           client.settings.acceptInvite({
-            params: { inviteId: pending.id as InviteId },
+            params: { inviteId: InviteId.make(pending.id) },
           }),
         { cookie: invitee.cookie },
       );
@@ -980,7 +992,7 @@ describe("settings api keys", () => {
     const notMine = await api.failure(
       (client) =>
         client.settings.revokeApiKey({
-          params: { id: theirs.id as ApiKeyId },
+          params: { id: ApiKeyId.make(theirs.id) },
         }),
       { cookie: person.cookie },
     );

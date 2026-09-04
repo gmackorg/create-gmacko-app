@@ -31,6 +31,12 @@ export interface DatabaseCheck {
   readonly checkedAt: Date;
 }
 
+/** The last successful check, and the instant it stops being reused. */
+interface CachedCheck {
+  readonly check: DatabaseCheck;
+  readonly until: number;
+}
+
 export interface HealthShape {
   readonly live: Effect.Effect<LiveStatus>;
   readonly ready: Effect.Effect<ReadyStatus, Unhealthy>;
@@ -61,7 +67,7 @@ export class Health extends Context.Service<Health, HealthShape>()(
       const database = yield* Database;
 
       // Successes only: a cached failure would hide a recovery for 5 s.
-      let cached: { readonly check: DatabaseCheck; readonly until: number } = {
+      let cached: CachedCheck = {
         check: { latencyMs: 0, checkedAt: new Date(0) },
         until: 0,
       };
