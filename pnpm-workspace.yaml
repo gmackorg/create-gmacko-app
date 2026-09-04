@@ -46,7 +46,12 @@ catalog:
   effect: 4.0.0-rc.112
   knip: ^6.0.4
   lefthook: ^2.1.4
-  oxlint: ^1.56.0
+  # oxlint and @oxlint/plugins MUST move together: a JS plugin is loaded into
+  # the linter process, so `@oxlint/plugins` has to be exactly the resolved
+  # oxlint version. Both are pinned exact so a caret cannot drift them apart.
+  # See tools/oxlint/anti-slop/README.md.
+  '@oxlint/plugins': 1.56.0
+  oxlint: 1.56.0
   posthog-js: ^1.362.0
   storybook: ^10.6.0
   tailwindcss: ^4.2.2

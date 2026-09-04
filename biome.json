@@ -19,7 +19,8 @@
       "!**/node_modules",
       "!docs/plans/**/*.html",
       "!apps/web/src/routeTree.gen.ts",
-      "!**/__snapshots__/**"
+      "!**/__snapshots__/**",
+      "!tools/oxlint/anti-slop/**"
     ]
   },
   "formatter": {

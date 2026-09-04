@@ -1,6 +1,7 @@
 {
   "name": "create-gmacko-app",
   "private": true,
+  "type": "module",
   "engines": {
     "node": "^24.0.0",
     "pnpm": "^10.32.1"
@@ -83,6 +84,7 @@
     "@commitlint/config-conventional": "catalog:",
     "@forgegraph/cli": "^0.3.0",
     "@gmacko/emulate": "^0.5.3",
+    "@oxlint/plugins": "catalog:",
     "@turbo/gen": "^2.8.18",
     "concurrently": "^9.1.0",
     "knip": "catalog:",
