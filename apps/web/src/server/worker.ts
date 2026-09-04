@@ -13,6 +13,11 @@ import { sentryWorkerOptions } from "@gmacko/monitoring/web/server";
 import startEntry from "@tanstack/react-start/server-entry";
 import { Effect } from "effect";
 
+// This module is wrangler.jsonc's `main`: the Worker entry, and so the
+// composition root that builds the exported handler. `makeWorker` is not an
+// Effect service constructor either — it returns an `ExportedHandler`, and
+// there is no Layer to import in its place.
+// oxlint-disable-next-line anti-slop-effect/no-service-constructor-imports
 import { makeWorker } from "./make-worker";
 import { flush, runtime } from "./runtime";
 

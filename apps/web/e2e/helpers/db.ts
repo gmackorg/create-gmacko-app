@@ -33,8 +33,8 @@ const d1 = (args: ReadonlyArray<string>): string =>
     },
   );
 
-interface ExecuteResult {
-  readonly results: ReadonlyArray<Record<string, unknown>>;
+interface ExecuteResult<Row> {
+  readonly results: ReadonlyArray<Row>;
 }
 
 /** Runs one statement and returns its rows. */
@@ -42,8 +42,11 @@ export const query = <T extends Record<string, unknown>>(
   sql: string,
 ): ReadonlyArray<T> => {
   const out = d1(["execute", "DB", "--json", "--command", sql]);
-  const parsed = JSON.parse(out) as ReadonlyArray<ExecuteResult>;
-  return (parsed[0]?.results ?? []) as ReadonlyArray<T>;
+  // SAFETY: `wrangler d1 execute --json` prints one `{ results: [...] }` per
+  // statement, and `sql` is a single statement, so element 0 is this query's
+  // rows; `T` is the row shape the caller's own SELECT list produces.
+  const parsed = JSON.parse(out) as ReadonlyArray<ExecuteResult<T>>;
+  return parsed[0]?.results ?? [];
 };
 
 /** Runs statements from a file (many statements, one wrangler call). */

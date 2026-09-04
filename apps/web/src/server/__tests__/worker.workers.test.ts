@@ -12,18 +12,30 @@ import { describe, expect, it } from "vitest";
 
 import { makeWorker, type WorkerParts } from "../make-worker";
 
-const env = { STAGE: "development" } as unknown as Cloudflare.Env;
+/**
+ * `makeWorker` is generic in its `Env` and passes it straight through, so
+ * the suite names the one binding vitest.workers.config.ts declares rather
+ * than pretending to be the whole generated `Cloudflare.Env`.
+ */
+interface TestEnv {
+  readonly STAGE: string;
+}
+
+const env: TestEnv = { STAGE: "development" };
 
 /** An `ExecutionContext` that remembers what was handed to `waitUntil`. */
 const context = () => {
   const promises: Promise<unknown>[] = [];
+  // SAFETY: `waitUntil` is the only member make-worker.ts touches (its
+  // `scheduled` hands the flush to it) and the only one these tests read;
+  // workerd owns `exports`, `tracing` and `abort`, which nothing here calls.
   const ctx = {
     waitUntil: (promise: Promise<unknown>) => {
       promises.push(promise);
     },
     passThroughOnException: () => {},
     props: {},
-  } as unknown as ExecutionContext;
+  } as ExecutionContext;
   return {
     ctx,
     promises,
@@ -46,8 +58,8 @@ const sentryTo = (sent: string[]): Sentry.CloudflareOptions => ({
 });
 
 const parts = (
-  overrides: Partial<WorkerParts<Cloudflare.Env>> = {},
-): WorkerParts<Cloudflare.Env> & { readonly order: string[] } => {
+  overrides: Partial<WorkerParts<TestEnv>> = {},
+): WorkerParts<TestEnv> & { readonly order: string[] } => {
   const order: string[] = [];
   return {
     order,
@@ -66,9 +78,15 @@ const parts = (
   };
 };
 
-/** `fetch`'s parameter carries the incoming `cf` properties; a plain Request is cast to it. */
+/**
+ * `fetch`'s parameter carries the incoming `cf` properties.
+ *
+ * SAFETY: `cf` is the only thing that separates the two Request types, and
+ * nothing on this path reads it — `makeWorker` hands the request straight to
+ * `parts.fetch`, which here only looks at `url`.
+ */
 const request = (url: string) =>
-  new Request(url) as unknown as Request<unknown, IncomingRequestCfProperties>;
+  new Request(url) as Request<unknown, IncomingRequestCfProperties>;
 
 const controller = (cron = "0 3 * * *"): ScheduledController => ({
   cron,

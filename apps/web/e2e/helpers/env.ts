@@ -46,7 +46,7 @@ const INHERITED_HOST_ENV = ["PATH", "HOME", "NODE_OPTIONS", "CI", "TMPDIR"];
  * The Worker's bindings for the suite: an allowlisted slice of the host
  * environment plus the suite's own fixed values; nothing else crosses over.
  */
-export const serverEnv = (): Record<string, string> => {
+export const serverEnv = () => {
   const env: Record<string, string> = {};
   for (const key of INHERITED_HOST_ENV) {
     const value = process.env[key];

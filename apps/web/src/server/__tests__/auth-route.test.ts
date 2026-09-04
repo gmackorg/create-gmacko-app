@@ -1,25 +1,20 @@
 /**
  * `/api/auth/*` is shared: the contract's `auth` group owns a few
- * method+path pairs, better-auth owns the rest. The route module imports
- * the Worker runtime, so it is mocked away; the dispatcher takes its
- * handlers by injection.
+ * method+path pairs, better-auth owns the rest. The split lives in
+ * `~/server/auth-dispatch`, which has no Worker runtime in it, so the suite
+ * imports the real functions and injects the two handlers.
  */
 import { AppApi } from "@gmacko/domain";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-vi.mock("~/server/runtime", () => ({
-  apiHandler: () => Promise.resolve(new Response("runtime api")),
-  authHandler: () => Promise.resolve(new Response("runtime auth")),
-  guardAuthRequest: () => Promise.resolve(null),
-}));
-
-const {
+import {
   authRateLimitScope,
+  authRouteOptions,
   contractAuthRoutes,
   isContractAuthRequest,
   makeAuthDispatch,
   matchesPathTemplate,
-} = await import("~/routes/api/auth.$");
+} from "~/server/auth-dispatch";
 
 const ORIGIN = "http://localhost";
 
@@ -190,13 +185,23 @@ describe("/api/auth/$ dispatch", () => {
   });
 
   it("registers a single ANY handler on the route", async () => {
-    const { Route } = await import("~/routes/api/auth.$");
-    const handlers = (
-      Route.options as {
-        server?: { handlers?: Record<string, unknown> };
-      }
-    ).server?.handlers;
-    expect(handlers).toBeDefined();
-    expect(Object.keys(handlers ?? {})).toEqual(["ANY"]);
+    const seen: Array<string> = [];
+    const options = authRouteOptions({
+      api: (request) => {
+        seen.push(request.method);
+        return Promise.resolve(new Response("api"));
+      },
+      auth: (request) => {
+        seen.push(request.method);
+        return Promise.resolve(new Response("auth"));
+      },
+    });
+    const handlers = options.server.handlers;
+    expect(Object.keys(handlers)).toEqual(["ANY"]);
+    const response = await handlers.ANY({
+      request: new Request(`${ORIGIN}/api/auth/sign-out`, { method: "POST" }),
+    });
+    expect(await response.text()).toBe("auth");
+    expect(seen).toEqual(["POST"]);
   });
 });

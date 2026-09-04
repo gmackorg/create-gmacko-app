@@ -60,8 +60,10 @@ const OAUTH_PAIRS = [
   ["AUTH_APPLE_ID", "AUTH_APPLE_SECRET"],
 ] as const satisfies ReadonlyArray<readonly [keyof Bindings, keyof Bindings]>;
 
-const present = (env: Bindings, key: keyof Bindings): boolean =>
-  typeof env[key] === "string" && env[key].length > 0;
+const present = (env: Bindings, key: keyof Bindings): boolean => {
+  const value = env[key];
+  return value !== undefined && value.length > 0;
+};
 
 /**
  * What a strict stage is missing: `AUTH_SECRET`, one complete OAuth pair
@@ -128,6 +130,12 @@ const origins = (...urls: ReadonlyArray<string | undefined>) =>
  * ships; a test flips one.
  */
 export const fromBindings = (
+  // `bindings` is the Worker's ambient `env` (a literal object in the
+  // suites), and the decode this rule asks for is the first line of the
+  // body. config.test.ts hands this an unknown STAGE precisely to prove it
+  // throws here, so a narrower parameter type would move the check to the
+  // wrong side of it.
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters
   bindings: unknown,
   options?: {
     readonly version?: string | undefined;
@@ -210,6 +218,9 @@ const originOf = (url: string | undefined): string | undefined => {
 };
 
 export const webFromBindings = (
+  // The same boundary as `fromBindings`: `Schema.decodeUnknownSync(Bindings)`
+  // on the first line of the body is what turns this input into a type.
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters
   bindings: unknown,
   client: {
     readonly posthogHost: string | undefined;

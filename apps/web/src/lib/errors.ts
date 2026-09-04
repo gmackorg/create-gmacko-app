@@ -28,9 +28,16 @@ export const conflictMessages: Readonly<Record<ConflictReason, string>> = {
   "self-demotion": "You cannot remove your own admin role.",
 };
 
-/** A sentence a person can act on, for any rejection of `api()` or a mutation. */
+/**
+ * A sentence a person can act on, for any rejection of `api()` or a mutation.
+ *
+ * `Error` is the type every one of those rejections has: the contract's
+ * errors are `Schema.TaggedError` classes (which extend it), `ApiClientError`
+ * extends it, and TanStack Query's `TError` defaults to it, so every
+ * `onError` in the app hands one over already typed.
+ */
 export const describeApiError = (
-  error: unknown,
+  error: Error,
   fallback = "Something went wrong.",
 ): string => {
   if (error instanceof Unauthorized) return "Sign in to continue.";
@@ -72,7 +79,7 @@ export const describeApiError = (
 };
 
 /** `describeApiError`, plus the request id so a report can be matched to a trace. */
-export const toastApiError = (error: unknown, fallback?: string): void => {
+export const toastApiError = (error: Error, fallback?: string): void => {
   const trace = traceOf(error);
   toast.error(describeApiError(error, fallback), {
     description: trace?.requestId ? `Request ${trace.requestId}` : undefined,

@@ -3,7 +3,7 @@
  * A refusal is a TanStack redirect (thrown), with the `?signin=1` hint only
  * for anonymous visitors.
  */
-import { SessionState, User } from "@gmacko/domain";
+import { SessionState, User, UserId } from "@gmacko/domain";
 import { isRedirect } from "@tanstack/react-router";
 import { describe, expect, it } from "vitest";
 
@@ -11,7 +11,7 @@ import { requireAdmin, requireUser } from "../guards";
 
 const user = (role: "user" | "admin") =>
   new User({
-    id: "u1" as never,
+    id: UserId.make("u1"),
     name: "Ada",
     email: "ada@example.com",
     emailVerified: true,
@@ -26,11 +26,16 @@ const anonymous = async () =>
 const signedIn = (role: "user" | "admin") => async () =>
   new SessionState({ user: user(role), credential: "session" });
 
-const redirectOf = async (run: () => Promise<unknown>) => {
-  const thrown = await run().then(
-    () => undefined,
-    (error: unknown) => error,
-  );
+const redirectOf = async (run: () => Promise<User>) => {
+  let thrown: unknown;
+  let resolved = false;
+  try {
+    await run();
+    resolved = true;
+  } catch (error) {
+    thrown = error;
+  }
+  if (resolved) throw new Error("expected a redirect, got a resolved promise");
   if (!isRedirect(thrown))
     throw new Error(`expected a redirect, got ${String(thrown)}`);
   return thrown.options;

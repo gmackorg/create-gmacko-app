@@ -14,7 +14,7 @@ export const useApiErrorHandler = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   return useCallback(
-    (error: unknown, fallback?: string) => {
+    (error: Error, fallback?: string) => {
       toastApiError(error, fallback);
       if (isUnauthorized(error)) {
         // The cached session is stale by definition; refetch it so the home

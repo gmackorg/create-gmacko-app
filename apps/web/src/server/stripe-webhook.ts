@@ -16,7 +16,12 @@ export interface StripeWebhookOptions {
   readonly onEvent?: ((type: string, id: string) => void) | undefined;
 }
 
-const json = (status: number, body: unknown): Response =>
+/** The three bodies this endpoint answers with. */
+type WebhookResponseBody =
+  | { readonly error: string }
+  | { readonly received: true; readonly type: string };
+
+const json = (status: number, body: WebhookResponseBody): Response =>
   Response.json(body, { status });
 
 export const handleStripeWebhook = async (

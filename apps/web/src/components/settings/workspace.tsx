@@ -1,8 +1,4 @@
-import {
-  CreateInvite,
-  CreateInviteForm,
-  type InviteRole,
-} from "@gmacko/domain";
+import { CreateInvite, CreateInviteForm } from "@gmacko/domain";
 import { Button } from "@gmacko/ui/button";
 import { Field, FieldContent, FieldError, FieldLabel } from "@gmacko/ui/field";
 import { Input } from "@gmacko/ui/input";
@@ -58,13 +54,14 @@ function Collaboration({ workspaceName }: { workspaceName: string }) {
     },
     onError: (error) => onError(error, "Could not create the invite."),
   });
+  // Typed as the contract's wire shape (role optional, defaulting
+  // server-side) so the Standard Schema validator and the form agree.
+  const defaultValues: (typeof CreateInvite)["Encoded"] = {
+    email: "",
+    role: "member",
+  };
   const form = useForm({
-    // Typed as the contract's wire shape (role optional, defaulting
-    // server-side) so the Standard Schema validator and the form agree.
-    defaultValues: {
-      email: "",
-      role: "member",
-    } as (typeof CreateInvite)["Encoded"],
+    defaultValues,
     validators: { onSubmit: CreateInviteForm },
     onSubmit: async ({ value }) => {
       await create
@@ -131,7 +128,11 @@ function Collaboration({ workspaceName }: { workspaceName: string }) {
                   name={field.name}
                   value={field.state.value ?? "member"}
                   onChange={(event) =>
-                    field.handleChange(event.target.value as InviteRole)
+                    // The two options below are the whole choice; anything
+                    // else the DOM could carry is not one of them.
+                    field.handleChange(
+                      event.target.value === "admin" ? "admin" : "member",
+                    )
                   }
                 >
                   <option value="member">Member</option>

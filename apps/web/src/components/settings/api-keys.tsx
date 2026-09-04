@@ -37,10 +37,14 @@ export function ApiKeysSection() {
     onError: (error) => onError(error, "Could not revoke the API key."),
   });
 
+  // Annotated, not asserted, so the form's field type is the contract's
+  // scope list rather than the literal `["read"]` this starts on.
+  const defaultPermissions: ReadonlyArray<ApiKeyScope> = ["read"];
+
   const form = useForm({
     defaultValues: {
       name: "",
-      permissions: ["read"] as ReadonlyArray<ApiKeyScope>,
+      permissions: defaultPermissions,
     },
     validators: { onSubmit: CreateApiKeyForm },
     onSubmit: async ({ value }) => {

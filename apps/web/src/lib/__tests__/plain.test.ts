@@ -1,19 +1,22 @@
-import { LaunchState, Post } from "@gmacko/domain";
+import { LaunchState, Post, PostId } from "@gmacko/domain";
 import { describe, expect, it } from "vitest";
 
-import { toPlain } from "../plain";
+import { type Flattened, toPlain } from "../plain";
 
 describe("toPlain", () => {
   it("flattens Schema.Class instances to plain objects, keeping Dates", () => {
     const createdAt = new Date("2026-09-03T00:00:00.000Z");
     const post = new Post({
-      id: "p1" as never,
+      id: PostId.make("p1"),
       title: "T",
       content: "C",
       createdAt,
       updatedAt: null,
     });
-    const plain = toPlain([post]) as Array<Record<string, unknown>>;
+    // SAFETY: `toPlain` takes the `Array.isArray` branch for an array
+    // input and maps element-wise, and every `Post` field is a string,
+    // null or Date, so the one element out is the plain record below.
+    const plain = toPlain([post]) as ReadonlyArray<Record<string, Flattened>>;
     expect(Object.getPrototypeOf(plain[0])).toBe(Object.prototype);
     expect(plain[0]).toEqual({
       id: "p1",

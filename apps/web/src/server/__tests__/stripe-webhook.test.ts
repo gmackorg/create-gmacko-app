@@ -49,10 +49,14 @@ const event = JSON.stringify({
 const deliver = (body: string, signature?: string) =>
   new Request("http://localhost/api/webhooks/stripe", {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      ...(signature ? { "stripe-signature": signature } : {}),
-    },
+    // An unsigned delivery carries no `stripe-signature` header at all,
+    // which is what the 400 case below is about.
+    headers: signature
+      ? {
+          "content-type": "application/json",
+          "stripe-signature": signature,
+        }
+      : { "content-type": "application/json" },
     body,
   });
 

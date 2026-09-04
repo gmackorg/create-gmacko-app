@@ -12,22 +12,29 @@ import { CreatePostForm, PostCardSkeleton, PostList } from "~/components/posts";
 import { RouterLink } from "~/components/router-link";
 import { WaitlistForm } from "~/components/waitlist-form";
 import { queries } from "~/lib/api";
+import type { RawSearch, SearchValue } from "~/lib/search";
 import { useSession } from "~/lib/session";
 
 /** `?signin=1` and friends: one-shot hints other routes redirect here with. */
 interface HomeSearch {
-  signin?: true;
-  waitlist?: true;
-  maintenance?: true;
+  signin?: true | undefined;
+  waitlist?: true | undefined;
+  maintenance?: true | undefined;
 }
 
-const isFlag = (value: unknown): boolean =>
-  value === true || value === 1 || value === "1";
+/**
+ * A hint is set or it is not: `true` when the URL carries one of the three
+ * spellings a redirect can produce, `undefined` otherwise. `undefined` is
+ * what an absent key already read as, and router-core's `encode` drops it,
+ * so the flag never reappears in the URL.
+ */
+const flag = (value: SearchValue): true | undefined =>
+  value === true || value === 1 || value === "1" ? true : undefined;
 
-const validateSearch = (search: Record<string, unknown>): HomeSearch => ({
-  ...(isFlag(search.signin) ? { signin: true as const } : {}),
-  ...(isFlag(search.waitlist) ? { waitlist: true as const } : {}),
-  ...(isFlag(search.maintenance) ? { maintenance: true as const } : {}),
+const validateSearch = (search: RawSearch): HomeSearch => ({
+  signin: flag(search.signin),
+  waitlist: flag(search.waitlist),
+  maintenance: flag(search.maintenance),
 });
 
 export const Route = createFileRoute("/")({

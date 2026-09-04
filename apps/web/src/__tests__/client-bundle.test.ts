@@ -20,6 +20,8 @@ const PACKAGES = resolve(APP, "../../packages");
  * The workspace scope, read from this app's own name rather than hard-coded,
  * so the test keeps its teeth in a scaffold generated with `--package-scope`.
  */
+// SAFETY: this is apps/web/package.json, which npm requires to carry a
+// string `name`; the scaffold always writes it as `<scope>/web`.
 const SCOPE = (
   JSON.parse(readFileSync(join(APP, "package.json"), "utf8")) as {
     name: string;
@@ -63,6 +65,13 @@ const asFile = (base: string): string | undefined => {
   return undefined;
 };
 
+/** One `exports` value: the target path, or the conditions object naming it. */
+type ExportTarget = string | { readonly default?: string | undefined };
+
+/** The target `entry` names, whichever of the two forms it takes. */
+const exportTarget = (entry: ExportTarget | undefined): string | undefined =>
+  entry instanceof Object ? entry.default : entry;
+
 /** `<scope>/<pkg>[/<sub>]` → the source file its `exports` names (default condition). */
 const WORKSPACE_SPEC = new RegExp(
   `^${SCOPE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/([^/]+)(/.*)?$`,
@@ -73,12 +82,15 @@ const workspaceFile = (spec: string): string | undefined => {
   const dir = join(PACKAGES, m[1]!);
   const pkgPath = join(dir, "package.json");
   if (!existsSync(pkgPath)) return undefined;
+  // SAFETY: a workspace package.json. Node requires each `exports` value to
+  // be the target path or a conditions object; the workspace packages all
+  // use those two forms, and `exportTarget` returns undefined for anything
+  // else, which drops the specifier from the graph rather than mis-reading it.
   const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as {
-    exports?: Record<string, string | { default?: string }>;
+    exports?: Record<string, ExportTarget>;
   };
   const key = `.${m[2] ?? ""}`;
-  const entry = pkg.exports?.[key];
-  const target = typeof entry === "string" ? entry : entry?.default;
+  const target = exportTarget(pkg.exports?.[key]);
   if (!target) return undefined;
   if (target.includes("*")) return undefined; // asset patterns (messages/*)
   return asFile(join(dir, target));

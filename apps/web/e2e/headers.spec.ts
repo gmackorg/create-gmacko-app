@@ -51,12 +51,11 @@ const assertSecureVisit = async (page: Page, path: string): Promise<void> => {
   const inlineWithoutNonce = await page
     .locator("script:not([src])")
     .evaluateAll(
-      (scripts, expected) =>
+      // The locator is `script:not([src])`, so every element is a script.
+      (scripts: HTMLScriptElement[], expected) =>
         // Browsers hide the `nonce` attribute once parsed; the IDL property
         // still carries it.
-        scripts.filter(
-          (script) => (script as HTMLScriptElement).nonce !== expected,
-        ).length,
+        scripts.filter((script) => script.nonce !== expected).length,
       nonce,
     );
   expect(inlineWithoutNonce, path).toBe(0);

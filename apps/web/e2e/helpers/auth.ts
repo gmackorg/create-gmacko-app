@@ -36,6 +36,9 @@ export const signIn = async (page: Page, person: Person): Promise<void> => {
   );
   expect(verified.status(), await verified.text()).toBe(302);
   const session = await page.request.get(`${BASE_URL}/api/auth/session`);
+  // SAFETY: `GET /api/auth/session` is the contract's `auth.session`
+  // endpoint, which answers a `SessionState`: `user` is the signed-in user
+  // row (which always carries `email`) or null.
   const body = (await session.json()) as { user: { email: string } | null };
   expect(body.user?.email).toBe(person.email);
 };
@@ -79,11 +82,20 @@ export const signInAsAdmin = async (
   expect(response.status(), await response.text()).toBe(201);
 };
 
+/** A JSON request body, as Playwright serialises it onto the wire. */
+export type JsonBody =
+  | string
+  | number
+  | boolean
+  | null
+  | ReadonlyArray<JsonBody>
+  | { readonly [key: string]: JsonBody };
+
 /** A typed call through the page's cookies, with the origin the cookie rule needs on writes. */
 export const api = (page: Page) => ({
   get: (path: string, headers: Record<string, string> = {}) =>
     page.request.get(`${BASE_URL}${path}`, { headers }),
-  post: (path: string, data: unknown, headers: Record<string, string> = {}) =>
+  post: (path: string, data: JsonBody, headers: Record<string, string> = {}) =>
     page.request.post(`${BASE_URL}${path}`, {
       data,
       headers: { ...origin, ...headers },

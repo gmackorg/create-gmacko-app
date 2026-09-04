@@ -8,6 +8,9 @@ import viteReact from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 
+// SAFETY: this reads apps/web/package.json, whose `version` npm requires to
+// be a semver string when present; `__APP_VERSION__` below already falls
+// back for the case where it is absent.
 const { version } = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8"),
 ) as { version?: string };

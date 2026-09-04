@@ -41,22 +41,28 @@ export function WaitlistForm(props: {
     onError: (error) => toastApiError(error, "Could not submit your request."),
   });
 
+  // Typed as the contract's wire shape (message and source optional) so the
+  // Standard Schema validator and the form agree.
+  const defaultValues: (typeof WaitlistSubmit)["Encoded"] = {
+    email: session.user?.email ?? "",
+    message: "",
+    source: props.source,
+  };
+
   const form = useForm({
-    // Typed as the contract's wire shape (message and source optional) so
-    // the Standard Schema validator and the form agree.
-    defaultValues: {
-      email: session.user?.email ?? "",
-      message: "",
-      source: props.source,
-    } as (typeof WaitlistSubmit)["Encoded"],
+    defaultValues,
     validators: { onSubmit: WaitlistSubmitForm },
     onSubmit: async ({ value }) => {
       const message = value.message?.trim() ?? "";
-      await submit.mutateAsync({
+      // `message` is optional on the wire: an empty box sends no key at all,
+      // which is not the same as sending an empty one.
+      const entry = {
         email: value.email.trim(),
         source: value.source ?? props.source,
-        ...(message.length > 0 ? { message } : {}),
-      });
+      };
+      await submit.mutateAsync(
+        message.length > 0 ? { ...entry, message } : entry,
+      );
     },
   });
 

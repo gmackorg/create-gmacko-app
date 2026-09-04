@@ -66,12 +66,21 @@ export const contentSecurityPolicy = (options: HeaderOptions): string => {
   return directives.join("; ");
 };
 
+/** Every header this module sets; nothing else is added to a response here. */
+export type SecurityHeaderName =
+  | "X-Frame-Options"
+  | "X-Content-Type-Options"
+  | "Referrer-Policy"
+  | "Permissions-Policy"
+  | "Strict-Transport-Security"
+  | "Content-Security-Policy";
+
 /** The headers to set on a response; CSP goes on HTML only, the rest on everything. */
 export const securityHeadersFor = (
   options: HeaderOptions,
   contentType: string | null,
-): Record<string, string> => {
-  const headers: Record<string, string> = {
+): Partial<Record<SecurityHeaderName, string>> => {
+  const headers: Partial<Record<SecurityHeaderName, string>> = {
     "X-Frame-Options": "DENY",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",

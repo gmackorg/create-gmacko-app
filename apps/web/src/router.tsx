@@ -30,7 +30,9 @@ export function getRouter() {
     context: { queryClient },
     defaultPreload: "intent",
     scrollRestoration: true,
-    ...(nonce ? { ssr: { nonce } } : {}),
+    // Always passed: every reader in the router is `options.ssr?.nonce`, so
+    // an undefined nonce here means exactly what an omitted `ssr` meant.
+    ssr: { nonce },
   });
   setupRouterSsrQueryIntegration({
     router,

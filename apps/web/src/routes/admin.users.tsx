@@ -6,16 +6,18 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 
 import { useApiErrorHandler } from "~/components/use-api-error";
 import { mutations, queries } from "~/lib/api";
+import type { RawSearch, SearchValue } from "~/lib/search";
 
 const PAGE_SIZE = 20;
 
-const pageOf = (value: unknown): number => {
-  const n = typeof value === "number" ? value : Number(value);
+/** 1-based page number; anything the URL cannot mean as one is page 1. */
+const pageOf = (value: SearchValue): number => {
+  const n = Number(value);
   return Number.isInteger(n) && n >= 1 ? n : 1;
 };
 
 export const Route = createFileRoute("/admin/users")({
-  validateSearch: (search: Record<string, unknown>) => ({
+  validateSearch: (search: RawSearch) => ({
     page: pageOf(search.page),
   }),
   loaderDeps: ({ search }) => ({ page: search.page }),
