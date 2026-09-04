@@ -154,14 +154,44 @@ export async function runCli(
   });
 }
 
+export interface CommandResult {
+  success: boolean;
+  stdout: string;
+  stderr: string;
+}
+
+export interface RunInAppOptions {
+  timeout?: number;
+  env?: Record<string, string>;
+}
+
+/**
+ * `execSync` with piped stdio throws an Error carrying the child's captured
+ * `stdout`/`stderr` (strings here, since the call sets `encoding: "utf-8"`).
+ * Both are optional, so a throw from anywhere else reads as empty output.
+ */
+interface ExecFailure extends Error {
+  stdout?: string;
+  stderr?: string;
+}
+
+function execFailure(cause: unknown): ExecFailure {
+  // SAFETY: `stdout`/`stderr` are optional on ExecFailure, so this widening of
+  // an Error can only ever produce `undefined` for a throw that did not come
+  // from execSync — never a wrong string.
+  return cause instanceof Error
+    ? (cause as ExecFailure)
+    : new Error(String(cause));
+}
+
 /**
  * Run a command in the generated app directory
  */
 export function runInApp(
   appPath: string,
   command: string,
-  options: { timeout?: number; env?: Record<string, string> } = {},
-): { success: boolean; stdout: string; stderr: string } {
+  options: RunInAppOptions = {},
+): CommandResult {
   const timeout = options.timeout || 600000; // 10 minutes default
 
   try {
@@ -174,12 +204,12 @@ export function runInApp(
     });
 
     return { success: true, stdout: stdout || "", stderr: "" };
-  } catch (error: unknown) {
-    const execError = error as { stdout?: string; stderr?: string };
+  } catch (error) {
+    const failure = execFailure(error);
     return {
       success: false,
-      stdout: execError.stdout || "",
-      stderr: execError.stderr || "",
+      stdout: failure.stdout || "",
+      stderr: failure.stderr || "",
     };
   }
 }
@@ -205,7 +235,7 @@ export function readJson<T = unknown>(
   appPath: string,
   relativePath: string,
 ): T {
-  return fs.readJsonSync(path.join(appPath, relativePath)) as T;
+  return fs.readJsonSync(path.join(appPath, relativePath));
 }
 
 /**

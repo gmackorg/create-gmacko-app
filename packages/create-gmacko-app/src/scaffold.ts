@@ -18,6 +18,59 @@ export const MOBILE_APP_DIR = "apps/expo";
 /** The template's worker/D1 base name; renamed to `<app>-web` per scaffold. */
 const TEMPLATE_WORKER_NAME = "gmacko-web";
 
+/** The `package.json` fields the scaffolder rewrites in the generated app. */
+interface RootPackageManifest {
+  scripts?: Record<string, string>;
+}
+
+interface McpServerEntry {
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+}
+
+/** The `.mcp.json` shape Claude Code reads and the operator lane extends. */
+interface McpConfig {
+  mcpServers?: Record<string, McpServerEntry>;
+}
+
+interface PortlessApp {
+  name?: string;
+  script?: string;
+}
+
+/** The `portless.json` shape: one entry per app directory it proxies. */
+interface PortlessConfig {
+  apps?: Record<string, PortlessApp>;
+}
+
+/**
+ * Reads the generated app's root `package.json`. Every field below is optional
+ * because these readers run against a freshly copied template file and then
+ * write it straight back with `writeJsonSync`, so nothing here may assume a
+ * key exists.
+ */
+function readRootPackage(rootPackagePath: string): RootPackageManifest {
+  return fs.readJsonSync(rootPackagePath);
+}
+
+function readMcpConfig(mcpConfigPath: string): McpConfig {
+  return fs.readJsonSync(mcpConfigPath);
+}
+
+function readPortlessConfig(portlessPath: string): PortlessConfig {
+  return fs.readJsonSync(portlessPath);
+}
+
+/**
+ * `execSync` with piped stdio throws an Error carrying the child's captured
+ * `stderr`; a failure from anywhere else (a missing binary, say) carries none.
+ */
+function capturedStderr(cause: unknown): string {
+  if (!(cause instanceof Error) || !("stderr" in cause)) return "";
+  return String(cause.stderr ?? "");
+}
+
 export async function scaffold(options: CliOptions): Promise<void> {
   const targetDir = path.resolve(process.cwd(), options.appName);
 
@@ -132,10 +185,7 @@ export async function scaffold(options: CliOptions): Promise<void> {
       spinner.stop("Failed to install dependencies");
       // Surface why — a swallowed install failure otherwise only shows up later
       // as confusing "turbo: not found" errors.
-      const stderr =
-        err && typeof err === "object" && "stderr" in err
-          ? String((err as { stderr?: unknown }).stderr ?? "")
-          : "";
+      const stderr = capturedStderr(err);
       if (stderr.trim()) {
         p.log.error(stderr.trim().split("\n").slice(-25).join("\n"));
       }
@@ -522,12 +572,16 @@ ${opencodeLines.join("\n")}${selectedLayerSection}${summaryLink}
 `;
 }
 
-function getBootstrapRecommendations(options: CliOptions): {
+interface BootstrapRecommendations {
   claudeLines: string[];
   codexLines: string[];
   opencodeLines: string[];
   selectedLayerLines: string[];
-} {
+}
+
+function getBootstrapRecommendations(
+  options: CliOptions,
+): BootstrapRecommendations {
   const claudeLines = [
     "- Claude-only: run `/office-hours` to force clarity on customer, problem, and wedge.",
     "- Claude-only: if your user-level gstack install includes `/autoplan`, run it next.",
@@ -831,9 +885,7 @@ ${notes}`,
 
 function addForgeGraphScripts(targetDir: string): void {
   const rootPackagePath = path.join(targetDir, "package.json");
-  const rootPackage = fs.readJsonSync(rootPackagePath) as {
-    scripts?: Record<string, string>;
-  };
+  const rootPackage = readRootPackage(rootPackagePath);
 
   rootPackage.scripts ??= {};
   rootPackage.scripts["forge:diff"] = "forge diff";
@@ -857,9 +909,7 @@ function addOptionalOperatorScripts(
   }
 
   const rootPackagePath = path.join(targetDir, "package.json");
-  const rootPackage = fs.readJsonSync(rootPackagePath) as {
-    scripts?: Record<string, string>;
-  };
+  const rootPackage = readRootPackage(rootPackagePath);
 
   rootPackage.scripts ??= {};
   // Run the operator CLI / MCP server source via tsx. pnpm never links a
@@ -887,16 +937,7 @@ function customizeMcpConfig(targetDir: string, options: CliOptions): void {
     return;
   }
 
-  const mcpConfig = fs.readJsonSync(mcpConfigPath) as {
-    mcpServers?: Record<
-      string,
-      {
-        command?: string;
-        args?: string[];
-        env?: Record<string, string>;
-      }
-    >;
-  };
+  const mcpConfig = readMcpConfig(mcpConfigPath);
 
   mcpConfig.mcpServers ??= {};
   mcpConfig.mcpServers["gmacko-app"] = {
@@ -955,9 +996,7 @@ function removeWebApp(targetDir: string): void {
   fs.removeSync(path.join(targetDir, ".github/workflows/preview.yml"));
 
   const rootPackagePath = path.join(targetDir, "package.json");
-  const rootPackage = fs.readJsonSync(rootPackagePath) as {
-    scripts?: Record<string, string>;
-  };
+  const rootPackage = readRootPackage(rootPackagePath);
   rootPackage.scripts ??= {};
   // The D1 scripts run wrangler against apps/web/wrangler.jsonc, which is
   // gone with the app.
@@ -982,9 +1021,7 @@ function removeWebApp(targetDir: string): void {
 
   const portlessPath = path.join(targetDir, "portless.json");
   if (fs.existsSync(portlessPath)) {
-    const portless = fs.readJsonSync(portlessPath) as {
-      apps?: Record<string, unknown>;
-    };
+    const portless = readPortlessConfig(portlessPath);
     if (portless.apps) delete portless.apps[WEB_APP_DIR];
     fs.writeJsonSync(portlessPath, portless, { spaces: 2 });
   }
@@ -1147,9 +1184,7 @@ function pruneOptionalLanes(targetDir: string, options: CliOptions): void {
     // The template root carries the lane's scripts; without the packages
     // they would point at nothing.
     const rootPackagePath = path.join(targetDir, "package.json");
-    const rootPackage = fs.readJsonSync(rootPackagePath) as {
-      scripts?: Record<string, string>;
-    };
+    const rootPackage = readRootPackage(rootPackagePath);
     if (rootPackage.scripts) {
       delete rootPackage.scripts["api:ops"];
       delete rootPackage.scripts["mcp:app"];

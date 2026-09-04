@@ -81,7 +81,7 @@ export async function runPrompts(
     process.exit(0);
   }
 
-  const integrationPreset = (await p.select({
+  const integrationPreset = await p.select<IntegrationPreset>({
     message: "Choose an integration preset",
     options: [
       {
@@ -106,7 +106,7 @@ export async function runPrompts(
       },
     ],
     initialValue: "recommended",
-  })) as IntegrationPreset;
+  });
 
   if (p.isCancel(integrationPreset)) {
     p.cancel("Operation cancelled.");
@@ -135,7 +135,7 @@ export async function runPrompts(
       p.cancel("Operation cancelled.");
       process.exit(0);
     }
-    integrations = { ...integrations, forgegraph: forgegraph as boolean };
+    integrations = { ...integrations, forgegraph };
   }
 
   if (integrations.realtime.enabled) {
@@ -210,11 +210,11 @@ export async function runPrompts(
 
   return {
     appName,
-    displayName: displayName as string,
-    packageScope: packageScope as string,
+    displayName,
+    packageScope,
     platforms: {
-      web: (platforms as string[]).includes("web"),
-      mobile: (platforms as string[]).includes("mobile"),
+      web: platforms.includes("web"),
+      mobile: platforms.includes("mobile"),
     },
     saasCollaboration: saasLayers.collaboration,
     saasBilling: saasLayers.billing,
@@ -223,17 +223,17 @@ export async function runPrompts(
     saasLaunch: saasLayers.launch,
     saasReferrals: saasLayers.referrals,
     saasOperatorApis: saasLayers.operatorApis,
-    saasBootstrap: saasBootstrap as boolean,
+    saasBootstrap,
     operatorLane: saasLayers.operatorApis,
     forgegraphServer: "https://forge.example.com",
     forgegraphPreviewDomain: "change-me.preview.example.com",
     forgegraphProductionDomain: "change-me.example.com",
     integrations: { ...integrations },
-    includeAi: includeAi as boolean,
-    includeProvision: includeProvision as boolean,
-    prune: prune as boolean,
-    install: install as boolean,
-    git: git as boolean,
+    includeAi,
+    includeProvision,
+    prune,
+    install,
+    git,
   };
 }
 
@@ -311,13 +311,13 @@ async function promptSaasLayers(): Promise<{
   }
 
   return {
-    collaboration: collaboration as boolean,
-    billing: billing as boolean,
-    metering: metering as boolean,
-    support: support as boolean,
-    launch: launch as boolean,
-    referrals: referrals as boolean,
-    operatorApis: operatorApis as boolean,
+    collaboration,
+    billing,
+    metering,
+    support,
+    launch,
+    referrals,
+    operatorApis,
   };
 }
 
@@ -352,11 +352,11 @@ async function promptCustomIntegrations(): Promise<IntegrationConfig> {
     process.exit(0);
   }
 
-  const selectedSet = new Set(selected as string[]);
+  const selectedSet = new Set(selected);
 
   let emailProvider: "resend" | "sendgrid" | "none" = "none";
   if (selectedSet.has("email")) {
-    const provider = await p.select({
+    const provider = await p.select<"resend" | "sendgrid">({
       message: "Email provider?",
       options: [
         { value: "resend", label: "Resend" },
@@ -368,7 +368,7 @@ async function promptCustomIntegrations(): Promise<IntegrationConfig> {
       p.cancel("Operation cancelled.");
       process.exit(0);
     }
-    emailProvider = provider as "resend" | "sendgrid";
+    emailProvider = provider;
   }
 
   let storageProvider: "uploadthing" | "none" = "none";

@@ -22,7 +22,7 @@ interface CliTool {
   installHint: string;
 }
 
-const CLI_TOOLS: Record<string, CliTool> = {
+const CLI_TOOLS = {
   gh: {
     name: "GitHub CLI",
     command: "gh",
@@ -38,7 +38,7 @@ const CLI_TOOLS: Record<string, CliTool> = {
     command: "eas",
     installHint: "npm i -g eas-cli",
   },
-};
+} satisfies Record<string, CliTool>;
 
 function isCliInstalled(command: string): boolean {
   try {
@@ -66,6 +66,14 @@ function isCliAuthenticated(command: string): boolean {
   }
 }
 
+/**
+ * A failed `exec` rejects with an Error whose message already carries the
+ * command line and the child's exit status.
+ */
+function commandFailureMessage(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause);
+}
+
 async function runCommand(
   command: string,
   cwd: string,
@@ -74,8 +82,7 @@ async function runCommand(
     const { stdout, stderr } = await execAsync(command, { cwd });
     return { success: true, output: stdout || stderr };
   } catch (error) {
-    const err = error as { message: string };
-    return { success: false, output: err.message };
+    return { success: false, output: commandFailureMessage(error) };
   }
 }
 
@@ -315,49 +322,66 @@ export function workerName(appName: string): string {
   return `${appName.replace(/^@[^/]+\//, "").replace(/[^a-z0-9-]/g, "-")}-web`;
 }
 
+/** The provisioning steps the picker offers, in prompt order. */
+export type ProvisionService = "git" | "database" | "forgegraph" | "eas";
+
+export interface ProvisionServiceOption {
+  value: ProvisionService;
+  label: string;
+  hint: string;
+}
+
+/**
+ * Builds the service picker's options. `isInstalled` is the PATH probe seam:
+ * it only decides a hint, so tests pass a fixed probe instead of shelling out.
+ */
+export function provisionServiceOptions(
+  config: ProvisionConfig,
+  isInstalled: (command: string) => boolean = isCliInstalled,
+): ProvisionServiceOption[] {
+  return [
+    {
+      value: "git",
+      label: "Git Repository (GitHub/Gitea)",
+      hint:
+        isInstalled("gh") || isInstalled("tea") ? "available" : "CLI not found",
+    },
+    {
+      value: "database",
+      label: "Local D1 database (migrate + seed)",
+      hint: config.platforms.web ? "recommended" : "web not selected",
+    },
+    {
+      value: "forgegraph",
+      label: "ForgeGraph + Cloudflare deployment",
+      hint: config.platforms.web ? "recommended" : "web not selected",
+    },
+    {
+      value: "eas",
+      label: "EAS Build (Expo)",
+      hint: config.platforms.mobile
+        ? isInstalled("eas")
+          ? "available"
+          : "CLI not found"
+        : "mobile not selected",
+    },
+  ];
+}
+
 export async function runProvisioning(config: ProvisionConfig): Promise<void> {
   p.intro(pc.bgMagenta(pc.white(" Provisioning Services ")));
 
-  const services = await p.multiselect({
+  const selectedServices = await p.multiselect<ProvisionService>({
     message: "Which services would you like to set up?",
-    options: [
-      {
-        value: "git",
-        label: "Git Repository (GitHub/Gitea)",
-        hint:
-          isCliInstalled("gh") || isCliInstalled("tea")
-            ? "available"
-            : "CLI not found",
-      },
-      {
-        value: "database",
-        label: "Local D1 database (migrate + seed)",
-        hint: config.platforms.web ? "recommended" : "web not selected",
-      },
-      {
-        value: "forgegraph",
-        label: "ForgeGraph + Cloudflare deployment",
-        hint: config.platforms.web ? "recommended" : "web not selected",
-      },
-      {
-        value: "eas",
-        label: "EAS Build (Expo)",
-        hint: config.platforms.mobile
-          ? isCliInstalled("eas")
-            ? "available"
-            : "CLI not found"
-          : "mobile not selected",
-      },
-    ],
+    options: provisionServiceOptions(config),
     required: false,
   });
 
-  if (p.isCancel(services) || (services as string[]).length === 0) {
+  if (p.isCancel(selectedServices) || selectedServices.length === 0) {
     p.outro("Provisioning skipped");
     return;
   }
 
-  const selectedServices = services as string[];
   const results: Record<string, boolean> = {};
 
   if (selectedServices.includes("git")) {

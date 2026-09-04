@@ -1,59 +1,31 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-const promptMocks = vi.hoisted(() => {
-  const multiselect = vi.fn();
-  return {
-    multiselect,
-    intro: vi.fn(),
-    outro: vi.fn(),
-    log: {
-      success: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      info: vi.fn(),
-      message: vi.fn(),
-    },
-    spinner: vi.fn(() => ({
-      start: vi.fn(),
-      stop: vi.fn(),
-      message: vi.fn(),
-    })),
-    isCancel: vi.fn(() => false),
-  };
-});
-
-vi.mock("@clack/prompts", () => promptMocks);
-vi.mock("node:child_process", () => ({
-  exec: vi.fn(),
-  execSync: vi.fn(() => ""),
-}));
+import { provisionServiceOptions } from "../provision.js";
 
 describe("provisioning guidance", () => {
-  beforeEach(() => {
-    vi.resetModules();
-    promptMocks.multiselect.mockReset();
-    promptMocks.multiselect.mockResolvedValue([]);
-  });
-
-  it("offers the local D1 and ForgeGraph + Cloudflare instead of Neon, Vercel or Postgres", async () => {
-    const { runProvisioning } = await import("../provision.js");
-
-    await runProvisioning({
-      projectPath: "/tmp/test-app",
-      appName: "test-app",
-      platforms: {
-        web: true,
-        mobile: true,
+  it("offers the local D1 and ForgeGraph + Cloudflare instead of Neon, Vercel or Postgres", () => {
+    // The PATH probe is injected so the option list is the same on every
+    // machine, whether or not gh/tea/eas happen to be installed.
+    const options = provisionServiceOptions(
+      {
+        projectPath: "/tmp/test-app",
+        appName: "test-app",
+        platforms: {
+          web: true,
+          mobile: true,
+        },
       },
-    });
-
-    expect(promptMocks.multiselect).toHaveBeenCalledTimes(1);
-
-    const promptCall = promptMocks.multiselect.mock.calls[0]?.[0];
-    const labels = (promptCall?.options ?? []).map(
-      (option: { label: string }) => option.label,
+      () => false,
     );
 
+    const labels = options.map((option) => option.label);
+
+    expect(options.map((option) => option.value)).toEqual([
+      "git",
+      "database",
+      "forgegraph",
+      "eas",
+    ]);
     expect(labels).toContain("ForgeGraph + Cloudflare deployment");
     expect(labels).toContain("Local D1 database (migrate + seed)");
     expect(labels).toContain("EAS Build (Expo)");

@@ -1,7 +1,7 @@
 import path from "node:path";
 import fs from "fs-extra";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
+import type { IntegrationConfig, PlatformConfig } from "../types.js";
 import {
   cleanupApp,
   EXPECTED_FILES,
@@ -14,6 +14,43 @@ import {
   readJson,
   runCli,
 } from "./helpers.js";
+
+/** The `biome.json` fields the formatting assertions read. */
+interface BiomeConfigView {
+  files?: {
+    includes?: string[];
+  };
+  css?: {
+    parser?: {
+      tailwindDirectives?: boolean;
+    };
+  };
+}
+
+/** The `package.json` fields the pruning assertions read. */
+interface WorkspaceManifest {
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+}
+
+interface PortlessApp {
+  name?: string;
+  script?: string;
+}
+
+/** `portless.json` as the scaffolder writes it: one entry per proxied app. */
+interface PortlessManifest {
+  apps?: Record<string, PortlessApp>;
+}
+
+/** `gmacko.integrations.json` as `createManifest` in scaffold.ts writes it. */
+interface IntegrationManifest {
+  preset: string;
+  integrations: IntegrationConfig;
+  platforms: PlatformConfig;
+  scaffoldedAt: string;
+  packageScope: string;
+}
 
 describe("create-gmacko-app scaffold", () => {
   let tempDir: string;
@@ -1212,7 +1249,19 @@ describe("create-gmacko-app scaffold", () => {
 
       expect(result.exitCode).toBe(0);
       expect(fileExists(result.appPath, "biome.json")).toBe(true);
-      expect(fileExists(result.appPath, ".oxlintrc.json")).toBe(true);
+      expect(fileExists(result.appPath, "oxlint.config.ts")).toBe(true);
+      // The oxlint config registers the vendored anti-slop plugin by relative
+      // path. If the plugin directory does not survive the copy, oxlint drops
+      // the rules silently, so assert on the entry points the config names.
+      expect(
+        fileExists(result.appPath, "tools/oxlint/anti-slop/index.ts"),
+      ).toBe(true);
+      expect(
+        fileExists(result.appPath, "tools/oxlint/anti-slop/effect/index.ts"),
+      ).toBe(true);
+      expect(
+        fileExists(result.appPath, "tools/oxlint/anti-slop/README.md"),
+      ).toBe(true);
       expect(fileExists(result.appPath, "lefthook.yml")).toBe(true);
       expect(fileExists(result.appPath, "commitlint.config.mjs")).toBe(true);
       expect(fileExists(result.appPath, "knip.json")).toBe(true);
@@ -1588,33 +1637,26 @@ describe("create-gmacko-app scaffold", () => {
   });
 
   /**
-   * `tooling/typescript/*.json` and `.oxlintrc.json` are JSONC: TypeScript has
-   * always allowed comments in a tsconfig, oxlint declares `allowComments`, and
+   * `tooling/typescript/*.json` and `knip.json` are JSONC: TypeScript has
+   * always allowed comments in a tsconfig, knip's schema tolerates them, and
    * biome parses both through the override in biome.json. The assertions below
    * are that the file still parses once the comments are gone, which is what
-   * the tools do.
+   * the tools do. (The oxlint config is TypeScript now, so it is imported
+   * rather than parsed — see scripts/__tests__/check-app-standards.test.ts.)
    */
-  const parseJsonc = (source: string): unknown =>
-    JSON.parse(
-      source
-        .split("\n")
-        .filter((line) => !line.trim().startsWith("//"))
-        .join("\n"),
-    );
+  const stripJsoncComments = (source: string): string =>
+    source
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("//"))
+      .join("\n");
 
   it("keeps repo formatting focused on first-party files", () => {
+    // SAFETY: every field of BiomeConfigView is optional, so this names the
+    // subset of biome.json the assertions below read without claiming any of
+    // it is present; each assertion fails if the real config drops the field.
     const biomeConfig = JSON.parse(
       fs.readFileSync(path.resolve(process.cwd(), "../../biome.json"), "utf8"),
-    ) as {
-      files?: {
-        includes?: string[];
-      };
-      css?: {
-        parser?: {
-          tailwindDirectives?: boolean;
-        };
-      };
-    };
+    ) as BiomeConfigView;
     const compiledTsconfig = fs.readFileSync(
       path.resolve(
         process.cwd(),
@@ -1629,8 +1671,10 @@ describe("create-gmacko-app scaffold", () => {
 
     expect(biomeConfig.files?.includes).toContain("!**/.claude");
     expect(biomeConfig.css?.parser?.tailwindDirectives).toBe(true);
-    expect(() => parseJsonc(compiledTsconfig)).not.toThrow();
-    expect(() => parseJsonc(baseTsconfig)).not.toThrow();
+    expect(() =>
+      JSON.parse(stripJsoncComments(compiledTsconfig)),
+    ).not.toThrow();
+    expect(() => JSON.parse(stripJsoncComments(baseTsconfig))).not.toThrow();
     // The Effect language-service plugin is editor-only but must be declared
     // once, in the base config every package extends.
     expect(baseTsconfig).toContain("@effect/language-service");
@@ -1646,14 +1690,10 @@ describe("create-gmacko-app scaffold", () => {
   });
 
   it("keeps repo lint noise focused on first-party files", () => {
-    const oxlintConfig = parseJsonc(
-      fs.readFileSync(
-        path.resolve(process.cwd(), "../../.oxlintrc.json"),
-        "utf8",
-      ),
-    ) as {
-      ignorePatterns?: string[];
-    };
+    const oxlintConfig = fs.readFileSync(
+      path.resolve(process.cwd(), "../../oxlint.config.ts"),
+      "utf8",
+    );
     const indexSource = fs.readFileSync(
       path.resolve(process.cwd(), "src/index.ts"),
       "utf8",
@@ -1668,7 +1708,10 @@ describe("create-gmacko-app scaffold", () => {
     );
     const testImportBlock = testSource.split("\n").slice(0, 4).join("\n");
 
-    expect(oxlintConfig.ignorePatterns).toContain(".claude/**");
+    expect(oxlintConfig).toContain('".claude/**"');
+    // The vendored plugin is upstream source; linting it would make every
+    // re-sync a fix-up commit.
+    expect(oxlintConfig).toContain('"tools/oxlint/anti-slop/**"');
     expect(indexSource).not.toContain("DEFAULT_INTEGRATIONS");
     expect(indexSource).not.toContain("storageProvider?: string");
     expect(promptsSource).not.toContain("PlatformConfig");
@@ -1719,7 +1762,7 @@ describe("create-gmacko-app scaffold", () => {
         result.appPath,
         "package.json",
       );
-      const portless = readJson<{ apps?: Record<string, unknown> }>(
+      const portless = readJson<PortlessManifest>(
         result.appPath,
         "portless.json",
       );
@@ -1902,10 +1945,7 @@ describe("create-gmacko-app scaffold", () => {
         for (const entry of fs.readdirSync(base)) {
           const pkgPath = path.join(base, entry, "package.json");
           if (!fs.existsSync(pkgPath)) continue;
-          const pkg = fs.readJsonSync(pkgPath) as {
-            dependencies?: Record<string, string>;
-            devDependencies?: Record<string, string>;
-          };
+          const pkg: WorkspaceManifest = fs.readJsonSync(pkgPath);
           for (const dep of [
             "@gmacko/analytics",
             "@gmacko/payments",
@@ -1984,13 +2024,10 @@ describe("create-gmacko-app scaffold", () => {
       expect(result.exitCode).toBe(0);
       expect(fileExists(result.appPath, "gmacko.integrations.json")).toBe(true);
 
-      const manifest = readJson<{
-        preset: string;
-        integrations: Record<string, unknown>;
-        platforms: Record<string, boolean>;
-        scaffoldedAt: string;
-        packageScope: string;
-      }>(result.appPath, "gmacko.integrations.json");
+      const manifest = readJson<IntegrationManifest>(
+        result.appPath,
+        "gmacko.integrations.json",
+      );
 
       expect(manifest.preset).toBeDefined();
       expect(manifest.integrations).toBeDefined();

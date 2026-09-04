@@ -142,9 +142,17 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
     it("should pass lint and the app standards", () => {
       console.log("[E2E] Running lint + check:standards...");
 
-      const result = runInApp(appPath, "pnpm lint && pnpm check:standards", {
-        timeout: 300000, // 5 minutes
-      });
+      // `pnpm lint` is turbo, so it only reaches workspace packages;
+      // `pnpm lint:ox` sweeps the whole tree from the root oxlint.config.ts and
+      // is what proves the vendored anti-slop plugin survived scaffolding —
+      // a config whose jsPlugins path is missing fails silently, not loudly.
+      const result = runInApp(
+        appPath,
+        "pnpm lint && pnpm lint:ox && pnpm check:standards",
+        {
+          timeout: 300000, // 5 minutes
+        },
+      );
 
       if (!result.success) logFailure("Lint", result);
       expect(result.success).toBe(true);
@@ -515,6 +523,10 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
     it("should use custom scope in package names", () => {
       const checkPackage = (pkgPath: string, expectedName: string) => {
         expect(fileExists(appPath, pkgPath)).toBe(true);
+        // SAFETY: each path below is a workspace package.json the scaffolder
+        // copied from the template and rewrote with the custom scope; every
+        // workspace manifest declares `name` (pnpm refuses to link one that
+        // does not), and the assertion two lines down fails if it is missing.
         const pkg = JSON.parse(
           fs.readFileSync(path.join(appPath, pkgPath), "utf-8"),
         ) as { name: string };

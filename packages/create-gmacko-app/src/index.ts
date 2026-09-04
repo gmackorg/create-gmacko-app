@@ -8,9 +8,46 @@ import type { CliOptions, IntegrationConfig } from "./types.js";
 
 // dist/index.js sits one level below package.json; the CLI reports the version
 // changesets publish rather than a hand-maintained string.
+// SAFETY: `../package.json` resolves to this package's own manifest, which is
+// checked into the repo and republished by changesets; npm rejects a package
+// whose manifest has no `version`, so the field is always a string here.
 const { version } = createRequire(import.meta.url)("../package.json") as {
   version: string;
 };
+
+/**
+ * The commander flags this CLI reads. Commander parses each declared option
+ * into this camelCase shape; options that only take effect through another
+ * flag (`--storage-provider`, which the `--integrations` list drives) are
+ * deliberately absent because nothing here consumes them.
+ */
+interface CliFlags {
+  yes?: boolean;
+  y?: boolean;
+  prune?: boolean;
+  install?: boolean;
+  git?: boolean;
+  ai?: boolean;
+  provision?: boolean;
+  web?: boolean;
+  mobile?: boolean;
+  saasCollaboration?: boolean;
+  saasBilling?: boolean;
+  saasMetering?: boolean;
+  saasSupport?: boolean;
+  saasLaunch?: boolean;
+  saasReferrals?: boolean;
+  saasOperatorApis?: boolean;
+  saasBootstrap?: boolean;
+  operatorLane?: boolean;
+  integrations?: string;
+  emailProvider?: string;
+  forgegraph?: boolean;
+  packageScope?: string;
+  forgegraphServer?: string;
+  forgegraphPreviewDomain?: string;
+  forgegraphProductionDomain?: string;
+}
 
 const program = new Command();
 
@@ -75,7 +112,7 @@ program
     "--forgegraph-production-domain <domain>",
     "ForgeGraph production domain placeholder to write into .forgegraph.yaml",
   )
-  .action(async (appName: string, opts: Record<string, unknown>) => {
+  .action(async (appName: string, opts: CliFlags) => {
     const validation = validateNpmPackageName(appName);
     if (!validation.validForNewPackages) {
       console.error(pc.red(`Invalid package name: ${appName}`));
@@ -102,20 +139,20 @@ program
       applyOperatorLaneFlags(options, opts);
       options.saasBootstrap = opts.saasBootstrap === true;
       applyForgeGraphFlags(options, opts);
-      if (opts.packageScope) options.packageScope = opts.packageScope as string;
+      if (opts.packageScope) options.packageScope = opts.packageScope;
       if (opts.forgegraph !== undefined) {
         options.integrations.forgegraph = opts.forgegraph === true;
       }
       if (opts.integrations !== undefined) {
         options.integrations = parseIntegrations(
-          opts.integrations as string,
-          opts.emailProvider as string | undefined,
+          opts.integrations,
+          opts.emailProvider,
           opts.forgegraph === true,
         );
       }
     } else {
       options = await runPrompts(appName, {
-        packageScope: opts.packageScope as string | undefined,
+        packageScope: opts.packageScope,
       });
       if (opts.prune !== undefined) options.prune = opts.prune === true;
       if (opts.install !== undefined) options.install = opts.install !== false;
@@ -143,6 +180,14 @@ program
     await scaffold(options);
   });
 
+/**
+ * `--email-provider` is free text on the command line; anything other than the
+ * one alternative provider falls back to the default the prompts use.
+ */
+function emailProviderFrom(value: string | undefined): "resend" | "sendgrid" {
+  return value === "sendgrid" ? "sendgrid" : "resend";
+}
+
 function parseIntegrations(
   list: string,
   emailProvider?: string,
@@ -160,9 +205,7 @@ function parseIntegrations(
     notifications: set.has("notifications"),
     email: {
       enabled: set.has("email"),
-      provider: set.has("email")
-        ? ((emailProvider as "resend" | "sendgrid") ?? "resend")
-        : "none",
+      provider: set.has("email") ? emailProviderFrom(emailProvider) : "none",
     },
     realtime: {
       enabled: set.has("realtime"),
@@ -175,10 +218,7 @@ function parseIntegrations(
   };
 }
 
-function applySaasCapabilityFlags(
-  options: CliOptions,
-  opts: Record<string, unknown>,
-): void {
+function applySaasCapabilityFlags(options: CliOptions, opts: CliFlags): void {
   if (opts.saasCollaboration !== undefined) {
     options.saasCollaboration = opts.saasCollaboration === true;
   }
@@ -202,10 +242,7 @@ function applySaasCapabilityFlags(
   }
 }
 
-function applyOperatorLaneFlags(
-  options: CliOptions,
-  opts: Record<string, unknown>,
-): void {
+function applyOperatorLaneFlags(options: CliOptions, opts: CliFlags): void {
   if (opts.saasOperatorApis !== undefined) {
     const requested = opts.saasOperatorApis === true;
     options.saasOperatorApis = requested;
@@ -219,19 +256,15 @@ function applyOperatorLaneFlags(
   }
 }
 
-function applyForgeGraphFlags(
-  options: CliOptions,
-  opts: Record<string, unknown>,
-): void {
+function applyForgeGraphFlags(options: CliOptions, opts: CliFlags): void {
   if (opts.forgegraphServer) {
-    options.forgegraphServer = opts.forgegraphServer as string;
+    options.forgegraphServer = opts.forgegraphServer;
   }
   if (opts.forgegraphPreviewDomain) {
-    options.forgegraphPreviewDomain = opts.forgegraphPreviewDomain as string;
+    options.forgegraphPreviewDomain = opts.forgegraphPreviewDomain;
   }
   if (opts.forgegraphProductionDomain) {
-    options.forgegraphProductionDomain =
-      opts.forgegraphProductionDomain as string;
+    options.forgegraphProductionDomain = opts.forgegraphProductionDomain;
   }
 }
 
