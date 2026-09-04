@@ -70,10 +70,66 @@ catalogs:
 
 linkWorkspacePackages: true
 
+# Postinstall scripts pnpm may run. Anything a transitive dependency declares
+# and that is not listed here or in `ignoredBuiltDependencies` makes
+# `pnpm install` exit non-zero with ERR_PNPM_IGNORED_BUILDS, so both lists are
+# maintained deliberately — a scaffolded app must not greet its author with a
+# failed install.
 onlyBuiltDependencies:
   - '@tailwindcss/oxide'
   - esbuild
   - protobufjs
+
+# Builds that are deliberately NOT run. Everything here was already being
+# skipped (pnpm skips any build not in `onlyBuiltDependencies`); naming it
+# turns a warning about the status quo into a recorded decision, and keeps
+# `pnpm install` silent and exit-0 — a scaffolded app must not greet its
+# author with a wall of build warnings, or, under a pnpm that defaults
+# `strict-dep-builds` on, a failed install.
+ignoredBuiltDependencies:
+  # --- decided for this repo ---
+  # workerd (via wrangler and @cloudflare/vitest-pool-workers). Its install
+  # script only re-checks the binary, which already ships prebuilt in the
+  # platform package (@cloudflare/workerd-darwin-arm64 and friends) that
+  # workerd depends on. Skipping it changes nothing: `wrangler dev`, the
+  # Workers test pool, and the fault lane all run.
+  - workerd
+  # redis-memory-server (via @gmacko/emulate). Its postinstall compiles Redis
+  # from source, which fails outright on a stock macOS toolchain — Redis needs
+  # GNU Make 4.x and macOS ships 3.81. Denied rather than allowed: nothing
+  # here runs a Redis emulator (emulate.config.yaml declares no `redis:`
+  # section), so allowing it would buy a guaranteed install failure in
+  # exchange for a server we never start.
+  - redis-memory-server
+  #
+  # --- optional native accelerators; the JS fallback is what we ship on ---
+  - bufferutil
+  - utf-8-validate
+  - msgpackr-extract
+  - better-sqlite3
+  - '@swc/core'
+  - sharp
+  #
+  # --- self-installing binaries, fetched lazily on first use instead ---
+  # lefthook resolves its binary from the platform package; `pnpm prepare`
+  # (`lefthook install`) works with this build skipped, which is how the git
+  # hooks are installed today.
+  - lefthook
+  # @sentry/cli and openapi-generator-cli download an executable/JAR at
+  # install time. Both are used only by opt-in lanes (source-map upload with
+  # SENTRY_AUTH_TOKEN set; `sdks/openapi` generation) and both fetch on demand
+  # when actually invoked.
+  - '@sentry/cli'
+  - '@openapitools/openapi-generator-cli'
+  #
+  # --- postinstall is a funding/telemetry notice, not a build ---
+  - core-js
+  - '@nestjs/core'
+  #
+  # --- transitive of @openapitools/openapi-generator-cli; unused here ---
+  - prisma
+  - '@prisma/client'
+  - '@prisma/engines'
 
 overrides:
   # Kill the residual Expo SDK-55 family that Expo autolinking otherwise
