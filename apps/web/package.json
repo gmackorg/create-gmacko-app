@@ -23,6 +23,7 @@
     "lint": "oxlint .",
     "test": "vitest run",
     "test:workers": "vitest run --config vitest.workers.config.ts",
+    "test:fault": "node ./fault/run.mjs",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "e2e": "playwright test",

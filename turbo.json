@@ -41,6 +41,12 @@
       "outputs": [],
       "cache": true
     },
+    "test:fault": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "cache": true,
+      "env": ["CLOUDFAULT_DEPTH", "CLOUDFAULT_REQUIRED", "CLOUDFAULT_SRC"]
+    },
     "test:watch": {
       "dependsOn": ["^build"],
       "cache": false,
