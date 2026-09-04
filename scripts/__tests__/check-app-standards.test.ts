@@ -8,6 +8,7 @@
  */
 import { spawnSync } from "node:child_process";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -19,6 +20,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { afterEach, describe, expect, it } from "vitest";
+
+import oxlintConfig from "../../oxlint.config.ts";
 
 const script = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -550,56 +553,116 @@ describe("no-d1-table-rebuild", () => {
 });
 
 /**
- * `.oxlintrc.json` mirrors exactly one of the standards
+ * `oxlint.config.ts` mirrors exactly one of the standards
  * (`no-cloudflare-env-outside-runtime`) so the editor and the pre-commit hook
  * report it before CI does. Two sources of truth for one rule drift, so this
  * pins them to each other: the allow-list in the script and the "off"
  * override in the oxlint config must name the same module.
+ *
+ * It also pins the vendored anti-slop wiring, because a config whose
+ * `jsPlugins` specifier points at a directory that did not survive scaffolding
+ * fails *silently* — oxlint would simply stop reporting the rules in every
+ * generated app.
  */
-describe("the oxlint mirror of no-cloudflare-env-outside-runtime", () => {
+describe("oxlint.config.ts", () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
   const source = readFileSync(
     join(root, "scripts", "check-app-standards.mjs"),
     "utf8",
   );
-  // `.oxlintrc.json` is JSONC (oxlint sets `allowComments`); drop the
-  // whole-line comments so `JSON.parse` can read it.
-  const oxlint = JSON.parse(
-    readFileSync(join(root, ".oxlintrc.json"), "utf8")
-      .split("\n")
-      .filter((line) => !line.trim().startsWith("//"))
-      .join("\n"),
-  ) as {
-    readonly overrides: ReadonlyArray<{
-      readonly files: ReadonlyArray<string>;
-      readonly rules: Record<string, unknown>;
-    }>;
-  };
+  const overrides = oxlintConfig.overrides ?? [];
 
-  it("restricts cloudflare:workers across app and package source", () => {
-    const restricting = oxlint.overrides.find(
-      (override) => override.rules["no-restricted-imports"] !== "off",
-    );
-    expect(restricting?.files).toEqual(["apps/*/src/**", "packages/*/src/**"]);
-    expect(JSON.stringify(restricting?.rules)).toContain("cloudflare:workers");
+  describe("the mirror of no-cloudflare-env-outside-runtime", () => {
+    it("restricts cloudflare:workers across app and package source", () => {
+      const restricting = overrides.find(
+        (override) => override.rules?.["no-restricted-imports"] !== "off",
+      );
+      expect(restricting?.files).toEqual([
+        "apps/*/src/**",
+        "packages/*/src/**",
+      ]);
+      expect(JSON.stringify(restricting?.rules)).toContain(
+        "cloudflare:workers",
+      );
+    });
+
+    it("exempts the same module the script's allow-list names", () => {
+      // `const CF_ENV_ALLOWED = new Set(["apps/web/src/server/runtime.ts"]);`
+      const allowed = [
+        ...source.matchAll(/CF_ENV_ALLOWED = new Set\(\[([^\]]*)\]\)/g),
+      ]
+        .flatMap((match) => (match[1] ?? "").split(","))
+        .map((entry) => entry.trim().replace(/^["']|["']$/g, ""))
+        .filter((entry) => entry.length > 0);
+      expect(allowed).toEqual(["apps/web/src/server/runtime.ts"]);
+
+      const exempting = overrides.find(
+        (override) => override.rules?.["no-restricted-imports"] === "off",
+      );
+      for (const file of allowed) expect(exempting?.files).toContain(file);
+      // Plus the shapes the script exempts by pattern, not by name.
+      expect(exempting?.files).toContain("**/*.workers.test.ts");
+      expect(exempting?.files).toContain("**/*.d.ts");
+    });
   });
 
-  it("exempts the same module the script's allow-list names", () => {
-    // `const CF_ENV_ALLOWED = new Set(["apps/web/src/server/runtime.ts"]);`
-    const allowed = [
-      ...source.matchAll(/CF_ENV_ALLOWED = new Set\(\[([^\]]*)\]\)/g),
-    ]
-      .flatMap((match) => (match[1] ?? "").split(","))
-      .map((entry) => entry.trim().replace(/^["']|["']$/g, ""))
-      .filter((entry) => entry.length > 0);
-    expect(allowed).toEqual(["apps/web/src/server/runtime.ts"]);
-
-    const exempting = oxlint.overrides.find(
-      (override) => override.rules["no-restricted-imports"] === "off",
+  describe("the vendored anti-slop plugin", () => {
+    const specifiers = (oxlintConfig.jsPlugins ?? []).map((plugin) =>
+      typeof plugin === "string" ? plugin : plugin.specifier,
     );
-    for (const file of allowed) expect(exempting?.files).toContain(file);
-    // Plus the shapes the script exempts by pattern, not by name.
-    expect(exempting?.files).toContain("**/*.workers.test.ts");
-    expect(exempting?.files).toContain("**/*.d.ts");
+
+    it("registers both plugin groups", () => {
+      const names = (oxlintConfig.jsPlugins ?? []).map((plugin) =>
+        typeof plugin === "string" ? plugin : plugin.name,
+      );
+      expect(names).toEqual(["anti-slop", "anti-slop-effect"]);
+    });
+
+    it("points at entry points that exist", () => {
+      expect(specifiers.length).toBeGreaterThan(0);
+      for (const specifier of specifiers) {
+        expect(existsSync(join(root, specifier))).toBe(true);
+      }
+    });
+
+    it("ignores the vendored source itself", () => {
+      expect(oxlintConfig.ignorePatterns).toContain(
+        "tools/oxlint/anti-slop/**",
+      );
+    });
+
+    it("enables every rule the vendored plugins export, or says why not", () => {
+      // The plugin index files list their own rules; the config must name each
+      // one, so a re-sync that adds a rule cannot land silently disabled.
+      const declared = new Set(
+        Object.keys(oxlintConfig.rules ?? {}).filter((rule) =>
+          rule.startsWith("anti-slop"),
+        ),
+      );
+      for (const [group, entry] of [
+        ["anti-slop", "tools/oxlint/anti-slop/index.ts"],
+        ["anti-slop-effect", "tools/oxlint/anti-slop/effect/index.ts"],
+      ] as const) {
+        const index = readFileSync(join(root, entry), "utf8");
+        const exported = [...index.matchAll(/^\t\t"([a-z0-9-]+)":/gm)].map(
+          (match) => match[1],
+        );
+        expect(exported.length).toBeGreaterThan(0);
+        for (const rule of exported) {
+          expect(declared).toContain(`${group}/${rule}`);
+        }
+      }
+    });
+
+    it("keeps @oxlint/plugins pinned to the resolved oxlint version", () => {
+      // oxlint loads the plugin into its own process; a version skew between
+      // the two is a runtime failure, not a type error.
+      const catalog = readFileSync(join(root, "pnpm-workspace.yaml"), "utf8");
+      const plugins = /^\s*'@oxlint\/plugins':\s*(\S+)$/m.exec(catalog)?.[1];
+      const oxlint = /^\s*oxlint:\s*(\S+)$/m.exec(catalog)?.[1];
+      expect(plugins).toBeDefined();
+      expect(plugins).toBe(oxlint);
+      expect(plugins).toMatch(/^\d+\.\d+\.\d+$/);
+    });
   });
 });
