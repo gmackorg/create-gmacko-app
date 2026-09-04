@@ -2,7 +2,10 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreExportsUsedInFile": true,
   "ignore": [".claude/**", "sdks/generated/**"],
-  "ignoreDependencies": ["cloudflare"],
+  // `postgres` is imported dynamically by scripts/pg-to-d1.mjs and is
+  // deliberately NOT a dependency: that script runs once, against a legacy
+  // database, and is invoked with `pnpm dlx --package=postgres`.
+  "ignoreDependencies": ["cloudflare", "postgres"],
   "ignoreBinaries": ["expo", "eas", "maestro", "generate"],
   "workspaces": {
     ".": {

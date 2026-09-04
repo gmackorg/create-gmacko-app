@@ -17,6 +17,6 @@ anyone still running an app generated from the old template.
 - `plans/2026-05-06-otel-*.md` — the OTel design for the Node runtime (tRPC
   middleware, pino); the Worker exports through `effect/unstable/observability`.
 
-The recipe for moving an existing database from the old stack to D1 is a
-Phase 9 deliverable of `docs/plans/2026-09-02-tanstack-effect-d1-migration.html`
-and is not documented here yet.
+- `postgres-to-d1.md` — the recipe for moving an existing database from the
+  old stack to D1, and the converter (`scripts/pg-to-d1.mjs`) it uses. This
+  one is not history: it is for anyone still on the old template.
