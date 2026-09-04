@@ -112,16 +112,21 @@ export const originAllowed = (
   return request.headers["sec-fetch-site"] === "same-origin";
 };
 
-/** The raw headers as a web `Headers`, the shape better-auth reads. */
+/**
+ * The raw headers as a web `Headers`, the shape better-auth reads.
+ * `HttpRouter.toWebHandler` keeps the web `Request` it was handed as `source`,
+ * so its own `Headers` is passed straight through; every other source (a
+ * platform adapter, a hand-built request in a test) is rebuilt from the
+ * header record.
+ */
 export const toWebHeaders = (request: Request): Headers => {
-  const source = request.source as { readonly headers?: unknown };
-  if (source.headers instanceof Headers) return source.headers;
+  const { source } = request;
+  if (source instanceof globalThis.Request) return source.headers;
   const headers = new Headers();
   for (const [name, value] of Object.entries(request.headers)) {
-    // The record carries its type id as a `~`-prefixed key; skip it.
-    if (typeof value === "string" && !name.startsWith("~")) {
-      headers.append(name, value);
-    }
+    // Every value in the record is a string, including the one under the
+    // record's own `~effect/http/Headers` type-id key; skip that key by name.
+    if (!name.startsWith("~")) headers.append(name, value);
   }
   return headers;
 };
@@ -169,6 +174,12 @@ const makeDeps: Effect.Effect<
  * here: the router's logger reports every defect once, with the request, so
  * a manual `logError` would print it twice. `what` names the read in the
  * defect for that report.
+ *
+ * SAFETY: the `catchTag` below handles exactly the `DatabaseError` member of
+ * `E | DatabaseError` and dies with it, so the surviving error channel is
+ * `Exclude<E, DatabaseError>` by construction. TypeScript cannot compute that
+ * subtraction while `E` is an unresolved type parameter, so the result type is
+ * restated here; no other error is touched.
  */
 const orDie =
   (what: string) =>
@@ -350,17 +361,20 @@ const RANK: Readonly<Record<WorkspaceMemberRole, number>> = {
   member: 1,
 };
 
+/** The same ranks keyed by the raw column value; a `Map` inherits no keys. */
+const RANK_BY_STORED_ROLE: ReadonlyMap<string, number> = new Map(
+  Object.entries(RANK),
+);
+
 /**
  * The rank of a stored role, failing closed: `role` is `text` in the
  * database, so a value the contract does not know (a bad migration, a hand
  * edit) ranks 0, below every `minimum`. `RequestContext` already drops such
- * rows before they reach here; this is the second line. `Object.hasOwn`,
- * not `in`: a key such as `"constructor"` is `in` every object literal.
+ * rows before they reach here; this is the second line. The lookup is a `Map`,
+ * not the record: a key such as `"constructor"` resolves on every object.
  */
 const rankOf = (role: string | null): number =>
-  role !== null && Object.hasOwn(RANK, role)
-    ? RANK[role as WorkspaceMemberRole]
-    : 0;
+  role === null ? 0 : (RANK_BY_STORED_ROLE.get(role) ?? 0);
 
 /**
  * "The current workspace" is `RequestContext.workspace(userId)`: the initial

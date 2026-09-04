@@ -440,6 +440,10 @@ describe("security middlewares", () => {
             .select({ id: user.id })
             .from(user)
             .where(eq(user.email, email));
+          // SAFETY: `workspace_membership.role` is a `text` column — drizzle
+          // narrows it to the contract's literals, sqlite stores any string —
+          // and this helper exists to seed the value outside them that the
+          // "ignores a row whose role the contract does not know" test needs.
           yield* db.insert(workspaceMembership).values({
             workspaceId,
             userId: member!.id,

@@ -35,6 +35,16 @@ const AuthTest = Auth.layer({
   },
 }).pipe(Layer.provide(layerTest));
 
+/** The fields these tests read off `/api/auth/get-session`'s body. */
+interface GetSessionBody {
+  readonly user: { readonly email: string };
+}
+
+/** `/api/auth/sign-in/social` answers with the provider URL to visit. */
+interface SignInSocialBody {
+  readonly url?: string;
+}
+
 const jsonHeaders = {
   "content-type": "application/json",
   origin: baseUrl,
@@ -96,9 +106,7 @@ describe("Auth service (sqlite-node)", () => {
           verifiedStatus: verified.status,
           location: verified.headers.get("location"),
           cookie,
-          session: (yield* Effect.promise(() => session.json())) as {
-            user: { email: string };
-          },
+          session: yield* Effect.promise(() => session.json<GetSessionBody>()),
           current,
           anonymous,
           stored,
@@ -131,7 +139,7 @@ describe("Auth service (sqlite-node)", () => {
         ),
       ),
     );
-    const body = (await response.json()) as { url?: string };
+    const body = await response.json<SignInSocialBody>();
     expect(response.status).toBe(200);
     expect(
       body.url?.startsWith("http://github.test/login/oauth/authorize"),

@@ -122,5 +122,14 @@ export const makeTestHandler = (
     disableLogger: true,
   });
 
-export const jsonOf = (response: Response) =>
-  response.json() as Promise<Record<string, unknown>>;
+/** What a middleware answers when it refuses: the contract's tagged errors. */
+export interface Refusal {
+  readonly _tag: string;
+  readonly reason?: string;
+}
+
+/** Every body the guarded endpoints return: the echoed caller, or a refusal. */
+export type TestBody = Refusal | Who;
+
+export const jsonOf = (response: Response): Promise<TestBody> =>
+  response.json<TestBody>();

@@ -81,8 +81,21 @@ export interface AuthOptions {
    */
   readonly extraPlugins?: ReadonlyArray<AuthPluginLike> | undefined;
   /** Sink for better-auth API errors; defaults to `console.error`. */
-  readonly onError?: ((error: unknown) => void) | undefined;
+  readonly onError?: ((error: AuthApiError) => void) | undefined;
 }
+
+/**
+ * A better-auth API failure as an `Error`. better-auth raises `APIError` (an
+ * `Error` subclass) for every handled failure and rethrows whatever a handler
+ * threw for a defect, so `toAuthApiError` normalises the second case rather
+ * than leaking `unknown` to the sink.
+ */
+export type AuthApiError = Error;
+
+const toAuthApiError = (cause: unknown): AuthApiError =>
+  cause instanceof Error
+    ? cause
+    : new Error("better-auth threw a non-Error value", { cause });
 
 /**
  * Bypass delivery: prints the link instead of emailing it. TODO(Phase 6):
@@ -129,14 +142,13 @@ const githubUserInfo =
     };
     const profileResponse = await fetch(`${apiUrl}/user`, { headers });
     if (!profileResponse.ok) return null;
-    const profile = (await profileResponse.json()) as GithubProfile;
+    const profile = await profileResponse.json<GithubProfile>();
     let email = profile.email;
     let emailVerified = email !== null;
     if (!email) {
       const emailsResponse = await fetch(`${apiUrl}/user/emails`, { headers });
       if (emailsResponse.ok) {
-        const emails =
-          (await emailsResponse.json()) as ReadonlyArray<GithubEmail>;
+        const emails = await emailsResponse.json<ReadonlyArray<GithubEmail>>();
         const primary = emails.find((e) => e.primary) ?? emails[0];
         email = primary?.email ?? null;
         emailVerified = primary?.verified ?? false;
@@ -161,7 +173,7 @@ export function makeAuth(options: AuthOptions, db: PlainDatabase) {
   const appleUrl = options.apple?.url ?? "https://appleid.apple.com";
   const onError =
     options.onError ??
-    ((error: unknown) => {
+    ((error: AuthApiError) => {
       // oxlint-disable-next-line no-console -- default sink until the Effect logger is threaded through
       console.error("better-auth API error", error);
     });
@@ -241,6 +253,12 @@ export function makeAuth(options: AuthOptions, db: PlainDatabase) {
           },
         ],
       }),
+      // SAFETY: `AuthPluginLike` names the whole of what better-auth requires
+      // of a plugin object at this position (`id`, optional `version`); the
+      // structural mismatch `BetterAuthPlugin` reports is nominal only —
+      // `HookEndpointContext` comes from whichever `@better-auth/core` copy
+      // pnpm resolved for the app that created the plugin (see
+      // `AuthOptions.extraPlugins`). Nothing here reads past `id`.
       ...((options.extraPlugins ?? []) as ReadonlyArray<BetterAuthPlugin>),
     ],
     socialProviders: options.apple
@@ -249,9 +267,11 @@ export function makeAuth(options: AuthOptions, db: PlainDatabase) {
             clientId: options.apple.clientId,
             clientSecret: options.apple.clientSecret,
             appBundleIdentifier: options.apple.bundleIdentifier,
-            ...(options.apple.url
-              ? { authorizationEndpoint: `${appleUrl}/auth/authorize` }
-              : {}),
+            // Always sent: `createAuthorizationURL` uses
+            // `options.authorizationEndpoint || <the provider's own>`, and
+            // `appleUrl` falls back to appleid.apple.com, so with no override
+            // configured this is byte-for-byte the built-in endpoint.
+            authorizationEndpoint: `${appleUrl}/auth/authorize`,
           },
         }
       : {},
@@ -261,8 +281,8 @@ export function makeAuth(options: AuthOptions, db: PlainDatabase) {
       ...(options.apple ? [appleUrl] : []),
     ],
     onAPIError: {
-      onError(error) {
-        onError(error);
+      onError(thrown) {
+        onError(toAuthApiError(thrown));
       },
     },
   } satisfies BetterAuthOptions;

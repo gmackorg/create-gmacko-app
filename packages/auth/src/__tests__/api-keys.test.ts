@@ -5,7 +5,7 @@
  */
 import { createHash } from "node:crypto";
 
-import { Database, DatabaseError } from "@gmacko/db";
+import { Database, type DatabaseDrizzle, DatabaseError } from "@gmacko/db";
 import { apiKeys, user } from "@gmacko/db/schema";
 import { layerTest } from "@gmacko/db/testing";
 import { eq } from "drizzle-orm";
@@ -259,10 +259,10 @@ describe("ApiKeys", () => {
         Effect.map(Database, (database) => ({
           ...database,
           db: new Proxy(database.db, {
-            get: (target, property, receiver) =>
+            get: (target: DatabaseDrizzle, property: keyof DatabaseDrizzle) =>
               property === "update"
                 ? () => ({ set: () => ({ where: () => Effect.fail(hiccup) }) })
-                : Reflect.get(target, property, receiver),
+                : target[property],
           }),
         })),
       ).pipe(Layer.provide(layerTest));

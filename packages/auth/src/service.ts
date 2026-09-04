@@ -5,6 +5,11 @@
 import { Database } from "@gmacko/db";
 import { Context, Effect, Layer } from "effect";
 import type { Session, User } from "./index";
+// This module owns the `Auth` service: it declares the tag, and `Auth.layer`
+// below is the only place the better-auth instance is constructed. `makeAuth`
+// is that constructor, so this import is the service's own composition root —
+// the Layer the rule asks for is the one defined here.
+// oxlint-disable-next-line anti-slop-effect/no-service-constructor-imports
 import { type Auth as AuthInstance, type AuthOptions, makeAuth } from "./index";
 
 /**

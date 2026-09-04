@@ -111,7 +111,7 @@ const toScopes = (
   permissions: ReadonlyArray<string>,
 ): ReadonlyArray<ApiKeyScope> =>
   permissions.filter((value): value is ApiKeyScope =>
-    (ApiKeyScope.literals as ReadonlyArray<string>).includes(value),
+    ApiKeyScope.literals.some((literal) => literal === value),
   );
 
 export class ApiKeys extends Context.Service<ApiKeys, ApiKeysShape>()(
@@ -153,6 +153,9 @@ export class ApiKeys extends Context.Service<ApiKeys, ApiKeysShape>()(
                 ),
               );
             return {
+              // SAFETY: `key` is the `api_keys` row selected above, so `key.id`
+              // is `api_keys.id` — the column `ApiKeyId` brands, and the brand
+              // refines nothing beyond `Schema.String`.
               keyId: key.id as ApiKeyId,
               user: toUser(owner),
               permissions: toScopes(key.permissions),
@@ -168,6 +171,8 @@ export class ApiKeys extends Context.Service<ApiKeys, ApiKeysShape>()(
               Effect.map((rows) =>
                 rows.map(
                   (row) =>
+                    // SAFETY: `row` is an `api_keys` row, so `row.id` is
+                    // `api_keys.id` — the column `ApiKeyId` brands.
                     new ApiKey({
                       id: row.id as ApiKeyId,
                       name: row.name,
@@ -206,6 +211,8 @@ export class ApiKeys extends Context.Service<ApiKeys, ApiKeysShape>()(
                 new Error("api_keys insert returned no row"),
               );
             }
+            // SAFETY: `row` is the `api_keys` row this insert returned, so
+            // `row.id` is `api_keys.id` — the column `ApiKeyId` brands.
             return new ApiKeyCreated({
               id: row.id as ApiKeyId,
               name: row.name,

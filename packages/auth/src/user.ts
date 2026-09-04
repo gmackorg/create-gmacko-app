@@ -27,6 +27,11 @@ export interface UserLike {
 
 export const toUser = (source: UserLike): User =>
   new User({
+    // SAFETY: `UserId` brands `user.id` and nothing else, and every `UserLike`
+    // is that row — a `select().from(user)` result, or better-auth's session
+    // user, which the drizzle adapter read from the same column. The brand
+    // carries no refinement beyond `Schema.String`, so the value is already
+    // everything `UserId` asserts.
     id: source.id as UserId,
     name: source.name,
     email: source.email,

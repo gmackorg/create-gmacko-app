@@ -94,6 +94,10 @@ export const resolveWorkspace = (
       (row) => row.workspaceId === initialWorkspaceId,
     );
     return {
+      // SAFETY: `initialWorkspaceId` is `application_settings.initial_workspace_id`,
+      // a foreign key to `workspace.id` — the column `WorkspaceId` brands — and
+      // the branch above establishes it is not null. The brand adds no
+      // refinement over `Schema.String`.
       workspaceId: initialWorkspaceId as WorkspaceId,
       role: membership?.role ?? null,
     };
@@ -108,7 +112,7 @@ export const resolveWorkspace = (
 const CAPACITY = 16;
 
 const isMemberRole = (value: string): value is WorkspaceMemberRole =>
-  (WorkspaceMemberRole.literals as ReadonlyArray<string>).includes(value);
+  WorkspaceMemberRole.literals.some((literal) => literal === value);
 
 export class RequestContext extends Context.Service<
   RequestContext,
@@ -154,6 +158,11 @@ export class RequestContext extends Context.Service<
                 // stored value it does not know must grant nothing, not 500.
                 const known = rows.filter((row) => isMemberRole(row.role));
                 const ignored = rows.length - known.length;
+                // SAFETY: every id below is the `workspace_membership` row's
+                // own column — `id`, and the `workspace_id`/`user_id` foreign
+                // keys — which is exactly what each brand names; the brands
+                // refine nothing beyond `Schema.String`. `role` is checked by
+                // `isMemberRole` in the filter above.
                 const memberships = known.map(
                   (row) =>
                     new WorkspaceMembership({

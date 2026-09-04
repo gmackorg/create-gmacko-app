@@ -45,11 +45,17 @@ export const makeStatementLog = (): StatementLog => {
 interface PreparedQueryLike {
   readonly sql: string;
 }
+/**
+ * The prepared statement drizzle builds. Opaque on purpose: this patch reads
+ * the query it was built from and hands the statement back untouched, so the
+ * only contract it needs is "the object drizzle's own builders execute".
+ */
+type PreparedStatementLike = object;
 interface SessionLike {
   prepareQuery: (
     query: PreparedQueryLike,
     ...rest: ReadonlyArray<unknown>
-  ) => unknown;
+  ) => PreparedStatementLike;
 }
 interface DrizzleLike {
   readonly _: { readonly session: SessionLike };
@@ -71,6 +77,12 @@ export const countingDatabase = (
         ["plain", database.plain],
       ];
       for (const [handle, drizzle] of handles) {
+        // SAFETY: both entries of `handles` are drizzle database instances
+        // (`Database.db` and `Database.plain`), and every drizzle instance
+        // keeps its session at `_.session` and routes every builder through
+        // `session.prepareQuery(query, …)` with the SQL text on the first
+        // argument — the same internal contract `@gmacko/db`'s own `rewire`
+        // (packages/db/src/database.ts) patches to map driver errors.
         const session = (drizzle as DrizzleLike)._.session;
         const prepareQuery = session.prepareQuery;
         session.prepareQuery = function (this: SessionLike, query, ...rest) {

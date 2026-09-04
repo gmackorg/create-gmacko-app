@@ -33,6 +33,22 @@ const profile = {
 };
 const primaryEmail = `octo-${crypto.randomUUID()}@example.com`;
 
+/** Every body the stand-in provider serves, in the shapes GitHub uses. */
+type ProviderBody =
+  | typeof profile
+  | ReadonlyArray<{
+      readonly email: string;
+      readonly primary: boolean;
+      readonly verified: boolean;
+    }>
+  | {
+      readonly access_token: string;
+      readonly token_type: string;
+      readonly scope: string;
+    }
+  | { readonly error: string }
+  | { readonly message: string };
+
 interface SeenRequest {
   readonly method: string;
   readonly path: string;
@@ -51,7 +67,7 @@ const fakeGithub = (): Server =>
     req.on("end", () => {
       const path = new URL(req.url ?? "/", "http://fake").pathname;
       seen.push({ method: req.method ?? "", path, headers: req.headers, body });
-      const json = (status: number, value: unknown) => {
+      const json = (status: number, value: ProviderBody) => {
         res.writeHead(status, { "content-type": "application/json" });
         res.end(JSON.stringify(value));
       };
@@ -81,6 +97,11 @@ const fakeGithub = (): Server =>
     });
   });
 
+/** `/api/auth/sign-in/social` answers with the provider URL to visit. */
+interface SignInSocialBody {
+  readonly url: string;
+}
+
 const cookieHeader = (response: Response, name: string): string => {
   const cookie = response.headers
     .getSetCookie()
@@ -101,6 +122,9 @@ describe("GitHub OAuth callback (generic provider, sqlite-node)", () => {
     await new Promise<void>((resolve) =>
       server.listen(0, "127.0.0.1", () => resolve()),
     );
+    // SAFETY: `server.listen(0, "127.0.0.1")` above has resolved, and for a
+    // listening TCP server `address()` returns an `AddressInfo`; it is `null`
+    // only before `listen` completes, and a string only for a pipe/UDS server.
     const { port } = server.address() as AddressInfo;
     const origin = `http://127.0.0.1:${port}`;
     const AuthTest = Auth.layer({
@@ -145,9 +169,9 @@ describe("GitHub OAuth callback (generic provider, sqlite-node)", () => {
             }),
           }),
         );
-        const { url } = (yield* Effect.promise(() => started.json())) as {
-          url: string;
-        };
+        const { url } = yield* Effect.promise(() =>
+          started.json<SignInSocialBody>(),
+        );
         const state = new URL(url).searchParams.get("state");
         if (!state) throw new Error(`no state in ${url}`);
         const stateCookie = cookieHeader(started, "better-auth.state");
