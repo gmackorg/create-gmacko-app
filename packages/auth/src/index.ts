@@ -13,6 +13,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { magicLink } from "better-auth/plugins/magic-link";
 import { oAuthProxy } from "better-auth/plugins/oauth-proxy";
+import { Schema } from "effect";
 
 export function isPlatformAdminRole(
   role: UserRole | null | undefined,
@@ -113,19 +114,32 @@ export const logMagicLink = async (link: MagicLink): Promise<void> => {
   );
 };
 
-interface GithubProfile {
-  readonly id: number;
-  readonly login: string;
-  readonly name: string | null;
-  readonly email: string | null;
-  readonly avatar_url: string | null;
-}
+/**
+ * The GitHub REST fields this module reads, decoded rather than asserted.
+ *
+ * Decoding (instead of `Response.json<T>()`, which is a workers-types-only
+ * overload) also keeps this file portable: `@gmacko/operator-core` and
+ * `@gmacko/mcp-server` compile this source transitively under `lib: DOM`,
+ * where `Response.json` takes no type argument.
+ */
+const GithubProfile = Schema.Struct({
+  id: Schema.Number,
+  login: Schema.String,
+  name: Schema.NullOr(Schema.String),
+  email: Schema.NullOr(Schema.String),
+  avatar_url: Schema.NullOr(Schema.String),
+});
 
-interface GithubEmail {
-  readonly email: string;
-  readonly primary: boolean;
-  readonly verified: boolean;
-}
+const GithubEmails = Schema.Array(
+  Schema.Struct({
+    email: Schema.String,
+    primary: Schema.Boolean,
+    verified: Schema.Boolean,
+  }),
+);
+
+const decodeGithubProfile = Schema.decodeUnknownSync(GithubProfile);
+const decodeGithubEmails = Schema.decodeUnknownSync(GithubEmails);
 
 /**
  * The generic plugin's default user-info fetch expects OIDC claims
@@ -142,13 +156,13 @@ const githubUserInfo =
     };
     const profileResponse = await fetch(`${apiUrl}/user`, { headers });
     if (!profileResponse.ok) return null;
-    const profile = await profileResponse.json<GithubProfile>();
+    const profile = decodeGithubProfile(await profileResponse.json());
     let email = profile.email;
     let emailVerified = email !== null;
     if (!email) {
       const emailsResponse = await fetch(`${apiUrl}/user/emails`, { headers });
       if (emailsResponse.ok) {
-        const emails = await emailsResponse.json<ReadonlyArray<GithubEmail>>();
+        const emails = decodeGithubEmails(await emailsResponse.json());
         const primary = emails.find((e) => e.primary) ?? emails[0];
         email = primary?.email ?? null;
         emailVerified = primary?.verified ?? false;

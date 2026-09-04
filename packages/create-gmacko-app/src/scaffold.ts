@@ -292,28 +292,62 @@ function updateIntegrationsConfig(
     "packages/config/src/integrations.ts",
   );
 
-  const content = `export const integrations = {
+  const content = `/** The transactional email provider; \`none\` means the app sends no email. */
+export type EmailProvider = "resend" | "sendgrid" | "none";
+/** The pub/sub + queue backend \`@gmacko/realtime\` talks to. */
+export type RealtimeProvider = "redis" | "none";
+/** The file storage service \`@gmacko/storage\` uploads through. */
+export type StorageProvider = "uploadthing" | "none";
+
+// Each provider-bearing integration is declared through its own contract
+// rather than written inline under \`as const\`, which would pin \`provider\` to
+// the single literal it is scaffolded with and turn every
+// \`provider === "…"\` comparison in this repo into a "no overlap" error.
+// \`enabled\` keeps the literal the scaffolder wrote, so a disabled integration
+// stays statically disabled for its consumers.
+
+/** How the app sends transactional email. */
+interface EmailIntegration {
+  readonly enabled: ${integrations.email.enabled};
+  readonly provider: EmailProvider;
+}
+/** How the app publishes and subscribes to realtime events. */
+interface RealtimeIntegration {
+  readonly enabled: ${integrations.realtime.enabled};
+  readonly provider: RealtimeProvider;
+}
+/** Where the app stores uploaded files. */
+interface StorageIntegration {
+  readonly enabled: ${integrations.storage.enabled};
+  readonly provider: StorageProvider;
+}
+
+const email: EmailIntegration = {
+  enabled: ${integrations.email.enabled},
+  provider: "${integrations.email.provider}",
+};
+// Node-only (ioredis + BullMQ): unsupported on the web app, which runs on
+// Cloudflare Workers. Enable it only for a Node service on a VPS node; see
+// packages/realtime/README.md.
+const realtime: RealtimeIntegration = {
+  enabled: ${integrations.realtime.enabled},
+  provider: "${integrations.realtime.provider}",
+};
+const storage: StorageIntegration = {
+  enabled: ${integrations.storage.enabled},
+  provider: "${integrations.storage.provider}",
+};
+
+export const integrations = {
   sentry: ${integrations.sentry},
   posthog: ${integrations.posthog},
   forgegraph: ${integrations.forgegraph},
   stripe: ${integrations.stripe},
   revenuecat: ${integrations.revenuecat},
   notifications: ${integrations.notifications},
-  email: {
-    enabled: ${integrations.email.enabled},
-    provider: "${integrations.email.provider}" as "resend" | "sendgrid" | "none",
-  },
-  // Node-only (ioredis + BullMQ): unsupported on the web app, which runs on
-  // Cloudflare Workers. Enable it only for a Node service on a VPS node; see
-  // packages/realtime/README.md.
-  realtime: {
-    enabled: ${integrations.realtime.enabled},
-    provider: "${integrations.realtime.provider}" as "redis" | "none",
-  },
-  storage: {
-    enabled: ${integrations.storage.enabled},
-    provider: "${integrations.storage.provider}" as "uploadthing" | "none",
-  },
+  email,
+  realtime,
+  storage,
   i18n: false,
   openapi: false,
 } as const;

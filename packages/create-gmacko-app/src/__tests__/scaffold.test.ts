@@ -1870,6 +1870,18 @@ describe("create-gmacko-app scaffold", () => {
       expect(integrationsContent).toContain("sentry: true");
       expect(integrationsContent).toContain("posthog: true");
       expect(integrationsContent).toContain("stripe: true");
+      // The generated file is linted by the app's own `pnpm lint`, so the
+      // template must not emit the shapes anti-slop rejects. The provider
+      // literals used to be written as `"resend" as "resend" | ... | "none"`,
+      // which is three unjustified assertions in every scaffolded app.
+      expect(integrationsContent).not.toMatch(/\bas "/);
+      expect(integrationsContent).toContain("const email: EmailIntegration");
+      expect(integrationsContent).toContain(
+        "const realtime: RealtimeIntegration",
+      );
+      expect(integrationsContent).toContain(
+        "const storage: StorageIntegration",
+      );
     }, 120000);
 
     it("should prune unused packages and their web wiring when --prune is passed", async () => {
