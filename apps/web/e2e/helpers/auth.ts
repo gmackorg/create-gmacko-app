@@ -7,7 +7,8 @@
  */
 import { expect, type Page } from "@playwright/test";
 import { magicLinkToken, setUserRole } from "./db";
-import { BASE_URL } from "./env";
+import { BASE_URL, GITHUB_USER } from "./env";
+import { hydrated } from "./nav";
 
 export interface Person {
   readonly email: string;
@@ -41,6 +42,26 @@ export const signIn = async (page: Page, person: Person): Promise<void> => {
   // row (which always carries `email`) or null.
   const body = (await session.json()) as { user: { email: string } | null };
   expect(body.user?.email).toBe(person.email);
+};
+
+/**
+ * The browser OAuth journey against the emulated GitHub: the page must
+ * already be on the app and hydrated. It ends back on `/` as a brand new
+ * document (the provider redirect is a full navigation), so it waits for
+ * React to own that document again before returning; a click landing on
+ * the server-rendered HTML before hydration does nothing at all.
+ */
+export const signInWithGitHub = async (page: Page): Promise<void> => {
+  await page.getByRole("button", { name: /sign in with github/i }).click();
+  // emulate's authorize page lists its users; pick the seeded one.
+  await expect(page).toHaveURL(/\/login\/oauth\/authorize/);
+  await page
+    .locator(
+      `form.user-form:has(input[name=login][value=${GITHUB_USER.login}]) button[type=submit]`,
+    )
+    .click();
+  await expect(page).toHaveURL(/\/$/);
+  await hydrated(page);
 };
 
 /** First-run setup through the contract; the caller becomes the platform admin and owns the workspace. */

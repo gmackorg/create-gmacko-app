@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { alice, bob, signInAsAdmin } from "./helpers/auth";
+import { alice, bob, signInAsAdmin, signInWithGitHub } from "./helpers/auth";
 import { magicLinkToken, reset } from "./helpers/db";
 import { GITHUB_USER } from "./helpers/env";
 import { gotoReady } from "./helpers/nav";
@@ -42,16 +42,7 @@ test.describe("Sign in", () => {
     page,
   }) => {
     await gotoReady(page, "/");
-    await page.getByRole("button", { name: /sign in with github/i }).click();
-    // emulate's authorize page lists its users; pick the seeded one.
-    await expect(page).toHaveURL(/\/login\/oauth\/authorize/);
-    await page
-      .locator(
-        `form.user-form:has(input[name=login][value=${GITHUB_USER.login}]) button[type=submit]`,
-      )
-      .click();
-
-    await expect(page).toHaveURL(/\/$/);
+    await signInWithGitHub(page);
     await expect(page.getByTestId("signed-in-as")).toContainText(
       `Logged in as ${GITHUB_USER.name}`,
     );
@@ -63,12 +54,7 @@ test.describe("Sign in", () => {
 
   test("sign out returns to the anonymous home", async ({ page }) => {
     await gotoReady(page, "/");
-    await page.getByRole("button", { name: /sign in with github/i }).click();
-    await page
-      .locator(
-        `form.user-form:has(input[name=login][value=${GITHUB_USER.login}]) button[type=submit]`,
-      )
-      .click();
+    await signInWithGitHub(page);
     await expect(page.getByTestId("signed-in-as")).toBeVisible();
 
     await page.getByRole("button", { name: "Sign out" }).click();
