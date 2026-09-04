@@ -150,6 +150,10 @@ Checked today:
   the ledger claim has two phases: a claim that commits while the Worker
   loses the result must not make the redelivery skip an effect that never ran.
 - **A 200 implies a ledger row** (`stripe-webhook-ledger-records-every-acknowledged-event`).
+- **The sign-up rate limiter fails open** (`signup-rate-limit-fails-open`): a
+  D1 outage must let the call through rather than lock every caller out, and
+  a working counter must still refuse past the allowance
+  (`apps/web/fault/signup-rate-limit.fault.ts`).
 
 Derived from the code and *not* yet checked here, with the reason:
 
@@ -162,9 +166,6 @@ Derived from the code and *not* yet checked here, with the reason:
 - API-key scopes (a `read` key cannot mutate) and the deleted-user session
   invariant — enforced before any write, so no infrastructure fault changes
   the answer; `packages/auth/src/__tests__/middleware.test.ts` covers them.
-- The sign-up rate limiter fails **open**: a D1 outage must let the call
-  through, never lock every caller out. Expressible today and worth adding.
-
 **The gap that bounds all of this**: `Database.batch([...])` is unperturbed.
 `@effect/sql-d1` implements it with `db.batch()`, and CloudFault's D1 proxy
 interposes on `prepare().bind().first/all/run/raw` only. Every guarded-write

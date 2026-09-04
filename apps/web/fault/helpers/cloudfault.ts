@@ -3,8 +3,7 @@
  *
  * Every `@gmacko/cloudfault` specifier in the repo lives here, so the day the
  * package moves (a new subpath, a rename, a different install strategy) one
- * file changes instead of every scenario. `fault/run.mjs` is what makes these
- * specifiers resolve while the package is unpublished.
+ * file changes instead of every scenario.
  */
 
 export type {
