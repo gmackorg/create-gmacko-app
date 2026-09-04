@@ -42,7 +42,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:workers": "vitest run --config vitest.workers.config.ts",
-    "typecheck": "tsc --noEmit --emitDeclarationOnly false"
+    "typecheck": "tsc --noEmit --emitDeclarationOnly false && tsc --noEmit -p tsconfig.scripts.json"
   },
   "dependencies": {
     "@effect/sql-d1": "catalog:",

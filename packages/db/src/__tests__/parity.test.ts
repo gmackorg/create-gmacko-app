@@ -115,8 +115,9 @@ describe.each(Object.entries(pairs))("%s", (_name, { table, model }) => {
 
 it("covers every table in the schema that a row model mirrors", () => {
   const modelled = Object.keys(pairs).sort();
-  // better-auth's three tables have no row model; everything else must.
-  const exempt = ["account", "session", "verification"];
+  // better-auth's three tables, and `rate_limit_window`, which is
+  // infrastructure rather than contract (see schema.ts).
+  const exempt = ["account", "rate_limit_window", "session", "verification"];
   const all = (Object.values(schema) as ReadonlyArray<unknown>)
     .filter((value): value is Table => is(value, Table))
     .map((table) => getTableName(table))

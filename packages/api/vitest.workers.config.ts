@@ -24,6 +24,16 @@ export default defineConfig(async () => {
           compatibilityDate: "2026-08-22",
           compatibilityFlags: ["nodejs_compat"],
           d1Databases: ["DB"],
+          // Mirrors apps/web/wrangler.jsonc `ratelimits` for the `contact`
+          // scope, with a limit small enough to exhaust in a test. Miniflare
+          // implements the binding (`PLUGINS.ratelimit`), so the 429 below is
+          // the real code path, not a stub.
+          ratelimits: {
+            RATE_LIMIT_CONTACT: {
+              namespace_id: "1002",
+              simple: { limit: 2, period: 60 },
+            },
+          },
           bindings: { TEST_MIGRATIONS: migrations },
         },
       }),

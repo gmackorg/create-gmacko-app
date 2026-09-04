@@ -58,8 +58,12 @@ const Handlers = Layer.mergeAll(
 export type AppServices = Database | AppConfig | Background | Auth;
 
 export interface ApiLiveOptions {
-  /** Defaults to the in-memory limiter with `defaultRateLimits`. */
-  readonly rateLimiter?: Layer.Layer<RateLimiter> | undefined;
+  /**
+   * Defaults to the in-memory limiter with `defaultRateLimits`. May require
+   * `Database` (`RateLimiter.layerD1`, `RateLimiter.layerCloudflare`), which
+   * the app provides along with the rest of `AppServices`.
+   */
+  readonly rateLimiter?: Layer.Layer<RateLimiter, never, Database> | undefined;
 }
 
 /**

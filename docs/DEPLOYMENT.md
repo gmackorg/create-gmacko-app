@@ -123,6 +123,34 @@ anywhere: locally the Worker reads the repo-root `.env` through the
 `apps/web/.env` link, and a `.dev.vars` file would silently turn that off
 (`pnpm check:standards`, `no-dev-vars`).
 
+## Rate limiting
+
+Two counters, chosen per scope in `apps/web/src/server/runtime.ts`:
+
+| Scope | Counter | Where it is applied |
+| --- | --- | --- |
+| `auth` | `RATE_LIMIT_AUTH` binding | better-auth's own writes under `/api/auth/*` that are not sign-up or magic-link |
+| `contact` | `RATE_LIMIT_CONTACT` binding | `POST /api/waitlist` |
+| `api-keys` | `RATE_LIMIT_API_KEYS` binding | create/revoke API key |
+| `operator-api` | `RATE_LIMIT_OPERATOR_API` binding | every `/api/admin/*` endpoint |
+| `signup` | `rate_limit_window` in D1 | `POST /api/auth/sign-up/*` and `POST /api/auth/sign-in/magic-link` |
+
+The bindings are declared in `wrangler.jsonc` (`ratelimits`, restated per
+environment because environments do not inherit them). A binding counts **per
+colo**, not globally, and costs no database round trip — the right trade for
+the read-mostly API scopes. Sign-up and magic-link send create an account or
+send mail, so they use the D1 table instead: one row per (scope, client,
+window start), incremented by a single guarded upsert
+(`ON CONFLICT … DO UPDATE SET count = count + 1 WHERE count < limit
+RETURNING count`), which needs no transaction. The nightly Cron Trigger
+deletes closed windows (`Jobs.pruneRateLimitWindows`).
+
+Changing a binding's `namespace_id` resets its counters; `simple.period` must
+be 10 or 60 and must agree with the scope's `windowMs` in `defaultRateLimits`
+(`packages/api/src/rate-limit.ts`), because a binding reports no reset time
+and the 429's `Retry-After` is derived from `period`. Both counters fail
+**open**: a binding error or a D1 outage logs a warning and allows the call.
+
 ## Worker types
 
 `apps/web/worker-configuration.d.ts` is generated from `wrangler.jsonc` by

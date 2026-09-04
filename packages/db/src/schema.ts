@@ -1,4 +1,10 @@
-import { integer, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  sqliteTable,
+  text,
+  unique,
+} from "drizzle-orm/sqlite-core";
 
 import { user } from "./auth-schema";
 import { bool, id, json, timestampMs, timestamps } from "./columns";
@@ -262,6 +268,29 @@ export const workspaceUsageRollup = sqliteTable(
       table.periodEnd,
     ),
   ],
+);
+
+/**
+ * One row per (rate-limit scope, caller, fixed window): the global counter
+ * behind sign-up and magic-link send. Cloudflare's Rate Limiting bindings
+ * count per colo, which is the right trade for the read-mostly API scopes but
+ * not for the two endpoints that create accounts and send mail, so those go
+ * through D1 instead.
+ *
+ * `key` is `<scope>:<client>:<window start ms>`, so a new window is a new row
+ * rather than a reset, and the nightly Cron tick deletes everything past
+ * `expires_at` (`Jobs.pruneRateLimitWindows`). It has no row model in
+ * @gmacko/domain on purpose: it is infrastructure, never part of the contract.
+ */
+export const rateLimitWindow = sqliteTable(
+  "rate_limit_window",
+  {
+    key: text().primaryKey(),
+    scope: text().notNull(),
+    count: integer().notNull().default(0),
+    expiresAt: timestampMs("expires_at").notNull(),
+  },
+  (table) => [index("rate_limit_window_expires_at_idx").on(table.expiresAt)],
 );
 
 export * from "./auth-schema";

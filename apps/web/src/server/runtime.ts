@@ -11,11 +11,17 @@ import {
   type ApiHandler,
   AppConfig,
   Background,
+  consumeForRequest,
+  Jobs,
   makeWebHandler,
+  type RateLimitBindings,
+  RateLimiter,
+  rateLimitedResponse,
 } from "@gmacko/api";
 import { RequestContext } from "@gmacko/auth/request-context";
 import { Auth } from "@gmacko/auth/service";
 import { Database } from "@gmacko/db";
+import type { RateLimitScope } from "@gmacko/domain";
 import { flushAfter, flushTelemetry, Observability } from "@gmacko/telemetry";
 import { Context, Effect, Layer, ManagedRuntime } from "effect";
 
@@ -40,12 +46,43 @@ const AppConfigLive = Layer.succeed(AppConfig)(config);
 // D1 bindings are safe to hold at module scope; one client per isolate.
 const DatabaseLive = Database.layer(env.DB);
 
+/**
+ * wrangler.jsonc `ratelimits`, keyed by the contract's `RateLimitScope`.
+ * `signup` has no binding on purpose: a Rate Limiting binding counts per
+ * colo, and sign-up plus magic-link send are the two paths where the counter
+ * has to be global, so they fall through to `rate_limit_window` in D1
+ * (packages/api/src/rate-limit.ts).
+ *
+ * A binding is `undefined` wherever the host does not declare it (the
+ * pool-workers suites that build their own Miniflare options), and that scope
+ * then uses D1 too — the same code path, one layer less.
+ */
+const rateLimitBindings: RateLimitBindings = {
+  auth: env.RATE_LIMIT_AUTH,
+  contact: env.RATE_LIMIT_CONTACT,
+  "api-keys": env.RATE_LIMIT_API_KEYS,
+  "operator-api": env.RATE_LIMIT_OPERATOR_API,
+};
+
+/**
+ * One layer object, used twice: in `ServicesLive` (so the auth route below
+ * can reach the limiter through the shared runtime) and as `makeWebHandler`'s
+ * `rateLimiter` option (so the API's middleware uses it instead of the
+ * in-memory default). The shared memo map makes that one instance.
+ */
+const RateLimiterLive = RateLimiter.layerCloudflare({
+  bindings: rateLimitBindings,
+}).pipe(Layer.provide(DatabaseLive));
+
 /** Every service the app provides, independent of HTTP. Shared by all handlers. */
 const ServicesLive = Layer.mergeAll(
   AppConfigLive,
   Background.layer(waitUntil),
   DatabaseLive,
   AuthLive.pipe(Layer.provide(Layer.mergeAll(AppConfigLive, DatabaseLive))),
+  // The Cron Trigger's work (worker.ts `scheduled`).
+  Jobs.layer.pipe(Layer.provide(DatabaseLive)),
+  RateLimiterLive,
   // JSON console logging (Workers Logs) plus, with an endpoint, OTLP export
   // of traces, logs and metrics; flushed after every request (below).
   Observability.layer({
@@ -106,7 +143,10 @@ const withTestDelay =
   };
 
 // Share the memo map so the services above are built once, not per layer.
-const api = makeWebHandler(ServicesLive, { memoMap: runtime.memoMap });
+const api = makeWebHandler(ServicesLive, {
+  memoMap: runtime.memoMap,
+  rateLimiter: RateLimiterLive,
+});
 
 /**
  * Fetch-style handler for everything under /api/* (except /api/auth) and
@@ -134,6 +174,25 @@ export const authHandler: (request: Request) => Promise<Response> = flushed(
   (request: Request) =>
     runtime.runPromise(Effect.flatMap(Auth, (auth) => auth.handler(request))),
 );
+
+/**
+ * The rate-limit gate for better-auth's own routes, which are not HttpApi
+ * endpoints and so never reach the contract's `RateLimit` middleware
+ * (`routes/api/auth.$.ts` decides which scope a request counts against).
+ * Answers the 429 to send, or `null` to let the request through.
+ */
+export const guardAuthRequest = (
+  scope: RateLimitScope,
+  request: Request,
+): Promise<Response | null> =>
+  runtime.runPromise(
+    consumeForRequest(scope, request).pipe(
+      Effect.as<Response | null>(null),
+      Effect.catchTag("RateLimited", (refused) =>
+        Effect.succeed(rateLimitedResponse(refused)),
+      ),
+    ),
+  );
 
 /** better-auth's server API, for the sign-out server function (src/server/actions.ts). */
 export const authApi = () =>

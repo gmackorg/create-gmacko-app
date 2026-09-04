@@ -10,9 +10,11 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("~/server/runtime", () => ({
   apiHandler: () => Promise.resolve(new Response("runtime api")),
   authHandler: () => Promise.resolve(new Response("runtime auth")),
+  guardAuthRequest: () => Promise.resolve(null),
 }));
 
 const {
+  authRateLimitScope,
   contractAuthRoutes,
   isContractAuthRequest,
   makeAuthDispatch,
@@ -127,6 +129,64 @@ describe("/api/auth/$ dispatch", () => {
       expect(await response.text()).toBe("auth");
       expect(seen.map((entry) => entry.target)).toEqual(["auth"]);
     }
+  });
+
+  it("counts better-auth's writes, and only its writes", () => {
+    // The two global-counter paths: they create an account or send mail.
+    expect(authRateLimitScope("POST", "/api/auth/sign-in/magic-link")).toBe(
+      "signup",
+    );
+    expect(authRateLimitScope("post", "/api/auth/sign-in/magic-link/")).toBe(
+      "signup",
+    );
+    expect(authRateLimitScope("POST", "/api/auth/sign-up/email")).toBe(
+      "signup",
+    );
+    // Every other write goes to the binding-backed scope.
+    expect(authRateLimitScope("POST", "/api/auth/sign-in/social")).toBe("auth");
+    expect(authRateLimitScope("POST", "/api/auth/sign-out")).toBe("auth");
+    // Reads are not counted here.
+    expect(authRateLimitScope("GET", "/api/auth/get-session")).toBeNull();
+    expect(authRateLimitScope("GET", "/api/auth/callback/github")).toBeNull();
+    expect(authRateLimitScope("OPTIONS", "/api/auth/session")).toBeNull();
+  });
+
+  it("answers the guard's 429 instead of calling better-auth", async () => {
+    const seen: Array<string> = [];
+    const handle = makeAuthDispatch({
+      api: () => Promise.resolve(new Response("api")),
+      auth: () => Promise.resolve(new Response("auth")),
+      guard: (scope) => {
+        seen.push(scope);
+        return Promise.resolve(
+          new Response("{}", { status: 429, headers: { "retry-after": "60" } }),
+        );
+      },
+    });
+    const response = await handle(
+      new Request(`${ORIGIN}/api/auth/sign-in/magic-link`, { method: "POST" }),
+    );
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("60");
+    expect(seen).toEqual(["signup"]);
+  });
+
+  it("never asks the guard about a contract endpoint (the middleware owns it)", async () => {
+    const seen: Array<string> = [];
+    const handle = makeAuthDispatch({
+      api: () => Promise.resolve(new Response("api")),
+      auth: () => Promise.resolve(new Response("auth")),
+      guard: (scope) => {
+        seen.push(scope);
+        return Promise.resolve(null);
+      },
+    });
+    const endpoint = AppApi.groups.auth.endpoints.session;
+    const response = await handle(
+      new Request(`${ORIGIN}${endpoint.path}`, { method: endpoint.method }),
+    );
+    expect(await response.text()).toBe("api");
+    expect(seen).toEqual([]);
   });
 
   it("registers a single ANY handler on the route", async () => {

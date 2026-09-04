@@ -8,6 +8,7 @@
  * Sentry options into `makeWorker` (make-worker.ts, covered by the workers
  * suite in src/server/__tests__/worker.workers.test.ts).
  */
+import { Jobs } from "@gmacko/api";
 import { sentryWorkerOptions } from "@gmacko/monitoring/web/server";
 import startEntry from "@tanstack/react-start/server-entry";
 import { Effect } from "effect";
@@ -18,13 +19,17 @@ import { flush, runtime } from "./runtime";
 export default makeWorker<Cloudflare.Env>({
   fetch: (request) => startEntry.fetch(request),
   // Runs on the shared ManagedRuntime, so cron work gets the same services
-  // (AppConfig, Database, Auth, Background) and logger as the HTTP handlers.
+  // (AppConfig, Database, Auth, Background, Jobs) and logger as the HTTP
+  // handlers. `Jobs.runScheduled` never fails: a cron tick has nobody to
+  // report a failure to, so each job logs its own cause and the tick ends 200.
   scheduled: (controller) =>
     runtime.runPromise(
       Effect.logInfo("cron tick", {
         cron: controller.cron,
         scheduledTime: new Date(controller.scheduledTime).toISOString(),
-      }),
+      }).pipe(
+        Effect.andThen(Effect.flatMap(Jobs, (jobs) => jobs.runScheduled)),
+      ),
     ),
   flush,
   /**

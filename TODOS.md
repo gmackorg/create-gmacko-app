@@ -8,7 +8,7 @@
 
 **Why:** Waitlist emails, usage rollups, and Stripe webhook fan-out need retries and backoff that a cron tick cannot provide. Today `platformPrimitives.jobs.provider` is `local` and nothing consumes it.
 
-**Context:** Proposed in the 2026-09-02 eng review of the TanStack + Effect + D1 migration plan (`docs/plans/2026-09-02-tanstack-effect-d1-migration.html`). The custom Worker entry from Phase 9 is where the `queue()` export lands. Local dev uses wrangler's queue emulation. The consumer must be idempotent because Queues deliver at least once. Start from `packages/api/src/jobs.ts` once Phase 9 lands; keep the interface so tests use the in-memory layer.
+**Context:** Proposed in the 2026-09-02 eng review of the TanStack + Effect + D1 migration plan (`docs/plans/2026-09-02-tanstack-effect-d1-migration.html`). `packages/api/src/jobs.ts` now exists with the `Jobs` interface and one job (`pruneRateLimitWindows`), driven by the Cron Trigger from `apps/web/src/server/worker.ts`; that entry is where the `queue()` export lands. Local dev uses wrangler's queue emulation. The consumer must be idempotent because Queues deliver at least once — every `Jobs` job already is. Keep the interface so tests use the in-memory layer.
 
 **Effort:** M
 **Priority:** P2

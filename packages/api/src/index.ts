@@ -27,6 +27,7 @@ export {
   type WebHandlerOptions,
 } from "./handler";
 export { Health, type HealthShape } from "./health/service";
+export { Jobs, type JobsShape } from "./jobs";
 export {
   ApiLive,
   type ApiLiveOptions,
@@ -36,9 +37,13 @@ export {
 } from "./layer";
 export { Posts, type PostsShape } from "./posts/service";
 export {
+  consumeForRequest,
   defaultRateLimits,
+  type RateLimitBinding,
+  type RateLimitBindings,
   RateLimiter,
   type RateLimiterShape,
   type RateLimitPolicy,
   type RateLimits,
+  rateLimitedResponse,
 } from "./rate-limit";
