@@ -24,12 +24,15 @@ describe("create-gmacko-app scaffold", () => {
     tempDir = ensureTempDir();
   });
 
+  // Deleting ~50 scaffolds can outrun vitest.config.ts's 30s `hookTimeout`
+  // on a loaded machine, and a timed-out cleanup fails the suite even when
+  // every test passed.
   afterAll(() => {
     // Clean up all test apps
     for (const appPath of appsToClean) {
       cleanupApp(appPath);
     }
-  });
+  }, 900000);
 
   describe("basic scaffolding", () => {
     it("should scaffold a new app with defaults", async () => {
