@@ -22,12 +22,12 @@
   },
   "dependencies": {
     "@gmacko/config": "workspace:*",
-    "@gmacko/logging": "workspace:*",
-    "uploadthing": "^7.7.4"
+    "@gmacko/logging": "workspace:*"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
     "@cloudflare/vitest-pool-workers": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
     "@gmacko/tsconfig": "workspace:*",
     "oxlint": "catalog:",
     "typescript": "catalog:",

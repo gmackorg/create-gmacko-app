@@ -2,8 +2,8 @@
 export type EmailProvider = "resend" | "sendgrid" | "none";
 /** The pub/sub + queue backend `@gmacko/realtime` talks to. */
 export type RealtimeProvider = "redis" | "none";
-/** The file storage service `@gmacko/storage` uploads through. */
-export type StorageProvider = "uploadthing" | "none";
+/** The object store `@gmacko/storage` writes to. */
+export type StorageProvider = "r2" | "none";
 
 // Each provider-bearing integration is declared through its own contract
 // rather than written inline under `as const`, which would pin `provider` to
