@@ -29,11 +29,45 @@ import {
 
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
 
+/**
+ * What a log field may hold: everything `JSON.stringify` writes unchanged,
+ * plus the three shapes this module converts itself — an `Error` becomes its
+ * fields, a `Date` its ISO string, a `bigint` its decimal string.
+ *
+ * A class instance, a function, a symbol or a circular object is *not* a log
+ * value. That is the point of naming the type: the sink serialises to JSON,
+ * so a value it cannot represent is a bug at the call site, not at the sink.
+ */
+export type LogValue =
+  | string
+  | number
+  | boolean
+  | bigint
+  | null
+  | undefined
+  | Date
+  | Error
+  | ReadonlyArray<LogValue>
+  | { readonly [key: string]: LogValue };
+
+/** The fields carried by one log event. */
+export interface LogFields {
+  readonly [key: string]: LogValue;
+}
+
+/**
+ * A field bag being built. The published contract is the readonly
+ * `LogFields`; only the code that assembles a bag needs to write to one.
+ */
+interface MutableLogFields {
+  [key: string]: LogValue;
+}
+
 export interface LogContext {
   requestId?: string;
   userId?: string;
   sessionId?: string;
-  [key: string]: unknown;
+  [key: string]: LogValue;
 }
 
 /** One emitted event, before serialisation. */
@@ -41,7 +75,7 @@ export interface LogRecord {
   readonly level: LogLevel;
   readonly time: string;
   readonly msg: string;
-  readonly fields: Readonly<Record<string, unknown>>;
+  readonly fields: LogFields;
   /** Present when the event was logged under a span. */
   readonly traceId?: string | undefined;
   readonly spanId?: string | undefined;
@@ -63,7 +97,7 @@ export interface LoggingOptions {
    */
   readonly redact?: ReadonlyArray<string> | undefined;
   /** Fields on every line (service, version, stage). */
-  readonly base?: Readonly<Record<string, unknown>> | undefined;
+  readonly base?: LogFields | undefined;
   /** Where lines go; defaults to the console, split by level. */
   readonly sink?: ((line: string, record: LogRecord) => void) | undefined;
 }
@@ -119,15 +153,32 @@ const fromEffectLevel = (level: EffectLogLevel.LogLevel): LogLevel => {
 };
 
 // ---------------------------------------------------------------------------
-// Redaction
+// Classifying a value
+//
+// `LogValue` is an untagged union, so redaction and rendering need one place
+// that turns a member of it into a named case. These three predicates are
+// that place: everything below them branches on the narrowed type instead of
+// re-testing the representation. They read the runtime tag
+// (`Object.prototype.toString`), which is total — it never throws, and unlike
+// a property probe it separates `null`, arrays, dates and errors from a field
+// bag in a single comparison.
 // ---------------------------------------------------------------------------
 
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" &&
-  value !== null &&
-  !Array.isArray(value) &&
-  !(value instanceof Error) &&
-  !(value instanceof Date);
+/** A field bag: the one shape redaction and field-merging descend into. */
+const isFieldBag = (value: LogValue): value is LogFields =>
+  Object.prototype.toString.call(value) === "[object Object]";
+
+/** A primitive string; boxed `String` objects are not `LogValue`s. */
+const isText = (value: LogValue): value is string =>
+  Object.prototype.toString.call(value) === "[object String]";
+
+/** A `bigint` — the one `LogValue` `JSON.stringify` refuses to serialise. */
+const isBigInt = (value: LogValue): value is bigint =>
+  Object.prototype.toString.call(value) === "[object BigInt]";
+
+// ---------------------------------------------------------------------------
+// Redaction
+// ---------------------------------------------------------------------------
 
 /**
  * A path trie: each node's children are keyed by the field name (or `*`
@@ -174,16 +225,16 @@ const step = (
 };
 
 const redactWith = (
-  fields: Readonly<Record<string, unknown>>,
+  fields: LogFields,
   nodes: ReadonlyArray<PathNode>,
-): Record<string, unknown> => {
-  const out: Record<string, unknown> = {};
+): LogFields => {
+  const out: MutableLogFields = {};
   for (const [key, value] of Object.entries(fields)) {
     const here = step(nodes, key);
     if (here.some((node) => node.hit)) {
       out[key] = REDACTED;
     } else if (
-      isPlainObject(value) &&
+      isFieldBag(value) &&
       here.some((node) => node.children.size > 0)
     ) {
       out[key] = redactWith(value, here);
@@ -201,32 +252,50 @@ const redactWith = (
  * dates and arrays are never descended into.
  */
 export const redact = (
-  fields: Readonly<Record<string, unknown>>,
+  fields: LogFields,
   paths: ReadonlyArray<string>,
-): Record<string, unknown> => redactWith(fields, [buildTrie(paths)]);
+): LogFields => redactWith(fields, [buildTrie(paths)]);
 
 // ---------------------------------------------------------------------------
 // Serialisation
 // ---------------------------------------------------------------------------
 
-const errorToJson = (error: Error): Record<string, unknown> => ({
+/**
+ * An `Error` reduced to log fields. `stack` and `cause` are always present as
+ * keys and `JSON.stringify` drops the ones that are `undefined`, so the
+ * emitted line carries them only when the error does.
+ */
+export type LoggedError = {
+  readonly name: string;
+  readonly message: string;
+  readonly stack?: string;
+  readonly cause?: LogValue;
+};
+
+const errorToJson = (error: Error): LoggedError => ({
   name: error.name,
   message: error.message,
-  ...(error.stack === undefined ? {} : { stack: error.stack }),
-  ...("cause" in error && error.cause !== undefined
-    ? { cause: toJsonValue(error.cause) }
-    : {}),
+  stack: error.stack,
+  // SAFETY: the standard library types `Error.cause` as `unknown` because any
+  // value can be thrown, but the field reached this serialiser through
+  // `LogFields`, whose value contract is `LogValue`. Where a caller breaks
+  // that contract the cost is a key `JSON.stringify` omits (a function, a
+  // symbol), never a throw — `toLogJson` inspects nothing the value must have.
+  cause: "cause" in error ? toLogJson(error.cause as LogValue) : undefined,
 });
 
-const toJsonValue = (value: unknown): unknown => {
+/**
+ * The `LogValue` `JSON.stringify` can emit: an `Error` becomes its fields, a
+ * `bigint` its decimal string (`JSON.stringify` throws on one). A `Date`
+ * needs nothing — `JSON.stringify` calls its `toJSON` before the replacer.
+ */
+const toLogJson = (value: LogValue): LogValue => {
   if (value instanceof Error) return errorToJson(value);
-  if (typeof value === "bigint") return value.toString();
-  if (typeof value === "symbol" || typeof value === "function")
-    return String(value);
+  if (isBigInt(value)) return value.toString();
   return value;
 };
 
-const replacer = (_key: string, value: unknown): unknown => toJsonValue(value);
+const replacer = (_key: string, value: LogValue): LogValue => toLogJson(value);
 
 /** The keys the record itself owns; a field of the same name is dropped, never spoofs them. */
 const CORE_KEYS = new Set([
@@ -240,7 +309,7 @@ const CORE_KEYS = new Set([
 
 /** The JSON line for a record: `{"level","time","msg",...fields,"traceId"?,"spanId"?,"cause"?}`. */
 export const formatJsonLine = (record: LogRecord): string => {
-  const line: Record<string, unknown> = {
+  const line: MutableLogFields = {
     level: record.level,
     time: record.time,
     msg: record.msg,
@@ -254,8 +323,8 @@ export const formatJsonLine = (record: LogRecord): string => {
   return JSON.stringify(line, replacer);
 };
 
-const formatValue = (value: unknown): string => {
-  if (typeof value === "string") return /\s/.test(value) ? `"${value}"` : value;
+const formatValue = (value: LogValue): string => {
+  if (isText(value)) return /\s/.test(value) ? `"${value}"` : value;
   if (value instanceof Error)
     return value.stack ?? `${value.name}: ${value.message}`;
   return JSON.stringify(value, replacer) ?? String(value);
@@ -266,7 +335,7 @@ export const formatPrettyLine = (record: LogRecord): string => {
   const { module: moduleName, ...rest } = record.fields;
   const clock = record.time.slice(11, 19);
   const head = `${clock} ${record.level.toUpperCase().padEnd(5)}`;
-  const scope = typeof moduleName === "string" ? ` [${moduleName}]` : "";
+  const scope = isText(moduleName) ? ` [${moduleName}]` : "";
   const pairs = Object.entries(rest)
     .map(([key, value]) => ` ${key}=${formatValue(value)}`)
     .join("");
@@ -294,20 +363,37 @@ const consoleSink = (line: string, record: LogRecord): void => {
 // The Effect logger
 // ---------------------------------------------------------------------------
 
+/** What one call to `Effect.log*` said, once its message list is sorted out. */
+interface SplitMessage {
+  readonly msg: string;
+  readonly fields: LogFields;
+}
+
 /**
  * Splits Effect's message list: the first string is the message, every
- * plain object contributes fields, anything else is collected under `data`.
+ * field bag contributes fields, anything else is collected under `data`.
+ *
+ * This is the package's I/O boundary. `Logger.make` hands over whatever the
+ * caller passed to `Effect.log*`, so `unknown` is the honest input type at
+ * exactly this one signature; the `SplitMessage` it returns is what the rest
+ * of the module works with.
  */
-const splitMessage = (
-  message: unknown,
-): { readonly msg: string; readonly fields: Record<string, unknown> } => {
-  const parts = Array.isArray(message) ? message : [message];
+// oxlint-disable-next-line anti-slop/no-unknown-parameters
+const splitMessage = (message: unknown): SplitMessage => {
+  // SAFETY: the message list holds whatever the caller passed to
+  // `Effect.log*`, and this package's published contract is that a logged
+  // value is a `LogValue`. Breaking it costs a key that `toLogJson` +
+  // `JSON.stringify` drop (a function, a symbol) — the classification below
+  // is by runtime tag, so it inspects nothing the value must have.
+  const parts = (
+    Array.isArray(message) ? message : [message]
+  ) as ReadonlyArray<LogValue>;
   let msg: string | undefined;
-  const fields: Record<string, unknown> = {};
-  const rest: unknown[] = [];
+  const fields: MutableLogFields = {};
+  const rest: LogValue[] = [];
   for (const part of parts) {
-    if (typeof part === "string" && msg === undefined) msg = part;
-    else if (isPlainObject(part)) Object.assign(fields, part);
+    if (isText(part) && msg === undefined) msg = part;
+    else if (isFieldBag(part)) Object.assign(fields, part);
     else if (part instanceof Error && !("err" in fields)) fields.err = part;
     else rest.push(part);
   }
@@ -326,7 +412,16 @@ export const makeLogger = (
   const render = format === "pretty" ? formatPrettyLine : formatJsonLine;
   return Logger.make(({ message, logLevel, cause, fiber, date }) => {
     const { msg, fields } = splitMessage(message);
-    const annotations = fiber.getRef(References.CurrentLogAnnotations);
+    // SAFETY: Effect types log annotations as `ReadonlyRecord<string,
+    // unknown>`. They are the values the app attached with
+    // `Effect.annotateLogs`, and `Logging.withContext` — the entry point this
+    // package publishes for that — types them as `LogContext`, whose values
+    // are `LogValue`s. An annotation attached some other way is serialised by
+    // the same `toLogJson` path as any field, so the worst case is a dropped
+    // key rather than a throw.
+    const annotations = fiber.getRef(
+      References.CurrentLogAnnotations,
+    ) as LogFields;
     const span = fiber.currentSpan;
     const record: LogRecord = {
       level: fromEffectLevel(logLevel),
@@ -365,13 +460,20 @@ export const Logging = {
 // The plain (non-Effect) surface
 // ---------------------------------------------------------------------------
 
-type LogMethod = (objOrMsg: unknown, msg?: string) => void;
+/**
+ * pino's two call shapes: `log.info("sent")`, or `log.info({ userId }, "sent")`
+ * when there are fields to carry.
+ */
+type LogMethod = (
+  fieldsOrMessage: LogFields | string,
+  message?: string,
+) => void;
 
 export interface Logger extends Record<LogLevel, LogMethod> {
   /** A logger with more bound fields. */
   child(bindings: LogContext): Logger;
   /** The fields bound to this logger. */
-  bindings(): Readonly<Record<string, unknown>>;
+  bindings(): LogFields;
 }
 
 let runtime = ManagedRuntime.make(Logging.layer());
@@ -388,21 +490,19 @@ export const configureLogging = (options: LoggingOptions): void => {
   void previous.dispose();
 };
 
-const makePlainLogger = (
-  bindings: Readonly<Record<string, unknown>>,
-): Logger => {
+const makePlainLogger = (bindings: LogFields): Logger => {
   const method =
     (level: LogLevel): LogMethod =>
-    (objOrMsg, msg) => {
-      const [fields, message] =
-        typeof objOrMsg === "string"
-          ? [{}, objOrMsg]
-          : [(objOrMsg ?? {}) as Record<string, unknown>, msg ?? ""];
-      runtime.runSync(
-        Effect.logWithLevel(toSeverity[level])(message, fields).pipe(
-          Effect.annotateLogs(bindings),
-        ),
-      );
+    (fieldsOrMessage, message) => {
+      const emit = (fields: LogFields, text: string): void => {
+        runtime.runSync(
+          Effect.logWithLevel(toSeverity[level])(text, fields).pipe(
+            Effect.annotateLogs(bindings),
+          ),
+        );
+      };
+      if (isText(fieldsOrMessage)) emit({}, fieldsOrMessage);
+      else emit(fieldsOrMessage, message ?? "");
     };
   return {
     trace: method("trace"),

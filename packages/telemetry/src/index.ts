@@ -98,7 +98,7 @@ export const flushTelemetry: Effect.Effect<void, never, OtlpExporter.Flusher> =
 export const flushAfter =
   <Args extends ReadonlyArray<unknown>, R>(
     respond: (...args: Args) => Promise<R>,
-    flush: () => Promise<unknown>,
+    flush: () => Promise<void>,
   ) =>
   async (...args: Args): Promise<R> => {
     try {

@@ -37,8 +37,12 @@ export function sentryWorkerOptions(
   };
 }
 
-/** Capture an exception from the Worker; logs to the console when Sentry is off. */
-export function captureException(error: unknown): void {
+/**
+ * Capture an exception from the Worker; logs to the console when Sentry is
+ * off. Takes an `Error`: a `catch` binding is `unknown`, so turn it into one
+ * at the boundary that caught it, where the expected failure is known.
+ */
+export function captureException(error: Error): void {
   if (!integrations.sentry) {
     // oxlint-disable-next-line no-console -- the fallback when Sentry is disabled
     console.error("[Sentry disabled]", error);

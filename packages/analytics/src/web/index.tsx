@@ -20,6 +20,19 @@ import { PostHogProvider as PHProvider } from "posthog-js/react";
 import type { ReactNode } from "react";
 import { useEffect } from "react";
 
+import type {
+  AnalyticsProperties,
+  FeatureFlagPayload,
+  FeatureFlagValue,
+} from "../properties";
+
+export type {
+  AnalyticsProperties,
+  AnalyticsValue,
+  FeatureFlagPayload,
+  FeatureFlagValue,
+} from "../properties";
+
 export interface PostHogWebConfig {
   apiKey: string;
   apiHost?: string | undefined;
@@ -111,7 +124,7 @@ export function PostHogProvider({
 
 export function trackEvent(
   eventName: string,
-  properties?: Record<string, unknown>,
+  properties?: AnalyticsProperties,
 ): void {
   if (!integrations.posthog) {
     return;
@@ -121,7 +134,7 @@ export function trackEvent(
 
 export function identifyUser(
   userId: string,
-  properties?: Record<string, unknown>,
+  properties?: AnalyticsProperties,
 ): void {
   if (!integrations.posthog) {
     return;
@@ -148,23 +161,21 @@ export function isFeatureEnabled(
   return posthog.isFeatureEnabled(flagKey) ?? defaultValue;
 }
 
-export function getFeatureFlag<T = string | boolean>(
+export function getFeatureFlag(
   flagKey: string,
-  defaultValue?: T,
-): T | undefined {
+  defaultValue?: FeatureFlagValue,
+): FeatureFlagValue | undefined {
   if (!integrations.posthog) {
     return defaultValue;
   }
-  return posthog.getFeatureFlag(flagKey) as T | undefined;
+  return posthog.getFeatureFlag(flagKey) ?? defaultValue;
 }
 
-export function getFeatureFlagPayload<T = Record<string, unknown>>(
-  flagKey: string,
-): T | undefined {
+export function getFeatureFlagPayload(flagKey: string): FeatureFlagPayload {
   if (!integrations.posthog) {
     return undefined;
   }
-  return posthog.getFeatureFlagPayload(flagKey) as T | undefined;
+  return posthog.getFeatureFlagPayload(flagKey);
 }
 
 export function onFeatureFlags(callback: () => void): void {
@@ -186,8 +197,8 @@ export function reloadFeatureFlags(): void {
 
 export interface Experiment {
   key: string;
-  variant: string | boolean | undefined;
-  payload?: Record<string, unknown>;
+  variant: FeatureFlagValue | undefined;
+  payload?: FeatureFlagPayload;
 }
 
 export function getExperiment(experimentKey: string): Experiment {
@@ -197,9 +208,7 @@ export function getExperiment(experimentKey: string): Experiment {
   return {
     key: experimentKey,
     variant: posthog.getFeatureFlag(experimentKey),
-    payload: posthog.getFeatureFlagPayload(experimentKey) as
-      | Record<string, unknown>
-      | undefined,
+    payload: posthog.getFeatureFlagPayload(experimentKey),
   };
 }
 

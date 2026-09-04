@@ -17,14 +17,16 @@ import {
   generateRequestId,
   Logging,
   type LogRecord,
+  type LogValue,
   redact,
 } from "../index";
 
+/** One parsed JSON line, as the sink wrote it. */
 interface Line {
   readonly level: string;
   readonly time: string;
   readonly msg: string;
-  readonly [key: string]: unknown;
+  readonly [key: string]: LogValue;
 }
 
 const capture = () => {
@@ -34,6 +36,10 @@ const capture = () => {
     lines,
     records,
     sink: (line: string, record: LogRecord) => {
+      // SAFETY: a sink is only ever handed the rendered line, and these suites
+      // never set `format: "pretty"`, so `line` is `formatJsonLine` output:
+      // `JSON.stringify` of an object whose first three keys are `level`,
+      // `time` and `msg`, all strings.
       lines.push(JSON.parse(line) as Line);
       records.push(record);
     },
@@ -145,7 +151,7 @@ describe("createLogger", () => {
     createLogger({ module: "x" }).info("hello");
     createLogger({ module: "x" }).fatal("bye");
     expect(info).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(info.mock.calls[0]?.[0] as string)).toMatchObject({
+    expect(JSON.parse(String(info.mock.calls[0]?.[0]))).toMatchObject({
       level: "info",
       msg: "hello",
       module: "x",
@@ -274,6 +280,9 @@ describe("formats", () => {
   });
 
   it("the core keys win over a field of the same name", () => {
+    // SAFETY: `formatJsonLine` returns `JSON.stringify` of an object whose
+    // first three keys are `level`, `time` and `msg` — the very property this
+    // case asserts — so parsing it back yields a `Line`.
     const line = JSON.parse(
       formatJsonLine({
         level: "info",
@@ -282,7 +291,7 @@ describe("formats", () => {
         fields: { level: "spoofed", time: "never", msg: "fake", extra: 1 },
         traceId: "t",
       }),
-    ) as Record<string, unknown>;
+    ) as Line;
     expect(line).toEqual({
       level: "info",
       time: "2026-09-03T10:11:12.000Z",

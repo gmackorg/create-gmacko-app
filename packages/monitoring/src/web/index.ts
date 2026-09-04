@@ -53,8 +53,13 @@ export function initSentryWeb(config: SentryWebConfig): void {
   });
 }
 
-/** Capture an exception; logs to the console when Sentry is off. */
-export function captureException(error: unknown): void {
+/**
+ * Capture an exception; logs to the console when Sentry is off. Callers hand
+ * over an `Error` — the router's `ErrorComponentProps["error"]`, or an error
+ * boundary's — not a raw caught value; parse a caught value into an `Error`
+ * before reporting it so the Sentry issue has a type and a stack.
+ */
+export function captureException(error: Error): void {
   if (!integrations.sentry) {
     // oxlint-disable-next-line no-console -- the fallback when Sentry is disabled
     console.error("[Sentry disabled]", error);

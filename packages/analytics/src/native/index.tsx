@@ -4,6 +4,19 @@ import { PostHogProvider as PHProvider, PostHog } from "posthog-react-native";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 
+import type {
+  AnalyticsProperties,
+  FeatureFlagPayload,
+  FeatureFlagValue,
+} from "../properties";
+
+export type {
+  AnalyticsProperties,
+  AnalyticsValue,
+  FeatureFlagPayload,
+  FeatureFlagValue,
+} from "../properties";
+
 export interface PostHogNativeConfig {
   apiKey: string;
   apiHost?: string;
@@ -70,7 +83,7 @@ export function PostHogNativeProvider({
 
 export function trackEventNative(
   eventName: string,
-  properties?: Record<string, string | number | boolean | null>,
+  properties?: AnalyticsProperties,
 ): void {
   if (!integrations.posthog || !posthogClient) {
     return;
@@ -80,7 +93,7 @@ export function trackEventNative(
 
 export function identifyUserNative(
   userId: string,
-  properties?: Record<string, string | number | boolean | null>,
+  properties?: AnalyticsProperties,
 ): void {
   if (!integrations.posthog || !posthogClient) {
     return;
@@ -106,24 +119,24 @@ export async function isFeatureEnabledNative(
   return value === true || value === "true" || defaultValue;
 }
 
-export async function getFeatureFlagNative<T = string | boolean>(
+export async function getFeatureFlagNative(
   flagKey: string,
-  defaultValue?: T,
-): Promise<T | undefined> {
+  defaultValue?: FeatureFlagValue,
+): Promise<FeatureFlagValue | undefined> {
   if (!integrations.posthog || !posthogClient) {
     return defaultValue;
   }
   const value = await posthogClient.getFeatureFlag(flagKey);
-  return (value as T) ?? defaultValue;
+  return value ?? defaultValue;
 }
 
-export async function getFeatureFlagPayloadNative<T = Record<string, unknown>>(
+export async function getFeatureFlagPayloadNative(
   flagKey: string,
-): Promise<T | undefined> {
+): Promise<FeatureFlagPayload> {
   if (!integrations.posthog || !posthogClient) {
     return undefined;
   }
-  return (await posthogClient.getFeatureFlagPayload(flagKey)) as T | undefined;
+  return await posthogClient.getFeatureFlagPayload(flagKey);
 }
 
 export async function reloadFeatureFlagsNative(): Promise<void> {
@@ -135,8 +148,8 @@ export async function reloadFeatureFlagsNative(): Promise<void> {
 
 export interface ExperimentNative {
   key: string;
-  variant: string | boolean | undefined;
-  payload?: Record<string, unknown>;
+  variant: FeatureFlagValue | undefined;
+  payload?: FeatureFlagPayload;
 }
 
 export async function getExperimentNative(
@@ -149,11 +162,7 @@ export async function getExperimentNative(
     posthogClient.getFeatureFlag(experimentKey),
     posthogClient.getFeatureFlagPayload(experimentKey),
   ]);
-  return {
-    key: experimentKey,
-    variant,
-    payload: payload as Record<string, unknown> | undefined,
-  };
+  return { key: experimentKey, variant, payload };
 }
 
 export function trackExperimentExposureNative(experimentKey: string): void {

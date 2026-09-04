@@ -85,6 +85,9 @@ describe("Observability", () => {
     await new Promise<void>((resolve) =>
       server.listen(0, "127.0.0.1", () => resolve()),
     );
+    // SAFETY: `listen(0, "127.0.0.1", …)` has called back, so the server is
+    // bound to a TCP socket rather than a pipe or still unbound — the two
+    // cases where `address()` returns a string or `null`.
     endpoint = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   });
   afterAll(
@@ -124,6 +127,10 @@ describe("Observability", () => {
     expect(traces.length).toBeGreaterThanOrEqual(1);
     expect(traces[0]?.headers["x-otlp-test"]).toBe("phase-7");
     expect(traces[0]?.headers["content-type"]).toContain("application/json");
+    // SAFETY: `posts("/v1/traces")` selects the requests the OTLP/HTTP JSON
+    // exporter POSTed to the traces path, and the assertions above pin their
+    // `content-type` as JSON. Their body is an `ExportTraceServiceRequest`;
+    // `OtlpTraces` names the subset of it this case reads.
     const spans = traces.flatMap((request) =>
       (JSON.parse(request.body) as OtlpTraces).resourceSpans.flatMap((rs) => {
         const service = rs.resource.attributes.find(
@@ -141,6 +148,9 @@ describe("Observability", () => {
         .stringValue,
     ).toBe("export");
 
+    // SAFETY: same exporter, the logs path: `posts("/v1/logs")` selects the
+    // OTLP/HTTP JSON requests it POSTed there, whose body is an
+    // `ExportLogsServiceRequest` — `OtlpLogs` names the fields read here.
     const logs = posts("/v1/logs").flatMap((request) =>
       (JSON.parse(request.body) as OtlpLogs).resourceLogs.flatMap((rl) =>
         rl.scopeLogs.flatMap((sl) => sl.logRecords),

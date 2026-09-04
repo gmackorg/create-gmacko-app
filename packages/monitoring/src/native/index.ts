@@ -30,9 +30,12 @@ export function initSentryNative(config: SentryNativeConfig): void {
 export const withSentry = Sentry.wrap;
 
 /**
- * Capture exception manually
+ * Capture an exception; logs to the console when Sentry is off. Callers hand
+ * over an `Error` — a React error boundary's `componentDidCatch` argument, or
+ * the one it stored — not a raw caught value; parse a caught value into an
+ * `Error` before reporting it so the Sentry issue has a type and a stack.
  */
-export function captureExceptionNative(error: unknown): void {
+export function captureExceptionNative(error: Error): void {
   if (!integrations.sentry) {
     console.error("[Sentry disabled]", error);
     return;
