@@ -49,39 +49,23 @@ wall clock is workerd startup. CI budgets 10 minutes for the depth-1 PR job
 and 45 for the nightly depth-3 one; that headroom is for the scenarios that
 have not been written yet, not for these.
 
-### Installing `@gmacko/cloudfault`
+### `@gmacko/cloudfault`
 
-**`@gmacko/cloudfault` is not published to npm yet, so this lane does not run
-on a clean checkout, and a freshly scaffolded app cannot install it.** Until
-`0.1.0` is on npm, `pnpm test:fault` prints what is missing and exits 0.
+`@gmacko/cloudfault@^0.1.0` is an ordinary devDependency of `apps/web`, so
+`pnpm install` is all the setup there is. The lane is typechecked by the
+ordinary `pnpm typecheck` (there is no side tsconfig) and audited by
+`pnpm knip` like every other dependency.
 
-Once it is published:
+`apps/web/fault/run.mjs` exists for one reason: a lane that cannot start must
+not look like a lane that passed. If `@gmacko/cloudfault` does not resolve it
+prints what is wrong and **exits non-zero**; `CLOUDFAULT_REQUIRED=0` is the
+only way to turn that back into a skip. Both workflows
+(`.github/workflows/ci.yml`, `.github/workflows/fault.yml`) set
+`CLOUDFAULT_REQUIRED: 1` explicitly so the intent is visible at the job.
 
-```bash
-pnpm -F @gmacko/web add -D @gmacko/cloudfault@^0.1.0
-```
-
-and then, in that same commit:
-
-1. delete `apps/web/tsconfig.fault.json` and drop `"fault"` from
-   `apps/web/tsconfig.json`'s `exclude`, so `pnpm typecheck` covers the lane;
-2. drop the `ignoreDependencies` entry for it in `knip.json`;
-3. set `CLOUDFAULT_REQUIRED: 1` in `.github/workflows/ci.yml` and
-   `.github/workflows/fault.yml`, so a lane that cannot run is a red build
-   rather than a silent skip;
-4. delete the `CLOUDFAULT_SRC` branch of `apps/web/fault/run.mjs`.
-
-Until then, for local work, either install a packed tarball
-(`pnpm -F @gmacko/web add -D ./gmacko-cloudfault-0.1.0.tgz`) or point the lane
-at a built checkout:
-
-```bash
-CLOUDFAULT_SRC=/path/to/cloudfault pnpm test:fault
-```
-
-`apps/web/fault/run.mjs` then writes a facade with the published subpath
-layout into `node_modules/@gmacko/cloudfault`, so import specifiers in
-`fault/` are the published ones either way.
+`apps/web/fault/helpers/cloudfault.ts` is the lane's single import surface —
+every `@gmacko/cloudfault` specifier in the repo lives there, so a subpath
+rename touches one file.
 
 ## Layout
 
@@ -217,12 +201,19 @@ Stated so nobody reads a green run as more than it is:
   `acceptInvite`, `completeBootstrap`, `reviewWaitlistEntry`,
   `deleteAccount`'s cascade — cannot currently be given a mid-batch fault.
   This is the biggest gap.
-- **No privileged oracle.** CloudFault infers `actual=committed` from "the
-  call returned before we cut the wire". That is sound for the
-  commit-then-timeout faults used here, because CloudFault chose the moment,
-  and unsound for a fault injected *inside* the backend (a partially applied
-  batch). When `@gmacko/emulate` grows a Cloudflare D1 emulator it can answer
-  "did it land" directly; `helpers/ledger.ts` is where that would plug in.
+- **No privileged oracle *in this lane*.** CloudFault infers
+  `actual=committed` from "the call returned before we cut the wire". That is
+  sound for the commit-then-timeout faults used here, because CloudFault chose
+  the moment, and unsound for a fault injected *inside* the backend (a
+  partially applied batch). `@gmacko/emulate` 0.11 now ships the Cloudflare D1
+  emulator with exactly that oracle (`GET /_cloudfault/outcome/:token`, with a
+  caller-minted `x-emulate-operation` token so the answer survives a destroyed
+  response). It is **not wired in**: this lane runs on Miniflare inside
+  workerd via `@cloudflare/vitest-pool-workers`, not over HTTP against the
+  emulator, so adopting the oracle means a second lane shape, not a flag.
+  `helpers/ledger.ts` is still where it would plug in. See
+  `docs/drizzle-migrations.md` → "Rehearsing a remote migration" for what the
+  emulator is used for today.
 - **Concurrency is recorded, not scheduled.** CloudFault runs logical clients
   as async sequences and records the interleaving that happened; it does not
   enumerate interleavings. Two-writer races are covered by ordinary tests

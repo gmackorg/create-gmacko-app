@@ -10,8 +10,9 @@ import { defineConfig } from "vitest/config";
  * (`createD1FaultProxy`) wraps a genuine `env.DB` rather than a fake.
  *
  * Run it through `fault/run.mjs` (`pnpm test:fault`), not directly: that
- * script is what resolves `@gmacko/cloudfault` while the package is still
- * unpublished. Search depth comes from `CLOUDFAULT_DEPTH` (default 1).
+ * script is what turns "`@gmacko/cloudfault` does not resolve" into a failure
+ * instead of a green run with no scenarios. Search depth comes from
+ * `CLOUDFAULT_DEPTH` (default 1).
  *
  * Miniflare options are inline for the same reason as
  * `vitest.workers.config.ts`: `wrangler: { configPath }` would take

@@ -25,13 +25,7 @@
         "e2e/**/*.ts",
         "fault/**/*.ts",
         "vitest.fault.config.ts"
-      ],
-      // The CloudFault lane's package is not on npm yet, so it cannot be a
-      // declared dependency without breaking `pnpm install` on a clean
-      // checkout; fault/run.mjs resolves it. Delete this line together with
-      // apps/web/tsconfig.fault.json when @gmacko/cloudfault is published and
-      // added to devDependencies. See docs/FAULT_TESTING.md.
-      "ignoreDependencies": ["@gmacko/cloudfault"]
+      ]
     },
     "apps/expo": {
       "entry": ["metro.config.js", "postcss.config.mjs", "src/app/**/*.tsx"],

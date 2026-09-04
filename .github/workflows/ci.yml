@@ -148,16 +148,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Reports the lane unavailable and exits 0 until `@gmacko/cloudfault`
-      # is on npm and listed in apps/web/package.json. Set
-      # CLOUDFAULT_REQUIRED=1 in the same commit that adds the dependency, so
-      # a missing package becomes a failure instead of a silent skip.
+      # `@gmacko/cloudfault` is a declared devDependency of apps/web, so the
+      # lane runs on every checkout. CLOUDFAULT_REQUIRED=1 is stated here
+      # rather than left to the runner's default so that a lane which cannot
+      # start is a red build, not a green job that tested nothing.
       # See docs/FAULT_TESTING.md.
       - name: Run fault scenarios (depth 1)
         run: pnpm test:fault
         env:
           CLOUDFAULT_DEPTH: 1
-          CLOUDFAULT_REQUIRED: 0
+          CLOUDFAULT_REQUIRED: 1
 
   build:
     name: Build

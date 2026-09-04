@@ -175,8 +175,9 @@ Add or update stories in `packages/ui/src/**/*.stories.tsx`; run `pnpm --filter 
   delivery, a write that commits while the caller is told it did not, and
   combinations of the two. `docs/FAULT_TESTING.md` explains how to read a
   minimal failure set and how to add a scenario or an invariant.
-  **The lane needs `@gmacko/cloudfault`, which is not on npm yet**; until it
-  is, `pnpm test:fault` reports itself unavailable and exits 0.
+  `@gmacko/cloudfault` is an ordinary devDependency of `apps/web`, so
+  `pnpm install` is the whole setup; if it does not resolve the lane fails
+  rather than skipping.
 - Place test files next to source: `my-file.ts` → `my-file.test.ts`
 
 ## Code Style
