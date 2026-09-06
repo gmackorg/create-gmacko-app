@@ -7,7 +7,6 @@ let redisClient: import("ioredis").default | null = null;
 let redisInitPromise: Promise<import("ioredis").default> | null = null;
 let subscriberClient: import("ioredis").default | null = null;
 let subscriberInitPromise: Promise<import("ioredis").default> | null = null;
-const channelRefCounts = new Map<string, number>();
 const queues: import("bullmq").Queue[] = [];
 const workers: import("bullmq").Worker[] = [];
 
@@ -63,10 +62,119 @@ export function getRedis(): import("ioredis").default | null {
   return redisClient;
 }
 
+// ---------------------------------------------------------------------------
+// The published message envelope
+// ---------------------------------------------------------------------------
+
+/** A JSON value, as `JSON.parse` produces it and `publish` serialises it. */
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | Array<JsonValue>
+  | { readonly [key: string]: JsonValue };
+
+/** The payload an event carries: a JSON object, keyed by field name. */
+export type RealtimePayload = { readonly [key: string]: JsonValue };
+
+/** The envelope `publish` writes and `subscribe` reads back. */
+export interface RealtimeMessage {
+  readonly event: string;
+  readonly data: RealtimePayload;
+}
+
+/** What `subscribe` hands the caller for each message on its channel. */
+export type RealtimeHandler = (event: string, data: RealtimePayload) => void;
+
+/**
+ * Whether a JSON value is the string one. `String(x) === x` holds for a
+ * primitive string and for nothing else: boxing a number, a boolean, `null`
+ * or an object yields its text, which is never identical to the value.
+ */
+const isJsonString = (value: JsonValue): value is string =>
+  String(value) === value;
+
+/** The object member of a JSON value: not absent, not `null`, not an array. */
+const asPayload = (value: JsonValue | undefined): RealtimePayload | null => {
+  if (value === null || value === undefined) return null;
+  if (Array.isArray(value)) return null;
+  if (!(value instanceof Object)) return null;
+  return value;
+};
+
+/**
+ * The `{ event, data }` envelope in a parsed message, or `null` when the
+ * value is not one — a missing or non-string `event`, or a `data` that is not
+ * a JSON object.
+ */
+export function readRealtimeMessage(value: JsonValue): RealtimeMessage | null {
+  const envelope = asPayload(value);
+  if (envelope === null) return null;
+  const event = envelope.event;
+  const data = asPayload(envelope.data);
+  if (event === undefined || !isJsonString(event) || data === null) return null;
+  return { event, data };
+}
+
+// ---------------------------------------------------------------------------
+// Subscribing
+// ---------------------------------------------------------------------------
+
+/** The raw `(channel, message)` callback a pub/sub client emits. */
+export type RealtimeMessageListener = (
+  channel: string,
+  message: string,
+) => void;
+
+/**
+ * The pub/sub surface `subscribeOn` drives. `redisSubscriber` adapts an
+ * ioredis connection to it; a test drives it with an in-memory implementation
+ * instead of a live Redis.
+ */
+export interface RealtimeSubscriber {
+  subscribe(channel: string): Promise<void>;
+  unsubscribe(channel: string): Promise<void>;
+  on(listener: RealtimeMessageListener): void;
+  off(listener: RealtimeMessageListener): void;
+}
+
+/** How many live subscriptions each subscriber holds per channel. */
+const refCountsBySubscriber = new WeakMap<
+  RealtimeSubscriber,
+  Map<string, number>
+>();
+
+const refCountsOf = (subscriber: RealtimeSubscriber): Map<string, number> => {
+  const existing = refCountsBySubscriber.get(subscriber);
+  if (existing !== undefined) return existing;
+  const counts = new Map<string, number>();
+  refCountsBySubscriber.set(subscriber, counts);
+  return counts;
+};
+
+/** An ioredis connection as a `RealtimeSubscriber`. */
+const redisSubscriber = (
+  client: import("ioredis").default,
+): RealtimeSubscriber => ({
+  subscribe: async (channel) => {
+    await client.subscribe(channel);
+  },
+  unsubscribe: async (channel) => {
+    await client.unsubscribe(channel);
+  },
+  on: (listener) => {
+    client.on("message", listener);
+  },
+  off: (listener) => {
+    client.off("message", listener);
+  },
+});
+
 export async function publish(
   channel: string,
   event: string,
-  data: Record<string, unknown>,
+  data: RealtimePayload,
 ): Promise<boolean> {
   const client = getRedis();
   if (!client) {
@@ -78,9 +186,59 @@ export async function publish(
   return true;
 }
 
+/**
+ * Route one channel of `subscriber` to `handler`, dropping messages from
+ * other channels and messages that are not a `{ event, data }` envelope. The
+ * subscriber is unsubscribed when its last handler for the channel is
+ * released. `subscribe` supplies the process-wide ioredis subscriber; a test
+ * supplies its own.
+ */
+export async function subscribeOn(
+  subscriber: RealtimeSubscriber,
+  channel: string,
+  handler: RealtimeHandler,
+): Promise<() => Promise<void>> {
+  const refCounts = refCountsOf(subscriber);
+  const refCount = refCounts.get(channel) ?? 0;
+  refCounts.set(channel, refCount + 1);
+  if (refCount === 0) {
+    await subscriber.subscribe(channel);
+  }
+
+  const listener: RealtimeMessageListener = (ch, raw) => {
+    if (ch !== channel) return;
+    let parsed: JsonValue;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      log.warn({ channel }, "failed to parse redis message");
+      return;
+    }
+    const message = readRealtimeMessage(parsed);
+    if (message === null) {
+      log.warn({ channel }, "invalid redis message shape");
+      return;
+    }
+    handler(message.event, message.data);
+  };
+
+  subscriber.on(listener);
+
+  return async () => {
+    subscriber.off(listener);
+    const current = refCounts.get(channel) ?? 1;
+    if (current <= 1) {
+      refCounts.delete(channel);
+      await subscriber.unsubscribe(channel);
+    } else {
+      refCounts.set(channel, current - 1);
+    }
+  };
+}
+
 export async function subscribe(
   channel: string,
-  handler: (event: string, data: Record<string, unknown>) => void,
+  handler: RealtimeHandler,
 ): Promise<() => Promise<void>> {
   if (!integrations.realtime.enabled) {
     log.debug("subscribe skipped (integration disabled)");
@@ -95,48 +253,7 @@ export async function subscribe(
   }
   subscriberClient = await subscriberInitPromise;
 
-  const refCount = channelRefCounts.get(channel) ?? 0;
-  channelRefCounts.set(channel, refCount + 1);
-  if (refCount === 0) {
-    await subscriberClient.subscribe(channel);
-  }
-
-  const listener = (ch: string, message: string) => {
-    if (ch !== channel) return;
-    try {
-      const parsed: unknown = JSON.parse(message);
-      if (
-        typeof parsed !== "object" ||
-        parsed === null ||
-        typeof (parsed as Record<string, unknown>).event !== "string" ||
-        typeof (parsed as Record<string, unknown>).data !== "object" ||
-        (parsed as Record<string, unknown>).data === null
-      ) {
-        log.warn({ channel }, "invalid redis message shape");
-        return;
-      }
-      const { event, data } = parsed as {
-        event: string;
-        data: Record<string, unknown>;
-      };
-      handler(event, data);
-    } catch {
-      log.warn({ channel }, "failed to parse redis message");
-    }
-  };
-
-  subscriberClient.on("message", listener);
-
-  return async () => {
-    subscriberClient?.off("message", listener);
-    const current = channelRefCounts.get(channel) ?? 1;
-    if (current <= 1) {
-      channelRefCounts.delete(channel);
-      await subscriberClient?.unsubscribe(channel);
-    } else {
-      channelRefCounts.set(channel, current - 1);
-    }
-  };
+  return subscribeOn(redisSubscriber(subscriberClient), channel, handler);
 }
 
 export type { Job, Queue, Worker } from "bullmq";
@@ -189,5 +306,4 @@ export async function shutdown(): Promise<void> {
   redisInitPromise = null;
   subscriberClient = null;
   subscriberInitPromise = null;
-  channelRefCounts.clear();
 }

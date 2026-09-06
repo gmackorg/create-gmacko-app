@@ -9,14 +9,19 @@ import { Modal, Pressable, Text, View } from "react-native";
 
 import { setLocale } from "~/utils/i18n";
 
-const LOCALE_LABELS: Record<string, string> = {
-  en: "English",
-  es: "Espanol",
-  fr: "Francais",
-  de: "Deutsch",
-  ja: "Japanese",
-  zh: "Chinese",
-};
+/**
+ * Display name per supported locale. A `Map` rather than an object literal so
+ * the lookup is total: `get` returns `undefined` for a locale that has no
+ * label yet, which the callers fall back from.
+ */
+const LOCALE_LABELS = new Map<Locale, string>([
+  ["en", "English"],
+  ["es", "Espanol"],
+  ["fr", "Francais"],
+  ["de", "Deutsch"],
+  ["ja", "Japanese"],
+  ["zh", "Chinese"],
+]);
 
 interface LocaleSwitcherProps {
   onLocaleChange?: (locale: string) => void;
@@ -41,7 +46,7 @@ export function LocaleSwitcher({ onLocaleChange }: LocaleSwitcherProps) {
       >
         <Text className="text-foreground">{t("common.selectLanguage")}</Text>
         <Text className="text-muted-foreground">
-          {LOCALE_LABELS[currentLocale] ?? currentLocale.toUpperCase()}
+          {LOCALE_LABELS.get(currentLocale) ?? currentLocale.toUpperCase()}
         </Text>
       </Pressable>
 
@@ -81,7 +86,7 @@ export function LocaleSwitcher({ onLocaleChange }: LocaleSwitcherProps) {
                         : "text-foreground"
                     }`}
                   >
-                    {LOCALE_LABELS[locale] ?? locale.toUpperCase()}
+                    {LOCALE_LABELS.get(locale) ?? locale.toUpperCase()}
                   </Text>
                   {currentLocale === locale && (
                     <Text className="text-primary">✓</Text>

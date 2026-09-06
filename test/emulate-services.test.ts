@@ -162,21 +162,6 @@ describe("resend emulator", () => {
     });
     expect(status).toBe(200);
     expect(body.id).toBeDefined();
-    expect(typeof body.id).toBe("string");
-  });
-});
-
-describe("postgres emulator", () => {
-  it("accepts connections on the wire protocol port", async () => {
-    const { createConnection } = await import("node:net");
-    const connected = await new Promise<boolean>((resolve) => {
-      const socket = createConnection({ port: 5432, host: "127.0.0.1" });
-      socket.once("connect", () => {
-        socket.destroy();
-        resolve(true);
-      });
-      socket.once("error", () => resolve(false));
-    });
-    expect(connected).toBe(true);
+    expect(body.id).toEqual(expect.any(String));
   });
 });

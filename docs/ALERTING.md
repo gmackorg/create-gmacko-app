@@ -7,115 +7,106 @@ dashboard recommendations for products built from create-gmacko-app.
 
 ### Architecture
 
+The Worker has no scrape endpoint and no process to instrument. Metrics,
+traces, and logs leave it by push:
+
 ```
-┌─────────────┐     ┌───────────────┐     ┌──────────────┐
-│  Next.js App │────▶│  /api/metrics │────▶│  Prometheus   │
-│  @gmacko/    │     │  (Prom format)│     │  / Grafana    │
-│  metrics     │     └───────────────┘     │  Agent        │
-└─────────────┘                            └──────┬───────┘
-                                                  │
-                                           ┌──────▼───────┐
-                                           │   Grafana     │
-                                           │  Dashboards   │
-                                           └──────┬───────┘
-                                                  │
-                                           ┌──────▼───────┐
-                                           │  Alertmanager │
-                                           │  / PagerDuty  │
-                                           └──────────────┘
+┌──────────────────────┐   OTLP/HTTP (waitUntil)   ┌──────────────────────┐
+│  Cloudflare Worker   │──────────────────────────▶│  OTLP collector       │
+│  @gmacko/telemetry   │                           │  (Grafana Cloud,      │
+│  Observability.layer │                           │   Honeycomb, Datadog, │
+└──────────┬───────────┘                           │   self-hosted otel)   │
+           │ console JSON                          └──────────┬───────────┘
+           ▼                                                  ▼
+┌──────────────────────┐                           ┌──────────────────────┐
+│  Workers Logs /      │                           │  Dashboards +        │
+│  Logpush             │                           │  Alerting            │
+└──────────────────────┘                           └──────────────────────┘
 ```
 
-### Built-in Metrics
+- `OTEL_EXPORTER_OTLP_ENDPOINT` (+ `OTEL_EXPORTER_OTLP_HEADERS`) turns the
+  export on; unset means console logs only.
+- Sentry (`SENTRY_DSN`) receives errors independently of OTLP.
+- Cloudflare's own analytics (requests, errors, CPU time, D1 Insights) need
+  no configuration.
 
-The `@gmacko/metrics` package provides these metrics out of the box:
+### Built-in Signals
 
-| Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
-| `http_requests_total` | Counter | method, route, status | Total HTTP requests |
-| `http_request_duration_seconds` | Histogram | method, route | Request latency |
-| `http_active_connections` | Gauge | — | Currently active connections |
-| `db_queries_total` | Counter | operation, table | Total database queries |
-| `db_query_duration_seconds` | Histogram | operation, table | Query latency |
-| `db_connection_pool_size` | Gauge | state | Connection pool utilization |
-| `cache_operations_total` | Counter | operation, result | Cache hit/miss ratio |
-| `jobs_processed_total` | Counter | queue, status | Background job throughput |
-| `job_duration_seconds` | Histogram | queue | Job processing time |
-| `active_users` | Gauge | — | Currently active users |
-| `api_key_usage_total` | Counter | key_id, endpoint | API key usage tracking |
-
-### Node.js Runtime Metrics (when prom-client is installed)
-
-- `nodejs_heap_size_total_bytes` — V8 heap total
-- `nodejs_heap_size_used_bytes` — V8 heap used
-- `nodejs_external_memory_bytes` — External memory
-- `nodejs_eventloop_lag_seconds` — Event loop lag
-- `nodejs_active_handles_total` — Active handles
-- `nodejs_gc_duration_seconds` — GC pause duration
+| Signal | Kind | Attributes | Description |
+|--------|------|------------|-------------|
+| `http.server.duration` | Histogram (ms) | `group.endpoint`, status | Latency per contract endpoint |
+| `group.endpoint` span | Trace | `http.response.status_code`, request id | One span per API call; declared 4xx end successfully, 500 and defects fail |
+| `sql.execute` span | Trace | statement, `db.system.name = sqlite` | Every D1 statement, under the endpoint span |
+| `RateLimited` | Log + 429 | scope, `Retry-After` | Rate-limit hits per `RateLimit` scope (`contact`, `api-keys`, `operator-api`) |
+| Cloudflare: requests, errors, CPU time, subrequests | Workers analytics | Worker, status | Platform-level throughput and error rate |
+| Cloudflare: `rows_read`, `rows_written`, query duration | D1 Insights | query | Database load; the 10 GB size cap is `wrangler d1 info DB` |
 
 ### Custom Metrics
 
-Add business-specific metrics using the registry:
+Add business metrics with Effect's `Metric` API; `@gmacko/telemetry` exports
+whatever the runtime records:
 
 ```typescript
-import { metrics } from "@gmacko/metrics";
+import { Metric } from "effect";
 
-// Custom counter for feature usage
-const featureUsage = metrics.counter(
-  "feature_usage_total",
-  "Feature usage tracking",
-  ["feature", "plan"]
+const featureUsage = Metric.counter("feature_usage_total", {
+  description: "Feature usage tracking",
+});
+
+// inside a service or handler
+yield* Metric.update(featureUsage, 1).pipe(
+  Effect.tagMetrics({ feature: "export", plan: "pro" }),
 );
-
-featureUsage.inc({ feature: "export", plan: "pro" });
 ```
 
 ## Alerting Rules
+
+Expressed against the OTLP-derived series; translate to your backend's
+query language.
 
 ### Critical (SEV-1) — Immediate Response
 
 | Alert | Condition | For | Action |
 |-------|-----------|-----|--------|
-| **ServiceDown** | `up == 0` | 2m | Page on-call, check deployment |
-| **HighErrorRate** | `rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05` | 5m | Page on-call, check Sentry |
-| **DatabaseDown** | Health check DB status = "fail" | 1m | Page on-call, check Neon |
-| **HighMemoryUsage** | `nodejs_heap_size_used_bytes / nodejs_heap_size_total_bytes > 0.9` | 5m | Page on-call, potential memory leak |
+| **ServiceDown** | `/api/health/ready` fails (external monitor) | 2m | Page on-call, check Cloudflare status and the last deploy |
+| **HighErrorRate** | 5xx share of `http.server.duration` > 5% | 5m | Page on-call, check Sentry and `wrangler tail` |
+| **DatabaseDown** | `/api/health/ready` returns 503 `Unhealthy` | 1m | Page on-call, check D1 status, `wrangler d1 info` |
+| **DeployMigrationFailed** | `pnpm deploy:<stage>` exits before `wrangler deploy` | — | Fix forward with a new migration; the previous Worker keeps serving |
 
 ### Warning (SEV-2) — Response within 1 hour
 
 | Alert | Condition | For | Action |
 |-------|-----------|-----|--------|
-| **HighLatency** | `histogram_quantile(0.95, http_request_duration_seconds) > 2` | 10m | Investigate slow endpoints |
-| **HighDBLatency** | `histogram_quantile(0.95, db_query_duration_seconds) > 1` | 10m | Check slow queries, indexes |
-| **LowCacheHitRate** | `rate(cache_operations_total{result="hit"}[10m]) / rate(cache_operations_total[10m]) < 0.5` | 15m | Review cache configuration |
-| **JobQueueBacklog** | `jobs_pending > 1000` | 10m | Scale workers, check for stuck jobs |
-| **HighMemoryUsage** | `nodejs_heap_size_used_bytes / nodejs_heap_size_total_bytes > 0.75` | 10m | Monitor, prepare for restart |
+| **HighLatency** | p95 `http.server.duration` > 2000 ms | 10m | Investigate slow endpoints by `group.endpoint` |
+| **HighDBLatency** | p95 `sql.execute` > 1000 ms | 10m | Check slow statements, add indexes (expand-only migration) |
+| **RateLimitSpike** | 429 count > 100/min on one scope | 10m | Abuse or a misbehaving client; review keys |
+| **D1SizeGrowth** | `database_size` > 8 GB | — | Plan a split before the 10 GB cap |
+| **CPUTime** | Workers CPU time p99 near the plan limit | 10m | Profile the endpoint; move work to `Background.run` |
 
 ### Informational (SEV-3/4) — Next business day
 
 | Alert | Condition | For | Action |
 |-------|-----------|-----|--------|
 | **DependenciesOutdated** | CI weekly check fails | — | Review Renovate PRs |
-| **CertExpiringSoon** | SSL cert expires in <30 days | — | Renew certificate |
-| **DiskSpaceWarning** | Disk usage >80% | — | Clean up or expand storage |
+| **PreviewDatabaseDrift** | Pending migrations on `gmacko-web-preview` | — | Merge or close the PR that added them |
 
 ## Dashboard Recommendations
 
 ### 1. Service Overview Dashboard
 
 **Panels:**
-- Request rate (requests/second) — timeseries
+- Request rate (requests/second) — timeseries (Cloudflare analytics)
 - Error rate (%) — timeseries with threshold line at 1%
-- P50/P95/P99 latency — timeseries
-- Active connections — gauge
-- Uptime percentage — stat panel
+- P50/P95/P99 `http.server.duration` — timeseries, split by `group.endpoint`
+- Health probe status — stat panel
 
 ### 2. Database Dashboard
 
 **Panels:**
-- Query rate by operation (SELECT/INSERT/UPDATE/DELETE) — stacked timeseries
-- Query latency P50/P95 — timeseries
-- Connection pool utilization — gauge
-- Slow queries (>1s) count — stat panel
+- `sql.execute` rate and latency — timeseries
+- D1 `rows_read` / `rows_written` — timeseries (D1 Insights)
+- Slow statements (>1s) — table from traces
+- `database_size` — gauge against the 10 GB cap
 
 ### 3. Business Metrics Dashboard
 
@@ -123,41 +114,31 @@ featureUsage.inc({ feature: "export", plan: "pro" });
 - Active users — timeseries
 - Feature usage breakdown — bar chart
 - Plan distribution — pie chart
-- API key usage by endpoint — table
+- API key usage by endpoint — table (from `group.endpoint` spans with a bearer credential)
 - Revenue metrics (from Stripe) — stat panels
 
-### 4. Infrastructure Dashboard
+### 4. Auth & Abuse Dashboard
 
 **Panels:**
-- Node.js heap usage — timeseries
-- Event loop lag — timeseries
-- GC pause duration — histogram
-- Cache hit rate — gauge
-- Background job throughput — timeseries
+- 401 / 403 by reason (`scope`, `origin`, `role`) — timeseries
+- 429 by `RateLimit` scope — timeseries
+- Sign-ins by provider — bar chart
 
 ## Setup Guide
 
 ### Option A: Grafana Cloud (Recommended for SaaS)
 
-1. Create a Grafana Cloud account
-2. Configure Grafana Agent to scrape `/api/metrics`
-3. Import dashboard templates from this repo
+1. Create a Grafana Cloud stack and an OTLP endpoint token
+2. `forge secret set OTEL_EXPORTER_OTLP_ENDPOINT https://otlp-gateway-<region>.grafana.net/otlp --stage production`
+   and `OTEL_EXPORTER_OTLP_HEADERS "Authorization=Basic <token>"`, then `pnpm secrets:push --stage production`
+3. Build the dashboards above from the `http.server.duration` and span data
 4. Set up alerting rules in Grafana Alerting
 
-### Option B: Self-hosted Prometheus + Grafana
+### Option B: Self-hosted OpenTelemetry Collector
 
-1. Add Prometheus scrape target:
-   ```yaml
-   scrape_configs:
-     - job_name: 'myapp'
-       scrape_interval: 15s
-       metrics_path: '/api/metrics'
-       bearer_token: '<METRICS_SECRET>'
-       static_configs:
-         - targets: ['myapp.example.com']
-   ```
-
-2. Configure Alertmanager for notifications:
+1. Run an OTLP/HTTP receiver reachable from Cloudflare (public HTTPS)
+2. Point `OTEL_EXPORTER_OTLP_ENDPOINT` at it; fan out to Prometheus, Loki, Tempo
+3. Configure Alertmanager for notifications:
    ```yaml
    receivers:
      - name: 'pagerduty'
@@ -169,18 +150,19 @@ featureUsage.inc({ feature: "export", plan: "pro" });
            api_url: '<SLACK_WEBHOOK_URL>'
    ```
 
-### Option C: Datadog / New Relic
+### Option C: Datadog / Honeycomb / New Relic
 
-The `/api/metrics` endpoint serves Prometheus format, which both Datadog and
-New Relic can ingest natively via their agents.
+All accept OTLP/HTTP directly; set the endpoint and the vendor's auth header
+in `OTEL_EXPORTER_OTLP_HEADERS`.
 
 ## Environment Variables
 
 ```bash
-# Protect the metrics endpoint in production
-METRICS_SECRET='your-secret-token'
-
-# Optional: StatsD for UDP-based metrics (DataDog Agent)
-# STATSD_HOST='localhost'
-# STATSD_PORT='8125'
+# Worker bindings (set through ForgeGraph, pushed with pnpm secrets:push)
+OTEL_EXPORTER_OTLP_ENDPOINT='https://otlp.example.com'
+OTEL_EXPORTER_OTLP_HEADERS='Authorization=Bearer <token>'
+SENTRY_DSN='https://...@sentry.io/...'
 ```
+
+Locally, the same keys in the repo-root `.env` export to a local collector;
+leave them unset to keep console logs only.

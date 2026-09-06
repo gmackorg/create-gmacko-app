@@ -11,11 +11,11 @@ Use this skill when building UI components for web (shadcn/ui) and mobile (Nativ
 
 This template uses:
 
-- **Web**: shadcn/ui + Tailwind CSS v4
+- **Web**: shadcn/ui + Tailwind CSS v4, rendered by TanStack Start (SSR + hydration; no `"use client"` directives)
 - **Mobile**: NativeWind v5 (Tailwind for React Native)
-- **Shared**: Consistent design tokens and component patterns
+- **Shared**: `@gmacko/ui` components with stories in `packages/ui/src/**/*.stories.tsx` (`pnpm --filter @gmacko/ui storybook`)
 
-Both platforms share the same Tailwind color scheme and design language.
+Both platforms share the same Tailwind color scheme and design language. Data on both sides comes from the same `queries`/`mutations` (`@gmacko/api-client/queries`).
 
 ## Checklist
 
@@ -33,15 +33,11 @@ Both platforms share the same Tailwind color scheme and design language.
 ### Adding Components
 
 ```bash
-# Add single component
-pnpm ui-add button
-
-# Add multiple components
-pnpm ui-add button card dialog form input label
-
-# See all available components
-pnpm ui-add --help
+# Interactive shadcn CLI into packages/ui
+pnpm ui-add
 ```
+
+Add a story next to any shared component you touch; Storybook runs from `packages/ui`.
 
 ### Using Components
 
@@ -66,82 +62,72 @@ export function MyComponent() {
 }
 ```
 
-### Form Pattern (with React Hook Form)
+### Form Pattern (TanStack Form + the domain schema)
+
+Forms validate with the contract's Standard Schema view (`CreatePostForm`,
+`CreateInviteForm`, ...), so the client and the server agree and a 400 from
+the API is rare:
 
 ```typescript
-"use client";
-
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { useForm } from "@tanstack/react-form";
+import { useMutation } from "@tanstack/react-query";
+import { CreatePost, CreatePostForm } from "@gmacko/domain/posts";
 
 import { Button } from "@gmacko/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@gmacko/ui/form";
+import { Field, FieldError, FieldLabel } from "@gmacko/ui/field";
 import { Input } from "@gmacko/ui/input";
+import { mutations } from "~/lib/api";
 
-const formSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  email: z.string().email("Invalid email address"),
-});
-
-type FormValues = z.infer<typeof formSchema>;
-
-export function MyForm({ onSubmit }: { onSubmit: (data: FormValues) => void }) {
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: { name: "", email: "" },
+export function CreatePostFormView() {
+  const create = useMutation(mutations.posts.create());
+  const form = useForm({
+    defaultValues: { title: "", content: "" },
+    validators: { onSubmit: CreatePostForm },
+    onSubmit: async ({ value }) => {
+      await create.mutateAsync(new CreatePost(value));
+      form.reset();
+    },
   });
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Name</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Email</FormLabel>
-              <FormControl>
-                <Input type="email" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <Button type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting ? "Submitting..." : "Submit"}
-        </Button>
-      </form>
-    </Form>
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void form.handleSubmit();
+      }}
+      className="space-y-4"
+    >
+      <form.Field name="title">
+        {(field) => {
+          const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
+          return (
+            <Field data-invalid={isInvalid}>
+              <FieldLabel htmlFor={field.name}>Title</FieldLabel>
+              <Input
+                id={field.name}
+                value={field.state.value}
+                onChange={(e) => field.handleChange(e.target.value)}
+                onBlur={field.handleBlur}
+              />
+              {isInvalid && <FieldError errors={field.state.meta.errors} />}
+            </Field>
+          );
+        }}
+      </form.Field>
+      <Button type="submit" disabled={create.isPending}>
+        {create.isPending ? "Submitting..." : "Submit"}
+      </Button>
+    </form>
   );
 }
 ```
 
+Typed API errors become words through `apps/web/src/lib/errors.ts`
+(`Unauthorized`, `Forbidden{scope}`, `Conflict{reason}`, `RateLimited`).
+
 ### Dialog Pattern
 
 ```typescript
-"use client";
-
 import { useState } from "react";
 import { Button } from "@gmacko/ui/button";
 import {
@@ -256,11 +242,12 @@ export function Input({
 ### List Pattern
 
 ```typescript
+import { useQuery } from "@tanstack/react-query";
 import { FlatList, View, Text, ActivityIndicator } from "react-native";
-import { api } from "~/utils/api";
+import { queries } from "~/utils/api";
 
 export function ItemList() {
-  const { data, isLoading, isError, refetch } = api.items.all.useQuery();
+  const { data, isLoading, isError, refetch } = useQuery(queries.posts.list());
 
   if (isLoading) {
     return (
@@ -340,9 +327,12 @@ Rounded: rounded-sm, rounded-md, rounded-lg, rounded-full
 Always handle these states:
 
 ```typescript
-// Web
+// Web (a component under a route whose loader prefetched the query)
+import { useQuery } from "@tanstack/react-query";
+import { queries } from "~/lib/api";
+
 function MyComponent() {
-  const { data, isLoading, isError } = api.items.all.useQuery();
+  const { data, isLoading, isError } = useQuery(queries.posts.list());
 
   if (isLoading) {
     return <Skeleton className="h-10 w-full" />;
@@ -360,8 +350,10 @@ function MyComponent() {
 }
 
 // Mobile
+import { queries } from "~/utils/api";
+
 function MyScreen() {
-  const { data, isLoading, isError, refetch } = api.items.all.useQuery();
+  const { data, isLoading, isError, refetch } = useQuery(queries.posts.list());
 
   if (isLoading) {
     return (

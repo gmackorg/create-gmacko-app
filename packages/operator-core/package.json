@@ -19,11 +19,13 @@
     "dev": "tsup src/index.ts --format esm --watch --dts",
     "format": "biome check .",
     "lint": "oxlint .",
-    "test": "vitest run src/__tests__/operator-core.test.ts",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@gmacko/trpc-client": "workspace:*"
+    "@gmacko/api-client": "workspace:*",
+    "@gmacko/domain": "workspace:*",
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
@@ -33,6 +35,6 @@
     "oxlint": "catalog:",
     "tsup": "^8.5.1",
     "typescript": "catalog:",
-    "vitest": "^4.1.0"
+    "vitest": "catalog:"
   }
 }

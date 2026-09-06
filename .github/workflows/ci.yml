@@ -37,11 +37,21 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      # `pnpm lint` is `turbo run lint`, so it only reaches files inside a
+      # workspace package. This sweeps the whole tree from the root config —
+      # scripts/, turbo/generators, test/ and the root dotfiles included — and
+      # is the same command the lefthook pre-commit hook runs.
+      - name: Lint (root sweep, incl. anti-slop plugin rules)
+        run: pnpm lint:ox
+
       - name: Format check
         run: pnpm format
 
       - name: App standards
         run: pnpm check:standards
+
+      - name: App standards rules (fixture tests)
+        run: pnpm test:standards
 
   typecheck:
     name: Type Check
@@ -65,6 +75,12 @@ jobs:
       - name: Type check
         run: pnpm typecheck
 
+      # `wrangler types` needs no Cloudflare auth; the committed
+      # apps/web/worker-configuration.d.ts must match wrangler.jsonc so the
+      # Env type the runtime is compiled against is the one deployed.
+      - name: Worker types are current
+        run: pnpm check:cf-types
+
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -87,6 +103,12 @@ jobs:
       - name: Run tests
         run: pnpm test
 
+      # The same Database suite against a real local D1 (Miniflare/workerd via
+      # @cloudflare/vitest-pool-workers); catches D1-only divergence that the
+      # sqlite-node suite cannot.
+      - name: Run Workers tests
+        run: pnpm test:workers
+
       - name: Upload coverage
         if: always()
         uses: actions/upload-artifact@v4
@@ -95,6 +117,82 @@ jobs:
           path: |
             packages/*/coverage
           retention-days: 7
+
+  migrate-rehearsal:
+    name: D1 Remote Migration Rehearsal
+    runs-on: ubuntu-latest
+    # `pnpm db:migrate:remote` is what a deploy runs against a real stage
+    # database, and it had never been executed in CI because it needed a
+    # Cloudflare account. @gmacko/emulate 0.11's Cloudflare service answers the
+    # D1 REST API over Miniflare (workerd SQLite, the engine production D1
+    # runs on), so the exact `wrangler d1 migrations apply DB --remote` command
+    # runs here with no credentials.
+    #
+    # This is not a second copy of `test:workers`: that applies the migration
+    # files the way *local* wrangler does (wrangler splits on `;` and sends the
+    # statements). `--remote` POSTs each file's SQL to the D1 HTTP API, which
+    # splits it server side and runs it as one atomic batch — a different
+    # execution path, and the one a deploy uses.
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Rehearse migrate:remote against the D1 emulator
+        run: pnpm db:rehearse:remote
+
+  fault:
+    name: Fault Injection
+    runs-on: ubuntu-latest
+    # A bounded depth-1 pass: every declared perturbation on its own, against
+    # the real Worker code on workerd with a real Miniflare D1. Pairs and
+    # deeper combinations are the scheduled job's business
+    # (.github/workflows/fault.yml), because the scenario count grows
+    # combinatorially and a PR gate has to stay under a couple of minutes.
+    #
+    # Budget: 10 minutes. Today the search itself is ~150ms and the job is
+    # install plus workerd startup (~2 minutes); the headroom is for the
+    # scenarios that have not been written yet. If this job starts using it,
+    # split scenarios across a matrix rather than dropping the depth.
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # `@gmacko/cloudfault` is a declared devDependency of apps/web, so the
+      # lane runs on every checkout. CLOUDFAULT_REQUIRED=1 is stated here
+      # rather than left to the runner's default so that a lane which cannot
+      # start is a red build, not a green job that tested nothing.
+      # See docs/FAULT_TESTING.md.
+      - name: Run fault scenarios (depth 1)
+        run: pnpm test:fault
+        env:
+          CLOUDFAULT_DEPTH: 1
+          CLOUDFAULT_REQUIRED: 1
 
   build:
     name: Build
@@ -120,8 +218,3 @@ jobs:
         run: pnpm build
         env:
           SKIP_ENV_VALIDATION: true
-          # Placeholder so @gmacko/db/client (which throws at import if unset)
-          # can instantiate during `next build` page-data collection. postgres-js
-          # is lazy — no connection is made at build time, and route handlers are
-          # not prerendered. Real DATABASE_URL is injected at deploy/runtime.
-          DATABASE_URL: postgresql://build:build@localhost:5432/build

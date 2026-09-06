@@ -29,6 +29,30 @@ env:
   # the branch under test are actually exercised (the CLI defaults to cloning
   # https://github.com/gmackorg/create-gmacko-app.git otherwise).
   CREATE_GMACKO_APP_TEMPLATE_REPO: ${{ github.workspace }}
+  # The mock .env every scaffold gets. It mirrors .env.example: the web lane
+  # reads these as Worker bindings (no database URL, the database is a local
+  # D1), Expo reads EXPO_PUBLIC_*, the operator lane reads GMACKO_API_*.
+  MOCK_ENV: |
+    STAGE="development"
+    APP_URL="http://localhost:3001"
+    AUTH_SECRET="test-secret-key-for-testing-only-32-chars"
+    AUTH_GITHUB_ID="test-github-client-id"
+    AUTH_GITHUB_SECRET="test-github-client-secret"
+    AUTH_GOOGLE_ID="test-google-client-id"
+    AUTH_GOOGLE_SECRET="test-google-client-secret"
+    BYPASS_MAGIC_LINK="true"
+    VITE_POSTHOG_HOST="https://us.i.posthog.com"
+    EXPO_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
+    EXPO_PUBLIC_POSTHOG_KEY_DEV="phc_test_dev"
+    EXPO_PUBLIC_POSTHOG_KEY_STAGING="phc_test_staging"
+    EXPO_PUBLIC_POSTHOG_KEY_PROD="phc_test_prod"
+    EXPO_PUBLIC_SENTRY_DSN_DEV="https://test@example.ingest.sentry.io/123"
+    EXPO_PUBLIC_SENTRY_DSN_STAGING="https://test@example.ingest.sentry.io/456"
+    EXPO_PUBLIC_SENTRY_DSN_PROD="https://test@example.ingest.sentry.io/789"
+    CLOUDFLARE_ACCOUNT_ID="test-cloudflare-account"
+    CLOUDFLARE_API_TOKEN="test-cloudflare-token"
+    GMACKO_API_URL="http://localhost:3001"
+    GMACKO_API_KEY="test-gmacko-api-key"
 
 jobs:
   build-cli:
@@ -61,7 +85,7 @@ jobs:
           retention-days: 1
 
   e2e-default:
-    name: E2E - Default Config
+    name: E2E - Default (web + mobile)
     needs: build-cli
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -97,32 +121,26 @@ jobs:
           CI: "true"
 
       - name: Create mock .env
-        run: |
-          cat > .env << 'EOF'
-          DATABASE_URL="postgresql://test:test@localhost:5432/test"
-          AUTH_SECRET="test-secret-key-for-testing-only"
-          AUTH_GITHUB_ID="test-github-client-id"
-          AUTH_GITHUB_SECRET="test-github-client-secret"
-          AUTH_GOOGLE_ID="test-google-client-id"
-          AUTH_GOOGLE_SECRET="test-google-client-secret"
-          AUTH_URL="http://localhost:3000"
-          NEXT_PUBLIC_APP_URL="http://localhost:3000"
-          NEXT_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
-          GMACKO_API_URL="http://localhost:3000"
-          GMACKO_API_KEY="test-gmacko-api-key"
-          EOF
+        run: printf '%s' "$MOCK_ENV" > .env
         working-directory: /tmp/e2e-test/test-app-default
 
-      - name: Run typecheck
-        run: pnpm run doctor
+      - name: Run doctor
+        run: |
+          pnpm run doctor | tee /tmp/e2e-test/default-doctor.log
+          grep 'Cloudflare Workers lane detected' /tmp/e2e-test/default-doctor.log || (echo "Doctor did not detect the Workers lane" && exit 1)
+          grep 'Cloudflare Workers env values' /tmp/e2e-test/default-doctor.log || (echo "Doctor did not report the Cloudflare env group" && exit 1)
         working-directory: /tmp/e2e-test/test-app-default
 
       - name: Validate ForgeGraph metadata
         run: |
           grep 'app: test-app-default' .forgegraph.yaml || (echo "Missing ForgeGraph app name" && exit 1)
+          grep 'type: d1' .forgegraph.yaml || (echo "Missing D1 database contract" && exit 1)
+          grep 'platform: cloudflare-workers' .forgegraph.yaml || (echo "Missing cloudflare-workers target" && exit 1)
+          grep 'workerName: test-app-default-web-staging' .forgegraph.yaml || (echo "Missing staging Worker name" && exit 1)
           grep '# healthcheck path: /.well-known/forge-health' .forgegraph.yaml || (echo "Missing ForgeGraph healthcheck note" && exit 1)
           grep '# preview domain: change-me.preview.example.com' .forgegraph.yaml || (echo "Missing ForgeGraph preview domain placeholder" && exit 1)
           grep '# production domain: change-me.example.com' .forgegraph.yaml || (echo "Missing ForgeGraph production domain placeholder" && exit 1)
+          grep '"name": "test-app-default-web"' apps/web/wrangler.jsonc || (echo "Worker not renamed after the app" && exit 1)
         working-directory: /tmp/e2e-test/test-app-default
 
       - name: Verify local forge CLI resolution
@@ -144,23 +162,43 @@ jobs:
         run: |
           pnpm auth:generate
           pnpm db:generate
-          test -f packages/db/src/auth-schema.ts || (echo "Auth schema output missing after bootstrap commands" && exit 1)
+          pnpm db:check
+          test -f packages/db/.cache/auth-schema.generated.ts || (echo "Auth schema output missing after bootstrap commands" && exit 1)
+          grep -q "hand-maintained" packages/db/src/auth-schema.ts || (echo "auth:generate overwrote the committed auth schema" && exit 1)
+          ls packages/db/migrations/*.sql >/dev/null || (echo "No D1 migrations after db:generate" && exit 1)
         working-directory: /tmp/e2e-test/test-app-default
 
-      - name: Validate health route scaffold
+      - name: Migrate and seed the local D1, run the Workers tests
         run: |
-          grep 'return "healthy"' apps/nextjs/src/app/api/health/route.ts || (echo "Missing healthy status in health route" && exit 1)
-          grep 'return "degraded"' apps/nextjs/src/app/api/health/route.ts || (echo "Missing degraded status in health route" && exit 1)
-          grep 'return "unhealthy"' apps/nextjs/src/app/api/health/route.ts || (echo "Missing unhealthy status in health route" && exit 1)
-          grep 'return NextResponse.json' apps/nextjs/src/app/api/health/route.ts || (echo "Missing NextResponse health route return" && exit 1)
+          pnpm db:migrate:local
+          pnpm db:seed
+          pnpm test:workers
         working-directory: /tmp/e2e-test/test-app-default
 
       - name: Run fast checks
         run: pnpm check:fast
         working-directory: /tmp/e2e-test/test-app-default
 
-      - name: Run Next.js build
-        run: pnpm --filter @gmacko/nextjs build
+      - name: Run web build
+        run: pnpm --filter @gmacko/web build
+        working-directory: /tmp/e2e-test/test-app-default
+
+      - name: Smoke the migrate-then-deploy stage script
+        # scripts/deploy-stage.mjs applies the D1 migrations and then deploys
+        # the Worker. Replace the resolved wrangler bin(s) with a fake (pnpm
+        # prepends node_modules/.bin, which shadows anything on PATH) and
+        # assert the sequence reaches `wrangler deploy` without Cloudflare
+        # credentials. Runs after the real web build so `vite build` is warm.
+        run: |
+          set -o pipefail
+          for w in $(find . -path '*/node_modules/.bin/wrangler'); do
+            rm -f "$w"
+            printf '#!/bin/sh\necho "fake-wrangler $@"\n' > "$w"
+            chmod +x "$w"
+          done
+          pnpm deploy:staging | tee /tmp/e2e-test/deploy-staging.log
+          grep 'fake-wrangler d1 migrations apply' /tmp/e2e-test/deploy-staging.log || (echo "deploy:staging did not apply D1 migrations first" && exit 1)
+          grep 'fake-wrangler deploy' /tmp/e2e-test/deploy-staging.log || (echo "deploy:staging did not reach wrangler deploy" && exit 1)
         working-directory: /tmp/e2e-test/test-app-default
 
   e2e-operators:
@@ -195,25 +233,12 @@ jobs:
           mkdir -p /tmp/e2e-test
           cd /tmp/e2e-test
           node ${{ github.workspace }}/packages/create-gmacko-app/dist/index.js test-app-operators \
-            --yes --no-git --no-mobile --saas-bootstrap --trpc-operators
+            --yes --no-git --no-mobile --saas-bootstrap --operator-lane
         env:
           CI: "true"
 
       - name: Create mock .env
-        run: |
-          cat > .env << 'EOF'
-          DATABASE_URL="postgresql://test:test@localhost:5432/test"
-          AUTH_SECRET="test-secret-key-for-testing-only"
-          AUTH_GITHUB_ID="test-github-client-id"
-          AUTH_GITHUB_SECRET="test-github-client-secret"
-          AUTH_GOOGLE_ID="test-google-client-id"
-          AUTH_GOOGLE_SECRET="test-google-client-secret"
-          AUTH_URL="http://localhost:3000"
-          NEXT_PUBLIC_APP_URL="http://localhost:3000"
-          NEXT_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
-          GMACKO_API_URL="http://localhost:3000"
-          GMACKO_API_KEY="test-gmacko-api-key"
-          EOF
+        run: printf '%s' "$MOCK_ENV" > .env
         working-directory: /tmp/e2e-test/test-app-operators
 
       - name: Run doctor
@@ -225,13 +250,13 @@ jobs:
 
       - name: Smoke operator CLI help
         run: |
-          # pipefail so a failing trpc:ops fails the step (tee would otherwise
+          # pipefail so a failing api:ops fails the step (tee would otherwise
           # swallow its exit code), and grep for the distinctive help tagline
           # rather than "gmacko-ops" — the latter also appears in error output,
           # which previously let a broken CLI false-pass.
           set -o pipefail
-          pnpm trpc:ops -- --help | tee /tmp/e2e-test/operator-help.log
-          grep 'CLI + MCP wrappers over the same tRPC API' /tmp/e2e-test/operator-help.log || (echo "Operator CLI help did not render" && exit 1)
+          pnpm api:ops -- --help | tee /tmp/e2e-test/operator-help.log
+          grep 'CLI + MCP wrappers over the same HTTP API' /tmp/e2e-test/operator-help.log || (echo "Operator CLI help did not render" && exit 1)
         working-directory: /tmp/e2e-test/test-app-operators
 
       - name: Verify bootstrap artifacts
@@ -241,10 +266,15 @@ jobs:
           grep '/office-hours' docs/ai/BOOTSTRAP_PLAYBOOK.md || (echo "Missing office-hours guidance" && exit 1)
           grep '/autoplan' docs/ai/BOOTSTRAP_PLAYBOOK.md || (echo "Missing autoplan guidance" && exit 1)
           grep '/design-consultation' docs/ai/BOOTSTRAP_PLAYBOOK.md || (echo "Missing design-consultation guidance" && exit 1)
+          grep '"gmacko-app"' .mcp.json || (echo "Operator lane did not register the app MCP server" && exit 1)
+        working-directory: /tmp/e2e-test/test-app-operators
+
+      - name: Run fast checks
+        run: pnpm check:fast
         working-directory: /tmp/e2e-test/test-app-operators
 
   e2e-minimal:
-    name: E2E - Minimal (Web Only)
+    name: E2E - Minimal (web only)
     needs: build-cli
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -282,25 +312,15 @@ jobs:
           CI: "true"
 
       - name: Create mock .env
-        run: |
-          cat > .env << 'EOF'
-          DATABASE_URL="postgresql://test:test@localhost:5432/test"
-          AUTH_SECRET="test-secret-key-for-testing-only"
-          AUTH_GITHUB_ID="test-github-client-id"
-          AUTH_GITHUB_SECRET="test-github-client-secret"
-          AUTH_GOOGLE_ID="test-google-client-id"
-          AUTH_GOOGLE_SECRET="test-google-client-secret"
-          AUTH_URL="http://localhost:3000"
-          NEXT_PUBLIC_APP_URL="http://localhost:3000"
-          NEXT_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
-          EOF
+        run: printf '%s' "$MOCK_ENV" > .env
         working-directory: /tmp/e2e-test/test-app-minimal
 
       - name: Verify structure
         run: |
-          test -d apps/nextjs || (echo "Missing apps/nextjs" && exit 1)
+          test -d apps/web || (echo "Missing apps/web" && exit 1)
           test ! -d apps/expo || (echo "apps/expo should not exist" && exit 1)
           test ! -d packages/analytics || (echo "packages/analytics should not exist" && exit 1)
+          test ! -d packages/payments || (echo "packages/payments should not exist" && exit 1)
           echo "Structure verified!"
         working-directory: /tmp/e2e-test/test-app-minimal
 
@@ -312,8 +332,8 @@ jobs:
         run: pnpm check:fast
         working-directory: /tmp/e2e-test/test-app-minimal
 
-      - name: Run Next.js build
-        run: pnpm --filter @gmacko/nextjs build
+      - name: Run web build
+        run: pnpm --filter @gmacko/web build
         working-directory: /tmp/e2e-test/test-app-minimal
 
   e2e-custom-scope:
@@ -349,31 +369,33 @@ jobs:
           cd /tmp/e2e-test
           node ${{ github.workspace }}/packages/create-gmacko-app/dist/index.js test-app-scope \
             --yes --no-git \
-            --no-mobile --no-ai --prune \
+            --no-mobile --prune --operator-lane \
             --package-scope "@mycompany" \
             --integrations ""
         env:
           CI: "true"
 
       - name: Create mock .env
-        run: |
-          cat > .env << 'EOF'
-          DATABASE_URL="postgresql://test:test@localhost:5432/test"
-          AUTH_SECRET="test-secret-key-for-testing-only"
-          AUTH_GITHUB_ID="test-github-client-id"
-          AUTH_GITHUB_SECRET="test-github-client-secret"
-          AUTH_GOOGLE_ID="test-google-client-id"
-          AUTH_GOOGLE_SECRET="test-google-client-secret"
-          AUTH_URL="http://localhost:3000"
-          NEXT_PUBLIC_APP_URL="http://localhost:3000"
-          NEXT_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
-          EOF
+        run: printf '%s' "$MOCK_ENV" > .env
         working-directory: /tmp/e2e-test/test-app-scope
 
       - name: Verify package scope
+        # The rename runs after every generator, so it must also have reached
+        # the operator root scripts, .mcp.json, .forgegraph.yaml and the
+        # generated workflows — not just the package.json names.
         run: |
           grep '"name": "@mycompany/api"' packages/api/package.json || (echo "Wrong scope in api" && exit 1)
+          grep '"name": "@mycompany/domain"' packages/domain/package.json || (echo "Wrong scope in domain" && exit 1)
           grep '"name": "@mycompany/db"' packages/db/package.json || (echo "Wrong scope in db" && exit 1)
+          grep '"name": "@mycompany/web"' apps/web/package.json || (echo "Wrong scope in web" && exit 1)
+          grep '"@gmacko/emulate"' package.json || (echo "External @gmacko/emulate was renamed" && exit 1)
+          grep '@mycompany/api-cli' package.json || (echo "api:ops kept the template scope" && exit 1)
+          grep '@mycompany/mcp-server' package.json || (echo "mcp:app kept the template scope" && exit 1)
+          grep '@mycompany/mcp-server' .mcp.json || (echo ".mcp.json kept the template scope" && exit 1)
+          for f in .github/workflows/preview.yml .github/workflows/e2e.yml .github/workflows/sdk.yml .forgegraph.yaml; do
+            grep -q '@mycompany/' "$f" || (echo "$f kept the template scope" && exit 1)
+            if grep -q '@gmacko/' "$f"; then echo "$f still names @gmacko/" && exit 1; fi
+          done
           echo "Package scope verified!"
         working-directory: /tmp/e2e-test/test-app-scope
 
@@ -385,8 +407,8 @@ jobs:
         run: pnpm check:fast
         working-directory: /tmp/e2e-test/test-app-scope
 
-      - name: Run Next.js build
-        run: pnpm --filter @mycompany/nextjs build
+      - name: Run web build
+        run: pnpm --filter @mycompany/web build
         working-directory: /tmp/e2e-test/test-app-scope
 
   e2e-full:
@@ -422,33 +444,18 @@ jobs:
           cd /tmp/e2e-test
           node ${{ github.workspace }}/packages/create-gmacko-app/dist/index.js test-app-full \
             --yes --no-git \
-            --tanstack-start \
-            --integrations "sentry,posthog,stripe,email" \
+            --saas-bootstrap \
+            --integrations "sentry,posthog,stripe,revenuecat,notifications,email,storage" \
             --email-provider resend
         env:
           CI: "true"
 
       - name: Create mock .env
         run: |
-          cat > .env << 'EOF'
-          DATABASE_URL="postgresql://test:test@localhost:5432/test"
-          AUTH_SECRET="test-secret-key-for-testing-only"
-          AUTH_GITHUB_ID="test-github-client-id"
-          AUTH_GITHUB_SECRET="test-github-client-secret"
-          AUTH_GOOGLE_ID="test-google-client-id"
-          AUTH_GOOGLE_SECRET="test-google-client-secret"
-          AUTH_URL="http://localhost:3000"
-          NEXT_PUBLIC_APP_URL="http://localhost:3000"
+          printf '%s' "$MOCK_ENV" > .env
+          cat >> .env << 'EOF'
           SENTRY_DSN="https://test@test.ingest.sentry.io/test"
-          NEXT_PUBLIC_POSTHOG_KEY="phc_test"
-          NEXT_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
-          EXPO_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
-          EXPO_PUBLIC_POSTHOG_KEY_DEV="phc_test_dev"
-          EXPO_PUBLIC_POSTHOG_KEY_STAGING="phc_test_staging"
-          EXPO_PUBLIC_POSTHOG_KEY_PROD="phc_test_prod"
-          EXPO_PUBLIC_SENTRY_DSN_DEV="https://test@example.ingest.sentry.io/123"
-          EXPO_PUBLIC_SENTRY_DSN_STAGING="https://test@example.ingest.sentry.io/456"
-          EXPO_PUBLIC_SENTRY_DSN_PROD="https://test@example.ingest.sentry.io/789"
+          VITE_POSTHOG_KEY="phc_test"
           STRIPE_SECRET_KEY="sk_test_123"
           RESEND_API_KEY="re_test_123"
           EOF
@@ -456,13 +463,13 @@ jobs:
 
       - name: Verify structure
         run: |
-          test -d apps/nextjs || (echo "Missing apps/nextjs" && exit 1)
+          test -d apps/web || (echo "Missing apps/web" && exit 1)
           test -d apps/expo || (echo "Missing apps/expo" && exit 1)
-          test -d apps/tanstack-start || (echo "Missing apps/tanstack-start" && exit 1)
           test -d packages/monitoring || (echo "Missing packages/monitoring" && exit 1)
           test -d packages/analytics || (echo "Missing packages/analytics" && exit 1)
           test -d packages/payments || (echo "Missing packages/payments" && exit 1)
           test -d packages/email || (echo "Missing packages/email" && exit 1)
+          test -d packages/storage || (echo "Missing packages/storage" && exit 1)
           echo "Structure verified!"
         working-directory: /tmp/e2e-test/test-app-full
 
@@ -474,12 +481,8 @@ jobs:
         run: pnpm check:fast
         working-directory: /tmp/e2e-test/test-app-full
 
-      - name: Run Next.js build
-        run: pnpm --filter @gmacko/nextjs build
-        working-directory: /tmp/e2e-test/test-app-full
-
-      - name: Run TanStack Start build
-        run: pnpm --filter @gmacko/tanstack-start build
+      - name: Run web build
+        run: pnpm --filter @gmacko/web build
         working-directory: /tmp/e2e-test/test-app-full
 
       - name: Run Expo typecheck
@@ -493,11 +496,11 @@ jobs:
           grep '"name"' /tmp/e2e-test/expo-config.json || (echo "Expo config did not resolve" && exit 1)
         working-directory: /tmp/e2e-test/test-app-full
 
-  e2e-vinext:
-    name: E2E - Vinext
+  e2e-mobile-only:
+    name: E2E - Mobile Only
     needs: build-cli
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -520,79 +523,107 @@ jobs:
       - name: Install CLI dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Scaffold vinext app
+      - name: Scaffold mobile-only app
         run: |
           mkdir -p /tmp/e2e-test
           cd /tmp/e2e-test
-          node ${{ github.workspace }}/packages/create-gmacko-app/dist/index.js test-app-vinext \
-            --yes --no-git \
-            --no-mobile --no-ai --vinext
+          node ${{ github.workspace }}/packages/create-gmacko-app/dist/index.js test-app-mobile \
+            --yes --no-git --no-web --no-ai
         env:
           CI: "true"
 
       - name: Create mock .env
+        run: printf '%s' "$MOCK_ENV" > .env
+        working-directory: /tmp/e2e-test/test-app-mobile
+
+      - name: Verify structure
         run: |
-          cat > .env << 'EOF'
-          DATABASE_URL="postgresql://test:test@localhost:5432/test"
-          AUTH_SECRET="test-secret-key-for-testing-only"
-          AUTH_GITHUB_ID="test-github-client-id"
-          AUTH_GITHUB_SECRET="test-github-client-secret"
-          AUTH_GOOGLE_ID="test-google-client-id"
-          AUTH_GOOGLE_SECRET="test-google-client-secret"
-          AUTH_URL="http://localhost:3000"
-          NEXT_PUBLIC_APP_URL="http://localhost:3000"
-          NEXT_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
-          CLOUDFLARE_ACCOUNT_ID="test-cloudflare-account"
-          CLOUDFLARE_API_TOKEN="test-cloudflare-token"
-          EOF
-        working-directory: /tmp/e2e-test/test-app-vinext
+          test ! -d apps/web || (echo "apps/web should not exist" && exit 1)
+          test -d apps/expo || (echo "Missing apps/expo" && exit 1)
+          test ! -f .github/workflows/preview.yml || (echo "preview.yml should not exist without a web app" && exit 1)
+          grep -q '"dev": "pnpm dev:emulate"' package.json || (echo "dev script should only start emulate" && exit 1)
+          echo "Structure verified!"
+        working-directory: /tmp/e2e-test/test-app-mobile
 
       - name: Run doctor
         run: |
-          pnpm run doctor | tee /tmp/e2e-test/vinext-doctor.log
-          grep 'Cloudflare Workers lane detected' /tmp/e2e-test/vinext-doctor.log || (echo "Doctor did not detect Cloudflare lane" && exit 1)
-          grep 'Cloudflare Workers env values' /tmp/e2e-test/vinext-doctor.log || (echo "Doctor did not report Cloudflare env group" && exit 1)
-          # Wrangler is an optional local dev tool; doctor only warns when it's
-          # absent (as on CI runners), so don't require it here.
-        working-directory: /tmp/e2e-test/test-app-vinext
+          pnpm run doctor | tee /tmp/e2e-test/mobile-doctor.log
+          if grep 'Cloudflare Workers lane detected' /tmp/e2e-test/mobile-doctor.log; then
+            echo "Doctor detected a Workers lane in a mobile-only scaffold" && exit 1
+          fi
+        working-directory: /tmp/e2e-test/test-app-mobile
 
-      - name: Run fast checks
-        run: pnpm check:fast
-        working-directory: /tmp/e2e-test/test-app-vinext
+      - name: Run typecheck
+        run: pnpm typecheck
+        working-directory: /tmp/e2e-test/test-app-mobile
 
-      - name: Verify vinext build is wired
-        # The full vinext/Vite Cloudflare build (`build:vinext`) OOMs a standard
-        # ubuntu-latest runner (~7 min "transforming" → "runner received shutdown
-        # signal"), so it can't run here. Validate the lane is wired instead; the
-        # full build runs once larger runners are enabled (see PR #8).
+      - name: Run Expo typecheck
+        run: pnpm --filter @gmacko/expo typecheck
+        working-directory: /tmp/e2e-test/test-app-mobile
+
+  e2e-mobile-pruned:
+    name: E2E - Mobile Only, Pruned
+    needs: build-cli
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download CLI dist
+        uses: actions/download-artifact@v4
+        with:
+          name: cli-dist
+          path: packages/create-gmacko-app/dist
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install CLI dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Scaffold pruned mobile-only app
         run: |
-          node -e "const s=require('./apps/nextjs/package.json').scripts; if(!s['build:vinext']||!s['prebuild:vinext']) { console.error('vinext build scripts missing'); process.exit(1); }"
-          test -f apps/nextjs/vinext.config.ts || test -f apps/nextjs/worker/index.ts || (echo "vinext worker entry missing" && exit 1)
-        working-directory: /tmp/e2e-test/test-app-vinext
+          mkdir -p /tmp/e2e-test
+          cd /tmp/e2e-test
+          node ${{ github.workspace }}/packages/create-gmacko-app/dist/index.js test-app-mobile-pruned \
+            --yes --no-git \
+            --no-web --no-ai --prune \
+            --integrations ""
+        env:
+          CI: "true"
 
-      - name: Smoke Cloudflare deploy script
+      - name: Create mock .env
+        run: printf '%s' "$MOCK_ENV" > .env
+        working-directory: /tmp/e2e-test/test-app-mobile-pruned
+
+      - name: Verify nothing imports the pruned packages
+        # Pruning with Expo kept used to leave dangling
+        # @gmacko/analytics/native and @gmacko/monitoring/native imports.
         run: |
-          # deploy:cloudflare:staging chains `build:vinext && wrangler deploy
-          # --env staging`. Stub the heavy vinext build (it OOMs a standard
-          # runner — see "Verify vinext build is wired") and replace the real
-          # wrangler bin with a fake. pnpm prepends node_modules/.bin, which
-          # shadows anything we put on PATH, so faking wrangler on PATH alone
-          # doesn't win — we overwrite the resolved bin(s) directly. This proves
-          # the deploy script reaches `wrangler deploy --env staging` without a
-          # real build or Cloudflare credentials.
-          node -e "const fs=require('fs'),p='apps/nextjs/package.json';const j=JSON.parse(fs.readFileSync(p,'utf-8'));j.scripts['build:vinext']='echo skip-vinext-build';fs.writeFileSync(p,JSON.stringify(j,null,2));"
-          for w in $(find . -path '*/node_modules/.bin/wrangler'); do
-            rm -f "$w"
-            printf '#!/bin/sh\necho "fake-wrangler $@"\n' > "$w"
-            chmod +x "$w"
-          done
-          pnpm --filter @gmacko/nextjs deploy:cloudflare:staging | tee /tmp/e2e-test/vinext-deploy.log
-          grep 'fake-wrangler deploy --env staging' /tmp/e2e-test/vinext-deploy.log || (echo "Cloudflare deploy script did not invoke wrangler correctly" && exit 1)
-        working-directory: /tmp/e2e-test/test-app-vinext
+          test ! -d apps/web || (echo "apps/web should not exist" && exit 1)
+          test ! -d packages/analytics || (echo "packages/analytics should not exist" && exit 1)
+          test ! -d packages/monitoring || (echo "packages/monitoring should not exist" && exit 1)
+          if grep -q '@gmacko/analytics' apps/expo/src/providers.tsx; then echo "providers.tsx still imports the pruned analytics package" && exit 1; fi
+          if grep -q '@gmacko/monitoring' apps/expo/src/providers.tsx; then echo "providers.tsx still imports the pruned monitoring package" && exit 1; fi
+          if grep -q '@gmacko/monitoring' apps/expo/src/components/error-boundary.tsx; then echo "error-boundary.tsx still imports the pruned monitoring package" && exit 1; fi
+          if grep -q 'db:migrate:local' package.json; then echo "D1 scripts survived removeWebApp" && exit 1; fi
+          echo "Prune verified!"
+        working-directory: /tmp/e2e-test/test-app-mobile-pruned
+
+      - name: Run typecheck
+        run: pnpm typecheck
+        working-directory: /tmp/e2e-test/test-app-mobile-pruned
 
   report:
     name: Report Results
-    needs: [e2e-default, e2e-operators, e2e-minimal, e2e-custom-scope, e2e-full, e2e-vinext]
+    needs: [e2e-default, e2e-operators, e2e-minimal, e2e-custom-scope, e2e-full, e2e-mobile-only, e2e-mobile-pruned]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -602,9 +633,9 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
 
           if [ "${{ needs.e2e-default.result }}" == "success" ]; then
-            echo "- :white_check_mark: Default configuration" >> $GITHUB_STEP_SUMMARY
+            echo "- :white_check_mark: Default (web + mobile)" >> $GITHUB_STEP_SUMMARY
           else
-            echo "- :x: Default configuration" >> $GITHUB_STEP_SUMMARY
+            echo "- :x: Default (web + mobile)" >> $GITHUB_STEP_SUMMARY
           fi
 
           if [ "${{ needs.e2e-operators.result }}" == "success" ]; then
@@ -631,10 +662,16 @@ jobs:
             echo "- :x: Full configuration" >> $GITHUB_STEP_SUMMARY
           fi
 
-          if [ "${{ needs.e2e-vinext.result }}" == "success" ]; then
-            echo "- :white_check_mark: Vinext" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.e2e-mobile-only.result }}" == "success" ]; then
+            echo "- :white_check_mark: Mobile only" >> $GITHUB_STEP_SUMMARY
           else
-            echo "- :x: Vinext" >> $GITHUB_STEP_SUMMARY
+            echo "- :x: Mobile only" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.e2e-mobile-pruned.result }}" == "success" ]; then
+            echo "- :white_check_mark: Mobile only, pruned" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- :x: Mobile only, pruned" >> $GITHUB_STEP_SUMMARY
           fi
 
           # Fail if any test failed
@@ -643,7 +680,8 @@ jobs:
              [ "${{ needs.e2e-minimal.result }}" != "success" ] || \
              [ "${{ needs.e2e-custom-scope.result }}" != "success" ] || \
              [ "${{ needs.e2e-full.result }}" != "success" ] || \
-             [ "${{ needs.e2e-vinext.result }}" != "success" ]; then
+             [ "${{ needs.e2e-mobile-only.result }}" != "success" ] || \
+             [ "${{ needs.e2e-mobile-pruned.result }}" != "success" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Some E2E tests failed!**" >> $GITHUB_STEP_SUMMARY
             exit 1
@@ -678,8 +716,7 @@ jobs:
         run: pnpm --dir packages/create-gmacko-app exec vitest run src/__tests__/e2e.test.ts
         env:
           RUN_E2E: "true"
-          # This suite also scaffolds + builds a vinext app; cap the V8 heap so
-          # its memory-heavy Vite build doesn't OOM the runner (inherited by the
-          # child build processes).
+          # The suite builds several Vite/Workers apps; cap the V8 heap so the
+          # child build processes do not OOM the runner.
           NODE_OPTIONS: "--max-old-space-size=8192"
           KEEP_TEST_APPS: ${{ inputs.keep_test_apps && 'true' || 'false' }}

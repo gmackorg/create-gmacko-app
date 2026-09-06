@@ -1,21 +1,13 @@
 import { defineConfig } from "vitest/config";
 
+/**
+ * Node suite: every endpoint through the in-process web handler over the
+ * sqlite-node `layerTest` (see src/testing.ts). The `*.workers.test.ts`
+ * files run against a Miniflare D1 via vitest.workers.config.ts.
+ */
 export default defineConfig({
   test: {
-    globals: true,
-    globalSetup: ["../../test/emulate-setup.ts"],
-    env: {
-      DATABASE_URL: "postgresql://localhost:5432/gmacko_dev",
-      REDIS_URL: "redis://localhost:6379",
-    },
-    include: ["src/**/*.{test,spec}.ts"],
-    exclude: ["**/node_modules/**", "**/dist/**"],
-    coverage: {
-      provider: "v8",
-      reporter: ["text", "json", "html"],
-      reportsDirectory: "./coverage",
-      include: ["src/**/*.ts"],
-      exclude: ["**/*.d.ts", "**/*.test.ts", "**/index.ts"],
-    },
+    include: ["src/**/*.test.ts"],
+    exclude: ["**/node_modules/**", "**/dist/**", "src/**/*.workers.test.ts"],
   },
 });

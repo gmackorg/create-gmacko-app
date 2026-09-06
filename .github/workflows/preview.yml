@@ -1,79 +1,170 @@
-name: ForgeGraph Preview Handoff
+name: Preview Deploy
+
+# A preview URL per pull request, as a *version* of the single
+# `gmacko-web-preview` Worker (`wrangler versions upload`) rather than a
+# Worker per PR. A version inherits that Worker's bindings and secrets, gets
+# its own `https://<version-prefix>-gmacko-web-preview.<subdomain>.workers.dev`
+# URL, and takes no production traffic until someone deploys it — so there is
+# nothing to create and nothing to delete when the PR closes.
+#
+# Phase 9 decision (2026-09-04): the preview database stays SHARED. The plan
+# had called for `wrangler d1 create gmacko-web-preview-<pr>` per PR; on the
+# versions-based lane that costs more than it buys:
+#
+#  * A per-PR database has to be a binding on the version that uses it, so
+#    every PR would need either its own Worker or a generated per-PR config.
+#    A Worker per PR starts with NO secrets (AUTH_SECRET, STRIPE_*, SENTRY_DSN
+#    …), so the workflow would have to push the whole preview secret set to a
+#    fresh Worker on every PR — a CI token with secret-write and N copies of
+#    the secrets, to review a diff.
+#  * The reason to isolate is that one PR's schema change could break another
+#    PR's preview. Expand/contract already prevents that, and it is enforced,
+#    not merely documented: `pnpm check:standards` (`no-d1-table-rebuild`)
+#    refuses a migration that rebuilds a table, and an additive migration is
+#    compatible with older code by construction.
+#  * Previews are for human QA. The automated suites run against local
+#    Miniflare D1, never against this database, so nothing in CI depends on
+#    its contents.
+#
+# What replaces the isolation, and the honest cost: shared preview data can
+# drift (a half-finished flow, a test workspace someone left behind). The
+# `reset` job below empties and re-seeds the database — weekly on a schedule,
+# and on demand from the Actions tab when a PR needs a clean slate. Revisit
+# this if previews ever need per-PR fixtures or if two PRs' data genuinely
+# collide; the alternative then is a dispatch namespace, not a Worker per PR.
+#
+# Pending migrations are applied to the shared preview D1 first, in a step of
+# its own (docs/drizzle-migrations.md).
+#
+# `wrangler versions upload` is run through `pnpm -F @gmacko/web
+# preview:upload` = `CLOUDFLARE_ENV=preview vite build && wrangler versions
+# upload`, the same shape as the `deploy:<stage>` scripts: the Cloudflare Vite
+# plugin resolves `env.preview` from wrangler.jsonc at build time and emits a
+# flat config, so wrangler is not given `--env` a second time.
+#
+# Needs the CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID secrets. Preview URLs
+# must be enabled for the Worker (they are by default).
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened]
     branches: [main]
+  # Reset the shared preview database: weekly, and on demand.
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      reset:
+        description: "Empty and re-seed the shared preview database"
+        type: boolean
+        default: false
 
 concurrency:
-  group: forgegraph-preview-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: preview-${{ github.event.pull_request.number || github.ref }}
+  # Never cancel a run in flight: it may be inside `migrate:remote` against
+  # the shared preview D1, and a half-applied migration is not something a
+  # rerun can reason about.
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
 jobs:
-  preview-handoff:
-    name: Publish ForgeGraph Preview Context
-    if: github.event.action != 'closed'
+  preview:
+    name: Upload preview version
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       pull-requests: write
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build preview handoff summary
-        id: summary
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Skip without Cloudflare credentials
+        id: creds
         run: |
-          PREVIEW_REF="pr-${{ github.event.pull_request.number }}"
-          PREVIEW_DOMAIN="${PREVIEW_REF}.${{ vars.PREVIEW_BASE_DOMAIN || 'preview.gmacko.io' }}"
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN is not set; skipping the preview upload"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
 
-          {
-            echo "preview_ref=${PREVIEW_REF}"
-            echo "preview_domain=${PREVIEW_DOMAIN}"
-            echo "preview_url=https://${PREVIEW_DOMAIN}"
-          } >> "$GITHUB_OUTPUT"
+      - name: Apply pending migrations to the shared preview D1
+        if: steps.creds.outputs.ok == 'true'
+        run: pnpm -F @gmacko/db migrate:remote --env preview
 
-      - name: Comment PR with ForgeGraph handoff
+      - name: Upload a preview version of gmacko-web-preview
+        id: upload
+        if: steps.creds.outputs.ok == 'true'
+        env:
+          VITE_POSTHOG_KEY: ${{ vars.PREVIEW_POSTHOG_KEY }}
+          VITE_SENTRY_DSN: ${{ vars.PREVIEW_SENTRY_DSN }}
+        run: |
+          set -o pipefail
+          pnpm -F @gmacko/web preview:upload | tee /tmp/versions-upload.log
+          # `|| true`: with pipefail set, a grep that matches nothing would
+          # otherwise abort the step before the warning below can explain why.
+          url="$(grep -oE 'https://[A-Za-z0-9.-]+\.workers\.dev' /tmp/versions-upload.log | head -n1 || true)"
+          version="$(grep -oE '[0-9a-f-]{36}' /tmp/versions-upload.log | head -n1 || true)"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ -z "$url" ]; then
+            echo "::warning::wrangler did not print a version preview URL; enable preview URLs for the Worker"
+          fi
+
+      - name: Comment the preview URL
+        if: steps.creds.outputs.ok == 'true'
         uses: actions/github-script@v7
+        env:
+          PREVIEW_URL: ${{ steps.upload.outputs.url }}
+          VERSION_ID: ${{ steps.upload.outputs.version }}
         with:
           script: |
-            const previewUrl = '${{ steps.summary.outputs.preview_url }}';
-            const previewRef = '${{ steps.summary.outputs.preview_ref }}';
-            const sha = '${{ github.event.pull_request.head.sha }}';
-            const shortSha = sha.substring(0, 7);
-
-            const body = `## ForgeGraph Preview Handoff
-
-            This template no longer performs preview deploys from GitHub Actions directly.
-            Preview environments should be created and managed in ForgeGraph.
+            const url = process.env.PREVIEW_URL;
+            const version = process.env.VERSION_ID || '(unknown)';
+            const link = url || '(preview URLs are not enabled for `gmacko-web-preview`)';
+            const sha = '${{ github.event.pull_request.head.sha }}'.slice(0, 7);
+            const body = `## Preview deploy
 
             | Field | Value |
             |------|-------|
-            | Preview ref | \`${previewRef}\` |
-            | Suggested URL | ${previewUrl} |
-            | Commit | \`${shortSha}\` |
+            | Worker | \`gmacko-web-preview\` (version, not deployed) |
+            | Version | \`${version}\` |
+            | URL | ${link} |
+            | Commit | \`${sha}\` |
+            | Database | shared \`gmacko-web-preview\` D1 ([why](../blob/main/.github/workflows/preview.yml)) |
 
-            Use the ForgeGraph deployment model described in \`deploy/README.md\` and \`deploy/forgegraph/README.md\`.
-            Configure the preview stack in ForgeGraph with colocated Postgres unless stronger isolation is warranted.
+            Health: ${url ? `${url}/.well-known/forge-health` : "n/a"}
             `;
-
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-
-            const botComment = comments.find((comment) =>
-              comment.user.type === 'Bot' &&
-              comment.body.includes('## ForgeGraph Preview Handoff')
+            const existing = comments.find(
+              (c) => c.user.type === 'Bot' && c.body.includes('## Preview deploy'),
             );
-
-            if (botComment) {
+            if (existing) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                comment_id: botComment.id,
+                comment_id: existing.id,
                 body,
               });
             } else {
@@ -85,47 +176,51 @@ jobs:
               });
             }
 
-  preview-closeout:
-    name: Close ForgeGraph Preview Handoff
-    if: github.event.action == 'closed'
+  reset:
+    name: Reset the shared preview database
+    if: >-
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && inputs.reset)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
-      pull-requests: write
-
     steps:
-      - name: Comment PR with closeout status
-        uses: actions/github-script@v7
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          script: |
-            const body = `## ForgeGraph Preview Handoff
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
 
-            PR closed. If this branch has a ForgeGraph preview environment, retire it from ForgeGraph using the repo's preview ref.
-            `;
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
+      - name: Skip without Cloudflare credentials
+        id: creds
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN is not set; skipping the preview reset"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
 
-            const botComment = comments.find((comment) =>
-              comment.user.type === 'Bot' &&
-              comment.body.includes('## ForgeGraph Preview Handoff')
-            );
+      # `--env preview` is hard-coded in all three steps. seed/reset.sql
+      # empties every table; it must never be pointed at another stage.
+      - name: Apply pending migrations
+        if: steps.creds.outputs.ok == 'true'
+        run: pnpm -F @gmacko/db migrate:remote --env preview
 
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body,
-              });
-            }
+      - name: Empty every table
+        if: steps.creds.outputs.ok == 'true'
+        run: pnpm -F @gmacko/db reset:remote --env preview
+
+      - name: Re-seed the defaults
+        if: steps.creds.outputs.ok == 'true'
+        run: pnpm -F @gmacko/db seed:remote --env preview

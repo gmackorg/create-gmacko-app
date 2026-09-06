@@ -1,60 +1,56 @@
-"use client";
-
+/**
+ * A plain `<select>` of the supported locales. Navigation is the app's
+ * business (a TanStack Router `navigate`, a cookie-setting server function),
+ * so the switcher reports the choice through `onChange` and does not touch
+ * the URL itself; `getPathWithLocale` builds the target path when the app
+ * prefixes routes with the locale.
+ */
 import { integrations } from "@gmacko/config";
-import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { defaultLocale, supportedLocales, useLocale } from "./index";
+import { supportedLocales, useLocale } from "./index";
 
-const localeLabels: Record<string, string> = {
-  en: "English",
-  es: "Espanol",
-  fr: "Francais",
-  de: "Deutsch",
-  ja: "Japanese",
-  zh: "Chinese",
-};
+/**
+ * The label each supported locale is listed under. A locale in
+ * `supportedLocales` with no entry here falls back to its own code.
+ */
+const localeLabels = new Map<string, string>([
+  ["en", "English"],
+  ["es", "Espanol"],
+  ["fr", "Francais"],
+  ["de", "Deutsch"],
+  ["ja", "Japanese"],
+  ["zh", "Chinese"],
+]);
 
 interface LocaleSwitcherProps {
-  className?: string;
+  className?: string | undefined;
+  /** The selected locale; defaults to the provider's current one. */
+  locale?: string | undefined;
+  onChange: (locale: string) => void;
 }
 
-export function LocaleSwitcher({ className }: LocaleSwitcherProps): ReactNode {
-  const locale = useLocale();
-  const pathname = usePathname();
-  const router = useRouter();
+export function LocaleSwitcher({
+  className,
+  locale,
+  onChange,
+}: LocaleSwitcherProps): ReactNode {
+  const current = useLocale();
 
   if (!integrations.i18n) {
     return null;
   }
 
-  const handleChange = (newLocale: string) => {
-    const segments = pathname.split("/").filter(Boolean);
-
-    if (supportedLocales.includes(segments[0] ?? "")) {
-      segments[0] = newLocale;
-    } else {
-      segments.unshift(newLocale);
-    }
-
-    const newPath =
-      newLocale === defaultLocale
-        ? "/" + segments.slice(1).join("/") || "/"
-        : "/" + segments.join("/");
-
-    router.push(newPath);
-  };
-
   return (
     <select
-      value={locale}
-      onChange={(e) => handleChange(e.target.value)}
+      value={locale ?? current}
+      onChange={(e) => onChange(e.target.value)}
       className={className}
       aria-label="Select language"
     >
       {supportedLocales.map((loc) => (
         <option key={loc} value={loc}>
-          {localeLabels[loc] ?? loc}
+          {localeLabels.get(loc) ?? loc}
         </option>
       ))}
     </select>

@@ -1,17 +1,17 @@
 /**
  * Server-side helpers for feature flags
  *
- * Usage in tRPC procedures:
- *   import { withFlags, requireFlag, getFlagsForUser } from "@gmacko/flags/server";
+ * The evaluation environment is an argument (the app's `AppConfig.stage`),
+ * never `process.env`.
  *
- *   // In a procedure
- *   export const myProcedure = protectedProcedure
- *     .use(withFlags)
- *     .query(async ({ ctx }) => {
- *       if (ctx.flags.isEnabled("betaFeatures")) {
- *         // Beta-only logic
- *       }
- *     });
+ * Usage in an API service (packages/api):
+ *   import { getFlagsForUser } from "@gmacko/flags/server";
+ *
+ *   // In a handler, with the CurrentUser the credential middleware provided
+ *   const flags = getFlagsForUser(user, config.stage);
+ *   if (flags.isEnabled("betaFeatures")) {
+ *     // Beta-only logic
+ *   }
  */
 import type { RuntimeFlagName } from "./flags";
 import {
@@ -37,16 +37,19 @@ export interface UserLike {
 }
 
 /**
- * Build a flag context from a user-like object
+ * Build a flag context from a user-like object and the deployment's environment
  */
-export function buildFlagContext(user?: UserLike | null): FlagContext {
-  if (!user) return {};
+export function buildFlagContext(
+  user?: UserLike | null,
+  environment?: string,
+): FlagContext {
+  if (!user) return environment ? { environment } : {};
 
   return {
     userId: user.id,
     email: user.email ?? undefined,
     organizationId: user.organizationId ?? undefined,
-    environment: process.env.NODE_ENV,
+    environment,
   };
 }
 
@@ -56,8 +59,9 @@ export function buildFlagContext(user?: UserLike | null): FlagContext {
  */
 export function getFlagsForUser(
   user?: UserLike | null,
+  environment?: string,
 ): Record<RuntimeFlagName, boolean> {
-  const context = buildFlagContext(user);
+  const context = buildFlagContext(user, environment);
   return getAllFlags(context);
 }
 
@@ -67,8 +71,9 @@ export function getFlagsForUser(
 export function isFlagEnabledForUser(
   flagName: RuntimeFlagName,
   user?: UserLike | null,
+  environment?: string,
 ): boolean {
-  const context = buildFlagContext(user);
+  const context = buildFlagContext(user, environment);
   return isEnabled(flagName, context);
 }
 
@@ -78,13 +83,14 @@ export function isFlagEnabledForUser(
 export function getFlagForUser(
   flagName: RuntimeFlagName,
   user?: UserLike | null,
+  environment?: string,
 ): FlagEvaluationResult<boolean> {
-  const context = buildFlagContext(user);
+  const context = buildFlagContext(user, environment);
   return getFlag(flagName, context);
 }
 
 /**
- * tRPC middleware context type
+ * Flags context type for a request-scoped service
  * Add this to your context type
  */
 export interface FlagsMiddlewareContext {
@@ -99,12 +105,12 @@ export interface FlagsMiddlewareContext {
 }
 
 /**
- * Create flags context for tRPC middleware
- * Use this in your createContext function or middleware
+ * Create the flags context for a request-scoped service
+ * Use this where the request context is built
  *
  * @example
  * ```ts
- * // In your tRPC context
+ * // In your request context builder
  * export const createContext = async (opts: CreateContextOptions) => {
  *   const user = await getUser(opts);
  *   return {
@@ -117,8 +123,9 @@ export interface FlagsMiddlewareContext {
  */
 export function createFlagsContext(
   user?: UserLike | null,
+  environment?: string,
 ): FlagsMiddlewareContext {
-  const context = buildFlagContext(user);
+  const context = buildFlagContext(user, environment);
 
   return {
     flags: {
@@ -148,8 +155,9 @@ export function createFlagsContext(
 export function requireFlagEnabled(
   flagName: RuntimeFlagName,
   user?: UserLike | null,
+  environment?: string,
 ): void {
-  if (!isFlagEnabledForUser(flagName, user)) {
+  if (!isFlagEnabledForUser(flagName, user, environment)) {
     throw new Error(`Feature "${flagName}" is not enabled`);
   }
 }

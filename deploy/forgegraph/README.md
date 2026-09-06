@@ -1,57 +1,74 @@
 # ForgeGraph Deployment Handoff
 
-Use this directory as the handoff point between the generated app repo and the ForgeGraph deployment repo or control plane.
+ForgeGraph is the control plane for the web lane: it registers the app and
+its stages, holds the stage secrets, triggers deploys and watches health. The
+Worker itself lives on Cloudflare; ForgeGraph never hosts it. This is the
+ForgeGraph side of [`docs/DEPLOYMENT.md`](../../docs/DEPLOYMENT.md).
 
-## Expected Direction
+## The repo contract: `.forgegraph.yaml`
 
-1. Keep the application flake-based at the repo root with [`flake.nix`](../../flake.nix).
-2. Define the app service and colocated Postgres service in ForgeGraph.
-3. Store runtime secrets in ForgeGraph rather than embedding deployment-specific config in GitHub Actions.
-4. Promote hosted Postgres only when real customer load or operational constraints justify the split.
-
-## `forge` Workflow
-
-If you are working from the sibling [`../ForgeGraph`](../../ForgeGraph) repo, use `forge` as the operator interface. If you want the published CLI, install `@forgegraph/cli`.
-
-```bash
-forge login --server <forgegraph-url> --token <token>
-forge diff
-forge apply
-forge stage list
-forge deploy create staging --wait
-forge deploy create production --wait
+```yaml
+app: gmacko
+server: https://forgegraf.com
+db: { type: d1, name: gmacko-web, migrate: node scripts/deploy-stage.mjs --migrate-only, migrateType: wrangler }
+stages:
+  - name: staging     # target: cloudflare-workers, worker gmacko-web-staging
+  - name: production  # target: cloudflare-workers, worker gmacko-web
+resources: { d1: [gmacko-web-staging, gmacko-web, gmacko-web-preview] }
+health: { url: /.well-known/forge-health }
 ```
 
-Use `forge logs <app> <stage> --follow` to follow a stage after it starts deploying.
+`pnpm forge:diff` / `pnpm forge:apply` sync it; `pnpm forge:stages` lists the
+stages; `pnpm forge:deploy:staging` and `pnpm forge:deploy:production` wrap
+`forge deploy create <stage> --wait`.
 
-The generated repo now also includes:
+## The deploy workflow
 
-- `.forgegraph.yaml` aligned to the current live `forge` repo contract: `app`, `server`, and `stages`, plus operator notes as comments
-- `pnpm forge:diff`, `pnpm forge:apply`, and `pnpm forge:pull` wrappers for repo-local config sync
-- `pnpm forge:deploy:staging` and `pnpm forge:deploy:production` wrappers around `forge deploy create <stage> --wait`
-- `pnpm forge:stages` as a quick repo-local view of configured ForgeGraph stages
+A `cloudflare-workers` deploy runs the repo's deploy workflow. `forge init`
+scaffolds a generic one (`pnpm build && npx wrangler deploy` from the wrangler
+config directory); replace it with [`deploy.yml`](./deploy.yml) from this
+directory, which runs `node scripts/deploy-stage.mjs --stage $FG_STAGE`:
 
-## Preview Environments
+1. `pnpm -F @gmacko/db migrate:remote --env <stage>` — the stage's pending D1
+   migrations. **A failure aborts the deploy.**
+2. `pnpm -F @gmacko/web deploy:<stage>` — build for that environment and
+   `wrangler deploy`.
 
-For preview environments in ForgeGraph, pass through:
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are provisioned into the
+repo by ForgeGraph from the workspace's Cloudflare integration; `FG_STAGE`
+selects the stage.
 
-- preview ref such as `pr-123`
-- preview domain such as `pr-123.preview.gmacko.io`
-- `DATABASE_URL`
-- `AUTH_SECRET`
-- any enabled integration env vars
+## Databases
 
-Keep preview database isolation simple by default:
+D1 is not `forge db create`. That command provisions Postgres on a node plus
+a Cloudflare Tunnel and a Hyperdrive config for VPS-hosted apps; the web
+lane's databases are created once with `wrangler d1 create` (see
+`deploy/cloudflare/README.md`) and their ids recorded in
+`apps/web/wrangler.jsonc`. Backups are D1 Time Travel and `wrangler d1
+export` (`docs/RUNBOOK.md`, "D1 operations").
 
-- start with schema isolation or a shared preview database
-- only move to a dedicated preview database when isolation requirements become real
+## Secrets
 
-## Production Environments
+```bash
+forge secret set AUTH_SECRET --stage staging --stdin
+forge secret list --stage staging
+pnpm secrets:push --stage staging          # → wrangler secret put, one key at a time, values on stdin
+```
 
-For production on the Hetzner VPS:
+The Worker's expected keys are the `Bindings` schema in
+`apps/web/src/server/config.ts`. `pnpm secrets:push` skips the keys that are
+not Worker bindings (`DATABASE_URL`, `REDIS_URL`, `FG_*`, the Cloudflare
+credentials).
 
-- run the app under the repo's `flake.nix`
-- run Postgres alongside the app first
-- point your stable domain at the ForgeGraph-managed deployment
-- drive deploys and secret changes through `forge`
-- keep backups and migration steps explicit before moving to hosted Postgres
+## Health
+
+`/.well-known/forge-health` is served by the Worker's Health service (the
+same code behind `/api/health`): `ok` + version in production, the component
+checks (D1 ping latency) in development and staging. Point the stage's health
+URL at the Worker's public origin.
+
+## Previews
+
+GitHub Actions deploys one Worker per pull request on the shared preview
+database (`.github/workflows/preview.yml`); ForgeGraph is not involved until
+Phase 9 gives previews their own databases and a ForgeGraph stage.

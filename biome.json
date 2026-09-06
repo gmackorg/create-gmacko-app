@@ -13,11 +13,14 @@
       "!**/.claude/**",
       "!**/.git",
       "!**/.jj",
-      "!**/.next",
       "!**/.turbo",
       "!**/coverage",
       "!**/dist",
-      "!**/node_modules"
+      "!**/node_modules",
+      "!docs/plans/**/*.html",
+      "!apps/web/src/routeTree.gen.ts",
+      "!**/__snapshots__/**",
+      "!tools/oxlint/anti-slop/**"
     ]
   },
   "formatter": {
@@ -31,5 +34,11 @@
   },
   "linter": {
     "enabled": false
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["tooling/typescript/*.json", "knip.json"],
+      "json": { "parser": { "allowComments": true } }
+    }
+  ]
 }

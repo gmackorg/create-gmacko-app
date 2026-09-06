@@ -1,57 +1,75 @@
-# Cloudflare Deployment Notes
+# Cloudflare Workers: the web lane
 
-Use this path when you intentionally want a Workers deployment lane instead of the default ForgeGraph + Nix path.
+`apps/web` is a Cloudflare Worker (TanStack Start server-rendered on workerd,
+the Effect HTTP API under `/api/*`) with a D1 database. This is the Workers
+side of the deploy lane described in [`docs/DEPLOYMENT.md`](../../docs/DEPLOYMENT.md).
 
-## Support Matrix
+## One Worker and one D1 per stage
 
-- Preferred owned-infra path: ForgeGraph + Nix + colocated Postgres
-- Preferred Workers-native path: TanStack Start on Cloudflare Workers
-- Experimental Next.js-on-Workers path: `vinext`
-- Adapter-based Next.js Workers path: possible, but less attractive than the two options above
+`apps/web/wrangler.jsonc` defines the top-level (development) config and the
+`preview`, `staging` and `production` environments. Each environment sets:
 
-## Recommended Choices
+- `name` — `gmacko-web-staging`, `gmacko-web`, `gmacko-web-preview`. There is
+  no Worker per PR: a preview is a *version* of `gmacko-web-preview`
+  (`wrangler versions upload`), which inherits its bindings and secrets.
+- `vars.STAGE` — read by `AppConfig` (cookie security, docs exposure, health
+  redaction, log level). `vars.APP_URL` / `ALLOWED_ORIGINS` are the stage's
+  public origin and extra credentialed origins.
+- `d1_databases[0]` — binding `DB`, the stage's database id, and
+  `migrations_dir` pointing at `packages/db/migrations`.
 
-Choose TanStack Start when:
+Create the databases once and paste the ids in:
 
-- Cloudflare Workers is the primary runtime
-- you want the cleanest current Workers integration
-- you do not need strict Next.js compatibility
+```bash
+pnpm -F @gmacko/web exec wrangler d1 create gmacko-web-staging
+pnpm -F @gmacko/web exec wrangler d1 create gmacko-web
+pnpm -F @gmacko/web exec wrangler d1 create gmacko-web-preview
+```
 
-Choose `vinext` when:
-
-- you want a Next-like app model on Cloudflare Workers
-- you are comfortable with an experimental stack
-- you want to keep the Next.js mental model while moving to a Vite/Workers runtime
-
-Stay on ForgeGraph when:
-
-- the product should run on the Hetzner VPS
-- you want Nix-controlled builds and owned deployment infrastructure
-- colocated Postgres is still the right operational tradeoff
-
-## Generated Next.js Commands
-
-When you scaffold with `--vinext`, the generated Next app includes a separate Workers lane.
+## Commands
 
 From the repo root:
 
-```sh
-pnpm --filter @gmacko/nextjs dev:vinext
-pnpm --filter @gmacko/nextjs build:vinext
-pnpm --filter @gmacko/nextjs deploy:cloudflare:staging
-pnpm --filter @gmacko/nextjs deploy:cloudflare:production
+```bash
+pnpm dev                       # emulate + apps/web on https://gmacko.localhost (local D1)
+pnpm db:migrate:local          # apply migrations to the local D1
+pnpm -F @gmacko/web build      # production build (dist/client + dist/server)
+pnpm deploy:staging            # migrate the staging D1, then wrangler deploy --env staging
+pnpm deploy:production         # same for production
+pnpm secrets:push --stage staging   # ForgeGraph secrets → wrangler secret put --env staging
+pnpm cf-typegen                # regenerate apps/web/worker-configuration.d.ts (CI checks the diff)
 ```
 
-What gets generated:
+`pnpm -F @gmacko/web deploy:<stage>` is `CLOUDFLARE_ENV=<stage> vite build &&
+wrangler deploy`: the Cloudflare Vite plugin writes the environment's
+flattened config to `dist/server/wrangler.json` and a redirect in
+`.wrangler/deploy/config.json`, so `wrangler deploy` in `apps/web` deploys
+that build. `deploy:<stage>:dry-run` adds `--dry-run --outdir dist/dry-run`
+(no credentials needed); `scripts/deploy-stage.mjs --dry-run` chains it after
+`wrangler d1 migrations list`.
 
-- `apps/nextjs/vite.config.ts` for `vinext`
-- `apps/nextjs/wrangler.jsonc` with `nodejs_compat` and a `staging` env block
-- `apps/nextjs/src/cloudflare-env.ts` for Workers-specific env validation
-- `apps/nextjs/README.cloudflare.md` as the app-local operating guide for this lane
-- `.env.example` entries for `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`
+## Environment variables and secrets
 
-The generated `build:vinext` script first builds the Next app's workspace dependencies and then runs `vinext build` through the existing `.env` loader. The production deploy script reuses that build output and then runs `wrangler deploy`; the staging deploy script does the same with `wrangler deploy --env staging`.
+- Development: the Worker reads `apps/web/.env`, a symlink to the repo-root
+  `.env` (`predev` creates it). Never create `.dev.vars`; it disables that.
+- Stages: non-secret values are `vars` in `wrangler.jsonc`; secrets are
+  `wrangler secret put KEY --env <stage>`, fed from ForgeGraph by
+  `pnpm secrets:push`.
+- Build-time: `VITE_*` (PostHog key/host, Sentry DSN for the browser) are
+  inlined by Vite; `SENTRY_AUTH_TOKEN` (+ `SENTRY_ORG`, `SENTRY_PROJECT`)
+  turns on source-map upload.
 
-## Important Constraint
+## Compatibility
 
-Do not try to make one runtime contract cover both ForgeGraph/Nix and Cloudflare Workers equally well. Treat them as separate deployment lanes with separate operational assumptions.
+`compatibility_date` ≥ 2026-08-04 enables `nodejs_compat` by default; the
+Worker needs it for `node:async_hooks` (TanStack Start's request context,
+better-auth). No other Node API is used: logging, telemetry (OTLP over
+fetch), Sentry (`@sentry/cloudflare`), Stripe (fetch client, SubtleCrypto)
+and Resend are all Workers-native, which `pnpm check:standards --graph` and
+the `no-raw-process-env` rule keep true for every package in the bundle.
+
+## Not on this lane
+
+`@gmacko/realtime` (ioredis + BullMQ) is Node-only and is not in the Worker's
+dependency graph.
+

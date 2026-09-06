@@ -1,0 +1,39 @@
+{
+  "name": "@gmacko/domain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./errors": "./src/errors.ts",
+    "./security": "./src/security.ts",
+    "./auth": "./src/auth/index.ts",
+    "./posts": "./src/posts/index.ts",
+    "./settings": "./src/settings/index.ts",
+    "./admin": "./src/admin/index.ts",
+    "./health": "./src/health/index.ts",
+    "./models": "./src/models/index.ts"
+  },
+  "license": "MIT",
+  "scripts": {
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "docs:api-auth": "tsx scripts/api-auth-matrix.ts",
+    "format": "biome check .",
+    "lint": "oxlint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.scripts.json"
+  },
+  "dependencies": {
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog:",
+    "@gmacko/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "oxlint": "catalog:",
+    "tsx": "^4.21.0",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -1,8 +1,8 @@
 {
   "extends": "@gmacko/tsconfig/base.json",
   "compilerOptions": {
-    "types": ["node"]
+    "types": ["node", "@cloudflare/workers-types"]
   },
-  "include": ["src", "*.ts"],
+  "include": ["src", "script"],
   "exclude": ["node_modules"]
 }

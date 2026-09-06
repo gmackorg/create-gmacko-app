@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@gmacko/config": "workspace:*",
-    "posthog-js": "^1.362.0",
+    "posthog-js": "catalog:",
     "posthog-react-native": "^4.37.4"
   },
   "devDependencies": {

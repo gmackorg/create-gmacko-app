@@ -3,6 +3,9 @@
   "compilerOptions": {
     "types": ["node"]
   },
+  // `scripts` is typechecked by tsconfig.scripts.json, not built: including it
+  // here would move tsc's inferred rootDir up to the package root and emit
+  // `dist/src/*.d.ts`, which is not where package.json `exports` points.
   "include": ["src"],
   "exclude": ["node_modules"]
 }

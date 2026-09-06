@@ -1,46 +1,62 @@
-import { getTableConfig } from "drizzle-orm/pg-core";
-import { describe, expect, it } from "vitest";
+import { Effect, ManagedRuntime } from "effect";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { userRoleEnum } from "../auth-schema";
-import {
-  applicationSettings,
-  workspace,
-  workspaceInviteAllowlist,
-  workspaceMembership,
-  workspaceRoleEnum,
-} from "../schema";
+import { Database } from "../database";
+import { layerTest } from "../testing";
 
-describe("SaaS workspace schema", () => {
-  it("keeps platform roles separate from workspace roles", () => {
-    expect(userRoleEnum).toEqual(["user", "admin"]);
-    expect(workspaceRoleEnum).toEqual(["owner", "admin", "member"]);
-    expect(userRoleEnum).not.toContain("owner");
-    expect(userRoleEnum).not.toContain("member");
+const expectedTables = [
+  "account",
+  "api_keys",
+  "application_settings",
+  "billing_plan",
+  "billing_plan_limit",
+  "post",
+  "rate_limit_window",
+  "session",
+  "stripe_webhook_event",
+  "usage_meter",
+  "user",
+  "user_preferences",
+  "verification",
+  "waitlist_entry",
+  "workspace",
+  "workspace_invite_allowlist",
+  "workspace_membership",
+  "workspace_subscription",
+  "workspace_usage_rollup",
+];
+
+describe("migrations", () => {
+  let runtime: ManagedRuntime.ManagedRuntime<Database, never>;
+  beforeAll(() => {
+    runtime = ManagedRuntime.make(layerTest);
+  });
+  afterAll(() => runtime.dispose());
+
+  it("creates exactly the 19 expected tables", async () => {
+    const names = await runtime.runPromise(
+      Effect.gen(function* () {
+        const { sql } = yield* Database;
+        // sqlite_* are sqlite's own (sqlite_sequence, sqlite_stat*), never ours.
+        const rows = yield* sql<{ name: string }>`
+          select name from sqlite_master
+          where type = 'table' and name not like 'sqlite\\_%' escape '\\'
+          order by name
+        `;
+        return rows.map((row) => row.name);
+      }),
+    );
+    expect(names).toHaveLength(19);
+    expect(names).toEqual([...expectedTables].sort());
   });
 
-  it("uses memberships instead of a single owner field on workspaces", () => {
-    expect(workspace.id).toBeDefined();
-    expect(workspace.slug).toBeDefined();
-    expect(workspaceMembership.workspaceId).toBeDefined();
-    expect(workspaceMembership.userId).toBeDefined();
-    expect(workspaceMembership.role).toBeDefined();
-  });
-
-  it("tracks invite allowlist entries separately from memberships", () => {
-    const membershipConfig = getTableConfig(workspaceMembership);
-    const inviteConfig = getTableConfig(workspaceInviteAllowlist);
-
-    expect(workspaceInviteAllowlist.workspaceId).toBeDefined();
-    expect(workspaceInviteAllowlist.email).toBeDefined();
-    expect(workspaceInviteAllowlist.invitedByUserId).toBeDefined();
-    expect(applicationSettings.initialWorkspaceId).toBeDefined();
-    expect(
-      membershipConfig.uniqueConstraints.map((constraint) =>
-        constraint.getName(),
-      ),
-    ).toContain("workspace_membership_workspace_user_unique");
-    expect(
-      inviteConfig.uniqueConstraints.map((constraint) => constraint.getName()),
-    ).toContain("workspace_invite_allowlist_workspace_email_unique");
+  it("enforces foreign keys", async () => {
+    const [row] = await runtime.runPromise(
+      Effect.gen(function* () {
+        const { sql } = yield* Database;
+        return yield* sql<{ foreign_keys: number }>`pragma foreign_keys`;
+      }),
+    );
+    expect(row?.foreign_keys).toBe(1);
   });
 });

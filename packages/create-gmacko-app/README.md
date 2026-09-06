@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/create-gmacko-app.svg)](https://www.npmjs.com/package/create-gmacko-app)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-Create a new Gmacko app with Next.js, Expo, Storybook, tRPC, ForgeGraph-first deployment guidance, and shared agent-native workflows.
+Create a new Gmacko app: TanStack Start + Effect on Cloudflare Workers with D1, Expo, Storybook, ForgeGraph deployment guidance, and shared agent-native workflows.
 
 ## Quick Start
 
@@ -13,51 +13,48 @@ pnpm dlx create-gmacko-app@latest my-app
 
 ## Description
 
-create-gmacko-app is a CLI tool designed to bootstrap production-ready, full-stack applications with a modern tech stack. It sets up a monorepo using Turborepo and pnpm workspaces, integrating web and mobile platforms with a shared backend, colocated-Postgres-first deployment guidance, and shared agent workflows.
+create-gmacko-app is a CLI tool that bootstraps a production-ready, full-stack application as a Turborepo + pnpm monorepo. The web app is one Cloudflare Worker: TanStack Start for rendering and routing plus an Effect `HttpApi` serving `/api/*`, backed by Cloudflare D1. The Expo app, the operator CLI and the MCP server all consume that same API through the typed `@gmacko/api-client`.
 
 ## CLI Options
 
-| Option                           | Description                                                                                                         |
-| :------------------------------- | :------------------------------------------------------------------------------------------------------------------ |
-| `<app-name>`                     | Name of the app to create                                                                                           |
-| `--yes, -y`                      | Accept all defaults without prompting                                                                               |
-| `--prune`                        | Remove unused integration packages                                                                                  |
-| `--no-install`                   | Skip pnpm install                                                                                                   |
-| `--no-git`                       | Skip repository init (`jj`/`git`)                                                                                   |
-| `--no-ai`                        | Exclude AI workflow system                                                                                          |
-| `--no-provision`                 | Exclude provisioning script                                                                                         |
-| `--web`                          | Include Next.js web app (default: true)                                                                             |
-| `--no-web`                       | Exclude Next.js web app                                                                                             |
-| `--mobile`                       | Include Expo mobile app (default: true)                                                                             |
-| `--no-mobile`                    | Exclude Expo mobile app                                                                                             |
-| `--tanstack-start`               | Include TanStack Start app                                                                                          |
-| `--no-tanstack-start`            | Exclude TanStack Start app (default)                                                                                |
-| `--vinext`                       | Add experimental `vinext` support to the Next.js app for a Cloudflare Workers lane                                 |
-| `--saas-collaboration`          | Add workspace invites and team-management scaffolding                                                                |
-| `--saas-billing`                | Add plans, billing-state, and limits scaffolding                                                                     |
-| `--saas-metering`               | Add usage meters and rollup scaffolding                                                                              |
-| `--saas-support`                | Add contact/support/public help surfaces                                                                             |
-| `--saas-launch`                 | Add maintenance mode, signup controls, waitlist, and allowlist scaffolding                                           |
-| `--saas-referrals`              | Add referral and launch-growth scaffolding                                                                           |
-| `--saas-operator-apis`          | Mark the app runtime as exposing operator API capability layers                                                      |
-| `--saas-bootstrap`               | Add the optional Claude SaaS bootstrap pack (`/office-hours` -> optional `/autoplan` -> `/design-consultation` + local follow-up skills) |
-| `--trpc-operators`               | Add the optional operator lane with CLI + MCP wrappers over the same tRPC API                                      |
-| `--forgegraph-server <url>`      | Write a ForgeGraph server URL into `.forgegraph.yaml`                                                               |
-| `--forgegraph-staging-node <id>` | Write the staging node placeholder into `.forgegraph.yaml`                                                          |
-| `--forgegraph-production-node <id>` | Write the production node placeholder into `.forgegraph.yaml`                                                   |
-| `--forgegraph-preview-domain <domain>` | Write the preview domain placeholder into `.forgegraph.yaml`                                               |
-| `--forgegraph-production-domain <domain>` | Write the production domain placeholder into `.forgegraph.yaml`                                         |
-| `--integrations <list>`          | Comma-separated list of integrations (sentry, posthog, stripe, revenuecat, notifications, email, realtime, storage) |
-| `--email-provider <provider>`    | Email provider (resend, sendgrid)                                                                                   |
-| `--realtime-provider <provider>` | Realtime provider (pusher, ably)                                                                                    |
-| `--storage-provider <provider>`  | Storage provider (uploadthing)                                                                                      |
-| `--package-scope <scope>`        | Package scope (default: @gmacko)                                                                                    |
+| Option                                   | Description                                                                                                         |
+| :--------------------------------------- | :------------------------------------------------------------------------------------------------------------------ |
+| `<app-name>`                             | Name of the app to create                                                                                           |
+| `--yes, -y`                              | Accept all defaults without prompting                                                                               |
+| `--prune`                                | Remove unused integration packages                                                                                  |
+| `--no-install`                           | Skip pnpm install                                                                                                   |
+| `--no-git`                               | Skip repository init (`jj`/`git`)                                                                                   |
+| `--no-ai`                                | Exclude AI workflow system                                                                                          |
+| `--no-provision`                         | Exclude provisioning script                                                                                         |
+| `--web`                                  | Include the web app: TanStack Start + Effect on Cloudflare Workers with D1 (default: true)                          |
+| `--no-web`                               | Exclude the web app (mobile-only scaffold; the Expo app targets a separately hosted API)                            |
+| `--mobile`                               | Include Expo mobile app (default: true)                                                                             |
+| `--no-mobile`                            | Exclude Expo mobile app                                                                                             |
+| `--saas-collaboration`                   | Add workspace invites and team-management scaffolding                                                               |
+| `--saas-billing`                         | Add plans, billing-state, and limits scaffolding                                                                    |
+| `--saas-metering`                        | Add usage meters and rollup scaffolding                                                                             |
+| `--saas-support`                         | Add contact/support/public help surfaces                                                                            |
+| `--saas-launch`                          | Add maintenance mode, signup controls, waitlist, and allowlist scaffolding                                          |
+| `--saas-referrals`                       | Add referral and launch-growth scaffolding                                                                          |
+| `--saas-operator-apis`                   | Mark the app runtime as exposing operator API capability layers (implies `--operator-lane`)                         |
+| `--saas-bootstrap`                       | Add the optional Claude SaaS bootstrap pack (`/office-hours` -> optional `/autoplan` -> `/design-consultation` + local follow-up skills) |
+| `--operator-lane`                        | Add the optional operator lane: CLI + MCP wrappers over the app's HTTP API (admin-scoped API keys)                  |
+| `--forgegraph`                           | Enable ForgeGraph integrations (health, logging, OTEL)                                                               |
+| `--forgegraph-server <url>`              | Write a ForgeGraph server URL into `.forgegraph.yaml`                                                               |
+| `--forgegraph-preview-domain <domain>`   | Write the preview domain placeholder into `.forgegraph.yaml`                                                        |
+| `--forgegraph-production-domain <domain>`| Write the production domain placeholder into `.forgegraph.yaml`                                                     |
+| `--integrations <list>`                  | Comma-separated list of integrations (sentry, posthog, stripe, revenuecat, notifications, email, realtime, storage) |
+| `--email-provider <provider>`            | Email provider (resend, sendgrid)                                                                                   |
+| `--storage-provider <provider>`          | Storage provider (r2)                                                                                               |
+| `--package-scope <scope>`                | Package scope (default: @gmacko)                                                                                    |
+
+`realtime` (Redis + BullMQ) is Node-only and cannot run on the Workers web app; it is off in every preset except "everything", and the scaffolder warns when it is enabled.
 
 ## Example Usage
 
 ### Recommended Setup (Default)
 
-Includes Next.js, Expo, Sentry, and PostHog.
+Includes the web app, Expo, Sentry, and PostHog.
 
 ```bash
 pnpm dlx create-gmacko-app@latest my-app
@@ -73,10 +70,10 @@ pnpm dlx create-gmacko-app@latest my-app --integrations ""
 
 ### Full Featured Setup
 
-Enable all integrations and extra apps.
+Enable all Workers-compatible integrations.
 
 ```bash
-pnpm dlx create-gmacko-app@latest my-app --tanstack-start --integrations sentry,posthog,stripe,revenuecat,notifications,email,realtime,storage
+pnpm dlx create-gmacko-app@latest my-app --integrations sentry,posthog,stripe,revenuecat,notifications,email,storage
 ```
 
 ### Web Only Setup
@@ -87,12 +84,12 @@ Skip the mobile app and AI features.
 pnpm dlx create-gmacko-app@latest my-app --no-mobile --no-ai
 ```
 
-### Experimental Cloudflare Setup
+### Mobile Only Setup
 
-Add the `vinext` Workers lane to the generated Next app.
+No Worker; the Expo app points `EXPO_PUBLIC_API_URL` at a hosted API.
 
 ```bash
-pnpm dlx create-gmacko-app@latest my-app --no-mobile --no-ai --vinext
+pnpm dlx create-gmacko-app@latest my-app --no-web
 ```
 
 ### Claude Bootstrap Setup
@@ -105,10 +102,10 @@ pnpm dlx create-gmacko-app@latest my-app --saas-bootstrap
 
 ### Operator Setup
 
-Add the optional tRPC-backed operator lane.
+Add the optional operator lane (CLI + MCP server over the HTTP API).
 
 ```bash
-pnpm dlx create-gmacko-app@latest my-app --trpc-operators
+pnpm dlx create-gmacko-app@latest my-app --operator-lane
 ```
 
 ### SaaS Layer Setup
@@ -128,16 +125,15 @@ pnpm dlx create-gmacko-app@latest my-app \
 ## Tech Stack
 
 - **Monorepo Management**: Turborepo + pnpm workspaces
-- **Web Framework**: Next.js 16
-- **Component Development**: Storybook 10
-- **Mobile Framework**: Expo SDK 55 / React Native 0.84
-- **Optional Framework**: TanStack Start
-- **Experimental Workers Lane**: `vinext` for Next-style apps on Cloudflare Workers
-- **Type-safe API**: tRPC v11 with OpenAPI support
-- **Database Layer**: Drizzle ORM + Postgres, with the recommended default being a colocated database before moving to hosted infrastructure
-- **Authentication**: Better-auth
+- **Web App**: TanStack Start (React 19, Vite 8) on Cloudflare Workers via `@cloudflare/vite-plugin`
+- **API**: Effect 4 `HttpApi` — the contract in `packages/domain`, the services in `packages/api`, the typed client in `packages/api-client` (browser, SSR loader, Expo, operator tools)
+- **Database**: Cloudflare D1 through Drizzle's Effect driver (`@effect/sql-d1`), forward-only expand/contract migrations applied with `wrangler d1 migrations apply`
+- **Authentication**: better-auth (magic link, GitHub/Google/Apple, Expo, scoped API keys)
+- **Component Development**: Storybook 10 in `packages/ui`
+- **Mobile Framework**: Expo SDK 56 / React Native 0.85
 - **Design System**: Tailwind CSS v4 + shadcn/ui components
-- **DX Baseline**: `jj`, `oxlint`, `biome`, `lefthook`, `commitlint`, `knip`
+- **Local Development**: `@gmacko/emulate` (GitHub/Google/Apple/Stripe/Resend emulators) + `portless` + a local D1
+- **DX Baseline**: `jj`, `oxlint`, `biome`, `lefthook`, `commitlint`, `knip`, `pnpm check:standards`
 - **Agent Workflow**: `AGENTS.md`, `CLAUDE.md`, `.claude/settings.json`, `opencode.json`, `.mcp.json`, and vendored Claude Code gstack skills
 
 ## AI Planning Workflow
@@ -160,18 +156,18 @@ If you scaffold with `--saas-bootstrap`, generated apps also include:
 
 That pack is designed to run after `pnpm bootstrap:local`, with `/office-hours` first, optional user-level `/autoplan` second, and `/design-consultation` before deeper implementation work.
 
-If you scaffold with `--trpc-operators`, generated apps also expose:
+If you scaffold with `--operator-lane`, generated apps also expose:
 
 ```bash
-pnpm trpc:ops -- --help
-pnpm trpc:ops -- auth_help
-pnpm trpc:ops -- get_workspace_context
-pnpm trpc:ops -- list_api_keys
-pnpm trpc:ops -- get_billing_overview
+pnpm api:ops -- --help
+pnpm api:ops -- auth_help
+pnpm api:ops -- get_workspace_context
+pnpm api:ops -- list_api_keys
+pnpm api:ops -- get_billing_overview
 pnpm mcp:app
 ```
 
-Both surfaces call into the same underlying tRPC API contract.
+Both surfaces call the same HTTP API through `@gmacko/api-client`; protected tools need `GMACKO_API_KEY` set to a key holding the `admin` scope. With AI files kept, `.mcp.json` also registers the app's MCP server as `gmacko-app`.
 
 ## SaaS Scaffold Maturity
 
@@ -180,25 +176,25 @@ Both surfaces call into the same underlying tRPC API contract.
 - Thin-by-design: email delivery, compliance workflows, and background jobs are scaffolded as extension points rather than full products.
 - Later-phase: multi-workspace UX, audit logs, ownership transfer, deeper billing automation, webhooks, and richer support tooling.
 
-See [../../docs/ai/DEVELOPER_EXPERIENCE.md](/Volumes/dev/create-gmacko-app/docs/ai/DEVELOPER_EXPERIENCE.md) for the current recommendations around Codex, Claude Code, OpenCode, Expo Orbit, Cloudflare Workers, ForgeGraph, and Nix.
+See [../../docs/ai/DEVELOPER_EXPERIENCE.md](../../docs/ai/DEVELOPER_EXPERIENCE.md) for the current recommendations around Codex, Claude Code, OpenCode, Expo Orbit, Cloudflare Workers, and ForgeGraph.
 
 ## Storybook
 
-The generated Next.js app includes Storybook for isolated UI work.
+Shared UI lives in `packages/ui`, which ships Storybook for isolated component work.
 
 ```bash
-pnpm --filter @gmacko/nextjs storybook
+pnpm --filter @gmacko/ui storybook
 ```
 
 ## Optional Integrations
 
-- **Monitoring**: Sentry
+- **Monitoring**: Sentry (`@sentry/cloudflare` in the Worker, `@sentry/react` in the browser, `@sentry/react-native` in Expo)
 - **Analytics**: PostHog
-- **Payments**: Stripe (web)
+- **Payments**: Stripe (web; webhook route `POST /api/webhooks/stripe`)
 - **Mobile Subscriptions**: RevenueCat (mobile)
 - **Communication**: Push notifications (Expo) and Email (Resend/SendGrid)
-- **Realtime Data**: Pusher or Ably
-- **File Storage**: UploadThing
+- **Realtime Data**: Redis + BullMQ, Node services only
+- **File Storage**: Cloudflare R2 (an `r2_buckets` binding on the app's own Worker; upload and download routes at `/api/storage`)
 
 ## Repository
 
@@ -206,28 +202,19 @@ The source code is available on GitHub: [https://github.com/gmackorg/create-gmac
 
 ## Deployment Guidance
 
-Generated apps should be guided toward:
+Generated apps are guided toward:
 
-- ForgeGraph-managed deployments as the default operating model
-- Hetzner VPS hosting with Postgres deployed alongside the app in the early stage
-- Nix-based build and runtime definitions as the repo evolves into a ForgeGraph-native deployment target
-- generated `.forgegraph.yaml` aligned to the live `forge` repo contract with `app`, `server`, `stages`, and operator notes as comments
-- optional CLI overrides for ForgeGraph server, stage node, and route placeholders
-- `forge:init`, `forge:doctor`, `forge:status`, `forge:diff`, `forge:apply`, `forge:pull`, `forge:stages`, `forge:deploy:staging`, and `forge:deploy:production` as the default repo-level ForgeGraph command surface
-- `--vinext` scaffolding that now emits:
-  - `apps/nextjs/vite.config.ts`
-  - `apps/nextjs/wrangler.jsonc`
-  - `apps/nextjs/worker/index.ts`
-  - `apps/nextjs/src/cloudflare-env.ts`
-  - `apps/nextjs/README.cloudflare.md`
-  - `prebuild:vinext`, `build:vinext`, `deploy:cloudflare:staging`, and `deploy:cloudflare:production`
+- ForgeGraph as the deployment control plane: one Cloudflare Worker and one D1 database per stage (`<app>-web-staging`, `<app>-web`; PR previews share `<app>-web-preview`)
+- a generated `.forgegraph.yaml` with the `d1` database contract, `cloudflare-workers` stage targets, the health URL, and operator notes as comments
+- `scripts/deploy-stage.mjs` as the single migrate-then-deploy sequence (`pnpm deploy:staging`, `pnpm deploy:production`); ForgeGraph runs the same script
+- stage secrets in ForgeGraph, pushed to the Worker with `pnpm secrets:push --stage <stage>`
+- `forge:init`, `forge:doctor`, `forge:status`, `forge:diff`, `forge:apply`, `forge:pull`, `forge:stages`, `forge:deploy:staging`, and `forge:deploy:production` as the repo-level ForgeGraph command surface
 - Expo development-build scripts and an app-local mobile README geared around Expo Orbit
 - Expo Sign in with Apple scaffolding, in-app account deletion, and `check:app-store` placeholder validation for App Store readiness
-- hosted Postgres only after the product has enough customers to justify the added operational split
 - `jj` as the default repo shape, with colocated Git compatibility for GitHub and other tooling
 - a modern baseline of `oxlint`, `biome`, `lefthook`, `commitlint`, and `knip`
 
-For Cloudflare-specific commands and operating notes after scaffolding, see [../../deploy/cloudflare/README.md](/Volumes/dev/create-gmacko-app/deploy/cloudflare/README.md).
+Deployment details live in the generated `docs/DEPLOYMENT.md` and `docs/RUNBOOK.md`.
 
 ## First-Run Checklist
 
@@ -235,11 +222,11 @@ After scaffolding a new repo:
 
 ```bash
 cd my-app
-pnpm bootstrap:local
-pnpm check:fast
+pnpm bootstrap:local   # doctor, .env, auth + db generate, local D1 migrate + seed, check:fast
+pnpm dev               # emulate + apps/web at https://gmacko.localhost
 ```
 
-`pnpm doctor` checks the local baseline for Node, pnpm, Docker Compose, `jj`, `forge`, `.env`, and `.forgegraph.yaml`. It also warns when ForgeGraph config still contains scaffold placeholders, verifies grouped core/ForgeGraph env values, and, for `--vinext` apps, checks Wrangler plus grouped Cloudflare env values.
+`pnpm run doctor` checks the local baseline for Node, pnpm, `jj`, `forge`, `.env`, `.forgegraph.yaml`, and the absence of `apps/web/.dev.vars`. It also warns when ForgeGraph config still contains scaffold placeholders, verifies grouped core/ForgeGraph env values, and, when the web app is present, checks Wrangler plus the Cloudflare env values needed for deploys.
 
 ## Maintaining The CLI
 
@@ -250,7 +237,7 @@ pnpm check:release
 pnpm e2e:cli:full
 ```
 
-`pnpm check:release` keeps validation scoped to `packages/create-gmacko-app` and the publish tarball. `pnpm e2e:cli:full` runs the slower generated-app suite locally with `RUN_E2E=true`. Full generated-app smoke coverage is handled in [../../.github/workflows/cli-e2e.yml](/Volumes/dev/create-gmacko-app/.github/workflows/cli-e2e.yml), including ForgeGraph script smoke checks, auth/db bootstrap checks, health-route assertions, Expo dev-client/config smoke checks, and the `vinext` lane's Cloudflare doctor assertions. The workflow also exposes a manual `RUN_E2E=true` job for the full `src/__tests__/e2e.test.ts` suite.
+`pnpm check:release` keeps validation scoped to `packages/create-gmacko-app` and the publish tarball. `pnpm e2e:cli:full` runs the slower generated-app suite locally with `RUN_E2E=true`. Full generated-app smoke coverage is handled in [../../.github/workflows/cli-e2e.yml](../../.github/workflows/cli-e2e.yml): default (web + mobile), operator lane, minimal (web only), custom scope, full, and mobile-only scaffolds, including ForgeGraph script smoke checks, auth/db bootstrap checks, a local D1 migrate + seed + Workers test run, a fake-wrangler migrate-then-deploy smoke, and Expo dev-client/config smoke checks. The workflow also exposes a manual `RUN_E2E=true` job for the full `src/__tests__/e2e.test.ts` suite.
 
 ## License
 

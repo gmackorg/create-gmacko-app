@@ -154,14 +154,44 @@ export async function runCli(
   });
 }
 
+export interface CommandResult {
+  success: boolean;
+  stdout: string;
+  stderr: string;
+}
+
+export interface RunInAppOptions {
+  timeout?: number;
+  env?: Record<string, string>;
+}
+
+/**
+ * `execSync` with piped stdio throws an Error carrying the child's captured
+ * `stdout`/`stderr` (strings here, since the call sets `encoding: "utf-8"`).
+ * Both are optional, so a throw from anywhere else reads as empty output.
+ */
+interface ExecFailure extends Error {
+  stdout?: string;
+  stderr?: string;
+}
+
+function execFailure(cause: unknown): ExecFailure {
+  // SAFETY: `stdout`/`stderr` are optional on ExecFailure, so this widening of
+  // an Error can only ever produce `undefined` for a throw that did not come
+  // from execSync — never a wrong string.
+  return cause instanceof Error
+    ? (cause as ExecFailure)
+    : new Error(String(cause));
+}
+
 /**
  * Run a command in the generated app directory
  */
 export function runInApp(
   appPath: string,
   command: string,
-  options: { timeout?: number; env?: Record<string, string> } = {},
-): { success: boolean; stdout: string; stderr: string } {
+  options: RunInAppOptions = {},
+): CommandResult {
   const timeout = options.timeout || 600000; // 10 minutes default
 
   try {
@@ -174,12 +204,12 @@ export function runInApp(
     });
 
     return { success: true, stdout: stdout || "", stderr: "" };
-  } catch (error: unknown) {
-    const execError = error as { stdout?: string; stderr?: string };
+  } catch (error) {
+    const failure = execFailure(error);
     return {
       success: false,
-      stdout: execError.stdout || "",
-      stderr: execError.stderr || "",
+      stdout: failure.stdout || "",
+      stderr: failure.stderr || "",
     };
   }
 }
@@ -205,71 +235,27 @@ export function readJson<T = unknown>(
   appPath: string,
   relativePath: string,
 ): T {
-  return fs.readJsonSync(path.join(appPath, relativePath)) as T;
+  return fs.readJsonSync(path.join(appPath, relativePath));
 }
 
 /**
- * Check package.json structure
- */
-export function validatePackageJson(
-  appPath: string,
-  checks: {
-    name?: string;
-    hasScript?: string;
-    hasDependency?: string;
-    hasDevDependency?: string;
-  },
-): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-
-  try {
-    const pkg = readJson<{
-      name?: string;
-      scripts?: Record<string, string>;
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-    }>(appPath, "package.json");
-
-    if (checks.name && pkg.name !== checks.name) {
-      errors.push(`Expected name "${checks.name}", got "${pkg.name}"`);
-    }
-
-    if (checks.hasScript && !pkg.scripts?.[checks.hasScript]) {
-      errors.push(`Missing script "${checks.hasScript}"`);
-    }
-
-    if (checks.hasDependency && !pkg.dependencies?.[checks.hasDependency]) {
-      errors.push(`Missing dependency "${checks.hasDependency}"`);
-    }
-
-    if (
-      checks.hasDevDependency &&
-      !pkg.devDependencies?.[checks.hasDevDependency]
-    ) {
-      errors.push(`Missing devDependency "${checks.hasDevDependency}"`);
-    }
-  } catch (err) {
-    errors.push(`Failed to read package.json: ${err}`);
-  }
-
-  return { valid: errors.length === 0, errors };
-}
-
-/**
- * Create a mock .env file for testing
+ * Create a mock .env for a generated app. Mirrors the keys `.env.example`
+ * documents: the web lane reads these as Worker bindings (no DATABASE_URL,
+ * the database is a local D1), Expo reads the EXPO_PUBLIC_* values, and the
+ * operator lane reads GMACKO_API_*.
  */
 export function createMockEnv(appPath: string): void {
   const envContent = `
 # Mock environment for testing
-DATABASE_URL="postgresql://test:test@localhost:5432/test"
-AUTH_SECRET="test-secret-key-for-testing-only"
+STAGE="development"
+APP_URL="http://localhost:3001"
+AUTH_SECRET="test-secret-key-for-testing-only-32-chars"
 AUTH_GITHUB_ID="test-github-client-id"
 AUTH_GITHUB_SECRET="test-github-client-secret"
 AUTH_GOOGLE_ID="test-google-client-id"
 AUTH_GOOGLE_SECRET="test-google-client-secret"
-AUTH_URL="http://localhost:3000"
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
-NEXT_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
+BYPASS_MAGIC_LINK="true"
+VITE_POSTHOG_HOST="https://us.i.posthog.com"
 EXPO_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
 EXPO_PUBLIC_POSTHOG_KEY_DEV="phc_test_dev"
 EXPO_PUBLIC_POSTHOG_KEY_STAGING="phc_test_staging"
@@ -279,28 +265,11 @@ EXPO_PUBLIC_SENTRY_DSN_STAGING="https://test@example.ingest.sentry.io/456"
 EXPO_PUBLIC_SENTRY_DSN_PROD="https://test@example.ingest.sentry.io/789"
 CLOUDFLARE_ACCOUNT_ID="test-cloudflare-account"
 CLOUDFLARE_API_TOKEN="test-cloudflare-token"
-GMACKO_API_URL="http://localhost:3000"
+GMACKO_API_URL="http://localhost:3001"
 GMACKO_API_KEY="test-gmacko-api-key"
 `;
 
   fs.writeFileSync(path.join(appPath, ".env"), envContent.trim());
-}
-
-export function createFakeCliBin(
-  appPath: string,
-  commands: Record<string, string>,
-): string {
-  const binDir = path.join(appPath, ".test-bin");
-  fs.ensureDirSync(binDir);
-
-  for (const [command, body] of Object.entries(commands)) {
-    const scriptPath = path.join(binDir, command);
-    fs.writeFileSync(scriptPath, `#!/bin/sh\n${body}\n`, {
-      mode: 0o755,
-    });
-  }
-
-  return binDir;
 }
 
 /**
@@ -312,20 +281,30 @@ export const EXPECTED_FILES = {
     "pnpm-workspace.yaml",
     "turbo.json",
     ".env.example",
+    "packages/domain/package.json",
     "packages/api/package.json",
+    "packages/api-client/package.json",
     "packages/db/package.json",
+    "packages/db/migrations",
     "packages/auth/package.json",
     "packages/config/package.json",
     "packages/ui/package.json",
   ],
-  withWeb: ["apps/nextjs/package.json", "apps/nextjs/next.config.js"],
+  withWeb: [
+    "apps/web/package.json",
+    "apps/web/vite.config.ts",
+    "apps/web/wrangler.jsonc",
+    "apps/web/src/server/worker.ts",
+    "apps/web/src/server/runtime.ts",
+    "apps/web/src/routes/__root.tsx",
+    "apps/web/e2e",
+  ],
   withStorybook: [
-    "apps/nextjs/.storybook/main.ts",
-    "apps/nextjs/.storybook/preview.tsx",
+    "packages/ui/.storybook/main.ts",
+    "packages/ui/.storybook/preview.tsx",
     "packages/ui/src/button.stories.tsx",
   ],
   withMobile: ["apps/expo/package.json", "apps/expo/app.config.ts"],
-  withTanstackStart: ["apps/tanstack-start/package.json"],
   withSentry: ["packages/monitoring/package.json"],
   withPosthog: ["packages/analytics/package.json"],
   withAi: [
@@ -335,5 +314,15 @@ export const EXPECTED_FILES = {
     ".claude/skills/gstack/setup",
     ".claude/skills/create-gmacko-app-workflow/SKILL.md",
     "docs/ai/INITIAL_PROPOSAL.md",
+  ],
+  /** Never present in a scaffold: the pre-migration stack. */
+  legacy: [
+    "apps/nextjs",
+    "packages/legacy-api",
+    "packages/legacy-db",
+    "packages/legacy-auth",
+    "docker-compose.yml",
+    "Dockerfile",
+    ".dockerignore",
   ],
 } as const;

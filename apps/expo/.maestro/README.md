@@ -20,7 +20,7 @@ Set the following environment variables:
 
 ```bash
 export APP_ID="com.gmacko.app"  # Your app's bundle ID
-export API_URL="http://localhost:3000"  # Backend API URL
+export API_URL="http://localhost:3001"  # Backend API URL
 export TEST_EMAIL="test@example.com"  # Test account email
 export TEST_PASSWORD="testpassword123"  # Test account password
 ```

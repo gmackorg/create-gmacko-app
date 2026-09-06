@@ -20,7 +20,18 @@
 
     "module": "Preserve",
     "moduleResolution": "Bundler",
-    "noEmit": true
+    "noEmit": true,
+
+    // Editor-only. `@effect/language-service` adds Effect-aware diagnostics
+    // (a missing service in `R`, a floating Effect, a `Layer` that does not
+    // provide what it claims), quick fixes and hovers to tsserver. TypeScript
+    // loads `plugins` in the language service only, never in `tsc`, so this
+    // cannot change what `pnpm typecheck` or CI accepts — it moves the same
+    // findings earlier, into the editor. VS Code needs the workspace
+    // TypeScript version ("typescript.tsdk": "node_modules/typescript/lib",
+    // then "Select TypeScript Version → Use Workspace Version") for a
+    // workspace plugin to load at all.
+    "plugins": [{ "name": "@effect/language-service" }]
   },
   "exclude": ["node_modules", "build", "dist", ".next", ".expo"]
 }

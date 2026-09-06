@@ -8,10 +8,8 @@ node_modules
 # testing
 coverage
 
-# next.js
-.next/
+# build output
 out/
-next-env.d.ts
 storybook-static/
 
 # nitro
@@ -58,6 +56,16 @@ data/
 
 # tanstack
 .tanstack
+
+# wrangler local state
+.wrangler/
+# never create one: its presence disables wrangler's .env loading (see AGENTS.md)
+.dev.vars
+.dev.vars.*
+
+# playwright
+playwright-report/
+test-results/
 # Claude Code
 .claude/settings.local.json
 session-ses_*.md
@@ -65,3 +73,8 @@ session-ses_*.md
 
 # Generated OpenAPI spec (produced by the SDK Generation workflow)
 sdks/openapi/openapi.json
+# Generated SDKs are CI artifacts (sdk.yml); only the placeholder is tracked.
+sdks/generated/*
+!sdks/generated/.gitkeep
+# Written by openapi-generator-cli on every run.
+openapitools.json

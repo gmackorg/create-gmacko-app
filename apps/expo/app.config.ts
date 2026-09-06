@@ -5,7 +5,7 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
 // gets its own bundle id + name so all three install side-by-side; production is
 // produced only through CI (.github/workflows/mobile-production.yml).
 const APP_VARIANT = process.env.APP_VARIANT ?? "development";
-const API_URL = process.env.API_URL ?? "http://localhost:3000";
+const API_URL = process.env.API_URL ?? "http://localhost:3001";
 const ASSOCIATED_DOMAIN =
   process.env.EXPO_PUBLIC_APP_DOMAIN ?? "change-me.example.com";
 
@@ -37,7 +37,10 @@ const getBundleId = (): string => {
   }
 };
 
-const getSentryConfig = () => {
+/** One entry of `ExpoConfig["plugins"]`: a plugin id, optionally with options. */
+type ExpoPlugin = NonNullable<ExpoConfig["plugins"]>[number];
+
+const getSentryConfig = (): ExpoPlugin | null => {
   if (!SENTRY_DSN) return null;
 
   return [
@@ -71,7 +74,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   ];
 
   if (sentryPlugin) {
-    plugins.push(sentryPlugin as [string, Record<string, unknown>]);
+    plugins.push(sentryPlugin);
   }
 
   return {

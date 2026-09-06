@@ -1,11 +1,36 @@
 import { execSync } from "node:child_process";
 import type { PlopTypes } from "@turbo/gen";
 
-interface PackageJson {
-  name: string;
-  scripts: Record<string, string>;
-  dependencies: Record<string, string>;
-  devDependencies: Record<string, string>;
+/**
+ * The part of the generated `package.json` this generator rewrites. Every
+ * other field is carried through the JSON round-trip untouched.
+ */
+interface GeneratedPackageJson {
+  dependencies?: Record<string, string>;
+}
+
+/** The `init` prompts, decoded out of plop's untyped answers bag. */
+interface InitAnswers {
+  readonly name: string;
+  readonly deps: readonly string[];
+}
+
+/**
+ * Plop hands each action an `Answers` bag typed `{ [key: string]: any }`.
+ * Both prompts are `input` prompts, so inquirer yields a string for each —
+ * empty when the prompt was skipped. Decode once here and let the actions
+ * work on the domain values; an empty `name` is the "nothing to scaffold"
+ * case the callers branch on.
+ */
+function parseInitAnswers(answers: PlopTypes.Answers): InitAnswers {
+  return {
+    name: String(answers.name ?? "")
+      .trim()
+      .replace(/^@gmacko\//, ""),
+    deps: String(answers.deps ?? "")
+      .split(" ")
+      .filter(Boolean),
+  };
 }
 
 export default function generator(plop: PlopTypes.NodePlopAPI): void {
@@ -27,11 +52,9 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
     ],
     actions: [
       (answers) => {
-        if ("name" in answers && typeof answers.name === "string") {
-          if (answers.name.startsWith("@gmacko/")) {
-            answers.name = answers.name.replace("@gmacko/", "");
-          }
-        }
+        // Write the decoded name back so the handlebars paths below (and the
+        // final scaffold step) all see the `@gmacko/`-stripped value.
+        answers.name = parseInitAnswers(answers).name;
         return "Config sanitized";
       },
       {
@@ -53,37 +76,41 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
         type: "modify",
         path: "packages/{{ name }}/package.json",
         async transform(content, answers) {
-          if ("deps" in answers && typeof answers.deps === "string") {
-            const pkg = JSON.parse(content) as PackageJson;
-            for (const dep of answers.deps.split(" ").filter(Boolean)) {
-              const version = await fetch(
-                `https://registry.npmjs.org/-/package/${dep}/dist-tags`,
-              )
-                .then((res) => res.json())
-                .then((json) => json.latest);
-              if (!pkg.dependencies) pkg.dependencies = {};
-              pkg.dependencies[dep] = `^${version}`;
-            }
-            return JSON.stringify(pkg, null, 2);
+          const { deps } = parseInitAnswers(answers);
+          if (deps.length === 0) return content;
+
+          // SAFETY: `content` is the file the preceding `add` action just
+          // wrote from templates/package.json.hbs, so it is a JSON object
+          // whose `dependencies` field is absent (the template declares only
+          // `devDependencies`) or a name → range map written by this loop.
+          const pkg = JSON.parse(content) as GeneratedPackageJson;
+          for (const dep of deps) {
+            const version = await fetch(
+              `https://registry.npmjs.org/-/package/${dep}/dist-tags`,
+            )
+              .then((res) => res.json())
+              .then((json) => json.latest);
+            pkg.dependencies ??= {};
+            pkg.dependencies[dep] = `^${version}`;
           }
-          return content;
+          return JSON.stringify(pkg, null, 2);
         },
       },
       async (answers) => {
         /**
          * Install deps and format everything
          */
-        if ("name" in answers && typeof answers.name === "string") {
-          // execSync("pnpm dlx sherif@latest --fix", {
-          //   stdio: "inherit",
-          // });
-          execSync("pnpm i", { stdio: "inherit" });
-          execSync(`pnpm exec biome check packages/${answers.name} --write`, {
-            stdio: "inherit",
-          });
-          return "Package scaffolded";
-        }
-        return "Package not scaffolded";
+        const { name } = parseInitAnswers(answers);
+        if (name.length === 0) return "Package not scaffolded";
+
+        // execSync("pnpm dlx sherif@latest --fix", {
+        //   stdio: "inherit",
+        // });
+        execSync("pnpm i", { stdio: "inherit" });
+        execSync(`pnpm exec biome check packages/${name} --write`, {
+          stdio: "inherit",
+        });
+        return "Package scaffolded";
       },
     ],
   });

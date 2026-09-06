@@ -53,6 +53,11 @@ function releaseLock() {
   }
 }
 
+/**
+ * Starts the service emulators the web lane talks to (GitHub, Google, Apple,
+ * Stripe, Resend) from the repo-root `emulate.config.yaml`. No Postgres and
+ * no Redis: apps/web runs on a local D1.
+ */
 export async function setup() {
   if (await isPortOpen(4000)) {
     return;
@@ -63,22 +68,9 @@ export async function setup() {
     return;
   }
 
-  const services = ["github", "google", "apple", "stripe", "resend"];
-  const startsPostgres = !(await isPortOpen(5432));
-  if (startsPostgres) {
-    services.push("postgres");
-  }
-
   proc = spawn(
     "npx",
-    [
-      "@gmacko/emulate",
-      "start",
-      "-s",
-      services.join(","),
-      "--seed",
-      "emulate.config.yaml",
-    ],
+    ["@gmacko/emulate", "start", "-s", "github,google,apple,stripe,resend"],
     {
       stdio: ["ignore", "pipe", "pipe"],
       cwd: ROOT,
@@ -92,12 +84,6 @@ export async function setup() {
 
   try {
     await waitForPort(4000);
-    // The Postgres (PGlite-over-wire) service can bind its port slightly after
-    // the hub. Wait for it too so DB tests don't race a not-yet-listening
-    // backend (a chronic source of flaky 5432 connection timeouts in CI).
-    if (startsPostgres) {
-      await waitForPort(5432);
-    }
   } catch (err) {
     releaseLock();
     throw err;

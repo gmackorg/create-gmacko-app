@@ -27,12 +27,14 @@ prompt_env() {
   fi
 }
 
-# Always required: Database
+# Database: Cloudflare D1, one per stage. Nothing to put in .env.
 echo ""
-echo "=== Database (Postgres) ==="
-echo "Run Postgres alongside the app first."
-echo "For Hetzner deployments, use the ForgeGraph setup in ../ForgeGraph as the reference."
-prompt_env "DATABASE_URL" "postgresql://user:password@host:5432/database"
+echo "=== Database (Cloudflare D1) ==="
+echo "Local development uses Miniflare's D1 (pnpm db:migrate:local && pnpm db:seed)."
+echo "Create the stage databases once and paste their ids into apps/web/wrangler.jsonc:"
+echo "  pnpm -F @gmacko/web exec wrangler d1 create <app>-web-staging"
+echo "  pnpm -F @gmacko/web exec wrangler d1 create <app>-web"
+echo "  pnpm -F @gmacko/web exec wrangler d1 create <app>-web-preview"
 
 # Always required: Auth
 echo ""
@@ -52,6 +54,13 @@ echo "Apple Sign In (optional): https://developer.apple.com/account/resources/id
 prompt_env "AUTH_APPLE_ID" "Apple Client ID (optional)"
 prompt_env "AUTH_APPLE_SECRET" "Apple Client Secret (optional)"
 
+# Cloudflare: deploys and remote D1 commands
+echo ""
+echo "=== Cloudflare (deploys) ==="
+echo "  Account id and an API token with Workers + D1 edit rights: https://dash.cloudflare.com/profile/api-tokens"
+prompt_env "CLOUDFLARE_ACCOUNT_ID" "Cloudflare account id"
+prompt_env "CLOUDFLARE_API_TOKEN" "Cloudflare API token"
+
 # Optional: Check integrations and prompt accordingly
 echo ""
 echo "=== Optional Integrations ==="
@@ -61,14 +70,15 @@ echo ""
 # PostHog (if enabled)
 echo "PostHog Analytics:"
 echo "  Create project at https://posthog.com"
-prompt_env "NEXT_PUBLIC_POSTHOG_KEY" "PostHog Project API Key"
-prompt_env "NEXT_PUBLIC_POSTHOG_HOST" "PostHog Host (e.g., https://us.i.posthog.com)"
+prompt_env "VITE_POSTHOG_KEY" "PostHog Project API Key"
+prompt_env "VITE_POSTHOG_HOST" "PostHog Host (e.g., https://us.i.posthog.com)"
 
 # Sentry (if enabled)
 echo ""
 echo "Sentry Monitoring:"
 echo "  Create project at https://sentry.io"
-prompt_env "NEXT_PUBLIC_SENTRY_DSN" "Sentry DSN"
+prompt_env "SENTRY_DSN" "Sentry DSN (Worker)"
+prompt_env "VITE_SENTRY_DSN" "Sentry DSN (browser)"
 
 echo ""
 echo "==================================="
@@ -76,6 +86,6 @@ echo "  Provisioning Complete!"
 echo "==================================="
 echo ""
 echo "Your .env file has been updated."
-echo "Run 'pnpm db:push' to initialize the database schema."
-echo "Preferred deployment direction: ForgeGraph + Hetzner VPS + colocated Postgres, then hosted Postgres later if needed."
+echo "Run 'pnpm db:migrate:local && pnpm db:seed' to set up the local D1, then 'pnpm dev'."
+echo "Stage secrets live in ForgeGraph: 'forge secret set KEY --stage <stage>', then 'pnpm secrets:push --stage <stage>'."
 echo ""

@@ -3,52 +3,41 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
-    },
-    "./openapi": {
-      "types": "./dist/openapi.d.ts",
-      "default": "./src/openapi.ts"
-    },
-    "./versioning": {
-      "types": "./dist/versioning.d.ts",
-      "default": "./src/versioning.ts"
-    },
-    "./deprecation": {
-      "types": "./dist/middleware/deprecation.d.ts",
-      "default": "./src/middleware/deprecation.ts"
-    }
+    ".": "./src/index.ts",
+    "./config": "./src/config.ts",
+    "./background": "./src/background.ts",
+    "./rate-limit": "./src/rate-limit.ts",
+    "./layer": "./src/layer.ts",
+    "./handler": "./src/handler.ts",
+    "./testing": "./src/testing.ts"
   },
   "license": "MIT",
   "scripts": {
-    "build": "tsc",
-    "clean": "git clean -xdf .cache .turbo dist node_modules coverage",
-    "dev": "tsc",
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
     "format": "biome check .",
     "lint": "oxlint .",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit --emitDeclarationOnly false"
+    "test:workers": "vitest run --config vitest.workers.config.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@gmacko/auth": "workspace:*",
     "@gmacko/config": "workspace:*",
     "@gmacko/db": "workspace:*",
+    "@gmacko/domain": "workspace:*",
     "@gmacko/telemetry": "workspace:*",
-    "@gmacko/validators": "workspace:*",
-    "@trpc/server": "catalog:",
-    "superjson": "catalog:",
-    "zod": "catalog:"
+    "drizzle-orm": "catalog:",
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
     "@gmacko/tsconfig": "workspace:*",
-    "@gmacko/vitest-config": "workspace:*",
     "@types/node": "catalog:",
-    "openapi-types": "^12.1.3",
     "oxlint": "catalog:",
     "typescript": "catalog:",
-    "vitest": "^4.1.0"
+    "vitest": "catalog:"
   }
 }

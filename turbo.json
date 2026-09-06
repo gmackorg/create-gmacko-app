@@ -1,6 +1,11 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "ui": "tui",
+  "globalDependencies": [
+    "oxlint.config.ts",
+    "tools/oxlint/anti-slop/**",
+    "biome.json"
+  ],
   "tasks": {
     "topo": {
       "dependsOn": ["^topo"]
@@ -30,6 +35,17 @@
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"],
       "cache": true
+    },
+    "test:workers": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "cache": true
+    },
+    "test:fault": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "cache": true,
+      "env": ["CLOUDFAULT_DEPTH", "CLOUDFAULT_REQUIRED"]
     },
     "test:watch": {
       "dependsOn": ["^build"],
@@ -73,7 +89,6 @@
     }
   },
   "globalEnv": [
-    "DATABASE_URL",
     "REDIS_URL",
     "AUTH_GITHUB_ID",
     "AUTH_GITHUB_SECRET",
@@ -89,30 +104,25 @@
     "STRIPE_WEBHOOK_SECRET",
     "RESEND_API_KEY",
     "PORT",
-    "NEXT_PUBLIC_PREVIEW",
-    "PREVIEW_PR_NUMBER",
-    "PREVIEW_DOMAIN",
-    "PREVIEW_BASE_DOMAIN",
-    "PREVIEW_DATABASE_URL",
-    "PREVIEW_USE_SCHEMA_ISOLATION",
-    "PREVIEW_SEND_EMAILS",
-    "PREVIEW_ENABLE_ANALYTICS",
-    "PREVIEW_BRANCH",
-    "PREVIEW_COMMIT",
-    "PREVIEW_DEPLOYED_AT",
     "GMACKO_API_URL",
     "GMACKO_API_KEY",
     "LOG_LEVEL",
     "SERVICE_NAME",
-    "npm_package_version",
     "APP_ENV",
-    "API_URL"
+    "API_URL",
+    "STAGE",
+    "APP_URL",
+    "ALLOWED_ORIGINS",
+    "VITE_POSTHOG_KEY",
+    "VITE_POSTHOG_HOST",
+    "VITE_SENTRY_DSN",
+    "CLOUDFLARE_ENV",
+    "SENTRY_AUTH_TOKEN"
   ],
   "globalPassThroughEnv": [
     "NODE_ENV",
     "CI",
     "SKIP_ENV_VALIDATION",
-    "NEXT_RUNTIME",
     "PORTLESS_URL",
     "AUTH_GITHUB_URL",
     "AUTH_GITHUB_API_URL",
@@ -120,9 +130,11 @@
     "AUTH_GOOGLE_TOKEN_URL",
     "AUTH_APPLE_URL",
     "RESEND_BASE_URL",
-    "OTEL_ENABLED",
-    "OTEL_EXPORTER_OTLP_ENDPOINT",
-    "OTEL_SERVICE_NAME",
+    "CLOUDFLARE_*",
+    "OTEL_*",
+    "SENTRY_*",
+    "E2E_*",
+    "WRANGLER_*",
     "npm_lifecycle_event"
   ]
 }

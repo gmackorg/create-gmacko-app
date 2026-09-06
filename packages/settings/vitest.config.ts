@@ -1,13 +1,9 @@
 import { defineConfig } from "vitest/config";
 
+/** Pure schema tests: no database, no emulate; nothing here needs a service. */
 export default defineConfig({
   test: {
     globals: true,
-    globalSetup: ["../../test/emulate-setup.ts"],
-    env: {
-      DATABASE_URL: "postgresql://localhost:5432/gmacko_dev",
-      REDIS_URL: "redis://localhost:6379",
-    },
     include: ["src/**/*.{test,spec}.ts"],
     exclude: ["**/node_modules/**", "**/dist/**"],
     coverage: {

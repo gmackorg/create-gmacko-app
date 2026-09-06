@@ -7,13 +7,21 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
-    "./client": {
-      "types": "./dist/client.d.ts",
-      "default": "./src/client.ts"
-    },
     "./schema": {
       "types": "./dist/schema.d.ts",
       "default": "./src/schema.ts"
+    },
+    "./seed": {
+      "types": "./dist/seed.d.ts",
+      "default": "./src/seed.ts"
+    },
+    "./columns": {
+      "types": "./dist/columns.d.ts",
+      "default": "./src/columns.ts"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./src/testing.ts"
     }
   },
   "license": "MIT",
@@ -23,31 +31,39 @@
     "dev": "tsc",
     "format": "biome check .",
     "lint": "oxlint .",
-    "generate": "pnpm with-env drizzle-kit generate",
-    "migrate": "pnpm with-env drizzle-kit migrate",
-    "push": "pnpm with-env drizzle-kit push",
-    "check": "pnpm with-env drizzle-kit check",
-    "seed": "pnpm with-env tsx src/seed.ts",
-    "studio": "pnpm with-env drizzle-kit studio",
+    "generate": "drizzle-kit generate && node scripts/flatten-migrations.mjs",
+    "check": "drizzle-kit check",
+    "migrate:local": "wrangler d1 migrations apply DB --local --config ../../apps/web/wrangler.jsonc",
+    "migrate:remote": "wrangler d1 migrations apply DB --remote --config ../../apps/web/wrangler.jsonc",
+    "migrate:list": "wrangler d1 migrations list DB --remote --config ../../apps/web/wrangler.jsonc",
+    "seed:sql": "tsx scripts/seed-sql.ts",
+    "seed:local": "pnpm seed:sql && wrangler d1 execute DB --local --file seed/seed.sql --config ../../apps/web/wrangler.jsonc",
+    "seed:remote": "wrangler d1 execute DB --remote --file seed/seed.sql --config ../../apps/web/wrangler.jsonc",
+    "reset:remote": "wrangler d1 execute DB --remote --file seed/reset.sql --config ../../apps/web/wrangler.jsonc",
+    "studio": "drizzle-kit studio",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit --emitDeclarationOnly false",
-    "with-env": "dotenv -e ../../.env --"
+    "test:workers": "vitest run --config vitest.workers.config.ts",
+    "typecheck": "tsc --noEmit --emitDeclarationOnly false && tsc --noEmit -p tsconfig.scripts.json"
   },
   "dependencies": {
-    "drizzle-orm": "^0.45.1",
-    "drizzle-zod": "^0.8.3",
-    "postgres": "^3.4.7",
-    "zod": "catalog:"
+    "@effect/sql-d1": "catalog:",
+    "drizzle-orm": "catalog:",
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
+    "@effect/sql-sqlite-node": "catalog:",
+    "@gmacko/domain": "workspace:*",
     "@gmacko/tsconfig": "workspace:*",
     "@types/node": "catalog:",
-    "drizzle-kit": "^0.31.10",
+    "drizzle-kit": "catalog:",
     "oxlint": "catalog:",
     "tsx": "^4.21.0",
     "typescript": "catalog:",
-    "vitest": "^4.1.0"
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
   }
 }

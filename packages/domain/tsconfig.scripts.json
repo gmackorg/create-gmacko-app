@@ -1,0 +1,9 @@
+{
+  "extends": "@gmacko/tsconfig/base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "tsBuildInfoFile": "${configDir}/.cache/tsbuildinfo.scripts.json"
+  },
+  "include": ["scripts", "src/__tests__"],
+  "exclude": ["node_modules"]
+}

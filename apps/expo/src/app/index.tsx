@@ -1,20 +1,18 @@
+import { ApiClientError } from "@gmacko/api-client";
+import { type Post, Unauthorized } from "@gmacko/domain";
 import { useTranslationsNative } from "@gmacko/i18n/native";
 import { LegendList } from "@legendapp/list";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { Link, Stack } from "expo-router";
 import { useEffect, useState } from "react";
 import { Platform, Pressable, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import type { RouterOutputs } from "~/utils/api";
-import { trpc } from "~/utils/api";
+import { mutations, queries } from "~/utils/api";
 import { authClient } from "~/utils/auth";
 
-function PostCard(props: {
-  post: RouterOutputs["post"]["all"][number];
-  onDelete: () => void;
-}) {
+function PostCard(props: { post: Post; onDelete: () => void }) {
   const t = useTranslationsNative();
 
   return (
@@ -44,22 +42,40 @@ function PostCard(props: {
   );
 }
 
+/**
+ * What the create form shows for a failed submit. The contract validates
+ * the payload server-side (title 1..256, content up to 256) and answers an
+ * empty 400, which the client surfaces as `ApiClientError{status: 400}`;
+ * an anonymous caller gets the typed `Unauthorized`.
+ */
+const describeCreateError = (
+  error: Error | null,
+  t: ReturnType<typeof useTranslationsNative>,
+): string | null => {
+  if (error === null) return null;
+  if (error instanceof Unauthorized) return t("errors.unauthorized");
+  if (error instanceof ApiClientError && error.status === 400) {
+    return "Title (1-256 characters) and content (up to 256) are required.";
+  }
+  return error.message;
+};
+
 function CreatePost() {
-  const queryClient = useQueryClient();
   const t = useTranslationsNative();
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
 
-  const { mutate, error } = useMutation(
-    trpc.post.create.mutationOptions({
-      async onSuccess() {
-        setTitle("");
-        setContent("");
-        await queryClient.invalidateQueries(trpc.post.all.queryFilter());
-      },
-    }),
-  );
+  // Invalidation (`posts.list`) is applied by the query client's mutation
+  // cache from the mutation's meta; nothing to do here beyond the form.
+  const { mutate, error } = useMutation({
+    ...mutations.posts.create(),
+    onSuccess() {
+      setTitle("");
+      setContent("");
+    },
+  });
+  const failure = describeCreateError(error, t);
 
   return (
     <View className="mt-4 flex gap-2">
@@ -69,22 +85,12 @@ function CreatePost() {
         onChangeText={setTitle}
         placeholder={t("common.create") + " " + t("common.title")}
       />
-      {error?.data?.zodError?.fieldErrors.title && (
-        <Text className="text-destructive mb-2">
-          {error.data.zodError.fieldErrors.title}
-        </Text>
-      )}
       <TextInput
         className="border-input bg-background text-foreground items-center rounded-md border px-3 text-lg leading-tight"
         value={content}
         onChangeText={setContent}
         placeholder={t("common.content")}
       />
-      {error?.data?.zodError?.fieldErrors.content && (
-        <Text className="text-destructive mb-2">
-          {error.data.zodError.fieldErrors.content}
-        </Text>
-      )}
       <Pressable
         className="bg-primary flex items-center rounded-sm p-2"
         onPress={() => {
@@ -96,10 +102,8 @@ function CreatePost() {
       >
         <Text className="text-foreground">{t("common.create")}</Text>
       </Pressable>
-      {error?.data?.code === "UNAUTHORIZED" && (
-        <Text className="text-destructive mt-2">
-          {t("errors.unauthorized")}
-        </Text>
+      {failure !== null && (
+        <Text className="text-destructive mt-2">{failure}</Text>
       )}
     </View>
   );
@@ -178,17 +182,11 @@ function MobileAuth() {
 }
 
 export default function Index() {
-  const queryClient = useQueryClient();
   const t = useTranslationsNative();
 
-  const postQuery = useQuery(trpc.post.all.queryOptions());
+  const postQuery = useQuery(queries.posts.list());
 
-  const deletePostMutation = useMutation(
-    trpc.post.delete.mutationOptions({
-      onSettled: () =>
-        queryClient.invalidateQueries(trpc.post.all.queryFilter()),
-    }),
-  );
+  const deletePostMutation = useMutation(mutations.posts.remove());
 
   return (
     <SafeAreaView className="bg-background">

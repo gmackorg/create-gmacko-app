@@ -1,0 +1,224 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gmacko-web",
+  // Custom Worker entry: re-exports TanStack Start's fetch handler and adds
+  // the non-HTTP handlers (scheduled, later queues) that the generated entry
+  // has no room for. See src/server/worker.ts.
+  "main": "src/server/worker.ts",
+  "compatibility_date": "2026-09-01",
+  // Node.js compatibility. With a compatibility_date >= 2026-08-04 workerd
+  // enables `nodejs_compat` by default (wrangler NODEJS_COMPAT_DEFAULT_ON_DATE),
+  // so nothing is listed here. Turning it off (`no_nodejs_compat`) is not an
+  // option: Phase 0 measured who needs it, and after Phase 5 (the
+  // legacy API/pino/Postgres chain is out of this Worker) what remains is
+  //   - @tanstack/start-server-core: `node:async_hooks` (AsyncLocalStorage for
+  //     the request context);
+  //   - better-auth: `node:async_hooks`.
+  "compatibility_flags": [],
+  "observability": { "enabled": true },
+  // Nightly maintenance tick, handled by `scheduled` in src/server/worker.ts.
+  // Locally: `curl http://localhost:3001/cdn-cgi/handler/scheduled?cron=0+3+*+*+*`.
+  "triggers": { "crons": ["0 3 * * *"] },
+  "vars": {
+    "STAGE": "development"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "gmacko-web",
+      // Placeholder id: local dev and tests use Miniflare's D1. The real
+      // databases are per environment below (`wrangler d1 create`, see
+      // docs/DEPLOYMENT.md).
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      // Flat wrangler-style migrations flattened from drizzle-kit's folders by
+      // `pnpm -F @gmacko/db generate`. Apply with `pnpm -F @gmacko/db migrate:local`.
+      "migrations_dir": "../../packages/db/migrations"
+    }
+  ],
+  // The object store behind `@gmacko/storage` (src/routes/api.storage.$.ts).
+  // Uploads go THROUGH the Worker rather than to a presigned URL, so this
+  // binding is the single place they can be authorized, size-checked against
+  // the bytes actually sent, and fault-injected (apps/web/fault/r2-upload).
+  // Create the buckets with `wrangler r2 bucket create <name>`; local dev and
+  // the pool-workers suites get a Miniflare bucket from this declaration
+  // alone. Like `d1_databases` this is NOT inherited and is restated in every
+  // environment below.
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "gmacko-web"
+    }
+  ],
+  // Cloudflare Rate Limiting bindings, one per scope the HttpApi annotates
+  // (@gmacko/domain `RateLimitScope`); `signup` deliberately has none, so it
+  // falls through to the global `rate_limit_window` counter in D1
+  // (packages/api/src/rate-limit.ts). `period` must be 10 or 60 and has to
+  // agree with the scope's `windowMs` in `defaultRateLimits`, because the
+  // binding does not report a reset time and the 429's `Retry-After` is
+  // derived from `period`. `namespace_id` is scoped to this Worker script;
+  // changing one resets its counters.
+  //
+  // These top-level numbers are the DEVELOPMENT ones: `developmentRateLimits`
+  // (the deployed allowances × 20), because this stage is driven by the
+  // Playwright suite, which signs in and creates keys dozens of times a minute
+  // from one address. Every `env` below restates the real `defaultRateLimits`
+  // numbers, and packages/api's `rateLimitsFor(stage)` picks the matching set
+  // for the D1 counter and the `Retry-After`. Keep the two in step.
+  "ratelimits": [
+    {
+      "name": "RATE_LIMIT_AUTH",
+      "namespace_id": "1001",
+      "simple": { "limit": 400, "period": 60 }
+    },
+    {
+      "name": "RATE_LIMIT_CONTACT",
+      "namespace_id": "1002",
+      "simple": { "limit": 100, "period": 60 }
+    },
+    {
+      "name": "RATE_LIMIT_API_KEYS",
+      "namespace_id": "1003",
+      "simple": { "limit": 200, "period": 60 }
+    },
+    {
+      "name": "RATE_LIMIT_OPERATOR_API",
+      "namespace_id": "1004",
+      "simple": { "limit": 2400, "period": 60 }
+    }
+  ],
+  // One Worker and one D1 per stage. Build with `CLOUDFLARE_ENV=<env> vite
+  // build` (the `deploy:<env>` scripts), migrate with
+  // `pnpm -F @gmacko/db migrate:remote --env <env>`, and push the stage's
+  // secrets with `pnpm secrets:push --stage <env>`. Environments inherit
+  // `main`, `compatibility_date`, `observability` and `triggers` from the
+  // top level; `vars`, `d1_databases`, `r2_buckets` and `ratelimits` are not
+  // inherited and are restated. Replace the placeholder ids after `wrangler d1
+  // create`, and create each bucket with `wrangler r2 bucket create`.
+  "env": {
+    // One Worker for every PR preview: .github/workflows/preview.yml uploads a
+    // *version* of it (`wrangler versions upload`), which gets its own preview
+    // URL and inherits these bindings. All open PRs share this database on
+    // purpose (docs/DEPLOYMENT.md, "One preview database, not one per PR");
+    // the workflow's `reset` job empties and re-seeds it weekly and on demand.
+    "preview": {
+      "name": "gmacko-web-preview",
+      "vars": { "STAGE": "preview" },
+      "ratelimits": [
+        {
+          "name": "RATE_LIMIT_AUTH",
+          "namespace_id": "1001",
+          "simple": { "limit": 20, "period": 60 }
+        },
+        {
+          "name": "RATE_LIMIT_CONTACT",
+          "namespace_id": "1002",
+          "simple": { "limit": 5, "period": 60 }
+        },
+        {
+          "name": "RATE_LIMIT_API_KEYS",
+          "namespace_id": "1003",
+          "simple": { "limit": 10, "period": 60 }
+        },
+        {
+          "name": "RATE_LIMIT_OPERATOR_API",
+          "namespace_id": "1004",
+          "simple": { "limit": 120, "period": 60 }
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "BUCKET",
+          "bucket_name": "gmacko-web-preview"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "gmacko-web-preview",
+          "database_id": "00000000-0000-0000-0000-000000000001",
+          "migrations_dir": "../../packages/db/migrations"
+        }
+      ]
+    },
+    "staging": {
+      "name": "gmacko-web-staging",
+      "vars": { "STAGE": "staging" },
+      "ratelimits": [
+        {
+          "name": "RATE_LIMIT_AUTH",
+          "namespace_id": "1001",
+          "simple": { "limit": 20, "period": 60 }
+        },
+        {
+          "name": "RATE_LIMIT_CONTACT",
+          "namespace_id": "1002",
+          "simple": { "limit": 5, "period": 60 }
+        },
+        {
+          "name": "RATE_LIMIT_API_KEYS",
+          "namespace_id": "1003",
+          "simple": { "limit": 10, "period": 60 }
+        },
+        {
+          "name": "RATE_LIMIT_OPERATOR_API",
+          "namespace_id": "1004",
+          "simple": { "limit": 120, "period": 60 }
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "BUCKET",
+          "bucket_name": "gmacko-web-staging"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "gmacko-web-staging",
+          "database_id": "00000000-0000-0000-0000-000000000002",
+          "migrations_dir": "../../packages/db/migrations"
+        }
+      ]
+    },
+    "production": {
+      "name": "gmacko-web",
+      "vars": { "STAGE": "production" },
+      "ratelimits": [
+        {
+          "name": "RATE_LIMIT_AUTH",
+          "namespace_id": "1001",
+          "simple": { "limit": 20, "period": 60 }
+        },
+        {
+          "name": "RATE_LIMIT_CONTACT",
+          "namespace_id": "1002",
+          "simple": { "limit": 5, "period": 60 }
+        },
+        {
+          "name": "RATE_LIMIT_API_KEYS",
+          "namespace_id": "1003",
+          "simple": { "limit": 10, "period": 60 }
+        },
+        {
+          "name": "RATE_LIMIT_OPERATOR_API",
+          "namespace_id": "1004",
+          "simple": { "limit": 120, "period": 60 }
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "BUCKET",
+          "bucket_name": "gmacko-web"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "gmacko-web",
+          "database_id": "00000000-0000-0000-0000-000000000003",
+          "migrations_dir": "../../packages/db/migrations"
+        }
+      ]
+    }
+  }
+}

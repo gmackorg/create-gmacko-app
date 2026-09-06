@@ -1,44 +1,33 @@
-import { integrations } from "@gmacko/config";
-import { createLogger } from "@gmacko/logging";
-import type { FileRouter } from "uploadthing/next";
-import { createUploadthing } from "uploadthing/next";
-import { UploadThingError } from "uploadthing/server";
-
-const log = createLogger({ module: "storage" });
-
 /**
- * Create an UploadThing file router
- * Only functional if storage integration is enabled
+ * `@gmacko/storage`: file uploads on Cloudflare R2.
+ *
+ * `storage.ts` holds the bucket operations; `handlers.ts` holds the two fetch
+ * handlers that authorize and enforce limits. This module is the public
+ * surface, so nothing outside the package imports either file directly.
  */
-export function createFileRouter(): ReturnType<
-  typeof createUploadthing
-> | null {
-  if (!integrations.storage.enabled) {
-    log.debug("uploadthing initialization skipped (integration disabled)");
-    return null;
-  }
 
-  return createUploadthing();
-}
-
-/**
- * Check if storage is enabled
- */
-export function isStorageEnabled(): boolean {
-  return integrations.storage.enabled;
-}
-
-/**
- * Create a guarded file router that returns empty if disabled
- */
-export function createGuardedRouter<T extends FileRouter>(
-  routerFn: () => T,
-): T | Record<string, never> {
-  if (!integrations.storage.enabled) {
-    return {} as Record<string, never>;
-  }
-  return routerFn();
-}
-
-export type { FileRouter };
-export { createUploadthing, UploadThingError };
+export {
+  type Authorize,
+  createDownloadHandler,
+  createUploadHandler,
+  type DownloadHandlerOptions,
+  type UploadHandlerOptions,
+  type UploadIdentity,
+} from "./handlers";
+export {
+  chunksOf,
+  contentTypeAllowed,
+  createStorage,
+  type EnabledOption,
+  isStorageEnabled,
+  type ListPage,
+  MIN_PART_SIZE,
+  readLimited,
+  type Storage,
+  type StorageBucket,
+  type StorageOptions,
+  StorageRejected,
+  StorageTooLarge,
+  type StoredObject,
+  type UploadLimits,
+} from "./storage";

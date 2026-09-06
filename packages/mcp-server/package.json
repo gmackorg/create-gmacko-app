@@ -16,23 +16,23 @@
     "dev": "tsup src/index.ts --format esm --watch",
     "format": "biome check .",
     "lint": "oxlint .",
-    "test": "vitest run src/__tests__/core.test.ts",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@gmacko/operator-core": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.27.1",
-    "superjson": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
+    "@gmacko/api": "workspace:*",
     "@gmacko/tsconfig": "workspace:*",
     "@types/node": "catalog:",
     "oxlint": "catalog:",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "catalog:",
-    "vitest": "^4.1.0"
+    "vitest": "catalog:"
   }
 }

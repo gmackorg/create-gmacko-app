@@ -16,6 +16,8 @@ github:
       name: gmacko (dev)
       redirect_uris:
         - https://gmacko.localhost/api/auth/callback/github
+        # apps/web without portless (see apps/web/README.md)
+        - http://localhost:3001/api/auth/callback/github
 
 google:
   users:
@@ -28,6 +30,8 @@ google:
       name: gmacko (dev)
       redirect_uris:
         - https://gmacko.localhost/api/auth/callback/google
+        # apps/web without portless (see apps/web/README.md)
+        - http://localhost:3001/api/auth/callback/google
 
 apple:
   users:
@@ -57,10 +61,38 @@ resend:
     - name: gmacko.localhost
       region: us-east-1
 
-postgres:
-  port: 5432
-  databases:
-    - name: gmacko_dev
-
-redis:
-  port: 6379
+# No `postgres:` / `redis:` sections: emulate starts only the services listed
+# here, and the web app (apps/web) runs on a local D1 (`pnpm db:migrate:local`),
+# with no Redis. `@gmacko/realtime` (Node-only) is the one consumer of Redis and
+# is not part of the web lane. (Denying redis-memory-server's postinstall in
+# pnpm-workspace.yaml follows from that: nothing here starts a Redis.)
+#
+# No `cloudflare:` section either, and this is the part that surprises people:
+# the app's local D1 (`DB`) and R2 (`BUCKET`) bindings do NOT come from
+# emulate. `pnpm dev` runs the Cloudflare Vite plugin, which runs its own
+# Miniflare from apps/web/wrangler.jsonc, and that is what materialises both —
+# under apps/web/.wrangler/state/v3/{d1,r2}. Declaring the binding is the whole
+# of the local setup; there is nothing to configure here for an upload to work.
+#
+# What emulate's Cloudflare service covers is the surface a binding does not:
+# the REST API behind `wrangler d1 create`, `wrangler r2 bucket create`,
+# `wrangler r2 object put --remote` and S3 SDK clients, all redirected with
+# CLOUDFLARE_API_BASE_URL (which must end in `/client/v4`). It is started on
+# demand, on its own port — `pnpm db:rehearse:remote` (scripts/d1-remote-rehearsal.mjs)
+# starts its own and creates what it needs over that API, so it reads nothing
+# from this file — or by hand with
+# `npx @gmacko/emulate start --service cloudflare`. See
+# docs/drizzle-migrations.md → "Rehearsing a remote migration".
+#
+# A section here would be started by `pnpm dev` too, which is why there isn't
+# one: an extra process every dev session for something nothing reads. If you
+# do add one, the seed nests under each service's own key, and a `port:` inside
+# it overrides `--port` on the command line:
+#
+#   cloudflare:
+#     d1:
+#       databases:
+#         - name: gmacko-web
+#     r2:
+#       buckets:
+#         - name: gmacko-web

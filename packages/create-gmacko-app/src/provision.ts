@@ -22,7 +22,7 @@ interface CliTool {
   installHint: string;
 }
 
-const CLI_TOOLS: Record<string, CliTool> = {
+const CLI_TOOLS = {
   gh: {
     name: "GitHub CLI",
     command: "gh",
@@ -38,12 +38,7 @@ const CLI_TOOLS: Record<string, CliTool> = {
     command: "eas",
     installHint: "npm i -g eas-cli",
   },
-  docker: {
-    name: "Docker",
-    command: "docker",
-    installHint: "Install Docker Desktop or docker engine",
-  },
-};
+} satisfies Record<string, CliTool>;
 
 function isCliInstalled(command: string): boolean {
   try {
@@ -71,6 +66,14 @@ function isCliAuthenticated(command: string): boolean {
   }
 }
 
+/**
+ * A failed `exec` rejects with an Error whose message already carries the
+ * command line and the child's exit status.
+ */
+function commandFailureMessage(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause);
+}
+
 async function runCommand(
   command: string,
   cwd: string,
@@ -79,14 +82,11 @@ async function runCommand(
     const { stdout, stderr } = await execAsync(command, { cwd });
     return { success: true, output: stdout || stderr };
   } catch (error) {
-    const err = error as { message: string };
-    return { success: false, output: err.message };
+    return { success: false, output: commandFailureMessage(error) };
   }
 }
 
-export async function provisionGitRepo(
-  config: ProvisionConfig,
-): Promise<boolean> {
+async function provisionGitRepo(config: ProvisionConfig): Promise<boolean> {
   const hasGh = isCliInstalled("gh");
   const hasTea = isCliInstalled("tea");
 
@@ -156,15 +156,17 @@ export async function provisionGitRepo(
   }
 }
 
-export async function provisionForgeGraph(
-  config: ProvisionConfig,
-): Promise<boolean> {
+/**
+ * Deployment guidance for the web lane: one Cloudflare Worker and one D1 per
+ * stage, orchestrated by ForgeGraph (docs/DEPLOYMENT.md in the generated app).
+ */
+async function provisionForgeGraph(config: ProvisionConfig): Promise<boolean> {
   if (!config.platforms.web) {
     return false;
   }
 
   const shouldSetup = await p.confirm({
-    message: "Show ForgeGraph deployment steps?",
+    message: "Show ForgeGraph + Cloudflare deployment steps?",
     initialValue: true,
   });
 
@@ -174,27 +176,28 @@ export async function provisionForgeGraph(
 
   const forgeGraphPath = path.resolve(config.projectPath, "../ForgeGraph");
   const hasLocalReference = existsSync(forgeGraphPath);
+  const worker = workerName(config.appName);
 
-  p.log.info("ForgeGraph deployment guidance:");
+  p.log.info("Deployment guidance (Cloudflare Workers + D1 via ForgeGraph):");
   p.log.message(
     pc.cyan(
-      `1. Keep this repo flake-based and deploy it from ForgeGraph on your Hetzner VPS.`,
+      `1. Create the stage databases once and paste their ids into apps/web/wrangler.jsonc:\n   pnpm -F @gmacko/web exec wrangler d1 create ${worker}-staging\n   pnpm -F @gmacko/web exec wrangler d1 create ${worker}\n   pnpm -F @gmacko/web exec wrangler d1 create ${worker}-preview`,
     ),
   );
   p.log.message(
     pc.cyan(
-      `2. Run Postgres alongside the app first and export DATABASE_URL in the deployment environment.`,
+      `2. Put the stage secrets in ForgeGraph (forge secret set KEY --stage staging), then push them: pnpm secrets:push --stage staging`,
     ),
   );
   p.log.message(
     pc.cyan(
-      `3. Use flake.nix as the Nix entry point for build and runtime definitions.`,
+      `3. Deploy: pnpm deploy:staging (applies the pending D1 migrations, then wrangler deploy); ForgeGraph runs the same script from .forgegraph.yaml.`,
     ),
   );
   if (hasLocalReference) {
     p.log.message(
       pc.cyan(
-        `4. Use the local ForgeGraph repo at ${forgeGraphPath} and deploy with forge.`,
+        `4. Use the local ForgeGraph repo at ${forgeGraphPath} and register the app with forge.`,
       ),
     );
     p.log.message(
@@ -204,7 +207,7 @@ export async function provisionForgeGraph(
     );
     p.log.message(
       pc.cyan(
-        `   Then: forge app create ${config.appName} --flake-ref . && forge stage add production --node <node-id> && forge deploy create production --wait`,
+        `   Then: pnpm forge:apply && forge deploy create staging --wait`,
       ),
     );
   }
@@ -212,7 +215,7 @@ export async function provisionForgeGraph(
   return true;
 }
 
-export async function provisionEAS(config: ProvisionConfig): Promise<boolean> {
+async function provisionEAS(config: ProvisionConfig): Promise<boolean> {
   if (!config.platforms.mobile) {
     return false;
   }
@@ -266,30 +269,19 @@ export async function provisionEAS(config: ProvisionConfig): Promise<boolean> {
   }
 }
 
-export async function provisionPostgres(
+/**
+ * The local D1: apply the checked-in migrations and seed the defaults. No
+ * service to start; Miniflare keeps the database in apps/web/.wrangler/state.
+ */
+async function provisionLocalDatabase(
   config: ProvisionConfig,
 ): Promise<boolean> {
-  if (!isCliInstalled("docker")) {
-    p.log.warn(
-      `Docker not found. Install with: ${CLI_TOOLS.docker.installHint}`,
-    );
-    return false;
-  }
-
-  try {
-    execSync("docker compose version", {
-      cwd: config.projectPath,
-      stdio: "ignore",
-    });
-  } catch {
-    p.log.warn(
-      "Docker Compose is required to start the local Postgres service",
-    );
+  if (!config.platforms.web) {
     return false;
   }
 
   const shouldSetup = await p.confirm({
-    message: "Start the local Postgres service?",
+    message: "Set up the local D1 database (migrate + seed)?",
     initialValue: true,
   });
 
@@ -298,81 +290,106 @@ export async function provisionPostgres(
   }
 
   const spinner = p.spinner();
-  spinner.start("Starting Postgres...");
+  spinner.start("Applying D1 migrations to the local database...");
 
-  const result = await runCommand(
-    "docker compose up -d postgres",
+  const migrate = await runCommand(
+    "pnpm -F @gmacko/db migrate:local",
     config.projectPath,
   );
-
-  if (!result.success) {
-    spinner.stop("Failed to start Postgres");
-    p.log.error(result.output);
+  if (!migrate.success) {
+    spinner.stop("Failed to migrate the local D1");
+    p.log.error(migrate.output);
     return false;
   }
 
-  spinner.stop("Postgres started!");
-  p.log.info("Use this connection string in your .env file:");
-  p.log.message(
-    pc.cyan(
-      `DATABASE_URL="postgresql://postgres:postgres@localhost:5432/gmacko_dev"`,
-    ),
+  const seed = await runCommand("pnpm db:seed", config.projectPath);
+  if (!seed.success) {
+    spinner.stop("Migrated, but the seed failed");
+    p.log.error(seed.output);
+    return false;
+  }
+
+  spinner.stop("Local D1 ready");
+  p.log.info(
+    "The web app reads the repo-root .env (no DATABASE_URL); `pnpm dev` starts emulate and the app.",
   );
 
   return true;
 }
 
+/** Worker and D1 base name for an app (wrangler names are lowercase, digits and dashes). */
+export function workerName(appName: string): string {
+  return `${appName.replace(/^@[^/]+\//, "").replace(/[^a-z0-9-]/g, "-")}-web`;
+}
+
+/** The provisioning steps the picker offers, in prompt order. */
+export type ProvisionService = "git" | "database" | "forgegraph" | "eas";
+
+export interface ProvisionServiceOption {
+  value: ProvisionService;
+  label: string;
+  hint: string;
+}
+
+/**
+ * Builds the service picker's options. `isInstalled` is the PATH probe seam:
+ * it only decides a hint, so tests pass a fixed probe instead of shelling out.
+ */
+export function provisionServiceOptions(
+  config: ProvisionConfig,
+  isInstalled: (command: string) => boolean = isCliInstalled,
+): ProvisionServiceOption[] {
+  return [
+    {
+      value: "git",
+      label: "Git Repository (GitHub/Gitea)",
+      hint:
+        isInstalled("gh") || isInstalled("tea") ? "available" : "CLI not found",
+    },
+    {
+      value: "database",
+      label: "Local D1 database (migrate + seed)",
+      hint: config.platforms.web ? "recommended" : "web not selected",
+    },
+    {
+      value: "forgegraph",
+      label: "ForgeGraph + Cloudflare deployment",
+      hint: config.platforms.web ? "recommended" : "web not selected",
+    },
+    {
+      value: "eas",
+      label: "EAS Build (Expo)",
+      hint: config.platforms.mobile
+        ? isInstalled("eas")
+          ? "available"
+          : "CLI not found"
+        : "mobile not selected",
+    },
+  ];
+}
+
 export async function runProvisioning(config: ProvisionConfig): Promise<void> {
   p.intro(pc.bgMagenta(pc.white(" Provisioning Services ")));
 
-  const services = await p.multiselect({
+  const selectedServices = await p.multiselect<ProvisionService>({
     message: "Which services would you like to set up?",
-    options: [
-      {
-        value: "git",
-        label: "Git Repository (GitHub/Gitea)",
-        hint:
-          isCliInstalled("gh") || isCliInstalled("tea")
-            ? "available"
-            : "CLI not found",
-      },
-      {
-        value: "postgres",
-        label: "Postgres Setup",
-        hint: isCliInstalled("docker") ? "available" : "Docker not found",
-      },
-      {
-        value: "forgegraph",
-        label: "ForgeGraph Deployment",
-        hint: config.platforms.web ? "recommended" : "web not selected",
-      },
-      {
-        value: "eas",
-        label: "EAS Build (Expo)",
-        hint: config.platforms.mobile
-          ? isCliInstalled("eas")
-            ? "available"
-            : "CLI not found"
-          : "mobile not selected",
-      },
-    ],
+    options: provisionServiceOptions(config),
     required: false,
   });
 
-  if (p.isCancel(services) || (services as string[]).length === 0) {
+  if (p.isCancel(selectedServices) || selectedServices.length === 0) {
     p.outro("Provisioning skipped");
     return;
   }
 
-  const selectedServices = services as string[];
   const results: Record<string, boolean> = {};
 
   if (selectedServices.includes("git")) {
     results.git = await provisionGitRepo(config);
   }
 
-  if (selectedServices.includes("postgres")) {
-    results.postgres = await provisionPostgres(config);
+  if (selectedServices.includes("database")) {
+    results.database = await provisionLocalDatabase(config);
   }
 
   if (selectedServices.includes("forgegraph")) {

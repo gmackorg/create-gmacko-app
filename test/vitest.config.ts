@@ -1,14 +1,14 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
+/** Smoke tests against the service emulators `pnpm dev` starts (no database). */
 export default defineConfig({
   test: {
     globals: true,
-    globalSetup: ["test/emulate-setup.ts"],
+    globalSetup: [
+      fileURLToPath(new URL("./emulate-setup.ts", import.meta.url)),
+    ],
     include: ["test/*.test.ts"],
-    env: {
-      DATABASE_URL: "postgresql://localhost:5432/gmacko_dev",
-      REDIS_URL: "redis://localhost:6379",
-    },
     testTimeout: 15000,
     hookTimeout: 30000,
   },

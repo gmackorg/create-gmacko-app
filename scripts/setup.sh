@@ -21,7 +21,7 @@ echo ""
 
 # Run doctor checks before installing dependencies
 echo "Running doctor checks..."
-pnpm doctor
+pnpm run doctor
 echo ""
 
 # Install dependencies

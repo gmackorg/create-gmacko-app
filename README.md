@@ -1,18 +1,22 @@
 # create-gmacko-app
 
-A fork of [create-t3-turbo](https://github.com/t3-oss/create-t3-turbo) with:
+A fork of [create-t3-turbo](https://github.com/t3-oss/create-t3-turbo) rebuilt around one Cloudflare Worker:
 
-- Postgres deployed alongside the app first, with hosted Postgres as a later migration once the product has real customer demand
-- ForgeGraph as the preferred deployment path for app hosting, especially on the Hetzner VPS setup
-- Nix-oriented deployment guidance so generated apps can move toward living as ForgeGraph repos
+- the web app (`apps/web`) is TanStack Start (React 19, Vite) plus an Effect `HttpApi` serving `/api/*`, deployed as a single Worker per stage
+- the database is Cloudflare D1 (SQLite) through Drizzle's Effect API; migrations are checked in and applied before every deploy
+- one API contract (`packages/domain`) shared by the browser, the SSR loader, Expo, the operator CLI/MCP server, and the generated SDKs
+- better-auth for magic-link, GitHub/Google/Apple sign-in, the Expo client, and scoped API keys
+- ForgeGraph as the deployment control plane (Workers + D1 per stage, secrets pushed from ForgeGraph)
 - `jj`-first repository setup with colocated Git compatibility
-- a baseline standards stack of `oxlint`, `biome`, `lefthook`, `commitlint`, and `knip`
-- Conditional integration system (Sentry, PostHog, Stripe, Email, Realtime, Storage)
+- a baseline standards stack of `oxlint`, `biome`, `lefthook`, `commitlint`, `knip`, and `pnpm check:standards`
+- conditional integration system (Sentry, PostHog, Stripe, Email, Realtime, Storage)
 - modular SaaS scaffold layers for collaboration, billing, metering, support, launch controls, referrals, operator APIs, and shared platform primitives
 - shared agent workflow support for Codex, Claude Code, and OpenCode via `AGENTS.md`, `CLAUDE.md`, `opencode.json`, and `.mcp.json`
 - optional Claude-first SaaS bootstrap guidance after local setup, including `/office-hours`, optional user-level `/autoplan`, `/design-consultation`, and local follow-up skills
-- optional operator surfaces where both the CLI and MCP server are wrappers over the same tRPC API
-- Storybook wired into the Next.js app for isolated UI development
+- optional operator surfaces where both the CLI and MCP server are wrappers over the same HTTP API
+- Storybook in `packages/ui` for isolated UI development
+
+The decision record for the stack is [`docs/adr/0001-tanstack-effect-d1.md`](./docs/adr/0001-tanstack-effect-d1.md); the architecture is in [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
 
 ## Installation
 
@@ -20,72 +24,73 @@ A fork of [create-t3-turbo](https://github.com/t3-oss/create-t3-turbo) with:
 >
 > Make sure to follow the system requirements specified in [`package.json#engines`](./package.json#L4) before proceeding.
 
-Clone this repository or use it as a template:
+Scaffold a new app:
+
+```bash
+npx create-gmacko-app my-app
+```
+
+Or clone this repository to work on the template itself:
 
 ```bash
 git clone https://github.com/gmackorg/create-gmacko-app.git my-app
 cd my-app
-pnpm setup
+pnpm run setup
 ```
 
 ## About
-
-Ever wondered how to migrate your T3 application into a monorepo? Stop right here! This is the perfect starter repo to get you running with the perfect stack!
 
 It uses [Turborepo](https://turborepo.com) and contains:
 
 ```text
 .github
   └─ workflows
-        └─ CI with pnpm cache setup
-.vscode
-  └─ Recommended extensions and settings for VSCode users
+        └─ CI, previews, CLI E2E, releases
 apps
   ├─ expo
-  │   ├─ Expo SDK 55
-  │   ├─ React Native 0.84 using React 19
+  │   ├─ Expo SDK 56, React Native 0.85, React 19
   │   ├─ Navigation using Expo Router
   │   ├─ Tailwind CSS v4 using NativeWind v5
-  │   └─ Typesafe API calls using tRPC
-  ├─ nextjs
-  │   ├─ Next.js 16
-  │   ├─ React 19
-  │   ├─ Storybook 10
-  │   ├─ Tailwind CSS v4
-  │   └─ E2E Typesafe API Server & Client
-  └─ tanstack-start
-      ├─ Tanstack Start v1 (rc)
-      ├─ React 19
+  │   └─ Typed API calls through @gmacko/api-client
+  └─ web
+      ├─ TanStack Start (React 19, Vite) on Cloudflare Workers
+      ├─ Effect HttpApi mounted at /api/* in the same Worker
+      ├─ better-auth at /api/auth/*
       ├─ Tailwind CSS v4
-      └─ E2E Typesafe API Server & Client
+      └─ Playwright E2E against a local D1
 packages
-  ├─ api
-  │   └─ tRPC v11 router definition
-  ├─ auth
-  │   └─ Authentication using better-auth
-  ├─ config
-  │   └─ Integration flags (single source of truth)
-  ├─ db
-  │   └─ Typesafe db calls using Drizzle & Postgres
-  ├─ ui
-  │   └─ UI components using shadcn-ui
-  ├─ analytics
-  │   └─ PostHog analytics wrapper (optional)
-  ├─ monitoring
-  │   └─ Sentry monitoring wrapper (optional)
-  ├─ payments
-  │   └─ Stripe payments wrapper (optional)
-  ├─ email
-  │   └─ Email service wrapper (optional)
-  ├─ realtime
-  │   └─ Realtime service wrapper (optional)
-  └─ storage
-      └─ File storage wrapper (optional)
+  ├─ domain        HttpApi contract: groups, Schema models, security middleware declarations
+  ├─ api           Effect services and HttpApiBuilder handlers behind the contract
+  ├─ api-client    Typed client (HttpApiClient transport) + TanStack Query queries/mutations
+  ├─ db            Drizzle Effect API over @effect/sql-d1; migrations in packages/db/migrations
+  ├─ auth          better-auth (magic link, GitHub/Google/Apple, Expo plugin, scoped API keys)
+  ├─ config        Integration flags (single source of truth)
+  ├─ ui            UI components (shadcn) and Storybook
+  ├─ operator-core Shared operator logic over @gmacko/api-client (operator lane)
+  ├─ api-cli       Operator CLI (operator lane)
+  ├─ mcp-server    Operator MCP server (operator lane)
+  ├─ logging       Effect logger over JSON console output
+  ├─ telemetry     OTLP export of traces, logs, and metrics
+  ├─ analytics     PostHog wrapper (optional)
+  ├─ monitoring    Sentry wrapper (optional)
+  ├─ payments      Stripe wrapper (optional)
+  ├─ billing       Plans, limits, and metering primitives
+  ├─ purchases     RevenueCat wrapper (optional)
+  ├─ email         Email service wrapper (optional)
+  ├─ notifications Expo push notifications (optional)
+  ├─ realtime      ioredis + BullMQ wrapper (Node-only; not for the Worker)
+  ├─ storage       File storage wrapper (optional)
+  ├─ flags         Feature flag system
+  ├─ i18n          Internationalization
+  └─ settings      Settings schemas
+sdks
+  └─ openapi       OpenAPI spec generated from the contract; SDKs under sdks/generated
 tooling
-  ├─ tailwind
-  │   └─ shared tailwind theme and configuration
-  └─ typescript
-      └─ shared tsconfig you can extend from
+  ├─ github        Shared GitHub Actions setup
+  ├─ openapi-generator
+  ├─ tailwind      Shared tailwind theme and configuration
+  ├─ typescript    Shared tsconfig you can extend from
+  └─ vitest        Shared Vitest config
 ```
 
 > In this template, we use `@gmacko` as a placeholder for package names. You can replace it with your own organization or project name using find-and-replace.
@@ -107,11 +112,11 @@ export const integrations = {
 } as const;
 ```
 
-Disabled integrations require no env vars and have no runtime code paths.
+Disabled integrations require no env vars and have no runtime code paths. Realtime is Node-only (ioredis + BullMQ) and is not part of the Worker; enable it only for separately deployed Node services.
 
 ## SaaS Scaffold
 
-The template can now scaffold a real SaaS baseline instead of only a framework shell. The default runtime stays simple, but the wizard and CLI flags can add:
+The template can scaffold a real SaaS baseline instead of only a framework shell. The default runtime stays simple, but the wizard and CLI flags can add:
 
 - first-run app bootstrap with the initial platform admin, first user, and first workspace
 - workspace-centric SaaS primitives with future-friendly memberships
@@ -121,7 +126,7 @@ The template can now scaffold a real SaaS baseline instead of only a framework s
 Current maturity:
 
 - stable: workspace bootstrap, collaboration, billing/limits/metering primitives, support and launch controls, shared platform primitives
-- stable: operator CLI + MCP wrapper lane over the same tRPC API
+- stable: operator CLI + MCP wrapper lane over the same HTTP API
 - guided but intentionally thin: email delivery, compliance hooks, and background jobs
 - later-phase work: multi-workspace UX, audit logs, webhooks, richer support tooling, and deeper billing automation
 
@@ -136,12 +141,12 @@ pnpm check:release
 pnpm e2e:cli:full
 ```
 
-`pnpm check:release` keeps validation scoped to the publishable CLI surface. `pnpm e2e:cli:full` runs the slower generated-app Vitest suite locally with `RUN_E2E=true`. Generated-app coverage also lives in [`.github/workflows/cli-e2e.yml`](/Volumes/dev/create-gmacko-app/.github/workflows/cli-e2e.yml), which exercises default, minimal, custom-scope, full, and `vinext` scaffolds on a nightly and manual basis, including ForgeGraph script smoke checks, auth/db bootstrap checks, health-route assertions, Expo dev-client/config smoke checks, and `vinext` doctor assertions for Cloudflare credentials. The same workflow also exposes a manual full-suite job that runs `src/__tests__/e2e.test.ts` with `RUN_E2E=true`.
+`pnpm check:release` keeps validation scoped to the publishable CLI surface. `pnpm e2e:cli:full` runs the slower generated-app Vitest suite locally with `RUN_E2E=true`. Generated-app coverage also lives in [`.github/workflows/cli-e2e.yml`](./.github/workflows/cli-e2e.yml), which scaffolds and checks a matrix of profiles nightly and on demand: default (web + mobile), operators (`--operator-lane`), minimal (web only), custom-scope, full (all integrations), and mobile-only. Each job runs the doctor, ForgeGraph metadata checks, auth/db bootstrap checks, health-route assertions, and Expo dev-client/config smoke checks where the profile includes them. The same workflow also exposes a manual full-suite job that runs `src/__tests__/e2e.test.ts` with `RUN_E2E=true`.
 
 ## Quick Start
 
 > **Note**
-> The recommended operating model is to run Postgres alongside the app during the early stages of the product. On the Hetzner VPS, use the sibling [`../ForgeGraph`](../ForgeGraph) deployment setup as the deployment reference, keep the database colocated with the app, and only move to a hosted Postgres provider once you have real customer and operational pressure to justify it.
+> The web app runs on Cloudflare Workers with a D1 database in every stage, including locally (a Miniflare D1 under `apps/web/.wrangler/state`). There is no `DATABASE_URL` and no local database server to run.
 
 <!-- SCAFFOLD_PROFILE_START -->
 > Generated repos replace this block with a scaffold-specific profile summary.
@@ -151,20 +156,22 @@ To get it running, follow the steps below:
 
 ### 1. Setup dependencies
 
-> [!NOTE]
->
-> While the repo does contain both a Next.js and Tanstack Start version of a web app, you can pick which one you like to use and delete the other folder before starting the setup.
-
 ```bash
 # Install dependencies
 pnpm i
 
-# Run the guided local bootstrap path
+# Run the guided local bootstrap path (writes .env for emulate)
 pnpm bootstrap:local
 
-# Verify linting and types before you start iterating
+# Verify linting, types, and app standards before you start iterating
 pnpm check:fast
+
+# Local D1 (once), then the dev loop: emulate + apps/web at https://gmacko.localhost
+pnpm db:migrate:local && pnpm db:seed
+pnpm dev
 ```
+
+`pnpm dev` starts [`@gmacko/emulate`](https://www.npmjs.com/package/@gmacko/emulate) (GitHub/Google/Apple/Stripe/Resend emulators) and the web app under `portless`. Sign in with the emulated GitHub; the first signed-in user completes the bootstrap screen and becomes the admin. `AGENTS.md` ("Local Development") explains how the Worker reads `.env` and why `apps/web/.dev.vars` must never exist.
 
 If you enable the optional SaaS bootstrap pack during scaffolding, the next Claude Code pass should be:
 
@@ -173,36 +180,32 @@ If you enable the optional SaaS bootstrap pack during scaffolding, the next Clau
 3. `/design-consultation`
 4. the local follow-up skills documented in `docs/ai/BOOTSTRAP_PLAYBOOK.md`
 
-If you enable the optional operator lane, generated repos also expose:
+If you enable the optional operator lane (`--operator-lane`), generated repos also expose:
 
 ```bash
-pnpm trpc:ops -- --help
+pnpm api:ops -- --help
 pnpm mcp:app
 ```
 
-Both are wrappers over the same tRPC API surface.
+Both are wrappers over the same HTTP API and authenticate with an API key that holds the `admin` scope.
 
 ### 2. Generate Better Auth Schema
 
-This project uses [Better Auth](https://www.better-auth.com) for authentication. The auth schema needs to be generated using the Better Auth CLI before you can use the authentication features.
+This project uses [Better Auth](https://www.better-auth.com) for authentication. The auth schema is generated with the Better Auth CLI; regenerate it after changing the auth configuration.
 
 ```bash
 # Generate the Better Auth schema
-pnpm --filter @gmacko/auth generate
+pnpm auth:generate
 ```
 
 This command runs the Better Auth CLI with the following configuration:
 
 - **Config file**: `packages/auth/script/auth-cli.ts` - A CLI-only configuration file (isolated from src to prevent imports)
-- **Output**: `packages/db/src/auth-schema.ts` - Generated Drizzle schema for authentication tables
+- **Output**: `packages/db/.cache/auth-schema.generated.ts` - the CLI's Drizzle (SQLite) schema for the authentication tables. The committed `packages/db/src/auth-schema.ts` is hand-maintained and never overwritten.
 
-The generation process:
+Reconcile the generated file into `packages/db/src/auth-schema.ts` (its header lists the deliberate differences, such as the NOT NULL `role` column), then `pnpm db:generate` and review the migration (expand/contract only; see `docs/drizzle-migrations.md`).
 
-1. Reads the Better Auth configuration from `packages/auth/script/auth-cli.ts`
-2. Generates the appropriate database schema based on your auth setup
-3. Outputs a Drizzle-compatible schema file to the `@gmacko/db` package
-
-> **Note**: The `auth-cli.ts` file is placed in the `script/` directory (instead of `src/`) to prevent accidental imports from other parts of the codebase. This file is exclusively for CLI schema generation and should **not** be used directly in your application. For runtime authentication, use the configuration from `packages/auth/src/index.ts`.
+> **Note**: The `auth-cli.ts` file is placed in the `script/` directory (instead of `src/`) to prevent accidental imports from other parts of the codebase. This file is exclusively for CLI schema generation and should **not** be used directly in your application. For runtime authentication, use `packages/auth/src/index.ts` (`makeAuth`).
 
 For more information about the Better Auth CLI, see the [official documentation](https://www.better-auth.com/docs/concepts/cli#generate).
 
@@ -222,13 +225,13 @@ Orbit gives you a cleaner device/simulator install loop once the development bui
 
 1. Make sure you have XCode and XCommand Line Tools installed [as shown on expo docs](https://docs.expo.dev/workflow/ios-simulator).
 
-   > **NOTE:** If you just installed XCode, or if you have updated it, you need to open the simulator manually once. Run `npx expo start` from `apps/expo`, and then enter `I` to launch Expo Go. After the manual launch, you can run `pnpm dev` in the root directory.
+   > **NOTE:** If you just installed XCode, or if you have updated it, you need to open the simulator manually once. Run `npx expo start` from `apps/expo`, and then enter `I` to launch Expo Go. After the manual launch, you can run `pnpm dev:mobile` in the root directory.
 
    ```diff
    +  "dev": "expo start --ios",
    ```
 
-2. Run `pnpm dev` at the project root folder.
+2. Run `pnpm dev:mobile` at the project root folder.
 
 #### Use Android Emulator
 
@@ -240,17 +243,17 @@ Orbit gives you a cleaner device/simulator install loop once the development bui
    +  "dev": "expo start --android",
    ```
 
-3. Run `pnpm dev` at the project root folder.
+3. Run `pnpm dev:mobile` at the project root folder.
 
 ### 4. Configuring Better-Auth to work with Expo
 
-In order to get Better-Auth to work with Expo, you must either:
+The Expo app talks to the Worker's API (`/api/*`, including `/api/auth/*`) over `@gmacko/api-client` with the better-auth Expo client's cookie. In order to get OAuth working from Expo, you must either:
 
 #### Deploy the Auth Proxy (RECOMMENDED)
 
-Better-auth comes with an [auth proxy plugin](https://www.better-auth.com/docs/plugins/oauth-proxy). By deploying the Next.js app, you can get OAuth working in preview deployments and development for Expo apps.
+Better-auth comes with an [auth proxy plugin](https://www.better-auth.com/docs/plugins/oauth-proxy). By deploying the web app, you can get OAuth working in preview deployments and development for Expo apps.
 
-By using the proxy plugin, the Next.js apps will forward any auth requests to the proxy server, which will handle the OAuth flow and then redirect back to the Next.js app. This makes it easy to get OAuth working since you'll have a stable URL that is publicly accessible and doesn't change for every deployment and doesn't rely on what port the app is running on. So if port 3000 is taken and your Next.js app starts at port 3001 instead, your auth should still work without having to reconfigure the OAuth provider.
+With the proxy plugin, the web app forwards auth requests to the proxy server, which handles the OAuth flow and then redirects back to the web app. This gives you a stable, publicly reachable URL that does not change per deployment or depend on the port the app is running on, so the OAuth provider needs one callback URL.
 
 For iOS releases, if you keep third-party sign-in enabled, also configure Sign in with Apple and verify the in-app account deletion flow before submission.
 
@@ -274,12 +277,14 @@ To add a new package, simply run `pnpm turbo gen init` in the monorepo root. Thi
 
 The generator sets up the `package.json`, `tsconfig.json` and a `index.ts`, as well as configures all the necessary configurations for tooling around your package such as formatting, linting and typechecking. When the package is created, you're ready to go build out the package.
 
+Packages that `apps/web` depends on ship inside the Worker bundle: they must not read `process.env` (take values as options or from `AppConfig`) and must not import Node-only modules. `pnpm check:standards --graph` lists that set.
+
 ### 5c. Work on shared UI in Storybook
 
-Run Storybook from the web app workspace:
+Run Storybook from the UI package:
 
 ```bash
-pnpm --filter @gmacko/nextjs storybook
+pnpm --filter @gmacko/ui storybook
 ```
 
 Shared component stories live in `packages/ui/src/**/*.stories.tsx`.
@@ -288,45 +293,18 @@ Shared component stories live in `packages/ui/src/**/*.stories.tsx`.
 
 Generated apps are set up for current agent-native and platform-native workflows:
 
-- `AGENTS.md` is the shared repo instruction file for Codex, Claude Code, and OpenCode.
+- `AGENTS.md` is the shared repo instruction file for Codex, Claude Code, and OpenCode; its "App Invariants" section lists the rules `pnpm check:standards` enforces.
 - `CLAUDE.md` is a thin Claude-specific shim that points back to `AGENTS.md` and the vendored gstack commands.
 - `.claude/settings.json` ships project-level Claude permissions, including `../ForgeGraph` as an additional working directory.
 - `opencode.json` loads the repo's shared instructions and planning docs into OpenCode.
-- `.mcp.json` configures the official Next.js MCP server for Next.js 16+ agent-assisted debugging.
+- `.mcp.json` ships empty; the operator lane adds the app's own MCP server (`packages/mcp-server`) to it.
 - Expo development should move toward development builds and Expo Orbit rather than long-term reliance on Expo Go.
-- Cloudflare support should be treated as a separate deployment lane:
-  - `vinext` is the experimental Next.js-on-Workers path.
-  - TanStack Start is the cleaner Workers-native path today.
-  - ForgeGraph + Nix remains the stable owned-infrastructure path.
-- Generated repos now also include `.forgegraph.yaml` aligned to the live `forge` repo contract and stronger Expo development-build defaults out of the box.
-- The scaffold can now override ForgeGraph server/node placeholders directly from the CLI and emits a fuller Cloudflare lane when `--vinext` is enabled:
-  - `apps/nextjs/vite.config.ts` with the Cloudflare Vite plugin wired for the RSC runtime
-  - `apps/nextjs/wrangler.jsonc` with staging and production-ready Workers config
-  - `apps/nextjs/worker/index.ts` as the generated Worker entry
-  - `apps/nextjs/src/cloudflare-env.ts` plus Cloudflare env stubs in `.env.example`
-  - `prebuild:vinext`, `build:vinext`, `deploy:cloudflare:staging`, and `deploy:cloudflare:production`
-- `pnpm doctor` now warns when `.forgegraph.yaml` still contains scaffold placeholders, checks grouped core and ForgeGraph env values, and, when the `vinext` lane exists, checks Wrangler plus grouped Cloudflare env values in `.env`
+- The web lane is Cloudflare-native end to end: TanStack Start and the Effect `HttpApi` run on workerd in development (`vite dev` through `@cloudflare/vite-plugin`), in tests (`@cloudflare/vitest-pool-workers`), and in every deployed stage.
+- Generated repos include `.forgegraph.yaml` aligned to the live `forge` repo contract (`cloudflare-workers` targets, D1 resources, the migrate command) and stronger Expo development-build defaults out of the box.
+- The scaffold can override the ForgeGraph server and domain placeholders directly from the CLI (`--forgegraph-server`, `--forgegraph-preview-domain`, `--forgegraph-production-domain`).
+- `pnpm run doctor` warns when `.forgegraph.yaml` still contains scaffold placeholders and checks grouped core, ForgeGraph, and Cloudflare env values in `.env`.
 
 See [docs/ai/DEVELOPER_EXPERIENCE.md](./docs/ai/DEVELOPER_EXPERIENCE.md) for the current support matrix and recommendations.
-
-### Experimental Cloudflare Lane
-
-If you scaffold with `--vinext`, the generated Next app gets an explicit Workers path alongside the default ForgeGraph/Nix path.
-
-From the generated repo root:
-
-```bash
-pnpm --filter @gmacko/nextjs dev:vinext
-CI=1 pnpm --filter @gmacko/nextjs build:vinext
-pnpm --filter @gmacko/nextjs deploy:cloudflare:staging
-pnpm --filter @gmacko/nextjs deploy:cloudflare:production
-```
-
-Notes:
-
-- `build:vinext` prebuilds the Next app's workspace dependencies before invoking `vinext`.
-- the generated Workers config assumes the normal default integration set; aggressively pruned integration layouts are still a separate cleanup path
-- this is intentionally a separate deployment lane from ForgeGraph and should not be treated as the primary production path for the Hetzner VPS setup
 
 ## AI Planning Workflow
 
@@ -343,48 +321,46 @@ This template keeps a shared planning flow for Codex, Claude Code, and OpenCode,
 
 ### Does the starter include Solito?
 
-No. Solito will not be included in this repo. It is a great tool if you want to share code between your Next.js and Expo app. However, the main purpose of this repo is not the integration between Next.js and Expo — it's the code splitting of your T3 App into a monorepo. The Expo app is just a bonus example of how you can utilize the monorepo with multiple apps but can just as well be any app such as Vite, Electron, etc.
+No. Solito will not be included in this repo. It is a great tool if you want to share code between your web and Expo app. However, the main purpose of this repo is the code splitting of an app into a monorepo with one API contract. The Expo app is a bonus example of how you can utilize the monorepo with multiple apps but can just as well be any app such as Vite, Electron, etc.
 
 Integrating Solito into this repo isn't hard, and there are a few [official templates](https://github.com/nandorojo/solito/tree/master/example-monorepos) by the creators of Solito that you can use as a reference.
 
 ### Does this pattern leak backend code to my client applications?
 
-No, it does not. The `api` package should only be a production dependency in the Next.js application where it's served. The Expo app, and all other apps you may add in the future, should only add the `api` package as a dev dependency. This lets you have full typesafety in your client applications, while keeping your backend code safe.
-
-If you need to share runtime code between the client and server, such as input validation schemas, you can create a separate `shared` package for this and import it on both sides.
+No, it does not. `@gmacko/api` (services and handlers) is a dependency of `apps/web` only, where it is served. The Expo app, the operator tools, and any other client depend on `@gmacko/api-client` and `@gmacko/domain`: the contract (paths, schemas, security declarations) and a client over it, with no database, auth, or handler code. Runtime code that both sides need (validation schemas, error types) lives in `@gmacko/domain` for the same reason.
 
 ## Deployment
 
-### Next.js
+### Web (Cloudflare Workers + D1)
 
 #### Prerequisites
 
 > **Note**
-> Please note that the Next.js application with tRPC must be deployed in order for the Expo app to communicate with the server in a production environment.
+> The web app must be deployed for the Expo app to reach the API in a production environment; the Expo app's `API_URL` (`EXPO_PUBLIC_STAGING_API_URL` / `EXPO_PUBLIC_PRODUCTION_API_URL` per build profile) points at the stage's Worker.
 
 #### Deploy with ForgeGraph
 
-The recommended deployment path for this template is to keep the application inside a ForgeGraph-managed repo and deploy it to the Hetzner VPS from there. In this workspace, the reference deployment setup lives in [`../ForgeGraph`](../ForgeGraph).
+The web app deploys as one Cloudflare Worker per stage with one D1 database per stage; ForgeGraph orchestrates the deploys and holds the stage secrets. The full guide is [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md).
 
-1. Treat ForgeGraph as the deployment home for the app.
-2. Run Postgres alongside the app on the VPS first, keeping application and database operations simple while the product is still early.
-3. Configure `DATABASE_URL`, auth secrets, and any enabled integration env vars in the ForgeGraph deployment environment.
-4. Install `@forgegraph/cli` or use `forge` from [`../ForgeGraph`](../ForgeGraph) to log in, create the app and stages if needed, manage secrets, and deploy the app.
-5. Prefer the repo-local wrappers once the app is configured: `pnpm forge:diff`, `pnpm forge:apply`, `pnpm forge:stages`, `pnpm forge:deploy:staging`, and `pnpm forge:deploy:production`.
-6. Point your production domain at the ForgeGraph-managed deployment so the Expo app can use a stable backend URL.
-7. When you have real customers and concrete operational needs, migrate Postgres to a hosted provider instead of paying that complexity cost upfront.
+1. Create the D1 databases once and record their ids in `apps/web/wrangler.jsonc`:
+   `pnpm -F @gmacko/web exec wrangler d1 create <app>-web-staging` (and `<app>-web`, `<app>-web-preview`).
+2. Install `@forgegraph/cli` or use `forge` from [`../ForgeGraph`](../ForgeGraph) to log in, sync `.forgegraph.yaml` (`pnpm forge:diff`, `pnpm forge:apply`), and manage secrets (`forge secret set KEY --stage <stage>`).
+3. Push the stage secrets into the Worker: `pnpm secrets:push --stage staging`.
+4. Deploy: `pnpm forge:deploy:staging` / `pnpm forge:deploy:production` (or directly `pnpm deploy:staging` / `pnpm deploy:production`). Both run `scripts/deploy-stage.mjs`: apply the pending D1 migrations, and only if that succeeds, build and `wrangler deploy`.
+5. Point your production domain at the Worker so the Expo app can use a stable backend URL.
+6. Every pull request gets a preview Worker on a shared preview D1 (`.github/workflows/preview.yml`).
+
+Migrations are forward-only and expand/contract (`docs/drizzle-migrations.md`); rollback is a Worker version rollback or a D1 Time Travel restore (`docs/RUNBOOK.md`).
 
 ### Auth Proxy
 
-The auth proxy comes as a better-auth plugin. This is required for the Next.js app to be able to authenticate users in preview deployments. The auth proxy is not used for OAuth requests in production deployments. The recommended place to run it is alongside the web app in your ForgeGraph deployment.
+The auth proxy comes as a better-auth plugin. It lets the web app authenticate users in preview deployments; it is not used for OAuth requests in production deployments. The recommended place to run it is the staging Worker.
 
 ### Expo
 
-Deploying your Expo application works slightly differently compared to Next.js on the web. Instead of "deploying" your app online, you need to submit production builds of your app to app stores, like [Apple App Store](https://www.apple.com/app-store) and [Google Play](https://play.google.com/store/apps). You can read the full [guide to distributing your app](https://docs.expo.dev/distribution/introduction), including best practices, in the Expo docs.
+Deploying your Expo application works differently from the web app. Instead of "deploying" your app online, you need to submit production builds of your app to app stores, like [Apple App Store](https://www.apple.com/app-store) and [Google Play](https://play.google.com/store/apps). You can read the full [guide to distributing your app](https://docs.expo.dev/distribution/introduction), including best practices, in the Expo docs.
 
-1. Make sure to modify the `getBaseUrl` function to point to your backend's production URL:
-
-   <https://github.com/t3-oss/create-t3-turbo/blob/656965aff7db271e5e080242c4a3ce4dad5d25f8/apps/expo/src/utils/api.tsx#L20-L37>
+1. Make sure `apps/expo/src/config/env.ts` resolves your backend's production URL (`API_URL` in `app.config.ts` extra, or `EXPO_PUBLIC_PRODUCTION_API_URL` / `EXPO_PUBLIC_STAGING_API_URL` per build profile); a preview or production build refuses to boot with a placeholder.
 
 2. Let's start by setting up [EAS Build](https://docs.expo.dev/build/introduction), which is short for Expo Application Services. The build service helps you create builds of your app, without requiring a full native development setup. The commands below are a summary of [Creating your first build](https://docs.expo.dev/build/setup).
 

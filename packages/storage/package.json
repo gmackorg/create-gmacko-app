@@ -15,17 +15,22 @@
     "dev": "tsc",
     "format": "biome check .",
     "lint": "oxlint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:workers": "vitest run --config vitest.workers.config.ts",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
     "@gmacko/config": "workspace:*",
-    "@gmacko/logging": "workspace:*",
-    "uploadthing": "^7.7.4"
+    "@gmacko/logging": "workspace:*"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
     "@gmacko/tsconfig": "workspace:*",
     "oxlint": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

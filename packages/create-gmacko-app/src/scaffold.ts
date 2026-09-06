@@ -3,12 +3,73 @@ import path from "node:path";
 import * as p from "@clack/prompts";
 import fs from "fs-extra";
 import pc from "picocolors";
-import { runProvisioning } from "./provision.js";
+import { REALTIME_WARNING } from "./prompts.js";
+import { runProvisioning, workerName } from "./provision.js";
 import type { CliOptions, IntegrationConfig } from "./types.js";
 
 const TEMPLATE_REPO =
   process.env.CREATE_GMACKO_APP_TEMPLATE_REPO ??
   "https://github.com/gmackorg/create-gmacko-app.git";
+
+/** The web app: TanStack Start + the Effect HTTP API as one Worker on D1. */
+export const WEB_APP_DIR = "apps/web";
+/** The Expo app. */
+export const MOBILE_APP_DIR = "apps/expo";
+/** The template's worker/D1 base name; renamed to `<app>-web` per scaffold. */
+const TEMPLATE_WORKER_NAME = "gmacko-web";
+
+/** The `package.json` fields the scaffolder rewrites in the generated app. */
+interface RootPackageManifest {
+  scripts?: Record<string, string>;
+}
+
+interface McpServerEntry {
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+}
+
+/** The `.mcp.json` shape Claude Code reads and the operator lane extends. */
+interface McpConfig {
+  mcpServers?: Record<string, McpServerEntry>;
+}
+
+interface PortlessApp {
+  name?: string;
+  script?: string;
+}
+
+/** The `portless.json` shape: one entry per app directory it proxies. */
+interface PortlessConfig {
+  apps?: Record<string, PortlessApp>;
+}
+
+/**
+ * Reads the generated app's root `package.json`. Every field below is optional
+ * because these readers run against a freshly copied template file and then
+ * write it straight back with `writeJsonSync`, so nothing here may assume a
+ * key exists.
+ */
+function readRootPackage(rootPackagePath: string): RootPackageManifest {
+  return fs.readJsonSync(rootPackagePath);
+}
+
+function readMcpConfig(mcpConfigPath: string): McpConfig {
+  return fs.readJsonSync(mcpConfigPath);
+}
+
+function readPortlessConfig(portlessPath: string): PortlessConfig {
+  return fs.readJsonSync(portlessPath);
+}
+
+/**
+ * `execSync` with piped stdio throws an Error carrying the child's captured
+ * `stderr`; a failure from anywhere else (a missing binary, say) carries none.
+ */
+function capturedStderr(cause: unknown): string {
+  if (!(cause instanceof Error) || !("stderr" in cause)) return "";
+  return String(cause.stderr ?? "");
+}
 
 export async function scaffold(options: CliOptions): Promise<void> {
   const targetDir = path.resolve(process.cwd(), options.appName);
@@ -29,7 +90,7 @@ export async function scaffold(options: CliOptions): Promise<void> {
   try {
     if (isLocalTemplatePath(TEMPLATE_REPO)) {
       fs.copySync(TEMPLATE_REPO, targetDir, {
-        filter: (src) => shouldCopyTemplatePath(src, TEMPLATE_REPO),
+        filter: (src) => shouldCopyTemplatePath(src),
       });
     } else {
       execSync(`git clone --depth 1 ${TEMPLATE_REPO} "${targetDir}"`, {
@@ -54,9 +115,9 @@ export async function scaffold(options: CliOptions): Promise<void> {
   // imports/deps); running after updatePackageScope would miss the @scope/*
   // references and leave dangling workspace deps and broken imports.
   if (options.prune) {
-    pruneIntegrations(targetDir, options.integrations);
+    pruneIntegrations(targetDir, options.integrations, options.platforms.web);
   }
-  updatePackageScope(targetDir, options.packageScope);
+  renameWorkerNames(targetDir, options.appName);
   createManifest(targetDir, options);
   createForgeGraphConfig(targetDir, options);
   addForgeGraphScripts(targetDir);
@@ -66,17 +127,10 @@ export async function scaffold(options: CliOptions): Promise<void> {
   customizeBootstrapPlaybook(targetDir, options);
 
   if (!options.platforms.web) {
-    fs.removeSync(path.join(targetDir, "apps/nextjs"));
+    removeWebApp(targetDir);
   }
   if (!options.platforms.mobile) {
-    fs.removeSync(path.join(targetDir, "apps/expo"));
-  }
-  if (!options.platforms.tanstackStart) {
-    fs.removeSync(path.join(targetDir, "apps/tanstack-start"));
-  }
-
-  if (options.platforms.web && options.vinext) {
-    configureVinext(targetDir);
+    fs.removeSync(path.join(targetDir, MOBILE_APP_DIR));
   }
 
   if (options.platforms.mobile) {
@@ -85,6 +139,11 @@ export async function scaffold(options: CliOptions): Promise<void> {
 
   customizeGeneratedReadme(targetDir, options);
   pruneOptionalLanes(targetDir, options);
+  // Rename the package scope LAST: every generator above writes the template's
+  // @gmacko/* names (the forge/operator root scripts, .mcp.json,
+  // .forgegraph.yaml, the README/playbook blocks), so the rename has to run
+  // after all of them or those files keep the old scope.
+  updatePackageScope(targetDir, options.packageScope);
 
   if (!options.includeAi) {
     fs.removeSync(path.join(targetDir, ".claude"));
@@ -100,6 +159,10 @@ export async function scaffold(options: CliOptions): Promise<void> {
   }
 
   spinner.stop("Project configured");
+
+  if (options.integrations.realtime.enabled) {
+    p.log.warn(REALTIME_WARNING);
+  }
 
   if (options.git) {
     spinner.start("Initializing repository...");
@@ -122,10 +185,7 @@ export async function scaffold(options: CliOptions): Promise<void> {
       spinner.stop("Failed to install dependencies");
       // Surface why — a swallowed install failure otherwise only shows up later
       // as confusing "turbo: not found" errors.
-      const stderr =
-        err && typeof err === "object" && "stderr" in err
-          ? String((err as { stderr?: unknown }).stderr ?? "")
-          : "";
+      const stderr = capturedStderr(err);
       if (stderr.trim()) {
         p.log.error(stderr.trim().split("\n").slice(-25).join("\n"));
       }
@@ -156,16 +216,43 @@ export async function scaffold(options: CliOptions): Promise<void> {
     }
   }
 
-  console.log(`
-  ${pc.bold("Next steps:")}
+  console.log(buildNextSteps(options));
+}
 
-  ${pc.cyan("cd")} ${options.appName}
-  ${pc.cyan("pnpm")} bootstrap:local
-  ${pc.dim("# Update .forgegraph.yaml with your real server, domains, and nodes")}
-  ${pc.cyan("pnpm")} forge:doctor
-  ${pc.cyan("pnpm")} check:fast
-  ${pc.cyan("pnpm")} dev
-`);
+function buildNextSteps(options: CliOptions): string {
+  const worker = workerName(options.appName);
+  const scope = options.packageScope;
+  const lines = [
+    "",
+    `  ${pc.bold("Next steps:")}`,
+    "",
+    `  ${pc.cyan("cd")} ${options.appName}`,
+    `  ${pc.cyan("pnpm")} bootstrap:local   ${pc.dim("# doctor, .env, auth + db generate, local D1 migrate + seed, check:fast")}`,
+  ];
+  if (options.platforms.web) {
+    lines.push(
+      `  ${pc.cyan("pnpm")} dev               ${pc.dim("# emulate + apps/web at https://gmacko.localhost (local D1, no DATABASE_URL)")}`,
+      "",
+      `  ${pc.dim("# Schema changes: edit packages/db/src/schema.ts, then")}`,
+      `  ${pc.cyan("pnpm")} db:generate && ${pc.cyan("pnpm")} db:migrate:local`,
+      "",
+      `  ${pc.dim("# Deploys (once per stage): create the D1 databases, paste the ids into apps/web/wrangler.jsonc")}`,
+      `  ${pc.cyan("pnpm")} -F ${scope}/web exec wrangler d1 create ${worker}-staging`,
+      `  ${pc.cyan("pnpm")} -F ${scope}/web exec wrangler d1 create ${worker}`,
+      `  ${pc.dim("# Update .forgegraph.yaml (server, domains), then: pnpm forge:doctor && pnpm deploy:staging")}`,
+    );
+  } else {
+    lines.push(
+      `  ${pc.cyan("pnpm")} --filter ${scope}/expo dev:client   ${pc.dim("# point EXPO_PUBLIC_API_URL at your hosted API")}`,
+    );
+  }
+  if (options.platforms.mobile && options.platforms.web) {
+    lines.push(
+      `  ${pc.cyan("pnpm")} --filter ${scope}/expo dev:client   ${pc.dim("# the Expo dev client against the web app's API")}`,
+    );
+  }
+  lines.push("");
+  return lines.join("\n");
 }
 
 function initializeRepository(
@@ -205,25 +292,62 @@ function updateIntegrationsConfig(
     "packages/config/src/integrations.ts",
   );
 
-  const content = `export const integrations = {
+  const content = `/** The transactional email provider; \`none\` means the app sends no email. */
+export type EmailProvider = "resend" | "sendgrid" | "none";
+/** The pub/sub + queue backend \`@gmacko/realtime\` talks to. */
+export type RealtimeProvider = "redis" | "none";
+/** The object store \`@gmacko/storage\` writes to. */
+export type StorageProvider = "r2" | "none";
+
+// Each provider-bearing integration is declared through its own contract
+// rather than written inline under \`as const\`, which would pin \`provider\` to
+// the single literal it is scaffolded with and turn every
+// \`provider === "…"\` comparison in this repo into a "no overlap" error.
+// \`enabled\` keeps the literal the scaffolder wrote, so a disabled integration
+// stays statically disabled for its consumers.
+
+/** How the app sends transactional email. */
+interface EmailIntegration {
+  readonly enabled: ${integrations.email.enabled};
+  readonly provider: EmailProvider;
+}
+/** How the app publishes and subscribes to realtime events. */
+interface RealtimeIntegration {
+  readonly enabled: ${integrations.realtime.enabled};
+  readonly provider: RealtimeProvider;
+}
+/** Where the app stores uploaded files. */
+interface StorageIntegration {
+  readonly enabled: ${integrations.storage.enabled};
+  readonly provider: StorageProvider;
+}
+
+const email: EmailIntegration = {
+  enabled: ${integrations.email.enabled},
+  provider: "${integrations.email.provider}",
+};
+// Node-only (ioredis + BullMQ): unsupported on the web app, which runs on
+// Cloudflare Workers. Enable it only for a Node service on a VPS node; see
+// packages/realtime/README.md.
+const realtime: RealtimeIntegration = {
+  enabled: ${integrations.realtime.enabled},
+  provider: "${integrations.realtime.provider}",
+};
+const storage: StorageIntegration = {
+  enabled: ${integrations.storage.enabled},
+  provider: "${integrations.storage.provider}",
+};
+
+export const integrations = {
   sentry: ${integrations.sentry},
   posthog: ${integrations.posthog},
   forgegraph: ${integrations.forgegraph},
   stripe: ${integrations.stripe},
   revenuecat: ${integrations.revenuecat},
   notifications: ${integrations.notifications},
-  email: {
-    enabled: ${integrations.email.enabled},
-    provider: "${integrations.email.provider}" as "resend" | "sendgrid" | "none",
-  },
-  realtime: {
-    enabled: ${integrations.realtime.enabled},
-    provider: "${integrations.realtime.provider}" as "redis" | "none",
-  },
-  storage: {
-    enabled: ${integrations.storage.enabled},
-    provider: "${integrations.storage.provider}" as "uploadthing" | "none",
-  },
+  email,
+  realtime,
+  storage,
   i18n: false,
   openapi: false,
 } as const;
@@ -302,33 +426,72 @@ export const isEmailDeliveryEnabled = () =>
   fs.writeFileSync(configPath, content);
 }
 
+const TEXT_EXTENSIONS = new Set([
+  ".json",
+  ".jsonc",
+  ".ts",
+  ".tsx",
+  ".js",
+  ".mjs",
+  ".css",
+  ".md",
+  ".yml",
+  ".yaml",
+  ".sh",
+]);
+
+/**
+ * `--package-scope`: rename the workspace packages from `@gmacko/*` to
+ * `@scope/*` in every text file — sources and package.json files, but also
+ * the workflows (`pnpm -F @gmacko/web ...`), `.forgegraph.yaml`,
+ * `.mcp.json`, `scripts/*.sh` and the docs, which all spell the scope out.
+ */
 function updatePackageScope(targetDir: string, scope: string): void {
   if (scope === "@gmacko") return;
 
-  const files = getAllFiles(targetDir);
+  for (const file of getAllFiles(targetDir)) {
+    if (!TEXT_EXTENSIONS.has(path.extname(file))) continue;
+    try {
+      const content = fs.readFileSync(file, "utf-8");
+      if (!content.includes("@gmacko/")) continue;
+      // Rename internal workspace packages only. @gmacko/emulate and
+      // @gmacko/cloudfault are external published dev dependencies — renaming
+      // either to @scope/… makes `pnpm install` 404, and for cloudfault it
+      // would also rewrite the import specifiers in apps/web/fault, which
+      // `pnpm typecheck` now covers. Add any future external @gmacko/* dep
+      // to this list.
+      fs.writeFileSync(
+        file,
+        content.replace(/@gmacko\/(?!(?:emulate|cloudfault)\b)/g, `${scope}/`),
+      );
+    } catch {
+      // Skip files that can't be read
+    }
+  }
+}
 
-  for (const file of files) {
-    if (
-      file.endsWith(".json") ||
-      file.endsWith(".ts") ||
-      file.endsWith(".tsx") ||
-      file.endsWith(".js") ||
-      file.endsWith(".mjs") ||
-      file.endsWith(".css")
-    ) {
-      try {
-        let content = fs.readFileSync(file, "utf-8");
-        if (content.includes("@gmacko/")) {
-          // Rename internal workspace packages only. @gmacko/emulate is an
-          // external published dev dependency — renaming it to @scope/emulate
-          // makes `pnpm install` 404. Preserve it (and any future external
-          // @gmacko/* deps added here).
-          content = content.replace(/@gmacko\/(?!emulate\b)/g, `${scope}/`);
-          fs.writeFileSync(file, content);
-        }
-      } catch {
-        // Skip files that can't be read
-      }
+/**
+ * The template names its Worker and D1 databases `gmacko-web` (`-staging`,
+ * `-preview`, `-pr-<n>`); a scaffold is `<app>-web`. Applied to every text
+ * file (wrangler.jsonc, the preview workflow, the deploy docs, the
+ * telemetry service name) so the names agree everywhere; the scaffolder's
+ * own sources and tests are left alone.
+ */
+function renameWorkerNames(targetDir: string, appName: string): void {
+  const worker = workerName(appName);
+  if (worker === TEMPLATE_WORKER_NAME) return;
+  const pattern = new RegExp(`\\b${TEMPLATE_WORKER_NAME}\\b`, "g");
+
+  for (const file of getAllFiles(targetDir)) {
+    if (!TEXT_EXTENSIONS.has(path.extname(file))) continue;
+    const relativePath = path.relative(targetDir, file);
+    if (relativePath.startsWith("packages/create-gmacko-app/")) continue;
+    try {
+      const content = fs.readFileSync(file, "utf-8");
+      if (!pattern.test(content)) continue;
+      fs.writeFileSync(file, content.replace(pattern, worker));
+    } catch {
+      // Skip files that can't be read
     }
   }
 }
@@ -371,8 +534,8 @@ function customizeGeneratedReadme(
     options.includeAi && options.saasBootstrap
       ? `\n\n${buildSaasBootstrapBlock(options)}`
       : "";
-  const trpcOperatorsBlock = options.trpcOperators
-    ? `\n\n${buildTrpcOperatorsBlock()}`
+  const operatorLaneBlock = options.operatorLane
+    ? `\n\n${buildOperatorLaneBlock()}`
     : "";
   const startIndex = readme.indexOf(startMarker);
   const endIndex = readme.indexOf(endMarker);
@@ -386,7 +549,7 @@ function customizeGeneratedReadme(
     profileBlock +
     agentQuickstartBlock +
     saasBootstrapBlock +
-    trpcOperatorsBlock +
+    operatorLaneBlock +
     readme.slice(endIndex + endMarker.length);
 
   fs.writeFileSync(readmePath, updatedReadme);
@@ -445,12 +608,16 @@ ${opencodeLines.join("\n")}${selectedLayerSection}${summaryLink}
 `;
 }
 
-function getBootstrapRecommendations(options: CliOptions): {
+interface BootstrapRecommendations {
   claudeLines: string[];
   codexLines: string[];
   opencodeLines: string[];
   selectedLayerLines: string[];
-} {
+}
+
+function getBootstrapRecommendations(
+  options: CliOptions,
+): BootstrapRecommendations {
   const claudeLines = [
     "- Claude-only: run `/office-hours` to force clarity on customer, problem, and wedge.",
     "- Claude-only: if your user-level gstack install includes `/autoplan`, run it next.",
@@ -458,35 +625,43 @@ function getBootstrapRecommendations(options: CliOptions): {
   ];
   const codexLines = [
     "- Start from `AGENTS.md` and `docs/ai/IMPLEMENTATION_PLAN.md`.",
-    "- Run `pnpm bootstrap:local`, then `pnpm doctor` and `pnpm check:fast`.",
+    "- Run `pnpm bootstrap:local`, then `pnpm run doctor` and `pnpm check:fast`.",
   ];
   const opencodeLines = [
     "- Start from `AGENTS.md`, `opencode.json`, and `docs/ai/IMPLEMENTATION_PLAN.md`.",
-    "- Run `pnpm bootstrap:local`, then `pnpm doctor` and `pnpm check:fast`.",
+    "- Run `pnpm bootstrap:local`, then `pnpm run doctor` and `pnpm check:fast`.",
   ];
   const selectedLayerLines: string[] = [];
 
+  const collaborationPaths =
+    "`packages/db/src/schema.ts`, `packages/domain/src/settings/api.ts` (the contract) and `packages/api/src/settings/service.ts` (the `Workspaces` service)";
+  const billingPaths =
+    "`packages/billing`, `packages/domain/src/settings/api.ts` and `packages/api/src/settings/billing.ts`";
+  const supportPaths =
+    "`apps/web/src/routes` (pricing, faq, changelog, contact, privacy, terms), `packages/domain/src/admin/api.ts` and `packages/api/src/admin/service.ts`";
+  const referralPaths = "`packages/api/src/admin/service.ts`";
+
   if (options.saasCollaboration) {
     selectedLayerLines.push(
-      "- Collaboration: use `packages/db/src/schema.ts` and `packages/api/src/router/settings.ts` for workspace membership and invites.",
+      `- Collaboration: use ${collaborationPaths} for workspace membership and invites.`,
     );
     codexLines.push(
-      "- Collaboration: inspect `packages/db/src/schema.ts` and `packages/api/src/router/settings.ts` for workspace membership and invites.",
+      `- Collaboration: inspect ${collaborationPaths} for workspace membership and invites.`,
     );
     opencodeLines.push(
-      "- Collaboration: inspect `packages/db/src/schema.ts` and `packages/api/src/router/settings.ts` for workspace membership and invites.",
+      `- Collaboration: inspect ${collaborationPaths} for workspace membership and invites.`,
     );
   }
 
   if (options.saasBilling || options.saasMetering) {
     selectedLayerLines.push(
-      "- Billing and metering: use `packages/billing` and `packages/api/src/router/settings.ts` for plan shape, limits, and usage rollups.",
+      `- Billing and metering: use ${billingPaths} for plan shape, limits, and usage rollups.`,
     );
     codexLines.push(
-      "- Billing and metering: use `packages/billing` and `packages/api/src/router/settings.ts` for plans, limits, and usage rollups.",
+      `- Billing and metering: use ${billingPaths} for plans, limits, and usage rollups.`,
     );
     opencodeLines.push(
-      "- Billing and metering: use `packages/billing` and `packages/api/src/router/settings.ts` for plans, limits, and usage rollups.",
+      `- Billing and metering: use ${billingPaths} for plans, limits, and usage rollups.`,
     );
     claudeLines.push(
       "- Claude-only: run `/setup-stripe-billing` once the workspace, plan, and usage model are clear.",
@@ -495,13 +670,13 @@ function getBootstrapRecommendations(options: CliOptions): {
 
   if (options.saasSupport || options.saasLaunch) {
     selectedLayerLines.push(
-      "- Support and launch: use `apps/nextjs/src/app`, `packages/api/src/router/admin.ts`, and `packages/api/src/router/settings.ts` for landing, contact, FAQ, changelog, maintenance mode, signup toggles, and waitlist review.",
+      `- Support and launch: use ${supportPaths} for landing, contact, FAQ, changelog, maintenance mode, signup toggles, and waitlist review.`,
     );
     codexLines.push(
-      "- Support and launch: use `apps/nextjs/src/app`, `packages/api/src/router/admin.ts`, and `packages/api/src/router/settings.ts` for landing, contact, FAQ, changelog, maintenance mode, signup toggles, and waitlist review.",
+      `- Support and launch: use ${supportPaths} for landing, contact, FAQ, changelog, maintenance mode, signup toggles, and waitlist review.`,
     );
     opencodeLines.push(
-      "- Support and launch: use `apps/nextjs/src/app`, `packages/api/src/router/admin.ts`, and `packages/api/src/router/settings.ts` for landing, contact, FAQ, changelog, maintenance mode, signup toggles, and waitlist review.",
+      `- Support and launch: use ${supportPaths} for landing, contact, FAQ, changelog, maintenance mode, signup toggles, and waitlist review.`,
     );
     claudeLines.push(
       "- Claude-only: run `/launch-landing-page` once the public shell and support flow are ready to shape.",
@@ -513,22 +688,22 @@ function getBootstrapRecommendations(options: CliOptions): {
       "- Referrals: keep referral capture and invite growth tied to the landing page and admin review tools.",
     );
     codexLines.push(
-      "- Referrals: keep referral capture and invite growth tied to the landing page and admin review tools in `packages/api/src/router/admin.ts`.",
+      `- Referrals: keep referral capture and invite growth tied to the landing page and admin review tools in ${referralPaths}.`,
     );
     opencodeLines.push(
-      "- Referrals: keep referral capture and invite growth tied to the landing page and admin review tools in `packages/api/src/router/admin.ts`.",
+      `- Referrals: keep referral capture and invite growth tied to the landing page and admin review tools in ${referralPaths}.`,
     );
   }
 
-  if (options.saasOperatorApis || options.trpcOperators) {
+  if (options.saasOperatorApis || options.operatorLane) {
     selectedLayerLines.push(
-      "- Operator APIs: use `pnpm trpc:ops -- --help` and `pnpm mcp:app` for the shared CLI and MCP wrapper lane.",
+      "- Operator APIs: use `pnpm api:ops -- --help` and `pnpm mcp:app` for the shared CLI and MCP wrapper lane (an API key with the `admin` scope).",
     );
     codexLines.push(
-      "- Operator APIs: use `packages/operator-core`, `packages/trpc-cli`, and `packages/mcp-server` for the shared CLI and MCP wrapper lane.",
+      "- Operator APIs: use `packages/operator-core`, `packages/api-cli`, and `packages/mcp-server` for the shared CLI and MCP wrapper lane.",
     );
     opencodeLines.push(
-      "- Operator APIs: use `packages/operator-core`, `packages/trpc-cli`, and `packages/mcp-server` for the shared CLI and MCP wrapper lane.",
+      "- Operator APIs: use `packages/operator-core`, `packages/api-cli`, and `packages/mcp-server` for the shared CLI and MCP wrapper lane.",
     );
   }
 
@@ -563,24 +738,25 @@ function customizeBootstrapPlaybook(
   fs.writeFileSync(playbookPath, buildSaasBootstrapContent(options, false));
 }
 
-function buildTrpcOperatorsBlock(): string {
+function buildOperatorLaneBlock(): string {
   return `## Operator lane
 
-- This scaffold includes CLI + MCP wrappers over the same tRPC API.
-- Use \`pnpm trpc:ops -- --help\` for the terminal operator surface.
-- Start with \`pnpm trpc:ops -- auth_help\` for login guidance.
-- Use \`pnpm trpc:ops -- get_workspace_context\` to inspect the current workspace.
-- Use \`pnpm trpc:ops -- list_api_keys\` and \`pnpm trpc:ops -- create_api_key --name automation\` for automation credentials.
-- Use \`pnpm trpc:ops -- get_billing_overview\` for usage and limits.
-- Use \`pnpm mcp:app\` to run the local MCP server. \`auth_help\` works without an API key; protected tools require \`GMACKO_API_KEY\`.
+- This scaffold includes CLI + MCP wrappers over the same HTTP API (\`@gmacko/api-client\`).
+- Use \`pnpm api:ops -- --help\` for the terminal operator surface.
+- Start with \`pnpm api:ops -- auth_help\` for login guidance.
+- Use \`pnpm api:ops -- get_workspace_context\` to inspect the current workspace.
+- Use \`pnpm api:ops -- list_api_keys\` and \`pnpm api:ops -- create_api_key --name automation\` for automation credentials.
+- Use \`pnpm api:ops -- get_billing_overview\` for usage and limits.
+- Use \`pnpm mcp:app\` to run the local MCP server. \`auth_help\` works without an API key; protected tools require \`GMACKO_API_KEY\` (a key holding the \`admin\` scope).
 `;
 }
 
 function buildScaffoldProfileBlock(options: CliOptions): string {
   const platforms = [
-    options.platforms.web ? "Next.js" : null,
+    options.platforms.web
+      ? "Web (TanStack Start + Effect on Cloudflare Workers, D1)"
+      : null,
     options.platforms.mobile ? "Expo" : null,
-    options.platforms.tanstackStart ? "TanStack Start" : null,
   ].filter(Boolean);
 
   const integrations = [
@@ -596,7 +772,7 @@ function buildScaffoldProfileBlock(options: CliOptions): string {
       ? "ForgeGraph (health, logging, OTEL)"
       : null,
     options.integrations.realtime.enabled
-      ? "Realtime + Jobs (Redis + BullMQ)"
+      ? "Realtime + Jobs (Redis + BullMQ, Node services only)"
       : null,
     options.integrations.storage.enabled
       ? `Storage (${options.integrations.storage.provider})`
@@ -615,90 +791,137 @@ function buildScaffoldProfileBlock(options: CliOptions): string {
 
   const preferredDevCommands = [
     "- `pnpm bootstrap:local`",
-    options.platforms.web ? "- `pnpm dev:next`" : null,
+    options.platforms.web ? "- `pnpm dev`" : null,
     options.platforms.mobile
       ? "- `pnpm --filter @gmacko/expo dev:client`"
       : null,
-    options.platforms.tanstackStart
-      ? "- `pnpm --filter @gmacko/tanstack-start dev`"
-      : null,
-    options.trpcOperators ? "- `pnpm trpc:ops -- --help`" : null,
+    options.operatorLane ? "- `pnpm api:ops -- --help`" : null,
   ]
     .filter(Boolean)
     .join("\n");
+
+  const deployPath = options.platforms.web
+    ? "ForgeGraph → one Cloudflare Worker + one D1 per stage (migrate, then deploy)"
+    : "EAS Build (no web app scaffolded)";
 
   return `<!-- SCAFFOLD_PROFILE_START -->
 > **Scaffold profile**
 > - Platforms: ${platforms.join(", ") || "none selected"}
 > - Integrations: ${integrations.join(", ") || "core only"}
 > - SaaS layers: ${saasLayers.join(", ") || "none selected"}
-> - Default deploy path: ForgeGraph + Nix + colocated Postgres
-> - Workers lane: ${options.vinext ? "vinext enabled (experimental)" : "not scaffolded"}
+> - Default deploy path: ${deployPath}
 > - Claude SaaS bootstrap pack: ${options.saasBootstrap ? "enabled" : "not scaffolded"}
-> - Operator lane: ${options.trpcOperators ? "CLI + MCP wrappers over the same tRPC API" : "not scaffolded"}
+> - Operator lane: ${options.operatorLane ? "CLI + MCP wrappers over the same HTTP API" : "not scaffolded"}
 >
 > **Recommended first commands**
 ${preferredDevCommands}
 <!-- SCAFFOLD_PROFILE_END -->`;
 }
 
-function getPrimaryServicePath(options: CliOptions): string {
-  if (options.platforms.web) return "apps/nextjs";
-  if (options.platforms.tanstackStart) return "apps/tanstack-start";
-  if (options.platforms.mobile) return "apps/expo";
-  return ".";
-}
-
-function getHealthcheckHint(options: CliOptions): string {
-  if (options.platforms.web) return "/api/health";
-  if (options.platforms.tanstackStart) return "/api/health";
-  if (options.platforms.mobile) return "n/a (mobile-only scaffold)";
-  return "n/a";
-}
-
+/**
+ * `.forgegraph.yaml`: the ForgeGraph repo contract for the web lane — one
+ * `cloudflare-workers` target per stage, the D1 resources, the health URL and
+ * the migrate-then-deploy sequence (`scripts/deploy-stage.mjs`). A
+ * mobile-only scaffold registers the app with no stages.
+ */
 function createForgeGraphConfig(targetDir: string, options: CliOptions): void {
-  const primaryServicePath = getPrimaryServicePath(options);
-  const healthcheckHint = options.integrations.forgegraph
-    ? "/.well-known/forge-health"
-    : getHealthcheckHint(options);
+  const worker = workerName(options.appName);
+  const notes = `# ForgeGraph operator notes:
+# primary web service path: ${options.platforms.web ? WEB_APP_DIR : options.platforms.mobile ? MOBILE_APP_DIR : "."}
+# healthcheck path: ${options.platforms.web ? "/.well-known/forge-health" : "n/a (mobile-only scaffold)"}
+# database strategy: ${options.platforms.web ? `cloudflare-d1 (per stage; previews share ${worker}-preview)` : "n/a (mobile-only scaffold)"}
+# preview domain: ${options.forgegraphPreviewDomain}
+# production domain: ${options.forgegraphProductionDomain}
+`;
 
-  const resources: string[] = [];
-  resources.push("  - type: postgres");
-  if (options.integrations.realtime.enabled) {
-    resources.push("  - type: redis");
+  if (!options.platforms.web) {
+    fs.writeFileSync(
+      path.join(targetDir, ".forgegraph.yaml"),
+      `# ForgeGraph repo contract. This scaffold has no web app: the Expo app talks
+# to a separately hosted API, so no stage is registered here. Add stages
+# once a backend repo exists (see deploy/README.md for the Workers shape).
+app: ${options.appName}
+server: ${options.forgegraphServer}
+
+${notes}`,
+    );
+    return;
   }
+
+  const stage = (name: string, sortOrder: number, workerSuffix: string) =>
+    `  - name: ${name}
+    sortOrder: ${sortOrder}
+    targets:
+      - name: web
+        platform: cloudflare-workers
+        config:
+          workerName: ${worker}${workerSuffix}
+          configPath: ${WEB_APP_DIR}/wrangler.jsonc
+          environment: ${name}
+          deploy: pnpm -F @gmacko/web deploy:${name}`;
 
   fs.writeFileSync(
     path.join(targetDir, ".forgegraph.yaml"),
-    `app: ${options.appName}
+    `# ForgeGraph repo contract for the web lane (${WEB_APP_DIR} on Cloudflare Workers + D1).
+# \`forge diff\` / \`forge apply\` sync this file with the server; \`forge deploy
+# create <stage> --wait\` (pnpm forge:deploy:<stage>) runs the repo's deploy
+# workflow for a cloudflare-workers target (deploy/forgegraph/deploy.yml).
+#
+# Deploy sequence per stage:
+#   1. pnpm -F @gmacko/db migrate:remote --env <stage>   # D1 migrations, forward-only
+#   2. pnpm -F @gmacko/web deploy:<stage>                # CLOUDFLARE_ENV=<stage> vite build && wrangler deploy
+# scripts/deploy-stage.mjs is the single place that ordering lives: \`pnpm
+# deploy:<stage>\` and deploy/forgegraph/deploy.yml both run it once and it
+# does 1 then 2. ForgeGraph's own stage machinery runs the two halves
+# separately — \`db.migrate\` below is step 1 (deploy-stage.mjs --migrate-only)
+# and each target's \`deploy\` is step 2 alone — so a stage is migrated exactly
+# once either way. A failing migration aborts the deploy. Migrations are expand/contract
+# only (docs/drizzle-migrations.md).
+#
+# D1 is NOT provisioned by \`forge db create\`. Create the databases once with
+# wrangler and put their ids in ${WEB_APP_DIR}/wrangler.jsonc (\`env.<stage>.d1_databases\`):
+#   pnpm -F @gmacko/web exec wrangler d1 create ${worker}-staging
+#   pnpm -F @gmacko/web exec wrangler d1 create ${worker}
+#   pnpm -F @gmacko/web exec wrangler d1 create ${worker}-preview   # shared by PR previews
+# Stage secrets live in ForgeGraph (\`forge secret set KEY --stage <stage>\`)
+# and reach the Worker with \`pnpm secrets:push --stage <stage>\`.
+
+app: ${options.appName}
 server: ${options.forgegraphServer}
+
+db:
+  type: d1
+  name: ${worker}
+  # Run by ForgeGraph before the deploy step; FG_STAGE selects the stage.
+  migrate: node scripts/deploy-stage.mjs --migrate-only
+  migrateType: wrangler
+
 stages:
-  - name: staging
-    nodeId: ${options.forgegraphStagingNode}
-    sortOrder: 10
-  - name: production
-    nodeId: ${options.forgegraphProductionNode}
-    sortOrder: 20
+${stage("staging", 10, "-staging")}
+${stage("production", 20, "")}
 
 resources:
-${resources.join("\n")}
+  d1:
+    - name: ${worker}-staging
+      binding: DB
+    - name: ${worker}
+      binding: DB
+    - name: ${worker}-preview
+      binding: DB
 
-# ForgeGraph operator notes:
-# flakeRef: .
-# primary web service path: ${primaryServicePath}
-# healthcheck path: ${healthcheckHint}
-# database strategy: colocated-postgres
-# preview domain: ${options.forgegraphPreviewDomain}
-# production domain: ${options.forgegraphProductionDomain}
-`,
+health:
+  # Served by the Worker (packages/api HealthApi); generic outside development.
+  url: /.well-known/forge-health
+  interval: 60
+  timeout: 10
+
+${notes}`,
   );
 }
 
 function addForgeGraphScripts(targetDir: string): void {
   const rootPackagePath = path.join(targetDir, "package.json");
-  const rootPackage = fs.readJsonSync(rootPackagePath) as {
-    scripts?: Record<string, string>;
-  };
+  const rootPackage = readRootPackage(rootPackagePath);
 
   rootPackage.scripts ??= {};
   rootPackage.scripts["forge:diff"] = "forge diff";
@@ -717,29 +940,31 @@ function addOptionalOperatorScripts(
   targetDir: string,
   options: CliOptions,
 ): void {
-  if (!options.trpcOperators) {
+  if (!options.operatorLane) {
     return;
   }
 
   const rootPackagePath = path.join(targetDir, "package.json");
-  const rootPackage = fs.readJsonSync(rootPackagePath) as {
-    scripts?: Record<string, string>;
-  };
+  const rootPackage = readRootPackage(rootPackagePath);
 
   rootPackage.scripts ??= {};
   // Run the operator CLI / MCP server source via tsx. pnpm never links a
   // workspace package's OWN declared bin into node_modules/.bin, so the
   // `exec gmacko-ops` / `exec gmacko-mcp` bin forms fail EACCES.
-  rootPackage.scripts["trpc:ops"] =
-    "pnpm --filter @gmacko/trpc-cli exec tsx src/index.ts";
+  rootPackage.scripts["api:ops"] =
+    "pnpm --filter @gmacko/api-cli exec tsx src/index.ts";
   rootPackage.scripts["mcp:app"] =
     "pnpm --filter @gmacko/mcp-server exec tsx src/index.ts";
 
   fs.writeJsonSync(rootPackagePath, rootPackage, { spaces: 2 });
 }
 
+/**
+ * `.mcp.json` ships empty; the operator lane adds the app's own MCP server
+ * (packages/mcp-server over the HTTP API) when AI files are kept.
+ */
 function customizeMcpConfig(targetDir: string, options: CliOptions): void {
-  if (!options.includeAi || !options.trpcOperators) {
+  if (!options.includeAi || !options.operatorLane) {
     return;
   }
 
@@ -748,23 +973,14 @@ function customizeMcpConfig(targetDir: string, options: CliOptions): void {
     return;
   }
 
-  const mcpConfig = fs.readJsonSync(mcpConfigPath) as {
-    mcpServers?: Record<
-      string,
-      {
-        command?: string;
-        args?: string[];
-        env?: Record<string, string>;
-      }
-    >;
-  };
+  const mcpConfig = readMcpConfig(mcpConfigPath);
 
   mcpConfig.mcpServers ??= {};
   mcpConfig.mcpServers["gmacko-app"] = {
     command: "pnpm",
     args: ["--filter", "@gmacko/mcp-server", "exec", "tsx", "src/index.ts"],
     env: {
-      GMACKO_API_URL: "http://localhost:3000",
+      GMACKO_API_URL: "http://localhost:3001",
       GMACKO_API_KEY: "change-me",
     },
   };
@@ -806,215 +1022,45 @@ After \`pnpm bootstrap:local\`:
   );
 }
 
-function configureVinext(targetDir: string): void {
-  const nextPkgPath = path.join(targetDir, "apps/nextjs/package.json");
-  const nextPkg = fs.readJsonSync(nextPkgPath) as {
-    scripts?: Record<string, string>;
-    devDependencies?: Record<string, string>;
-  };
+/**
+ * `--no-web`: drop the Worker and everything in the root that only drives it
+ * (its dev/deploy/e2e scripts, the per-PR preview workflow). The Expo app
+ * then targets a separately hosted API (`EXPO_PUBLIC_API_URL`).
+ */
+function removeWebApp(targetDir: string): void {
+  fs.removeSync(path.join(targetDir, WEB_APP_DIR));
+  fs.removeSync(path.join(targetDir, ".github/workflows/preview.yml"));
 
-  nextPkg.scripts ??= {};
-  nextPkg.devDependencies ??= {};
-
-  nextPkg.scripts["prebuild:vinext"] =
-    "pnpm --dir ../.. --filter @gmacko/nextjs^... build";
-  nextPkg.scripts["dev:vinext"] =
-    "pnpm prebuild:vinext && pnpm with-env vinext dev";
-  nextPkg.scripts["build:vinext"] =
-    "pnpm prebuild:vinext && pnpm with-env vinext build";
-  nextPkg.scripts["start:vinext"] = "pnpm with-env vinext start";
-  nextPkg.scripts["deploy:cloudflare"] = "pnpm deploy:cloudflare:production";
-  nextPkg.scripts["deploy:cloudflare:staging"] =
-    "pnpm build:vinext && pnpm with-env wrangler deploy --env staging";
-  nextPkg.scripts["deploy:cloudflare:production"] =
-    "pnpm build:vinext && pnpm with-env wrangler deploy";
-
-  nextPkg.devDependencies.vinext = "^0.0.35";
-  nextPkg.devDependencies.vite = "^8.0.2";
-  nextPkg.devDependencies.wrangler = "^4.77.0";
-  nextPkg.devDependencies["@cloudflare/vite-plugin"] = "^1.30.1";
-  nextPkg.devDependencies["@vitejs/plugin-rsc"] = "^0.5.21";
-  nextPkg.devDependencies = sortObjectKeys(nextPkg.devDependencies);
-
-  fs.writeJsonSync(nextPkgPath, nextPkg, { spaces: 2 });
-
-  fs.writeFileSync(
-    path.join(targetDir, "apps/nextjs/vite.config.ts"),
-    `import { cloudflare } from "@cloudflare/vite-plugin";
-import vinext from "vinext";
-import { defineConfig } from "vite";
-
-export default defineConfig({
-  plugins: [
-    vinext(),
-    cloudflare({
-      viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
-    }),
-  ],
-});
-`,
-  );
-
-  fs.writeFileSync(
-    path.join(targetDir, "apps/nextjs/wrangler.jsonc"),
-    `{
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "${path.basename(targetDir)}",
-  "compatibility_date": "2026-03-23",
-  "compatibility_flags": ["nodejs_compat"],
-  "main": "./worker/index.ts",
-  "assets": {
-    "directory": "dist/client",
-    "not_found_handling": "none",
-    "binding": "ASSETS"
-  },
-  "images": {
-    "binding": "IMAGES"
-  },
-  "vars": {
-    "APP_ENV": "production"
-  },
-  "env": {
-    "staging": {
-      "vars": {
-        "APP_ENV": "staging"
-      }
-    }
+  const rootPackagePath = path.join(targetDir, "package.json");
+  const rootPackage = readRootPackage(rootPackagePath);
+  rootPackage.scripts ??= {};
+  // The D1 scripts run wrangler against apps/web/wrangler.jsonc, which is
+  // gone with the app.
+  for (const script of [
+    "dev:web",
+    "dev:app",
+    "e2e:web",
+    "cf-typegen",
+    "check:cf-types",
+    "db:migrate:local",
+    "db:migrate:remote",
+    "db:seed",
+    "deploy:migrate",
+    "deploy:staging",
+    "deploy:production",
+    "secrets:push",
+  ]) {
+    delete rootPackage.scripts[script];
   }
-}
-`,
-  );
+  rootPackage.scripts.dev = "pnpm dev:emulate";
+  fs.writeJsonSync(rootPackagePath, rootPackage, { spaces: 2 });
 
-  fs.writeFileSync(
-    path.join(targetDir, "apps/nextjs/src/cloudflare-env.ts"),
-    `import { z } from "zod/v4";
-
-export const cloudflareEnvSchema = z.object({
-  APP_ENV: z.enum(["development", "staging", "production"]).default("production"),
-  CLOUDFLARE_ACCOUNT_ID: z.string().min(1),
-  CLOUDFLARE_API_TOKEN: z.string().min(1),
-});
-
-export type CloudflareEnv = z.infer<typeof cloudflareEnvSchema>;
-`,
-  );
-
-  fs.ensureDirSync(path.join(targetDir, "apps/nextjs/worker"));
-  fs.writeFileSync(
-    path.join(targetDir, "apps/nextjs/worker/index.ts"),
-    `import {
-  DEFAULT_DEVICE_SIZES,
-  DEFAULT_IMAGE_SIZES,
-  handleImageOptimization,
-} from "vinext/server/image-optimization";
-import type { ImageConfig } from "vinext/server/image-optimization";
-import handler from "vinext/server/app-router-entry";
-
-interface Env {
-  APP_ENV?: "development" | "staging" | "production";
-  ASSETS: {
-    fetch(request: Request): Promise<Response>;
-  };
-  IMAGES: {
-    input(stream: ReadableStream): {
-      transform(options: Record<string, unknown>): {
-        output(options: {
-          format: string;
-          quality: number;
-        }): Promise<{ response(): Response }>;
-      };
-    };
-  };
-}
-
-interface ExecutionContext {
-  waitUntil(promise: Promise<unknown>): void;
-  passThroughOnException(): void;
-}
-
-const imageConfig: ImageConfig = {};
-
-export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(request.url);
-
-    if (url.pathname === "/_vinext/image") {
-      const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
-      return handleImageOptimization(
-        request,
-        {
-          fetchAsset: (assetPath) =>
-            env.ASSETS.fetch(new Request(new URL(assetPath, request.url))),
-          transformImage: async (body, { width, format, quality }) => {
-            const result = await env.IMAGES.input(body)
-              .transform(width > 0 ? { width } : {})
-              .output({ format, quality });
-            return result.response();
-          },
-        },
-        allowedWidths,
-        imageConfig,
-      );
-    }
-
-    return handler.fetch(request, env, ctx);
-  },
-};
-`,
-  );
-
-  const envExamplePath = path.join(targetDir, ".env.example");
-  const envExample = fs.readFileSync(envExamplePath, "utf-8");
-  if (!envExample.includes("CLOUDFLARE_ACCOUNT_ID")) {
-    fs.writeFileSync(
-      envExamplePath,
-      `${envExample}
-
-# =====================================================
-# OPTIONAL: Cloudflare Workers (vinext)
-# Used for the experimental Next.js-on-Workers lane
-# =====================================================
-# CLOUDFLARE_ACCOUNT_ID='your-account-id'
-# CLOUDFLARE_API_TOKEN='your-api-token'
-`,
-    );
+  const portlessPath = path.join(targetDir, "portless.json");
+  if (fs.existsSync(portlessPath)) {
+    const portless = readPortlessConfig(portlessPath);
+    if (portless.apps) delete portless.apps[WEB_APP_DIR];
+    fs.writeJsonSync(portlessPath, portless, { spaces: 2 });
   }
-
-  fs.writeFileSync(
-    path.join(targetDir, "apps/nextjs/README.cloudflare.md"),
-    `# Cloudflare Workers Lane
-
-This app includes an experimental \`vinext\` lane for Cloudflare Workers.
-
-## Commands
-
-\`\`\`bash
-pnpm --filter @gmacko/nextjs dev:vinext
-pnpm --filter @gmacko/nextjs build:vinext
-pnpm --filter @gmacko/nextjs deploy:cloudflare:staging
-pnpm --filter @gmacko/nextjs deploy:cloudflare:production
-\`\`\`
-
-## Required Env
-
-- \`CLOUDFLARE_ACCOUNT_ID\`
-- \`CLOUDFLARE_API_TOKEN\`
-
-## Notes
-
-- This lane is experimental and should not replace the default ForgeGraph + Nix deployment path by accident.
-- The generated Worker config lives in \`apps/nextjs/wrangler.jsonc\`.
-- Prefer the root deployment guidance for the stable Hetzner VPS path.
-`,
-  );
-}
-
-function sortObjectKeys(
-  record: Record<string, string>,
-): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(record).sort(([left], [right]) => left.localeCompare(right)),
-  );
 }
 
 function configureExpoApp(
@@ -1022,7 +1068,10 @@ function configureExpoApp(
   appName: string,
   displayName: string,
 ): void {
-  const expoConfigPath = path.join(targetDir, "apps/expo/app.config.ts");
+  const expoConfigPath = path.join(
+    targetDir,
+    `${MOBILE_APP_DIR}/app.config.ts`,
+  );
   const sanitizedId = appName.replace(/[^a-z0-9-]/gi, "").toLowerCase();
   const bundleSegment = sanitizedId.replace(/-/g, "");
 
@@ -1049,10 +1098,18 @@ function configureExpoApp(
 function pruneIntegrations(
   targetDir: string,
   integrations: IntegrationConfig,
+  keepWebApp: boolean,
 ): void {
   const packagesToPrune: string[] = [];
 
-  if (!integrations.sentry) {
+  // `@gmacko/monitoring` is structural for the web lane, not optional
+  // decoration: apps/web imports it for the browser Sentry init, the root
+  // error boundary and the Worker's `withSentry` wrapper, and the package is
+  // already inert when `integrations.sentry` is off (every entry point checks
+  // the flag). Deleting it would leave four dangling imports, so with a web
+  // app it stays and Sentry is simply off.
+  const pruneMonitoring = !integrations.sentry && !keepWebApp;
+  if (pruneMonitoring) {
     packagesToPrune.push("monitoring");
   }
   if (!integrations.posthog) {
@@ -1084,18 +1141,35 @@ function pruneIntegrations(
     }
   }
 
-  if (!integrations.sentry) {
-    pruneNextSentryFiles(targetDir);
+  if (!integrations.posthog) {
+    pruneWebAnalyticsFiles(targetDir);
   }
 
-  if (!integrations.posthog) {
-    pruneNextAnalyticsFiles(targetDir);
+  if (!integrations.stripe) {
+    pruneWebStripeFiles(targetDir);
+  }
+
+  if (!integrations.storage.enabled) {
+    pruneWebStorageFiles(targetDir);
+  }
+
+  // Only rewrite the Expo files for a package that is actually gone; an
+  // integration that is merely off is handled at runtime by `integrations`.
+  if (!integrations.posthog || pruneMonitoring) {
+    pruneExpoProviders(targetDir, {
+      posthog: integrations.posthog,
+      sentry: !pruneMonitoring,
+    });
+  }
+
+  if (pruneMonitoring) {
+    pruneExpoErrorBoundary(targetDir);
   }
 
   // Remove references to pruned packages from EVERY remaining workspace
-  // package.json — not just apps. e.g. packages/billing declares
-  // @gmacko/payments, so pruning payments (Stripe off) otherwise breaks
-  // `pnpm install` with ERR_PNPM_WORKSPACE_PKG_NOT_FOUND.
+  // package.json — not just apps. e.g. apps/web declares @gmacko/payments,
+  // so pruning payments (Stripe off) otherwise breaks `pnpm install` with
+  // ERR_PNPM_WORKSPACE_PKG_NOT_FOUND.
   const prunedDeps = packagesToPrune.map((p) => `@gmacko/${p}`);
   for (const dir of ["apps", "packages", "tooling"]) {
     const base = path.join(targetDir, dir);
@@ -1143,113 +1217,414 @@ function pruneOptionalLanes(targetDir: string, options: CliOptions): void {
     );
   }
 
-  if (!options.trpcOperators) {
+  if (!options.operatorLane) {
     fs.removeSync(path.join(targetDir, "packages/operator-core"));
-    fs.removeSync(path.join(targetDir, "packages/trpc-cli"));
+    fs.removeSync(path.join(targetDir, "packages/api-cli"));
     fs.removeSync(path.join(targetDir, "packages/mcp-server"));
+    // The template root carries the lane's scripts; without the packages
+    // they would point at nothing.
+    const rootPackagePath = path.join(targetDir, "package.json");
+    const rootPackage = readRootPackage(rootPackagePath);
+    if (rootPackage.scripts) {
+      delete rootPackage.scripts["api:ops"];
+      delete rootPackage.scripts["mcp:app"];
+      fs.writeJsonSync(rootPackagePath, rootPackage, { spaces: 2 });
+    }
   }
 }
 
-function pruneNextSentryFiles(targetDir: string): void {
-  const sentryFiles = [
-    "apps/nextjs/sentry.client.config.ts",
-    "apps/nextjs/sentry.edge.config.ts",
-    "apps/nextjs/sentry.server.config.ts",
-  ];
-
-  for (const relativePath of sentryFiles) {
-    const filePath = path.join(targetDir, relativePath);
-    if (fs.existsSync(filePath)) {
-      fs.removeSync(filePath);
-    }
-  }
-
-  removeSnippet(
-    path.join(targetDir, "apps/nextjs/src/app/error.tsx"),
-    'import { captureException } from "@gmacko/monitoring/web";\n',
-  );
-  removeSnippet(
-    path.join(targetDir, "apps/nextjs/src/app/error.tsx"),
-    `    // Report error to Sentry if enabled
-    if (integrations.sentry) {
-      captureException(error);
-    }
-
-`,
-  );
-
-  removeSnippet(
-    path.join(targetDir, "apps/nextjs/src/app/global-error.tsx"),
-    'import { captureException } from "@gmacko/monitoring/web";\n',
-  );
-  removeSnippet(
-    path.join(targetDir, "apps/nextjs/src/app/global-error.tsx"),
-    `    // Report error to Sentry if enabled
-    if (integrations.sentry) {
-      captureException(error);
-    }
-
-`,
-  );
-
-  removeSnippet(
-    path.join(targetDir, "apps/nextjs/src/components/error-boundary.tsx"),
-    'import { captureException } from "@gmacko/monitoring/web";\n',
-  );
-  removeSnippet(
-    path.join(targetDir, "apps/nextjs/src/components/error-boundary.tsx"),
-    `    // Report to Sentry if enabled
-    if (integrations.sentry) {
-      captureException(error);
-    }
-
-`,
-  );
-
-  const instrumentationPath = path.join(
-    targetDir,
-    "apps/nextjs/src/instrumentation.ts",
-  );
-  if (fs.existsSync(instrumentationPath)) {
-    fs.writeFileSync(
-      instrumentationPath,
-      `export async function register() {}
-`,
-    );
-  }
-}
-
-function pruneNextAnalyticsFiles(targetDir: string): void {
+/**
+ * PostHog off + prune: `apps/web/src/providers.tsx` is the only importer of
+ * `@gmacko/analytics/web`; it becomes a pass-through. (Sentry has no
+ * equivalent here: `packages/monitoring` survives whenever apps/web does —
+ * see `pruneIntegrations` — and is inert with the integration off.)
+ */
+function pruneWebAnalyticsFiles(targetDir: string): void {
   const providersPath = path.join(
     targetDir,
-    "apps/nextjs/src/app/providers.tsx",
+    `${WEB_APP_DIR}/src/providers.tsx`,
   );
   if (!fs.existsSync(providersPath)) return;
 
   fs.writeFileSync(
     providersPath,
-    `"use client";
-
+    `/**
+ * Browser-side providers. Analytics was pruned at scaffold time; add a
+ * provider here when one is needed.
+ */
 import type { ReactNode } from "react";
 
-interface ProvidersProps {
-  children: ReactNode;
-}
-
-export function Providers({ children }: ProvidersProps) {
-  return <>{children}</>;
+export function Providers({ children }: { children: ReactNode }) {
+  return children;
 }
 `,
   );
 }
 
-function removeSnippet(filePath: string, snippet: string): void {
-  if (!fs.existsSync(filePath)) return;
+/**
+ * PostHog and/or Sentry off + prune: `apps/expo/src/providers.tsx` is the one
+ * importer of `@gmacko/analytics/native` and (with the error boundary) of
+ * `@gmacko/monitoring/native`. Regenerate it with only the providers whose
+ * packages survive, so no import dangles once the packages are removed.
+ */
+function pruneExpoProviders(
+  targetDir: string,
+  keep: { posthog: boolean; sentry: boolean },
+): void {
+  const providersPath = path.join(
+    targetDir,
+    `${MOBILE_APP_DIR}/src/providers.tsx`,
+  );
+  if (!fs.existsSync(providersPath)) return;
 
-  const content = fs.readFileSync(filePath, "utf-8");
-  if (!content.includes(snippet)) return;
+  const sentry = keep.sentry;
+  const posthog = keep.posthog;
+  const imports = [
+    posthog
+      ? 'import { PostHogNativeProvider } from "@gmacko/analytics/native";'
+      : null,
+    // `integrations` and `env` are only read by the Sentry/PostHog branches.
+    sentry || posthog ? 'import { integrations } from "@gmacko/config";' : null,
+    'import en from "@gmacko/i18n/messages/en.json";',
+    'import es from "@gmacko/i18n/messages/es.json";',
+    'import { I18nNativeProvider } from "@gmacko/i18n/native";',
+    sentry
+      ? 'import { initSentryNative } from "@gmacko/monitoring/native";'
+      : null,
+    'import type { ReactNode } from "react";',
+    sentry
+      ? 'import { useEffect, useState } from "react";'
+      : 'import { useState } from "react";',
+    "",
+    sentry || posthog ? 'import { env } from "./config/env";' : null,
+    'import { getStoredLocale } from "./utils/i18n";',
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
 
-  fs.writeFileSync(filePath, content.replace(snippet, ""));
+  const sentryEffect = sentry
+    ? `
+  useEffect(() => {
+    if (integrations.sentry && env.observability.sentryDsn) {
+      initSentryNative({
+        dsn: env.observability.sentryDsn,
+        environment: env.environment,
+        debug: env.enableDebugMode,
+        tracesSampleRate: env.isProduction ? 0.1 : 1.0,
+      });
+    }
+  }, []);
+`
+    : "";
+
+  const posthogWrap = posthog
+    ? `
+  if (integrations.posthog && env.observability.posthogKey) {
+    return (
+      <PostHogNativeProvider
+        apiKey={env.observability.posthogKey}
+        apiHost={env.observability.posthogHost}
+      >
+        {content}
+      </PostHogNativeProvider>
+    );
+  }
+`
+    : "";
+
+  const pruned = [
+    !posthog ? "analytics" : null,
+    !sentry ? "monitoring" : null,
+  ].filter(Boolean);
+
+  fs.writeFileSync(
+    providersPath,
+    `/**
+ * App-wide providers. ${pruned.join(" and ")} ${pruned.length > 1 ? "were" : "was"} pruned at
+ * scaffold time; add the provider back here when the package is restored.
+ */
+${imports}
+
+interface ProvidersProps {
+  children: ReactNode;
+}
+
+const resources = {
+  en: { translation: en },
+  es: { translation: es },
+} as const;
+
+export function Providers({ children }: ProvidersProps) {
+  const [initialLocale] = useState(getStoredLocale);
+${sentryEffect}
+  const content = (
+    <I18nNativeProvider resources={resources} initialLocale={initialLocale}>
+      {children}
+    </I18nNativeProvider>
+  );
+${posthogWrap}
+  return content;
+}
+`,
+  );
+}
+
+/**
+ * Sentry off + prune: `apps/expo/src/components/error-boundary.tsx` reports
+ * caught errors through `@gmacko/monitoring/native`. Strip that import and
+ * the two guarded `captureExceptionNative` calls; the boundary itself (and
+ * its `integrations.sentry` status line, now always false) stays.
+ */
+function pruneExpoErrorBoundary(targetDir: string): void {
+  const boundaryPath = path.join(
+    targetDir,
+    `${MOBILE_APP_DIR}/src/components/error-boundary.tsx`,
+  );
+  if (!fs.existsSync(boundaryPath)) return;
+
+  let content = fs.readFileSync(boundaryPath, "utf-8");
+  content = content.replace(
+    'import { captureExceptionNative } from "@gmacko/monitoring/native";\n',
+    "",
+  );
+  content = content.replace(
+    /\n *\/\/ Report to Sentry if enabled\n *if \(integrations\.sentry\) \{\n *captureExceptionNative\(error\);\n *\}\n/,
+    "\n",
+  );
+  content = content.replace(
+    /const handleReport = \(\) => \{\n *if \(onReport\) \{\n *onReport\(\);\n *\} else if \(integrations\.sentry && error\) \{\n[^}]*\}\n *\};/,
+    "const handleReport = () => {\n    onReport?.();\n  };",
+  );
+  if (content.includes("captureExceptionNative")) {
+    throw new Error(
+      "pruneExpoErrorBoundary: apps/expo/src/components/error-boundary.tsx no longer matches the template; update the scaffolder",
+    );
+  }
+  fs.writeFileSync(boundaryPath, content);
+}
+
+/**
+ * Stripe off + prune: the webhook route keeps its path (it is part of the
+ * generated route tree) but no longer verifies deliveries through
+ * `@gmacko/payments`; it answers 503 until the payments package is added
+ * back. Its signature test goes with the package, and so does the CloudFault
+ * scenario that perturbs its delivery — the fault lane itself stays (its
+ * config, runner and helpers are payment-agnostic), so the generated app has
+ * a working lane to add the first scenario to.
+ */
+function pruneWebStripeFiles(targetDir: string): void {
+  const webhookPath = path.join(
+    targetDir,
+    `${WEB_APP_DIR}/src/server/stripe-webhook.ts`,
+  );
+  if (!fs.existsSync(webhookPath)) return;
+
+  fs.writeFileSync(
+    webhookPath,
+    `/**
+ * \`POST /api/webhooks/stripe\`: payments were pruned at scaffold time, so the
+ * route only acknowledges that no webhook is configured. Restore
+ * \`packages/payments\` and its \`constructWebhookEvent\` to verify deliveries.
+ */
+/**
+ * The idempotency ledger (\`@gmacko/api\`'s \`WebhookEvents\`), as a promise-shaped
+ * interface. Declared but unused while payments are pruned, so that
+ * \`src/server/runtime.ts\` — which is NOT pruned and imports this type to bind
+ * the ledger to the isolate's runtime — still typechecks. Stripe delivers at
+ * least once, so a restored handler must dedupe on \`event.id\` before it runs
+ * any side effect.
+ */
+export interface StripeWebhookLedger {
+  readonly claim: (event: {
+    readonly id: string;
+    readonly type: string;
+  }) => Promise<"first" | "duplicate" | "retry">;
+  readonly complete: (id: string) => Promise<void>;
+}
+
+export interface StripeWebhookOptions {
+  /** \`STRIPE_WEBHOOK_SECRET\`; unset means the endpoint is not configured. */
+  readonly secret: string | undefined;
+  readonly events?: StripeWebhookLedger | undefined;
+  readonly onEvent?:
+    | ((type: string, id: string) => void | Promise<void>)
+    | undefined;
+}
+
+/** The one body this endpoint answers with while payments are pruned. */
+type WebhookResponseBody = { readonly error: string };
+
+const json = (status: number, body: WebhookResponseBody): Response =>
+  Response.json(body, { status });
+
+export const handleStripeWebhook = async (
+  request: Request,
+  _options: StripeWebhookOptions,
+): Promise<Response> => {
+  if (request.method !== "POST") {
+    return json(405, { error: "method not allowed" });
+  }
+  return json(503, { error: "webhook not configured" });
+};
+`,
+  );
+  fs.removeSync(
+    path.join(
+      targetDir,
+      `${WEB_APP_DIR}/src/server/__tests__/stripe-webhook.test.ts`,
+    ),
+  );
+  // The Stripe scenario and the two helpers only it uses. The rest of the
+  // lane is payment-agnostic and stays, including the sign-up rate-limit
+  // scenario, so the generated app still has a working fault lane and a
+  // worked example to copy.
+  for (const file of [
+    `${WEB_APP_DIR}/fault/stripe-webhook.fault.ts`,
+    `${WEB_APP_DIR}/fault/helpers/ledger.ts`,
+    `${WEB_APP_DIR}/fault/helpers/stripe.ts`,
+  ]) {
+    fs.removeSync(path.join(targetDir, file));
+  }
+}
+
+/**
+ * Removes every `r2_buckets` binding from wrangler.jsonc.
+ *
+ * There are four — the top level plus one per environment, because
+ * environments do not inherit bindings — and each is written before its
+ * `d1_databases` neighbour precisely so it always carries a trailing comma
+ * and can be cut without leaving a dangling one behind.
+ */
+function removeR2Bindings(source: string): string {
+  return (
+    source
+      .replace(/\n[ \t]*(?:\/\/[^\n]*\n[ \t]*)*"r2_buckets": \[[^\]]*\],/g, "")
+      // The prose above `env` lists what is not inherited, and names a step
+      // that no longer applies.
+      .replace(
+        "`vars`, `d1_databases`, `r2_buckets` and `ratelimits` are not",
+        "`vars`, `d1_databases` and `ratelimits` are not",
+      )
+      .replace(
+        "`, and create each bucket with `wrangler r2 bucket create`.",
+        "`.",
+      )
+  );
+}
+
+/**
+ * Storage was not selected, so `packages/storage` is gone. The route files and
+ * `src/server/runtime.ts` stay — `src/routeTree.gen.ts` names the routes, and
+ * regenerating it needs a Vite build — so `src/server/storage.ts`, the app's
+ * only importer of the package, is replaced by a stub of the same shape whose
+ * handlers answer 404. That is what a disabled storage integration answers
+ * anyway, so the routes behave exactly as they would with the package present
+ * and the flag off.
+ */
+function pruneWebStorageFiles(targetDir: string): void {
+  const storagePath = path.join(
+    targetDir,
+    `${WEB_APP_DIR}/src/server/storage.ts`,
+  );
+  if (!fs.existsSync(storagePath)) return;
+
+  fs.writeFileSync(
+    storagePath,
+    `/**
+ * \`/api/storage\`: file storage was pruned at scaffold time, so the route
+ * answers 404 — the same answer \`@gmacko/storage\` gives when the integration
+ * is off. Restore \`packages/storage\`, add an \`r2_buckets\` binding named
+ * \`BUCKET\` to every scope in wrangler.jsonc, and put the policy back here.
+ */
+
+/** Returns the caller's identity, or null to refuse with a 401. */
+export type Authorize = (
+  request: Request,
+) => Promise<{ readonly id: string } | null>;
+
+/** The two fetch handlers \`routes/api.storage.$.ts\` mounts. */
+export interface StorageHandlers {
+  readonly upload: (request: Request) => Promise<Response>;
+  readonly download: (request: Request) => Promise<Response>;
+}
+
+const notEnabled = (): Promise<Response> =>
+  Promise.resolve(
+    Response.json({ error: "storage is not enabled" }, { status: 404 }),
+  );
+
+export const createStorageHandlers = (
+  _bucket: unknown,
+  _authorize: Authorize,
+): StorageHandlers => ({ upload: notEnabled, download: notEnabled });
+`,
+  );
+
+  // `src/server/runtime.ts` is not pruned and is the only caller. Its
+  // `env.BUCKET` would dangle once the binding is out of wrangler.jsonc and
+  // the generated worker-configuration.d.ts, so the argument goes with them.
+  const runtimePath = path.join(
+    targetDir,
+    `${WEB_APP_DIR}/src/server/runtime.ts`,
+  );
+  if (fs.existsSync(runtimePath)) {
+    fs.writeFileSync(
+      runtimePath,
+      fs
+        .readFileSync(runtimePath, "utf8")
+        .replace(
+          "createStorageHandlers(env.BUCKET, storageIdentity)",
+          "createStorageHandlers(undefined, storageIdentity)",
+        ),
+    );
+  }
+
+  // The generated types must agree with wrangler.jsonc or the app's own
+  // `pnpm check:cf-types` fails on its first CI run.
+  const cfTypesPath = path.join(
+    targetDir,
+    `${WEB_APP_DIR}/worker-configuration.d.ts`,
+  );
+  if (fs.existsSync(cfTypesPath)) {
+    fs.writeFileSync(
+      cfTypesPath,
+      fs
+        .readFileSync(cfTypesPath, "utf8")
+        .replace(/^[ \t]*BUCKET: R2Bucket;\r?\n/gm, ""),
+    );
+  }
+
+  // The R2 scenario and the bucket the fault lane gives it. The rest of the
+  // lane is storage-agnostic and stays.
+  fs.removeSync(
+    path.join(targetDir, `${WEB_APP_DIR}/fault/r2-upload.fault.ts`),
+  );
+
+  const faultConfigPath = path.join(
+    targetDir,
+    `${WEB_APP_DIR}/vitest.fault.config.ts`,
+  );
+  if (fs.existsSync(faultConfigPath)) {
+    fs.writeFileSync(
+      faultConfigPath,
+      fs
+        .readFileSync(faultConfigPath, "utf8")
+        .replace(
+          /\n *\/\/ The upload scenario[\s\S]*?\n *r2Buckets: \["BUCKET"\],/,
+          "",
+        ),
+    );
+  }
+
+  // A binding to a bucket nothing writes to is a bucket the deploy still
+  // insists exists, so it goes with the code that used it.
+  const wranglerPath = path.join(targetDir, `${WEB_APP_DIR}/wrangler.jsonc`);
+  if (fs.existsSync(wranglerPath)) {
+    fs.writeFileSync(
+      wranglerPath,
+      removeR2Bindings(fs.readFileSync(wranglerPath, "utf8")),
+    );
+  }
 }
 
 function getAllFiles(dir: string): string[] {
@@ -1281,23 +1656,24 @@ function isLocalTemplatePath(templateRepo: string): boolean {
   return fs.existsSync(templateRepo) && fs.statSync(templateRepo).isDirectory();
 }
 
-function shouldCopyTemplatePath(src: string, templateRoot: string): boolean {
-  const basename = path.basename(src);
+/** Skipped when copying a local template: VCS state, installs, build and dev-server output. */
+const SKIPPED_TEMPLATE_DIRS = new Set([
+  ".git",
+  ".jj",
+  "node_modules",
+  ".turbo",
+  ".cache",
+  "dist",
+  ".wrangler",
+  ".tanstack",
+  ".artifacts",
+  ".expo",
+  "coverage",
+  "playwright-report",
+  "test-results",
+  "storybook-static",
+]);
 
-  if (
-    basename === ".git" ||
-    basename === ".jj" ||
-    basename === "node_modules" ||
-    basename === ".turbo" ||
-    basename === ".cache" ||
-    basename === "dist"
-  ) {
-    return false;
-  }
-
-  if (src === templateRoot) {
-    return true;
-  }
-
-  return true;
+function shouldCopyTemplatePath(src: string): boolean {
+  return !SKIPPED_TEMPLATE_DIRS.has(path.basename(src));
 }

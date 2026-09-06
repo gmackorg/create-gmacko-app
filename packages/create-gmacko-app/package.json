@@ -1,7 +1,7 @@
 {
   "name": "create-gmacko-app",
   "version": "0.1.1",
-  "description": "Create a modern SaaS app with Next.js, Expo, ForgeGraph guidance, and agent-native DX defaults",
+  "description": "Create a Gmacko app: TanStack Start + Effect on Cloudflare Workers with D1, Expo, ForgeGraph deployment guidance, and agent-native DX defaults",
   "type": "module",
   "engines": {
     "node": "^24.0.0",
@@ -34,11 +34,13 @@
   "keywords": [
     "saas",
     "template",
-    "nextjs",
+    "tanstack-start",
+    "effect",
+    "cloudflare-workers",
+    "d1",
     "expo",
     "turborepo",
-    "forgegraph",
-    "vinext"
+    "forgegraph"
   ],
   "homepage": "https://github.com/gmackorg/create-gmacko-app#readme",
   "bugs": {
@@ -52,7 +54,6 @@
     "@types/fs-extra": "^11.0.4",
     "@types/node": "catalog:",
     "@types/validate-npm-package-name": "^4.0.2",
-    "execa": "^9.6.1",
     "tsup": "^8.5.1",
     "typescript": "catalog:",
     "vitest": "^4.1.0"

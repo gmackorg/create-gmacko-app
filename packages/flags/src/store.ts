@@ -1,9 +1,11 @@
 /**
  * In-Memory Flag Store
  *
- * A simple, synchronous flag store that can be configured via:
- * 1. Direct configuration
- * 2. Environment variables
+ * A simple, synchronous flag store configured by its definitions and by
+ * `FlagStoreOptions`: the evaluation environment and per-flag overrides
+ * (`FLAG_<NAME>` values the app reads from its validated config). The
+ * store itself never reads `process.env`, so it is safe in the Worker
+ * bundle.
  *
  * Designed to be extended/replaced with external services like
  * LaunchDarkly or Flagsmith in the future.
@@ -18,6 +20,21 @@ import type {
   FlagValue,
 } from "./types";
 
+export interface FlagStoreOptions {
+  /** The environment flags are evaluated for (`development`, `staging`, `production`). */
+  readonly environment?: string | undefined;
+  /**
+   * Per-flag overrides keyed `FLAG_<FLAGNAME>` (uppercase, hyphens to
+   * underscores), the values the deployment supplies; parsed by the flag's
+   * default value type.
+   */
+  readonly overrides?: Readonly<Record<string, string | undefined>> | undefined;
+}
+
+/** The override key for a flag: `FLAG_NEW_DASHBOARD` for `newDashboard`. */
+export const flagOverrideKey = (flagName: string): string =>
+  `FLAG_${flagName.toUpperCase().replace(/-/g, "_")}`;
+
 /**
  * Hash a string to a number between 0-99 for percentage rollouts
  * Uses a simple but consistent hash algorithm
@@ -30,6 +47,36 @@ function hashToPercentage(input: string): number {
     hash = hash & hash; // Convert to 32bit integer
   }
   return Math.abs(hash % 100);
+}
+
+/**
+ * The value an allowlisted or rolled-in identifier sees. A boolean flag's
+ * "on" state is `true`; every other flag has one value, its default.
+ */
+function enabledValue<T>(flagDef: FlagDefinition<T>): T {
+  if (flagDef.defaultValue !== false) return flagDef.defaultValue;
+  // SAFETY: this line is reached only when `defaultValue` is the `false`
+  // literal, so the definition is a `FlagDefinition<boolean>` and `true`
+  // inhabits its value type `T`.
+  return true as T;
+}
+
+/**
+ * Parse a deployment-supplied `FLAG_*` override string into the flag's own
+ * value type, which is fixed by the type of its default value.
+ */
+function parseOverride<T>(flagDef: FlagDefinition<T>, raw: string): T {
+  const isBoolean =
+    flagDef.defaultValue === true || flagDef.defaultValue === false;
+  // `Number.isFinite` is true for numbers only; it never coerces its argument.
+  const isNumber = Number.isFinite(flagDef.defaultValue);
+  // SAFETY: each branch produces a value of the same JavaScript type as
+  // `flagDef.defaultValue` — boolean for a boolean default, number for a
+  // numeric one, the raw string otherwise — and `FlagDefinition<T>` says that
+  // type is `T`.
+  return (
+    isBoolean ? raw === "true" || raw === "1" : isNumber ? Number(raw) : raw
+  ) as T;
 }
 
 /**
@@ -57,12 +104,8 @@ function evaluateRollout<T>(
 
   // Check allowlist
   if (identifier && rollout.allowlist?.includes(identifier)) {
-    // For boolean flags, return true; otherwise return the non-default "enabled" state
-    const enabledValue = (
-      typeof flagDef.defaultValue === "boolean" ? true : flagDef.defaultValue
-    ) as T;
     return {
-      value: enabledValue,
+      value: enabledValue(flagDef),
       reason: "allowlist",
       flagName,
     };
@@ -72,11 +115,8 @@ function evaluateRollout<T>(
   if (identifier) {
     const bucket = hashToPercentage(`${flagName}:${identifier}`);
     if (bucket < rollout.percentage) {
-      const enabledValue = (
-        typeof flagDef.defaultValue === "boolean" ? true : flagDef.defaultValue
-      ) as T;
       return {
-        value: enabledValue,
+        value: enabledValue(flagDef),
         reason: "rollout",
         flagName,
       };
@@ -89,12 +129,17 @@ function evaluateRollout<T>(
 /**
  * Create a type-safe flag store with the given definitions
  */
-export function createFlagStore<T extends FlagDefinitions>(definitions: T) {
+export function createFlagStore<T extends FlagDefinitions>(
+  definitions: T,
+  options: FlagStoreOptions = {},
+) {
   // Runtime overrides (can be set programmatically)
   const overrides = new Map<string, unknown>();
+  // Deployment-supplied overrides
+  const supplied = options.overrides ?? {};
 
   // Current environment
-  let currentEnvironment: string = process.env.NODE_ENV ?? "development";
+  let currentEnvironment: string = options.environment ?? "development";
 
   /**
    * Set the current environment for flag evaluation
@@ -141,6 +186,10 @@ export function createFlagStore<T extends FlagDefinitions>(definitions: T) {
     flagName: K,
     context?: FlagContext,
   ): FlagEvaluationResult<FlagValue<T[K]>> {
+    // SAFETY: `T[K]` is a `FlagDefinition<V>` (the `FlagDefinitions`
+    // constraint), and `FlagValue<T[K]>` is defined as exactly that inferred
+    // `V`. The two are the same type; TypeScript cannot evaluate the
+    // conditional in `FlagValue` while `K` is an unresolved type parameter.
     const flagDef = definitions[flagName] as
       | FlagDefinition<FlagValue<T[K]>>
       | undefined;
@@ -151,29 +200,24 @@ export function createFlagStore<T extends FlagDefinitions>(definitions: T) {
 
     // 1. Check for runtime override
     if (overrides.has(flagName)) {
+      // SAFETY: `setOverride<K>` is the only writer of `overrides`, and it
+      // accepts exactly `FlagValue<T[K]>` for the key `flagName: K`, so the
+      // value stored under this key has that type. The map is heterogeneous
+      // across flags, which is why it cannot say so itself.
+      const override = overrides.get(flagName) as FlagValue<T[K]>;
       return {
-        value: overrides.get(flagName) as FlagValue<T[K]>,
+        value: override,
         reason: "override",
         flagName,
       };
     }
 
-    // 2. Check for environment variable override
+    // 2. Check for a deployment-supplied override
     // Format: FLAG_[FLAGNAME] (uppercase, hyphens to underscores)
-    const envKey = `FLAG_${flagName.toUpperCase().replace(/-/g, "_")}`;
-    const envValue = process.env[envKey];
+    const envValue = supplied[flagOverrideKey(flagName)];
     if (envValue !== undefined) {
-      // Parse environment variable based on default value type
-      let parsedValue: unknown;
-      if (typeof flagDef.defaultValue === "boolean") {
-        parsedValue = envValue === "true" || envValue === "1";
-      } else if (typeof flagDef.defaultValue === "number") {
-        parsedValue = Number(envValue);
-      } else {
-        parsedValue = envValue;
-      }
       return {
-        value: parsedValue as FlagValue<T[K]>,
+        value: parseOverride(flagDef, envValue),
         reason: "override",
         flagName,
       };
@@ -183,7 +227,7 @@ export function createFlagStore<T extends FlagDefinitions>(definitions: T) {
     const envSpecificValue = flagDef.environments?.[currentEnvironment];
     if (envSpecificValue !== undefined) {
       return {
-        value: envSpecificValue as FlagValue<T[K]>,
+        value: envSpecificValue,
         reason: "environment",
         flagName,
       };
@@ -219,11 +263,15 @@ export function createFlagStore<T extends FlagDefinitions>(definitions: T) {
   function getAllFlags(
     context?: FlagContext,
   ): Record<FlagName<T>, FlagValue<T[FlagName<T>]>> {
-    const result = {} as Record<FlagName<T>, FlagValue<T[FlagName<T>]>>;
-    for (const flagName of Object.keys(definitions) as FlagName<T>[]) {
-      result[flagName] = getFlagValue(flagName, context);
-    }
-    return result;
+    // SAFETY: `Object.keys` returns an object's own enumerable string keys, so
+    // for `definitions: T` they are exactly `keyof T & string`, which is
+    // `FlagName<T>`. Its `string[]` signature cannot express that.
+    const flagNames = Object.keys(definitions) as Array<FlagName<T>>;
+    // SAFETY: the entries below are one per key of `definitions`, i.e. one per
+    // `FlagName<T>`, so the record they build has every key of the result type.
+    return Object.fromEntries(
+      flagNames.map((flagName) => [flagName, getFlagValue(flagName, context)]),
+    ) as Record<FlagName<T>, FlagValue<T[FlagName<T>]>>;
   }
 
   /**

@@ -1,3 +1,40 @@
+/** The transactional email provider; `none` means the app sends no email. */
+export type EmailProvider = "resend" | "sendgrid" | "none";
+/** The pub/sub + queue backend `@gmacko/realtime` talks to. */
+export type RealtimeProvider = "redis" | "none";
+/** The object store `@gmacko/storage` writes to. */
+export type StorageProvider = "r2" | "none";
+
+// Each provider-bearing integration is declared through its own contract
+// rather than written inline under `as const`, which would pin `provider` to
+// the single literal it is scaffolded with and turn every
+// `provider === "…"` comparison in this repo into a "no overlap" error.
+// `enabled` keeps the literal the scaffolder wrote, so a disabled integration
+// stays statically disabled for its consumers.
+
+/** How the app sends transactional email. */
+interface EmailIntegration {
+  readonly enabled: false;
+  readonly provider: EmailProvider;
+}
+/** How the app publishes and subscribes to realtime events. */
+interface RealtimeIntegration {
+  readonly enabled: false;
+  readonly provider: RealtimeProvider;
+}
+/** Where the app stores uploaded files. */
+interface StorageIntegration {
+  readonly enabled: false;
+  readonly provider: StorageProvider;
+}
+
+const email: EmailIntegration = { enabled: false, provider: "none" };
+// Node-only (ioredis + BullMQ): unsupported on the web lane, which runs on
+// Cloudflare Workers. Enable it only for a Node service on a VPS node; see
+// packages/realtime/README.md.
+const realtime: RealtimeIntegration = { enabled: false, provider: "none" };
+const storage: StorageIntegration = { enabled: false, provider: "none" };
+
 export const integrations = {
   sentry: true,
   posthog: true,
@@ -5,22 +42,12 @@ export const integrations = {
   stripe: false,
   revenuecat: false,
   notifications: false,
-  email: {
-    enabled: false,
-    provider: "none" as "resend" | "sendgrid" | "none",
-  },
-  realtime: {
-    enabled: false,
-    provider: "none" as "redis" | "none",
-  },
-  storage: {
-    enabled: false,
-    provider: "none" as "uploadthing" | "none",
-  },
-  // Keep disabled to match the flat (non-localized) app route structure — with
-  // i18n enabled, next-intl's locale routing leaves the root `/` unresolved
-  // (404). The scaffolder also generates apps with i18n:false; enabling it
-  // requires adding a [locale] segment.
+  email,
+  realtime,
+  storage,
+  // Keep disabled to match the flat (non-localized) route structure of
+  // apps/web; enabling it means adding a locale segment to the routes. The
+  // scaffolder also generates apps with i18n:false.
   i18n: false,
   openapi: false,
 } as const;

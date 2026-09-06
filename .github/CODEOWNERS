@@ -3,10 +3,11 @@
 
 # Infrastructure & CI
 .github/ @gmackie
-Dockerfile @gmackie
-docker-compose.yml @gmackie
+deploy/ @gmackie
+apps/web/wrangler.jsonc @gmackie
 
 # Core packages
+packages/domain/ @gmackie
 packages/db/ @gmackie
 packages/auth/ @gmackie
 packages/api/ @gmackie

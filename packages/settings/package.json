@@ -22,7 +22,7 @@
   "devDependencies": {
     "@biomejs/biome": "catalog:",
     "@gmacko/tsconfig": "workspace:*",
-    "@gmacko/vitest-config": "workspace:*",
+    "@vitest/coverage-v8": "^4.1.0",
     "oxlint": "catalog:",
     "typescript": "catalog:",
     "vitest": "^4.1.0"

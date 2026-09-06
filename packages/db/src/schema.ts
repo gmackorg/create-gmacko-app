@@ -1,9 +1,13 @@
-import { sql } from "drizzle-orm";
-import { pgTable, unique } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod/v4";
+import {
+  index,
+  integer,
+  sqliteTable,
+  text,
+  unique,
+} from "drizzle-orm/sqlite-core";
 
 import { user } from "./auth-schema";
+import { bool, id, json, timestampMs, timestamps } from "./columns";
 
 export const workspaceRoleEnum = ["owner", "admin", "member"] as const;
 export type WorkspaceRole = (typeof workspaceRoleEnum)[number];
@@ -26,91 +30,67 @@ export type BillingLimitPeriod = (typeof billingLimitPeriodEnum)[number];
 export const usageAggregationEnum = ["sum", "max"] as const;
 export type UsageAggregation = (typeof usageAggregationEnum)[number];
 
-export const Post = pgTable("post", (t) => ({
-  id: t.uuid().notNull().primaryKey().defaultRandom(),
-  title: t.varchar({ length: 256 }).notNull(),
-  content: t.text().notNull(),
-  createdAt: t.timestamp().defaultNow().notNull(),
-  updatedAt: t
-    .timestamp({ mode: "date", withTimezone: true })
-    .$onUpdateFn(() => sql`now()`),
-}));
-
-export const CreatePostSchema = createInsertSchema(Post, {
-  title: z.string().max(256),
-  content: z.string().max(256),
-}).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
+export const Post = sqliteTable("post", {
+  id: id(),
+  title: text().notNull(),
+  content: text().notNull(),
+  ...timestamps(),
 });
 
-export const userPreferences = pgTable("user_preferences", (t) => ({
-  id: t.uuid().notNull().primaryKey().defaultRandom(),
-  userId: t
-    .text()
+export const userPreferences = sqliteTable("user_preferences", {
+  id: id(),
+  userId: text("user_id")
     .notNull()
     .unique()
     .references(() => user.id, { onDelete: "cascade" }),
-  theme: t.varchar({ length: 20 }).notNull().default("system"),
-  language: t.varchar({ length: 10 }).notNull().default("en"),
-  timezone: t.varchar({ length: 50 }).notNull().default("UTC"),
-  emailNotifications: t.boolean().notNull().default(true),
-  pushNotifications: t.boolean().notNull().default(true),
-  createdAt: t.timestamp().defaultNow().notNull(),
-  updatedAt: t
-    .timestamp({ mode: "date", withTimezone: true })
-    .$onUpdateFn(() => sql`now()`),
-}));
+  theme: text().notNull().default("system"),
+  language: text().notNull().default("en"),
+  timezone: text().notNull().default("UTC"),
+  emailNotifications: bool("email_notifications").notNull().default(true),
+  pushNotifications: bool("push_notifications").notNull().default(true),
+  ...timestamps(),
+});
 
-export const apiKeys = pgTable("api_keys", (t) => ({
-  id: t.uuid().notNull().primaryKey().defaultRandom(),
-  userId: t
-    .text()
+export const apiKeys = sqliteTable("api_keys", {
+  id: id(),
+  userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
-  name: t.varchar({ length: 100 }).notNull(),
-  keyHash: t.text().notNull(),
-  keyPrefix: t.varchar({ length: 12 }).notNull(),
-  permissions: t.json().$type<string[]>().notNull().default(["read"]),
-  lastUsedAt: t.timestamp({ mode: "date", withTimezone: true }),
-  expiresAt: t.timestamp({ mode: "date", withTimezone: true }),
-  createdAt: t.timestamp().defaultNow().notNull(),
-  revokedAt: t.timestamp({ mode: "date", withTimezone: true }),
-}));
+  name: text().notNull(),
+  keyHash: text("key_hash").notNull(),
+  keyPrefix: text("key_prefix").notNull(),
+  permissions: json<string[]>("permissions").notNull().default(["read"]),
+  lastUsedAt: timestampMs("last_used_at"),
+  expiresAt: timestampMs("expires_at"),
+  createdAt: timestampMs("created_at")
+    .notNull()
+    .$defaultFn(() => new Date()),
+  revokedAt: timestampMs("revoked_at"),
+});
 
-export const workspace = pgTable("workspace", (t) => ({
-  id: t.uuid().notNull().primaryKey().defaultRandom(),
-  name: t.varchar({ length: 120 }).notNull(),
-  slug: t.varchar({ length: 160 }).notNull().unique(),
-  ownerUserId: t
-    .text()
+export const workspace = sqliteTable("workspace", {
+  id: id(),
+  name: text().notNull(),
+  slug: text().notNull().unique(),
+  ownerUserId: text("owner_user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
-  createdAt: t.timestamp().defaultNow().notNull(),
-  updatedAt: t
-    .timestamp({ mode: "date", withTimezone: true })
-    .$onUpdateFn(() => sql`now()`),
-}));
+  ...timestamps(),
+});
 
-export const workspaceMembership = pgTable(
+export const workspaceMembership = sqliteTable(
   "workspace_membership",
-  (t) => ({
-    id: t.uuid().notNull().primaryKey().defaultRandom(),
-    workspaceId: t
-      .uuid()
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
       .notNull()
       .references(() => workspace.id, { onDelete: "cascade" }),
-    userId: t
-      .text()
+    userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    role: t.text().$type<WorkspaceRole>().notNull().default("member"),
-    createdAt: t.timestamp().defaultNow().notNull(),
-    updatedAt: t
-      .timestamp({ mode: "date", withTimezone: true })
-      .$onUpdateFn(() => sql`now()`),
-  }),
+    role: text().$type<WorkspaceRole>().notNull().default("member"),
+    ...timestamps(),
+  },
   (table) => [
     unique("workspace_membership_workspace_user_unique").on(
       table.workspaceId,
@@ -119,25 +99,20 @@ export const workspaceMembership = pgTable(
   ],
 );
 
-export const workspaceInviteAllowlist = pgTable(
+export const workspaceInviteAllowlist = sqliteTable(
   "workspace_invite_allowlist",
-  (t) => ({
-    id: t.uuid().notNull().primaryKey().defaultRandom(),
-    workspaceId: t
-      .uuid()
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
       .notNull()
       .references(() => workspace.id, { onDelete: "cascade" }),
-    email: t.varchar({ length: 320 }).notNull(),
-    role: t.text().$type<WorkspaceRole>().notNull().default("member"),
-    invitedByUserId: t
-      .text()
+    email: text().notNull(),
+    role: text().$type<WorkspaceRole>().notNull().default("member"),
+    invitedByUserId: text("invited_by_user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    createdAt: t.timestamp().defaultNow().notNull(),
-    updatedAt: t
-      .timestamp({ mode: "date", withTimezone: true })
-      .$onUpdateFn(() => sql`now()`),
-  }),
+    ...timestamps(),
+  },
   (table) => [
     unique("workspace_invite_allowlist_workspace_email_unique").on(
       table.workspaceId,
@@ -146,25 +121,26 @@ export const workspaceInviteAllowlist = pgTable(
   ],
 );
 
-export const applicationSettings = pgTable("application_settings", (t) => ({
-  id: t.uuid().notNull().primaryKey().defaultRandom(),
-  setupCompletedAt: t.timestamp({ mode: "date", withTimezone: true }),
-  setupCompletedByUserId: t
-    .text()
-    .references(() => user.id, { onDelete: "set null" }),
-  initialWorkspaceId: t
-    .uuid()
-    .references(() => workspace.id, { onDelete: "set null" }),
-  maintenanceMode: t.boolean().notNull().default(false),
-  signupEnabled: t.boolean().notNull().default(true),
-  announcementMessage: t.text(),
-  announcementTone: t.varchar({ length: 24 }).notNull().default("info"),
-  allowedEmailDomains: t.json().$type<string[]>().notNull().default([]),
-  createdAt: t.timestamp().defaultNow().notNull(),
-  updatedAt: t
-    .timestamp({ mode: "date", withTimezone: true })
-    .$onUpdateFn(() => sql`now()`),
-}));
+export const applicationSettings = sqliteTable("application_settings", {
+  id: id(),
+  setupCompletedAt: timestampMs("setup_completed_at"),
+  setupCompletedByUserId: text("setup_completed_by_user_id").references(
+    () => user.id,
+    { onDelete: "set null" },
+  ),
+  initialWorkspaceId: text("initial_workspace_id").references(
+    () => workspace.id,
+    { onDelete: "set null" },
+  ),
+  maintenanceMode: bool("maintenance_mode").notNull().default(false),
+  signupEnabled: bool("signup_enabled").notNull().default(true),
+  announcementMessage: text("announcement_message"),
+  announcementTone: text("announcement_tone").notNull().default("info"),
+  allowedEmailDomains: json<string[]>("allowed_email_domains")
+    .notNull()
+    .default([]),
+  ...timestamps(),
+});
 
 export const waitlistSourceEnum = [
   "landing",
@@ -182,129 +158,108 @@ export const waitlistStatusEnum = [
 ] as const;
 export type WaitlistStatus = (typeof waitlistStatusEnum)[number];
 
-export const waitlistEntry = pgTable(
+export const waitlistEntry = sqliteTable(
   "waitlist_entry",
-  (t) => ({
-    id: t.uuid().notNull().primaryKey().defaultRandom(),
-    email: t.varchar({ length: 320 }).notNull(),
-    source: t.text().$type<WaitlistSource>().notNull().default("landing"),
-    status: t.text().$type<WaitlistStatus>().notNull().default("pending"),
-    message: t.text(),
-    referralCode: t.varchar({ length: 120 }),
-    reviewedByUserId: t
-      .text()
-      .references(() => user.id, { onDelete: "set null" }),
-    reviewedAt: t.timestamp({ mode: "date", withTimezone: true }),
-    createdAt: t.timestamp().defaultNow().notNull(),
-    updatedAt: t
-      .timestamp({ mode: "date", withTimezone: true })
-      .$onUpdateFn(() => sql`now()`),
-  }),
+  {
+    id: id(),
+    email: text().notNull(),
+    source: text().$type<WaitlistSource>().notNull().default("landing"),
+    status: text().$type<WaitlistStatus>().notNull().default("pending"),
+    message: text(),
+    referralCode: text("referral_code"),
+    reviewedByUserId: text("reviewed_by_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    reviewedAt: timestampMs("reviewed_at"),
+    ...timestamps(),
+  },
   (table) => [
     unique("waitlist_entry_email_source_unique").on(table.email, table.source),
   ],
 );
 
-export const billingPlan = pgTable("billing_plan", (t) => ({
-  id: t.uuid().notNull().primaryKey().defaultRandom(),
-  key: t.varchar({ length: 64 }).notNull().unique(),
-  name: t.varchar({ length: 120 }).notNull(),
-  description: t.text(),
-  interval: t.text().$type<BillingInterval>().notNull().default("month"),
-  amountInCents: t.integer().notNull().default(0),
-  currency: t.varchar({ length: 3 }).notNull().default("usd"),
-  isDefault: t.boolean().notNull().default(false),
-  active: t.boolean().notNull().default(true),
-  createdAt: t.timestamp().defaultNow().notNull(),
-  updatedAt: t
-    .timestamp({ mode: "date", withTimezone: true })
-    .$onUpdateFn(() => sql`now()`),
-}));
+export const billingPlan = sqliteTable("billing_plan", {
+  id: id(),
+  key: text().notNull().unique(),
+  name: text().notNull(),
+  description: text(),
+  interval: text().$type<BillingInterval>().notNull().default("month"),
+  amountInCents: integer("amount_in_cents").notNull().default(0),
+  currency: text().notNull().default("usd"),
+  isDefault: bool("is_default").notNull().default(false),
+  active: bool("active").notNull().default(true),
+  ...timestamps(),
+});
 
-export const billingPlanLimit = pgTable(
+export const billingPlanLimit = sqliteTable(
   "billing_plan_limit",
-  (t) => ({
-    id: t.uuid().notNull().primaryKey().defaultRandom(),
-    planId: t
-      .uuid()
+  {
+    id: id(),
+    planId: text("plan_id")
       .notNull()
       .references(() => billingPlan.id, { onDelete: "cascade" }),
-    key: t.varchar({ length: 80 }).notNull(),
-    value: t.integer(),
-    period: t.text().$type<BillingLimitPeriod>().notNull().default("month"),
-    createdAt: t.timestamp().defaultNow().notNull(),
-    updatedAt: t
-      .timestamp({ mode: "date", withTimezone: true })
-      .$onUpdateFn(() => sql`now()`),
-  }),
+    key: text().notNull(),
+    value: integer(),
+    period: text().$type<BillingLimitPeriod>().notNull().default("month"),
+    ...timestamps(),
+  },
   (table) => [
     unique("billing_plan_limit_plan_key_unique").on(table.planId, table.key),
   ],
 );
 
-export const workspaceSubscription = pgTable(
+export const workspaceSubscription = sqliteTable(
   "workspace_subscription",
-  (t) => ({
-    id: t.uuid().notNull().primaryKey().defaultRandom(),
-    workspaceId: t
-      .uuid()
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
       .notNull()
       .references(() => workspace.id, { onDelete: "cascade" }),
-    planId: t.uuid().references(() => billingPlan.id, { onDelete: "set null" }),
-    status: t
-      .text()
+    planId: text("plan_id").references(() => billingPlan.id, {
+      onDelete: "set null",
+    }),
+    status: text()
       .$type<WorkspaceSubscriptionStatus>()
       .notNull()
       .default("free"),
-    provider: t.text().$type<BillingProvider>().notNull().default("manual"),
-    stripeCustomerId: t.varchar({ length: 255 }),
-    stripeSubscriptionId: t.varchar({ length: 255 }),
-    currentPeriodStart: t.timestamp({ mode: "date", withTimezone: true }),
-    currentPeriodEnd: t.timestamp({ mode: "date", withTimezone: true }),
-    cancelAtPeriodEnd: t.boolean().notNull().default(false),
-    createdAt: t.timestamp().defaultNow().notNull(),
-    updatedAt: t
-      .timestamp({ mode: "date", withTimezone: true })
-      .$onUpdateFn(() => sql`now()`),
-  }),
+    provider: text().$type<BillingProvider>().notNull().default("manual"),
+    stripeCustomerId: text("stripe_customer_id"),
+    stripeSubscriptionId: text("stripe_subscription_id"),
+    currentPeriodStart: timestampMs("current_period_start"),
+    currentPeriodEnd: timestampMs("current_period_end"),
+    cancelAtPeriodEnd: bool("cancel_at_period_end").notNull().default(false),
+    ...timestamps(),
+  },
   (table) => [
     unique("workspace_subscription_workspace_unique").on(table.workspaceId),
   ],
 );
 
-export const usageMeter = pgTable("usage_meter", (t) => ({
-  id: t.uuid().notNull().primaryKey().defaultRandom(),
-  key: t.varchar({ length: 80 }).notNull().unique(),
-  name: t.varchar({ length: 120 }).notNull(),
-  description: t.text(),
-  aggregation: t.text().$type<UsageAggregation>().notNull().default("sum"),
-  unit: t.varchar({ length: 40 }).notNull().default("count"),
-  createdAt: t.timestamp().defaultNow().notNull(),
-  updatedAt: t
-    .timestamp({ mode: "date", withTimezone: true })
-    .$onUpdateFn(() => sql`now()`),
-}));
+export const usageMeter = sqliteTable("usage_meter", {
+  id: id(),
+  key: text().notNull().unique(),
+  name: text().notNull(),
+  description: text(),
+  aggregation: text().$type<UsageAggregation>().notNull().default("sum"),
+  unit: text().notNull().default("count"),
+  ...timestamps(),
+});
 
-export const workspaceUsageRollup = pgTable(
+export const workspaceUsageRollup = sqliteTable(
   "workspace_usage_rollup",
-  (t) => ({
-    id: t.uuid().notNull().primaryKey().defaultRandom(),
-    workspaceId: t
-      .uuid()
+  {
+    id: id(),
+    workspaceId: text("workspace_id")
       .notNull()
       .references(() => workspace.id, { onDelete: "cascade" }),
-    meterId: t
-      .uuid()
+    meterId: text("meter_id")
       .notNull()
       .references(() => usageMeter.id, { onDelete: "cascade" }),
-    periodStart: t.timestamp({ mode: "date", withTimezone: true }).notNull(),
-    periodEnd: t.timestamp({ mode: "date", withTimezone: true }).notNull(),
-    quantity: t.integer().notNull().default(0),
-    createdAt: t.timestamp().defaultNow().notNull(),
-    updatedAt: t
-      .timestamp({ mode: "date", withTimezone: true })
-      .$onUpdateFn(() => sql`now()`),
-  }),
+    periodStart: timestampMs("period_start").notNull(),
+    periodEnd: timestampMs("period_end").notNull(),
+    quantity: integer().notNull().default(0),
+    ...timestamps(),
+  },
   (table) => [
     unique("workspace_usage_rollup_workspace_meter_period_unique").on(
       table.workspaceId,
@@ -315,19 +270,60 @@ export const workspaceUsageRollup = pgTable(
   ],
 );
 
-export const CreateUserPreferencesSchema = createInsertSchema(userPreferences, {
-  theme: z.enum(["light", "dark", "system"]).default("system"),
-  language: z.string().max(10).default("en"),
-  timezone: z.string().max(50).default("UTC"),
-}).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+/**
+ * One row per (rate-limit scope, caller, fixed window): the global counter
+ * behind sign-up and magic-link send. Cloudflare's Rate Limiting bindings
+ * count per colo, which is the right trade for the read-mostly API scopes but
+ * not for the two endpoints that create accounts and send mail, so those go
+ * through D1 instead.
+ *
+ * `key` is `<scope>:<client>:<window start ms>`, so a new window is a new row
+ * rather than a reset, and the nightly Cron tick deletes everything past
+ * `expires_at` (`Jobs.pruneRateLimitWindows`). It has no row model in
+ * @gmacko/domain on purpose: it is infrastructure, never part of the contract.
+ */
+export const rateLimitWindow = sqliteTable(
+  "rate_limit_window",
+  {
+    key: text().primaryKey(),
+    scope: text().notNull(),
+    count: integer().notNull().default(0),
+    expiresAt: timestampMs("expires_at").notNull(),
+  },
+  (table) => [index("rate_limit_window_expires_at_idx").on(table.expiresAt)],
+);
 
-export const UpdateUserPreferencesSchema =
-  CreateUserPreferencesSchema.partial().omit({
-    userId: true,
-  });
+/**
+ * One row per Stripe webhook event id: the idempotency ledger behind
+ * `POST /api/webhooks/stripe`. Stripe delivers at least once — "Occasionally,
+ * the same event is sent more than once" — so an endpoint with side effects
+ * has to dedupe on `event.id` or apply them twice.
+ *
+ * Two columns, not one, because a lost response is not a lost write. A
+ * delivery *claims* the event (guarded insert), runs its effect, then marks
+ * `completed_at`. A redelivery that finds `completed_at` set is a true
+ * duplicate and does nothing; one that finds it NULL is retrying a claim
+ * whose effect provably never finished, and runs it. Claim-and-forget (a
+ * single column) turns "the response was lost" into "the effect is lost
+ * forever", which is what apps/web/fault/stripe-webhook.fault.ts checks.
+ *
+ * Like `rate_limit_window` this is infrastructure: no row model in
+ * @gmacko/domain, never part of the contract. The nightly Cron tick is the
+ * right place to prune rows older than Stripe's retry window.
+ */
+export const stripeWebhookEvent = sqliteTable(
+  "stripe_webhook_event",
+  {
+    /** Stripe's own `evt_...` id; the dedupe key, so it is the primary key. */
+    eventId: text("event_id").primaryKey(),
+    type: text().notNull(),
+    receivedAt: timestampMs("received_at").notNull(),
+    /** Set once the delivery's side effect finished; NULL while in flight. */
+    completedAt: timestampMs("completed_at"),
+  },
+  (table) => [
+    index("stripe_webhook_event_received_at_idx").on(table.receivedAt),
+  ],
+);
 
 export * from "./auth-schema";

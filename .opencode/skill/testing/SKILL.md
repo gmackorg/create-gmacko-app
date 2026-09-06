@@ -1,21 +1,22 @@
 ---
 name: testing
-description: Write and run unit tests, integration tests, and E2E Playwright tests against a spec
+description: Write and run unit tests, API tests, Workers tests, and E2E Playwright tests against a spec
 ---
 
 # Testing Skill
 
-Comprehensive testing workflow: unit tests (Vitest), integration tests (Vitest + DB), and E2E functional tests (Playwright) written against a specification. If no spec exists, prompt the user to provide one before writing tests.
+Comprehensive testing workflow: unit tests (Vitest), API tests (Vitest + the `HttpApi` in-process over an in-memory SQLite), Workers tests (Miniflare D1), and E2E functional tests (Playwright) written against a specification. If no spec exists, prompt the user to provide one before writing tests.
 
 ## Testing Pyramid
 
 ```
-         /  E2E  \        ← Playwright: full user flows against the spec
-        /  Integ  \       ← Vitest + real DB: router procedures end-to-end
-       /   Unit    \      ← Vitest: pure logic, validators, utils
+         /  E2E  \        ← Playwright: full user flows against a local D1
+        /  API    \       ← Vitest + makeTestApi: every endpoint end to end
+       /  Workers  \      ← Vitest pool-workers: migrations and D1 behavior
+      /   Unit      \     ← Vitest: schemas, pure logic, utils
 ```
 
-**Rule: every feature ships with tests at all three levels.**
+**Rule: every feature ships with tests at the unit, API, and E2E levels.**
 
 ## Prerequisite: Specification
 
@@ -32,15 +33,16 @@ Before writing any test, you MUST have a clear specification. If the user has no
 Spec: "Users can create posts with a title (required, max 256 chars) and content (required)"
 
 Unit tests:
-  ✓ CreatePostSchema rejects empty title
-  ✓ CreatePostSchema rejects title > 256 chars
-  ✓ CreatePostSchema rejects missing content
-  ✓ CreatePostSchema accepts valid input
+  ✓ CreatePost rejects empty title
+  ✓ CreatePost rejects title > 256 chars
+  ✓ CreatePost rejects missing content
+  ✓ CreatePost accepts valid input
 
-Integration tests:
-  ✓ post.create inserts a row and returns the post
-  ✓ post.create requires authentication
-  ✓ post.all returns created posts
+API tests:
+  ✓ posts.create inserts a row and returns 201 with the post
+  ✓ posts.create is Unauthorized without a credential
+  ✓ posts.create is Forbidden{scope} with a read-only key
+  ✓ posts.list returns created posts
 
 E2E tests:
   ✓ Authenticated user can create a post from the form
@@ -54,9 +56,10 @@ E2E tests:
 
 ```
 packages/
-├── api/src/router/__tests__/post.test.ts
-├── db/src/__tests__/schema.test.ts
-├── validators/src/__tests__/feature-name.test.ts
+├── domain/src/__tests__/api.test.ts          # contract invariants (HttpApi.reflect)
+├── domain/src/__tests__/models.test.ts       # Schema validation
+├── db/src/__tests__/database.test.ts         # Database service on sqlite-node
+├── api-client/src/__tests__/                 # client + query layer
 ├── settings/src/__tests__/schemas.test.ts
 └── create-gmacko-app/src/__tests__/types.test.ts
 ```
@@ -64,51 +67,37 @@ packages/
 ### Running
 
 ```bash
-pnpm test                          # All unit tests
-pnpm -F @gmacko/api test          # API package only
-pnpm -F @gmacko/api test:watch    # Watch mode
+pnpm test                          # All unit + API tests
+pnpm -F @gmacko/api test           # API package only
+pnpm -F @gmacko/api test:watch     # Watch mode
+pnpm test:workers                  # Miniflare D1 suites
 pnpm test:coverage                 # With coverage report
 ```
 
 ### Patterns
 
-#### Testing Zod Schemas
+#### Testing domain Schemas
 
 ```typescript
-// packages/validators/src/__tests__/feature-name.test.ts
+// packages/domain/src/__tests__/models.test.ts
+import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { CreateFeatureSchema } from "../feature-name";
+import { CreatePost } from "../posts";
 
-describe("CreateFeatureSchema", () => {
+const decode = Schema.decodeUnknownSync(CreatePost);
+
+describe("CreatePost", () => {
   it("accepts valid input", () => {
-    const result = CreateFeatureSchema.safeParse({
-      title: "My Feature",
-      priority: "high",
-    });
-    expect(result.success).toBe(true);
+    expect(decode({ title: "Hello", content: "World" })).toMatchObject({ title: "Hello" });
   });
 
-  it("rejects empty title", () => {
-    const result = CreateFeatureSchema.safeParse({
-      title: "",
-      priority: "low",
-    });
-    expect(result.success).toBe(false);
+  it("rejects an empty title", () => {
+    expect(() => decode({ title: "", content: "x" })).toThrow();
   });
 
-  it("rejects title exceeding max length", () => {
-    const result = CreateFeatureSchema.safeParse({
-      title: "a".repeat(257),
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("defaults priority to medium", () => {
-    const result = CreateFeatureSchema.parse({
-      title: "Test",
-    });
-    expect(result.priority).toBe("medium");
+  it("rejects a title exceeding max length", () => {
+    expect(() => decode({ title: "a".repeat(257), content: "x" })).toThrow();
   });
 });
 ```
@@ -116,212 +105,157 @@ describe("CreateFeatureSchema", () => {
 #### Testing Utility Functions
 
 ```typescript
-// packages/api/src/__tests__/utils.test.ts
+// packages/auth/src/__tests__/api-keys.test.ts
+import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { generateApiKey, hashApiKey } from "../utils";
+import { hashSecret, KEY_PREFIX } from "../api-keys";
 
-describe("API Key Utils", () => {
-  it("generates keys with gmk_ prefix", () => {
-    const key = generateApiKey();
-    expect(key).toMatch(/^gmk_/);
+describe("API key hashing", () => {
+  it("is deterministic", async () => {
+    const a = await Effect.runPromise(hashSecret(`${KEY_PREFIX}test`));
+    const b = await Effect.runPromise(hashSecret(`${KEY_PREFIX}test`));
+    expect(a).toBe(b);
   });
 
-  it("produces deterministic hashes", () => {
-    const key = "gmk_test_key";
-    expect(hashApiKey(key)).toBe(hashApiKey(key));
-  });
-
-  it("produces different hashes for different keys", () => {
-    expect(hashApiKey("gmk_a")).not.toBe(hashApiKey("gmk_b"));
+  it("differs per secret", async () => {
+    const a = await Effect.runPromise(hashSecret(`${KEY_PREFIX}a`));
+    const b = await Effect.runPromise(hashSecret(`${KEY_PREFIX}b`));
+    expect(a).not.toBe(b);
   });
 });
 ```
 
-## Integration Tests (Vitest + Database)
+## API Tests (Vitest + the HttpApi in-process)
 
-Integration tests exercise tRPC procedures against a real (or test) database.
+API tests exercise the real handler chain (middleware, credential, rate limit, service, database) through the typed client, against an in-memory SQLite that has the checked-in migrations applied. No server, no network.
 
 ### Setup
 
+`packages/api/src/testing.ts` provides `makeTestApi`:
+
 ```typescript
-// packages/api/src/__tests__/helpers/setup.ts
-import { beforeAll, afterAll, afterEach } from "vitest";
-import { sql } from "drizzle-orm";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { Effect } from "effect";
+import { Database } from "@gmacko/db";
+import { Post as PostTable } from "@gmacko/db/schema";
+import { CreatePost } from "@gmacko/domain";
+import { makeTestApi, type TestApi, type TestUser } from "../testing";
 
-import { db } from "@gmacko/db/client";
+let api: TestApi;
+let author: TestUser;
 
-// Clean tables between tests
-export async function cleanDatabase() {
-  await db.execute(sql`TRUNCATE TABLE post, user_preferences, api_keys CASCADE`);
-}
+beforeAll(async () => {
+  api = makeTestApi();                 // in-memory sqlite-node, migrations applied
+  author = await api.createUser();     // signed-in user with a session cookie
+});
+afterAll(() => api.dispose());
 
-// Create a test user for authenticated procedures
-export async function createTestUser() {
-  const [user] = await db
-    .insert(schema.user)
-    .values({
-      id: "test-user-id",
-      name: "Test User",
-      email: "integration@test.com",
-      emailVerified: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .returning();
-  return user!;
-}
+const clearPosts = () =>
+  api.run(Effect.flatMap(Database, ({ db }) => db.delete(PostTable)));
 ```
 
-### Testing Router Procedures
+`TestApi` gives you `call` (typed client, resolves the success), `failure` (resolves the typed error), `fetch` (raw HTTP against the handler), `run` (an Effect against the app's services), `createUser`, `createApiKey`, and span/log inspection (`spansNamed`, `logsMentioning`).
+
+### Testing Endpoints
 
 ```typescript
-// packages/api/src/router/__tests__/post.integration.test.ts
-import { describe, expect, it, beforeEach } from "vitest";
+// packages/api/src/posts/posts.test.ts
+describe("posts", () => {
+  it("create returns the created row with 201 and needs the write scope", async () => {
+    const created = await api.call(
+      (client) => client.posts.create({ payload: new CreatePost({ title: "Hello", content: "World" }) }),
+      { cookie: author.cookie },
+    );
+    expect(created).toMatchObject({ title: "Hello", content: "World" });
 
-import { db } from "@gmacko/db/client";
-import { Post } from "@gmacko/db/schema";
+    const anonymous = await api.failure((client) =>
+      client.posts.create({ payload: new CreatePost({ title: "x", content: "y" }) }),
+    );
+    expect(anonymous).toMatchObject({ _tag: "Unauthorized" });
 
-import { cleanDatabase, createTestUser } from "../helpers/setup";
-
-describe("post router (integration)", () => {
-  beforeEach(async () => {
-    await cleanDatabase();
+    const readKey = await api.createApiKey(author, ["read"]);
+    const scoped = await api.failure(
+      (client) => client.posts.create({ payload: new CreatePost({ title: "x", content: "y" }) }),
+      { bearer: readKey.key },
+    );
+    expect(scoped).toMatchObject({ _tag: "Forbidden", reason: "scope" });
   });
 
-  it("creates a post and returns it", async () => {
-    const user = await createTestUser();
-
-    // Call the procedure directly or through a test caller
-    const [created] = await db
-      .insert(Post)
-      .values({ title: "Test Post", content: "Test content" })
-      .returning();
-
-    expect(created).toBeDefined();
-    expect(created!.title).toBe("Test Post");
-  });
-
-  it("lists all posts", async () => {
-    await db.insert(Post).values([
-      { title: "Post 1", content: "Content 1" },
-      { title: "Post 2", content: "Content 2" },
-    ]);
-
-    const posts = await db.select().from(Post);
-    expect(posts).toHaveLength(2);
+  it("rejects an empty title with 400", async () => {
+    const response = await api.fetch("/api/posts", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: author.cookie, origin: api.baseUrl },
+      body: JSON.stringify({ title: "", content: "x" }),
+    });
+    expect(response.status).toBe(400);
   });
 });
 ```
 
-### Testing with tRPC Test Caller
+Test every endpoint for: the success shape and status, each declared error, `Unauthorized` without a credential, `Forbidden{scope}` with an under-scoped key, and (for admin endpoints) `Forbidden{role}` for a non-admin session.
+
+### Testing services directly
+
+When a service has logic worth testing without HTTP, run it against the app's services:
 
 ```typescript
-// packages/api/src/__tests__/helpers/caller.ts
-import { appRouter } from "../../root";
-import { createTRPCContext } from "../../trpc";
-
-export async function createAuthenticatedCaller(userId: string) {
-  const ctx = await createTRPCContext({
-    headers: new Headers(),
-    auth: {} as any, // Mock auth for testing
-  });
-
-  // Override session for testing
-  return appRouter.createCaller({
-    ...ctx,
-    session: {
-      user: { id: userId, name: "Test", email: "test@test.com" },
-      session: null,
-    },
-  });
-}
-
-export async function createPublicCaller() {
-  const ctx = await createTRPCContext({
-    headers: new Headers(),
-    auth: {} as any,
-  });
-  return appRouter.createCaller(ctx);
-}
+const posts = await api.run(Effect.flatMap(Posts, (service) => service.list));
 ```
+
+## Workers Tests (Miniflare D1)
+
+`*.workers.test.ts` files run under `@cloudflare/vitest-pool-workers` on a real D1 (`vitest.workers.config.ts` in `packages/db` and `packages/api`). Use them for anything D1-specific: the migration set applied from empty (`packages/db/src/__tests__/migrations.workers.test.ts` asserts no `__new_` table survives), `Database.batch` atomicity, and error classification. `pnpm test:workers` runs them; a migration that passes on sqlite-node and fails here is a D1 rule violation.
 
 ## E2E Tests (Playwright)
 
-E2E tests are written against the feature specification and test real user flows in the browser.
+E2E tests are written against the feature specification and test real user flows in the browser, against `vite dev` on workerd with its own local D1 (`apps/web/.wrangler/e2e`) and an emulated GitHub for OAuth.
 
 ### Directory Structure
 
 ```
-apps/nextjs/e2e/
-├── auth.setup.ts          # Shared auth state setup
-├── fixtures/
-│   └── test-data.ts       # Shared test data
-├── pages/
-│   ├── home.spec.ts       # Landing page tests
-│   ├── settings.spec.ts   # Settings tests
-│   └── admin.spec.ts      # Admin tests
-└── flows/
-    ├── signup-to-post.spec.ts     # Full user journey
-    └── subscription-upgrade.spec.ts
+apps/web/e2e/
+├── global-setup.ts        # migrates + seeds the E2E D1, starts emulated GitHub
+├── global-teardown.ts
+├── helpers/
+│   ├── db.ts              # reset(), migrate(), seed(), magicLinkToken(email), setUserRole(...)
+│   ├── env.ts             # bindings for the dev server
+│   ├── auth.ts            # signIn(page, person), signInAsAdmin, completeBootstrap, alice/bob
+│   └── nav.ts             # navigation helpers
+├── auth.spec.ts
+├── api-keys.spec.ts
+├── admin.spec.ts
+├── invites.spec.ts
+├── delete-account.spec.ts
+├── session-expiry.spec.ts
+├── ssr.spec.ts
+└── headers.spec.ts
 ```
 
-### Authentication Setup
+### Authentication
+
+Sign-in runs through the real magic-link flow with `BYPASS_MAGIC_LINK=true`: a spec requests a link through the UI, reads the token back from the E2E database (`magicLinkToken(email)` in `helpers/db.ts` queries the `verification` table), and visits the link. `helpers/auth.ts` wraps that as `signIn(page, person)` (with `alice` and `bob` as seeded `Person`s) and `signInAsAdmin`; `setUserRole(email, "admin")` in `helpers/db.ts` promotes a user for admin specs.
 
 ```typescript
-// apps/nextjs/e2e/auth.setup.ts
-import { test as setup, expect } from "@playwright/test";
-
-const ADMIN_FILE = "e2e/.auth/admin.json";
-const USER_FILE = "e2e/.auth/user.json";
-
-setup("authenticate as admin", async ({ page }) => {
-  // Use the default seed accounts
-  await page.goto("/api/auth/signin");
-  await page.fill('[name="email"]', "admin@example.com");
-  await page.fill('[name="password"]', "admin123");
-  await page.click('button[type="submit"]');
-  await page.waitForURL("/");
-  await page.context().storageState({ path: ADMIN_FILE });
-});
-
-setup("authenticate as test user", async ({ page }) => {
-  await page.goto("/api/auth/signin");
-  await page.fill('[name="email"]', "test@example.com");
-  await page.fill('[name="password"]', "test123");
-  await page.click('button[type="submit"]');
-  await page.waitForURL("/");
-  await page.context().storageState({ path: USER_FILE });
-});
+// shape of the flow the helpers implement
+await page.goto("/");
+await page.getByLabel("Email").fill(email);
+await page.getByRole("button", { name: "Send magic link" }).click();
+await page.goto(`/api/auth/magic-link/verify?token=${magicLinkToken(email)}`);
 ```
 
 ### Writing E2E Tests Against a Spec
 
 ```typescript
-// apps/nextjs/e2e/pages/settings.spec.ts
-import { test, expect } from "@playwright/test";
+// apps/web/e2e/api-keys.spec.ts
+import { expect, test } from "@playwright/test";
+import { reset } from "./helpers/db";
+import { signIn } from "./helpers/auth";
 
-test.describe("Settings Page", () => {
-  // Use authenticated state
-  test.use({ storageState: "e2e/.auth/user.json" });
-
-  /**
-   * SPEC: User can view and update their theme preference
-   * Acceptance: Theme toggle changes persist after page reload
-   */
-  test("user can change theme preference", async ({ page }) => {
-    await page.goto("/settings");
-
-    // Verify settings page loads
-    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-
-    // Click "Dark" theme button
-    await page.getByRole("button", { name: "Dark" }).click();
-
-    // Reload page and verify persistence
-    await page.reload();
-    const darkButton = page.getByRole("button", { name: "Dark" });
-    await expect(darkButton).toHaveAttribute("data-state", "active");
+test.describe("API keys", () => {
+  test.beforeEach(async ({ page }) => {
+    reset();
+    await signIn(page, { email: "keys@example.com", name: "Keys" });
   });
 
   /**
@@ -333,82 +267,43 @@ test.describe("Settings Page", () => {
    */
   test("user can create and revoke API keys", async ({ page }) => {
     await page.goto("/settings");
-
-    // Create a new key
-    await page.getByRole("button", { name: "Create New Key" }).click();
-    await page.fill('[id="keyName"]', "E2E Test Key");
+    await page.getByRole("button", { name: "Create key" }).click();
+    await page.getByLabel("Name").fill("E2E Test Key");
     await page.getByLabel("read").check();
-    await page.getByRole("button", { name: "Create Key" }).click();
+    await page.getByRole("button", { name: "Create" }).click();
 
-    // Verify key is shown
-    await expect(page.getByText("API Key Created Successfully")).toBeVisible();
     const keyText = await page.locator("code").first().textContent();
     expect(keyText).toMatch(/^gmk_/);
 
-    // Dismiss and verify key appears in list
-    await page.getByRole("button", { name: "Dismiss" }).click();
+    await page.getByRole("button", { name: "Done" }).click();
     await expect(page.getByText("E2E Test Key")).toBeVisible();
 
-    // Revoke the key
-    page.on("dialog", (dialog) => dialog.accept());
     await page.getByRole("button", { name: "Revoke" }).click();
-
-    // Verify key is gone
     await expect(page.getByText("E2E Test Key")).not.toBeVisible();
   });
 });
 ```
 
-### Testing Subscription Flows
-
-```typescript
-// apps/nextjs/e2e/flows/subscription-upgrade.spec.ts
-import { test, expect } from "@playwright/test";
-
-test.describe("Subscription Management", () => {
-  test.use({ storageState: "e2e/.auth/user.json" });
-
-  /**
-   * SPEC: User can view their current plan and available upgrades
-   */
-  test("displays current plan and upgrade options", async ({ page }) => {
-    await page.goto("/settings/billing");
-
-    // Verify current plan badge
-    await expect(page.getByText("Current Plan")).toBeVisible();
-
-    // Verify all plan tiers are shown
-    await expect(page.getByText("Free")).toBeVisible();
-    await expect(page.getByText("Starter")).toBeVisible();
-    await expect(page.getByText("Pro")).toBeVisible();
-    await expect(page.getByText("Enterprise")).toBeVisible();
-
-    // Verify pricing
-    await expect(page.getByText("$19")).toBeVisible();
-    await expect(page.getByText("$49")).toBeVisible();
-    await expect(page.getByText("Custom")).toBeVisible();
-  });
-});
-```
+In development only, an `x-test-delay: <ms>` request header holds an API response so a spec can leave a page while a mutation is in flight.
 
 ### Running E2E Tests
 
 ```bash
 # Run all E2E tests
-pnpm -F @gmacko/nextjs e2e
+pnpm e2e:web                      # = pnpm -F @gmacko/web e2e
 
 # Run specific test file
-pnpm -F @gmacko/nextjs e2e -- settings.spec.ts
+pnpm -F @gmacko/web e2e -- api-keys.spec.ts
 
-# Run with UI mode (interactive debugging)
-pnpm -F @gmacko/nextjs exec playwright test --ui
-
-# Run specific project (browser)
-pnpm -F @gmacko/nextjs exec playwright test --project=chromium
+# UI mode (interactive debugging) / headed
+pnpm -F @gmacko/web e2e:ui
+pnpm -F @gmacko/web e2e:headed
 
 # View test report
-pnpm -F @gmacko/nextjs exec playwright show-report
+pnpm -F @gmacko/web exec playwright show-report
 ```
+
+Mobile E2E uses Maestro: `pnpm -F @gmacko/expo e2e` (`apps/expo/.maestro/`).
 
 ## Test Writing Guidelines
 
@@ -416,15 +311,15 @@ pnpm -F @gmacko/nextjs exec playwright show-report
 
 ```typescript
 // Unit tests: describe what the unit does
-describe("CreatePostSchema", () => {
+describe("CreatePost", () => {
   it("accepts valid input", ...);
-  it("rejects empty title", ...);
+  it("rejects an empty title", ...);
 });
 
-// Integration tests: describe the behavior
-describe("post.create", () => {
-  it("inserts a row and returns the post", ...);
-  it("requires authentication", ...);
+// API tests: describe the behavior per endpoint
+describe("posts", () => {
+  it("create returns the created row with 201 and needs the write scope", ...);
+  it("remove is 404 for an unknown id", ...);
 });
 
 // E2E tests: describe the user story with spec reference
@@ -436,26 +331,27 @@ test("post appears in the list after creation", ...);
 
 | Layer | Target | Enforced |
 |-------|--------|----------|
-| Unit (validators, utils) | 90%+ | Yes |
-| Integration (routers) | 80%+ | Yes |
+| Unit (schemas, utils) | 90%+ | Yes |
+| API (endpoints) | every endpoint, every declared error | Yes (contract test checks the declarations; API tests check behavior) |
 | E2E (critical paths) | All acceptance criteria | Manual |
 
 ### What to Test at Each Level
 
 | Level | Test | Don't Test |
 |-------|------|------------|
-| Unit | Schema validation, pure functions, transformations | Database queries, API calls, UI rendering |
-| Integration | Router procedures, DB queries, auth middleware | Browser behavior, visual layout |
-| E2E | User flows, page navigation, form submissions | Internal implementation, edge cases covered by unit tests |
+| Unit | Schema validation, pure functions, transformations | Database queries, HTTP, UI rendering |
+| API | Endpoint behavior, credential and role refusals, rate limits, database effects | Browser behavior, visual layout |
+| Workers | D1-only behavior: migrations, batch atomicity, error mapping | Business logic already covered by API tests |
+| E2E | User flows, page navigation, form submissions, SSR + hydration | Internal implementation, edge cases covered by unit tests |
 
 ## Prompting for Missing Specs
 
 If a user asks you to test a feature but hasn't provided a spec, ask these questions:
 
 1. **What is the feature?** (one sentence)
-2. **Who uses it?** (anonymous, authenticated user, admin)
+2. **Who uses it?** (anonymous, authenticated user, admin, API key with which scope)
 3. **What are the success criteria?** (list of behaviors)
-4. **What are the error cases?** (invalid input, unauthorized, not found)
+4. **What are the error cases?** (invalid input, unauthorized, forbidden, not found, conflict)
 5. **Are there edge cases?** (empty lists, max lengths, concurrent access)
 
 Then create a test plan document before writing any test code:
@@ -465,11 +361,11 @@ Then create a test plan document before writing any test code:
 
 ### Acceptance Criteria
 - [ ] Criterion 1 → `unit: test_name` + `e2e: test_name`
-- [ ] Criterion 2 → `integration: test_name`
+- [ ] Criterion 2 → `api: test_name`
 
 ### Error Cases
 - [ ] Invalid input → `unit: schema_rejects_invalid`
-- [ ] Unauthorized → `integration: requires_auth`
+- [ ] Unauthorized → `api: requires_credential`
 
 ### Edge Cases
 - [ ] Empty list → `e2e: shows_empty_state`

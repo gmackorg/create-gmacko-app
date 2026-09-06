@@ -4,32 +4,39 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./middleware": "./src/middleware.ts",
+    "./service": "./src/service.ts",
     "./client": "./src/client.ts",
-    "./env": "./env.ts"
+    "./api-keys": "./src/api-keys.ts",
+    "./middleware": "./src/middleware.ts",
+    "./request-context": "./src/request-context.ts",
+    "./security-config": "./src/security-config.ts",
+    "./testing": "./src/testing.ts"
   },
   "license": "MIT",
   "scripts": {
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "format": "biome check .",
+    "generate": "mkdir -p ../db/.cache && pnpx auth@1.7.2 generate --config script/auth-cli.ts --output ../db/.cache/auth-schema.generated.ts -y && echo \"Wrote packages/db/.cache/auth-schema.generated.ts. Reconcile it into packages/db/src/auth-schema.ts by hand (see that file's header); the committed schema is never overwritten.\"",
     "lint": "oxlint .",
-    "generate": "dotenv -e ../../.env -- pnpx @better-auth/cli generate --config script/auth-cli.ts --output ../db/src/auth-schema.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@better-auth/expo": "catalog:",
     "@gmacko/db": "workspace:*",
-    "@gmacko/logging": "workspace:*",
-    "@t3-oss/env-core": "^0.13.10",
+    "@gmacko/domain": "workspace:*",
     "better-auth": "catalog:",
-    "zod": "catalog:"
+    "drizzle-orm": "catalog:",
+    "effect": "catalog:"
   },
   "devDependencies": {
-    "@better-auth/cli": "catalog:",
     "@biomejs/biome": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
     "@gmacko/tsconfig": "workspace:*",
     "@types/node": "catalog:",
     "oxlint": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^4.1.0"
   }
 }

@@ -1,16 +1,22 @@
+/**
+ * better-auth on Cloudflare D1 (drizzle sqlite adapter), built from explicit
+ * options and an injected promise-drizzle instance so nothing here reads the
+ * environment or opens a database at import time.
+ */
 import { expo } from "@better-auth/expo";
-import { db } from "@gmacko/db/client";
-import type { WorkspaceRole } from "@gmacko/db/schema";
-import { createLogger } from "@gmacko/logging";
+import type { PlainDatabase } from "@gmacko/db";
+import type { UserRole, WorkspaceRole } from "@gmacko/db/schema";
+import * as schema from "@gmacko/db/schema";
 import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { magicLink, oAuthProxy } from "better-auth/plugins";
-
-const log = createLogger({ module: "auth" });
+import { genericOAuth } from "better-auth/plugins/generic-oauth";
+import { magicLink } from "better-auth/plugins/magic-link";
+import { oAuthProxy } from "better-auth/plugins/oauth-proxy";
+import { Schema } from "effect";
 
 export function isPlatformAdminRole(
-  role: "user" | "admin" | null | undefined,
+  role: UserRole | null | undefined,
 ): role is "admin" {
   return role === "admin";
 }
@@ -21,94 +27,276 @@ export function canManageWorkspace(
   return role === "owner" || role === "admin";
 }
 
-export function initAuth<
-  TExtraPlugins extends BetterAuthPlugin[] = [],
->(options: {
-  baseUrl: string;
-  productionUrl: string;
-  secret: string | undefined;
+export interface OAuthClient {
+  readonly clientId: string;
+  readonly clientSecret: string;
+}
 
-  githubClientId: string;
-  githubClientSecret: string;
-  googleClientId: string;
-  googleClientSecret: string;
-  appleClientId?: string;
-  appleClientSecret?: string;
-  appleBundleIdentifier?: string;
-  githubUrl?: string;
-  githubApiUrl?: string;
-  googleUrl?: string;
-  googleTokenUrl?: string;
-  appleUrl?: string;
-  bypassMagicLink?: boolean;
-  sendMagicLinkEmail?: (params: {
-    email: string;
-    url: string;
-  }) => Promise<void>;
-  extraPlugins?: TExtraPlugins;
-}) {
-  const ghUrl = options.githubUrl ?? "https://github.com";
-  const ghApiUrl = options.githubApiUrl ?? "https://api.github.com";
-  const googleUrl = options.googleUrl ?? "https://accounts.google.com";
+/** The shape every better-auth plugin has; see `AuthOptions.extraPlugins`. */
+export interface AuthPluginLike {
+  readonly id: string;
+  readonly version?: string | undefined;
+}
+
+export interface MagicLink {
+  readonly email: string;
+  readonly url: string;
+  readonly token: string;
+}
+
+export interface AuthOptions {
+  /** Public origin this instance serves (cookies, callbacks). */
+  readonly baseUrl: string;
+  /** Origin registered with the OAuth providers; `oAuthProxy` relays previews to it. */
+  readonly productionUrl: string;
+  readonly secret: string | undefined;
+  /** Origins allowed to send credentials (the app URL, the Expo dev origin). */
+  readonly allowedOrigins: ReadonlyArray<string>;
+  /** `url`/`apiUrl` default to github.com; emulate overrides them (AUTH_GITHUB_URL, AUTH_GITHUB_API_URL). */
+  readonly github: OAuthClient & {
+    readonly url?: string | undefined;
+    readonly apiUrl?: string | undefined;
+  };
+  /** `url`/`tokenUrl` default to Google; emulate overrides them (AUTH_GOOGLE_URL, AUTH_GOOGLE_TOKEN_URL). */
+  readonly google: OAuthClient & {
+    readonly url?: string | undefined;
+    readonly tokenUrl?: string | undefined;
+  };
+  /** Built-in provider; only the authorization endpoint is overridable in 1.7.2 (AUTH_APPLE_URL). */
+  readonly apple?:
+    | (OAuthClient & {
+        readonly bundleIdentifier?: string | undefined;
+        readonly url?: string | undefined;
+      })
+    | undefined;
+  readonly magicLink: {
+    /** Delivers the link; `logMagicLink` is the bypass used in development. */
+    readonly send: (link: MagicLink) => Promise<void>;
+  };
+  /**
+   * Framework plugins the app adds (e.g. `tanstackStartCookies()`). Typed
+   * loosely on purpose: pnpm installs one `better-auth` copy per distinct
+   * peer set, so a plugin created in an app resolves to a different copy of
+   * `@better-auth/core` than this package and its `HookEndpointContext` is
+   * nominally incompatible. Structurally the objects are identical.
+   */
+  readonly extraPlugins?: ReadonlyArray<AuthPluginLike> | undefined;
+  /** Sink for better-auth API errors; defaults to `console.error`. */
+  readonly onError?: ((error: AuthApiError) => void) | undefined;
+}
+
+/**
+ * A better-auth API failure as an `Error`. better-auth raises `APIError` (an
+ * `Error` subclass) for every handled failure and rethrows whatever a handler
+ * threw for a defect, so `toAuthApiError` normalises the second case rather
+ * than leaking `unknown` to the sink.
+ */
+export type AuthApiError = Error;
+
+const toAuthApiError = (cause: unknown): AuthApiError =>
+  cause instanceof Error
+    ? cause
+    : new Error("better-auth threw a non-Error value", { cause });
+
+/**
+ * Bypass delivery: prints the link instead of emailing it. TODO(Phase 6):
+ * route through the Effect logger once the auth instance is built inside a
+ * runtime that can hand a logger callback in.
+ */
+export const logMagicLink = async (link: MagicLink): Promise<void> => {
+  // oxlint-disable-next-line no-console -- deliberate bypass sink
+  console.info(
+    JSON.stringify({
+      msg: "magic link generated (bypass mode)",
+      email: link.email,
+      url: link.url,
+    }),
+  );
+};
+
+/**
+ * The GitHub REST fields this module reads, decoded rather than asserted.
+ *
+ * Decoding (instead of `Response.json<T>()`, which is a workers-types-only
+ * overload) also keeps this file portable: `@gmacko/operator-core` and
+ * `@gmacko/mcp-server` compile this source transitively under `lib: DOM`,
+ * where `Response.json` takes no type argument.
+ */
+const GithubProfile = Schema.Struct({
+  id: Schema.Number,
+  login: Schema.String,
+  name: Schema.NullOr(Schema.String),
+  email: Schema.NullOr(Schema.String),
+  avatar_url: Schema.NullOr(Schema.String),
+});
+
+const GithubEmails = Schema.Array(
+  Schema.Struct({
+    email: Schema.String,
+    primary: Schema.Boolean,
+    verified: Schema.Boolean,
+  }),
+);
+
+const decodeGithubProfile = Schema.decodeUnknownSync(GithubProfile);
+const decodeGithubEmails = Schema.decodeUnknownSync(GithubEmails);
+
+/**
+ * The generic plugin's default user-info fetch expects OIDC claims
+ * (`picture`, `email_verified`); GitHub returns `avatar_url` and may hide the
+ * email, so mirror what the built-in provider does with `/user/emails`.
+ */
+const githubUserInfo =
+  (apiUrl: string) => async (tokens: { accessToken?: string | undefined }) => {
+    // No token, no identity: never call the API with an empty bearer.
+    if (!tokens.accessToken) return null;
+    const headers = {
+      authorization: `Bearer ${tokens.accessToken}`,
+      "user-agent": "gmacko-auth",
+    };
+    const profileResponse = await fetch(`${apiUrl}/user`, { headers });
+    if (!profileResponse.ok) return null;
+    const profile = decodeGithubProfile(await profileResponse.json());
+    let email = profile.email;
+    let emailVerified = email !== null;
+    if (!email) {
+      const emailsResponse = await fetch(`${apiUrl}/user/emails`, { headers });
+      if (emailsResponse.ok) {
+        const emails = decodeGithubEmails(await emailsResponse.json());
+        const primary = emails.find((e) => e.primary) ?? emails[0];
+        email = primary?.email ?? null;
+        emailVerified = primary?.verified ?? false;
+      }
+    }
+    if (!email) return null;
+    return {
+      id: String(profile.id),
+      email,
+      emailVerified,
+      name: profile.name ?? profile.login,
+      image: profile.avatar_url ?? undefined,
+    };
+  };
+
+export function makeAuth(options: AuthOptions, db: PlainDatabase) {
+  const githubUrl = options.github.url ?? "https://github.com";
+  const githubApiUrl = options.github.apiUrl ?? "https://api.github.com";
+  const googleUrl = options.google.url ?? "https://accounts.google.com";
   const googleTokenUrl =
-    options.googleTokenUrl ?? "https://oauth2.googleapis.com/token";
-  const appleUrl = options.appleUrl ?? "https://appleid.apple.com";
+    options.google.tokenUrl ?? "https://oauth2.googleapis.com/token";
+  const appleUrl = options.apple?.url ?? "https://appleid.apple.com";
+  const onError =
+    options.onError ??
+    ((error: AuthApiError) => {
+      // oxlint-disable-next-line no-console -- default sink until the Effect logger is threaded through
+      console.error("better-auth API error", error);
+    });
 
   const config = {
     database: drizzleAdapter(db, {
-      provider: "pg",
+      provider: "sqlite",
+      schema,
+      // D1 has no interactive transactions; the adapter must never call
+      // `db.transaction`. (This is also the adapter's default.)
+      transaction: false,
     }),
     baseURL: options.baseUrl,
     secret: options.secret,
+    user: {
+      additionalFields: {
+        // Mirrors `user.role` in @gmacko/db's auth-schema so the session's
+        // user carries it and `auth generate` keeps the column.
+        role: {
+          type: ["user", "admin"],
+          required: false,
+          defaultValue: "user",
+          input: false,
+        },
+      },
+    },
+    session: {
+      // The signed cookie serves `getSession` for up to 5 minutes without a
+      // D1 read. It is never trusted on its own, though: `RequestContext`
+      // (request-context.ts) checks every session — cached or not — against
+      // the `user` row with one indexed read per request, so a deleted
+      // account (or a banned one, once the row carries such a flag) stops
+      // authenticating on its next request, not when the cache expires; and
+      // `DELETE /api/account` expires the cookies on its response. Anything
+      // that gates on `user.role` reads the row too: `RequestContext.role`,
+      // which `AdminOnlyLive` (middleware.ts) uses, so a demotion applies on
+      // the next request. What the cache still saves is the `session` row
+      // read (and better-auth's own user read) on every request.
+      cookieCache: { enabled: true, maxAge: 300 },
+    },
     plugins: [
-      oAuthProxy({
-        productionURL: options.productionUrl,
-      }),
+      oAuthProxy({ productionURL: options.productionUrl }),
       expo(),
       magicLink({
-        sendMagicLink: async ({ email, url }) => {
-          if (options.bypassMagicLink) {
-            log.info({ email, url }, "magic link generated (bypass mode)");
-            return;
-          }
-          if (options.sendMagicLinkEmail) {
-            await options.sendMagicLinkEmail({ email, url });
-          }
-        },
+        sendMagicLink: ({ email, url, token }) =>
+          options.magicLink.send({ email, url, token }),
       }),
-      ...(options.extraPlugins ?? []),
+      // GitHub and Google as generic providers (first-class social providers
+      // since 1.7.0, signed in through `/sign-in/social`): unlike the built-in
+      // providers, every endpoint is configurable, which is what lets emulate
+      // stand in for them locally.
+      genericOAuth({
+        config: [
+          {
+            providerId: "github",
+            clientId: options.github.clientId,
+            clientSecret: options.github.clientSecret,
+            authorizationUrl: `${githubUrl}/login/oauth/authorize`,
+            tokenUrl: `${githubUrl}/login/oauth/access_token`,
+            userInfoUrl: `${githubApiUrl}/user`,
+            getUserInfo: githubUserInfo(githubApiUrl),
+            scopes: ["read:user", "user:email"],
+            // GitHub's authorization server ignores PKCE; emulate rejects
+            // unknown token parameters, so match the built-in provider.
+            pkce: false,
+          },
+          {
+            providerId: "google",
+            clientId: options.google.clientId,
+            clientSecret: options.google.clientSecret,
+            authorizationUrl: `${googleUrl}/o/oauth2/v2/auth`,
+            tokenUrl: googleTokenUrl,
+            // User info comes from the id_token claims (the plugin decodes it
+            // before falling back to a userinfo endpoint).
+            scopes: ["openid", "email", "profile"],
+            prompt: "select_account",
+          },
+        ],
+      }),
+      // SAFETY: `AuthPluginLike` names the whole of what better-auth requires
+      // of a plugin object at this position (`id`, optional `version`); the
+      // structural mismatch `BetterAuthPlugin` reports is nominal only —
+      // `HookEndpointContext` comes from whichever `@better-auth/core` copy
+      // pnpm resolved for the app that created the plugin (see
+      // `AuthOptions.extraPlugins`). Nothing here reads past `id`.
+      ...((options.extraPlugins ?? []) as ReadonlyArray<BetterAuthPlugin>),
     ],
-    socialProviders: {
-      github: {
-        clientId: options.githubClientId,
-        clientSecret: options.githubClientSecret,
-        authorizationEndpoint: `${ghUrl}/login/oauth/authorize`,
-        tokenEndpoint: `${ghUrl}/login/oauth/access_token`,
-        userInfoEndpoint: `${ghApiUrl}/user`,
-      },
-      google: {
-        clientId: options.googleClientId,
-        clientSecret: options.googleClientSecret,
-        authorizationEndpoint: `${googleUrl}/o/oauth2/v2/auth`,
-        tokenEndpoint: googleTokenUrl,
-      },
-      ...(options.appleClientId && options.appleClientSecret
-        ? {
-            apple: {
-              clientId: options.appleClientId,
-              clientSecret: options.appleClientSecret,
-              appBundleIdentifier: options.appleBundleIdentifier,
-              authorizationEndpoint: `${appleUrl}/auth/authorize`,
-              tokenEndpoint: `${appleUrl}/auth/token`,
-              jwksEndpoint: `${appleUrl}/auth/keys`,
-            },
-          }
-        : {}),
-    },
-    trustedOrigins: ["expo://", appleUrl, "https://gmacko.localhost"],
+    socialProviders: options.apple
+      ? {
+          apple: {
+            clientId: options.apple.clientId,
+            clientSecret: options.apple.clientSecret,
+            appBundleIdentifier: options.apple.bundleIdentifier,
+            // Always sent: `createAuthorizationURL` uses
+            // `options.authorizationEndpoint || <the provider's own>`, and
+            // `appleUrl` falls back to appleid.apple.com, so with no override
+            // configured this is byte-for-byte the built-in endpoint.
+            authorizationEndpoint: `${appleUrl}/auth/authorize`,
+          },
+        }
+      : {},
+    trustedOrigins: [
+      "expo://",
+      ...options.allowedOrigins,
+      ...(options.apple ? [appleUrl] : []),
+    ],
     onAPIError: {
-      onError(error, ctx) {
-        log.error({ err: error, context: ctx }, "better-auth API error");
+      onError(thrown) {
+        onError(toAuthApiError(thrown));
       },
     },
   } satisfies BetterAuthOptions;
@@ -116,5 +304,6 @@ export function initAuth<
   return betterAuth(config);
 }
 
-export type Auth = ReturnType<typeof initAuth>;
+export type Auth = ReturnType<typeof makeAuth>;
 export type Session = Auth["$Infer"]["Session"];
+export type User = Session["user"];

@@ -1,13 +1,18 @@
-import type { Config } from "drizzle-kit";
+import { defineConfig } from "drizzle-kit";
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("Missing DATABASE_URL");
-}
-
-export default {
-  schema: ["./src/schema.ts", "./src/auth-schema.ts"],
+/**
+ * `generate` needs only the schema. The D1 HTTP credentials are read for
+ * `studio` / `push` against a remote database and may be left unset.
+ */
+export default defineConfig({
+  dialect: "sqlite",
+  driver: "d1-http",
+  // schema.ts re-exports auth-schema.ts; listing both would duplicate tables.
+  schema: "./src/schema.ts",
   out: "./drizzle",
-  dialect: "postgresql",
-  dbCredentials: { url: process.env.DATABASE_URL },
-  casing: "snake_case",
-} satisfies Config;
+  dbCredentials: {
+    accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "",
+    databaseId: process.env.CLOUDFLARE_D1_DATABASE_ID ?? "",
+    token: process.env.CLOUDFLARE_D1_TOKEN ?? "",
+  },
+});

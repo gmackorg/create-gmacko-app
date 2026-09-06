@@ -13,13 +13,12 @@ function config(overrides: {
   posthogKey?: string;
 }) {
   const environment = overrides.environment;
-  // Use `in` so an explicit `undefined` override is honoured (not replaced by
-  // the default) — the point of several cases is a MISSING value.
+  // `apiUrl` is required on EnvironmentConfig, so a missing one is not a case
+  // this helper can express — `??` supplies the default. The observability
+  // fields below are optional, and several cases turn on a MISSING value, so
+  // those use `in` to honour an explicit `undefined` override.
   return {
-    apiUrl:
-      "apiUrl" in overrides
-        ? (overrides.apiUrl as string)
-        : "https://api.example.com",
+    apiUrl: overrides.apiUrl ?? "https://api.example.com",
     environment,
     isDevelopment: environment === "development",
     isPreview: environment === "preview",

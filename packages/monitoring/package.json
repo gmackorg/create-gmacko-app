@@ -14,6 +14,10 @@
     "./native": {
       "types": "./dist/native/index.d.ts",
       "default": "./src/native/index.ts"
+    },
+    "./web/server": {
+      "types": "./dist/web/server.d.ts",
+      "default": "./src/web/server.ts"
     }
   },
   "license": "MIT",
@@ -27,22 +31,19 @@
   },
   "dependencies": {
     "@gmacko/config": "workspace:*",
-    "@sentry/nextjs": "^10.44.0",
+    "@sentry/cloudflare": "catalog:",
+    "@sentry/react": "catalog:",
     "@sentry/react-native": "^8.4.0"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
     "@gmacko/tsconfig": "workspace:*",
+    "@types/react": "catalog:react19",
     "oxlint": "catalog:",
     "typescript": "catalog:"
   },
   "peerDependencies": {
-    "next": ">=15.0.0",
     "react": ">=18.0.0"
-  },
-  "peerDependenciesMeta": {
-    "next": {
-      "optional": true
-    }
   }
 }

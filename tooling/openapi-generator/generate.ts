@@ -21,7 +21,7 @@ interface LanguageConfig {
   templateDir?: string;
 }
 
-const LANGUAGES: Record<string, LanguageConfig> = {
+const LANGUAGES = {
   python: {
     generator: "python",
     outputDir: "sdks/generated/python",
@@ -85,39 +85,55 @@ const LANGUAGES: Record<string, LanguageConfig> = {
     generator: "typescript-fetch",
     outputDir: "sdks/generated/typescript",
     additionalProperties: {
-      npmName: "@gmacko/api-client",
+      // Not "@gmacko/api-client": that is the workspace's typed Effect client.
+      npmName: "@gmacko/openapi-client",
       supportsES6: "true",
       typescriptThreePlus: "true",
     },
   },
-};
+} satisfies Record<string, LanguageConfig>;
+
+/** The languages this script can generate — the keys of `LANGUAGES`. */
+type SdkLanguage = keyof typeof LANGUAGES;
+
+function isSdkLanguage(value: string): value is SdkLanguage {
+  return Object.hasOwn(LANGUAGES, value);
+}
+
+const ALL_LANGUAGES = Object.keys(LANGUAGES).filter(isSdkLanguage);
+
+interface GenerationRequest {
+  languages: SdkLanguage[];
+  all: boolean;
+}
 
 const ROOT_DIR = resolve(import.meta.dirname, "../..");
 const SPEC_PATH = resolve(ROOT_DIR, "sdks/openapi/openapi.json");
 
-function parseArgs(): { languages: string[]; all: boolean } {
+function parseArgs(): GenerationRequest {
   const args = process.argv.slice(2);
   const all = args.includes("--all");
   const languageIndex = args.indexOf("--language");
 
   if (all) {
-    return { languages: Object.keys(LANGUAGES), all: true };
+    return { languages: ALL_LANGUAGES, all: true };
   }
 
-  if (languageIndex !== -1 && args[languageIndex + 1]) {
-    return { languages: [args[languageIndex + 1]], all: false };
+  const requested = args[languageIndex + 1];
+  if (languageIndex !== -1 && requested) {
+    if (!isSdkLanguage(requested)) {
+      console.error(`Unknown language: ${requested}`);
+      console.error(`Available languages: ${ALL_LANGUAGES.join(", ")}`);
+      process.exit(1);
+    }
+    return { languages: [requested], all: false };
   }
 
   return { languages: ["typescript"], all: false };
 }
 
-function generateSdk(language: string): void {
-  const config = LANGUAGES[language];
-  if (!config) {
-    console.error(`Unknown language: ${language}`);
-    console.error(`Available languages: ${Object.keys(LANGUAGES).join(", ")}`);
-    process.exit(1);
-  }
+function generateSdk(language: SdkLanguage): void {
+  const config: LanguageConfig = LANGUAGES[language];
 
   const outputPath = resolve(ROOT_DIR, config.outputDir);
 

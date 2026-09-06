@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { Command } from "commander";
 import pc from "picocolors";
 import validateNpmPackageName from "validate-npm-package-name";
@@ -5,12 +6,57 @@ import { getDefaultOptions, runPrompts } from "./prompts.js";
 import { scaffold } from "./scaffold.js";
 import type { CliOptions, IntegrationConfig } from "./types.js";
 
+// dist/index.js sits one level below package.json; the CLI reports the version
+// changesets publish rather than a hand-maintained string.
+// SAFETY: `../package.json` resolves to this package's own manifest, which is
+// checked into the repo and republished by changesets; npm rejects a package
+// whose manifest has no `version`, so the field is always a string here.
+const { version } = createRequire(import.meta.url)("../package.json") as {
+  version: string;
+};
+
+/**
+ * The commander flags this CLI reads. Commander parses each declared option
+ * into this camelCase shape; options that only take effect through another
+ * flag (`--storage-provider`, which the `--integrations` list drives) are
+ * deliberately absent because nothing here consumes them.
+ */
+interface CliFlags {
+  yes?: boolean;
+  y?: boolean;
+  prune?: boolean;
+  install?: boolean;
+  git?: boolean;
+  ai?: boolean;
+  provision?: boolean;
+  web?: boolean;
+  mobile?: boolean;
+  saasCollaboration?: boolean;
+  saasBilling?: boolean;
+  saasMetering?: boolean;
+  saasSupport?: boolean;
+  saasLaunch?: boolean;
+  saasReferrals?: boolean;
+  saasOperatorApis?: boolean;
+  saasBootstrap?: boolean;
+  operatorLane?: boolean;
+  integrations?: string;
+  emailProvider?: string;
+  forgegraph?: boolean;
+  packageScope?: string;
+  forgegraphServer?: string;
+  forgegraphPreviewDomain?: string;
+  forgegraphProductionDomain?: string;
+}
+
 const program = new Command();
 
 program
   .name("create-gmacko-app")
-  .description("Create a new Gmacko app with Next.js, Expo, tRPC, and more")
-  .version("0.1.1")
+  .description(
+    "Create a new Gmacko app: TanStack Start + Effect on Cloudflare Workers with D1, Expo, and agent-native DX defaults",
+  )
+  .version(version)
   .argument("<app-name>", "Name of the app to create")
   .option("--yes, -y", "Accept all defaults without prompting")
   .option("--prune", "Remove unused integration packages")
@@ -18,12 +64,13 @@ program
   .option("--no-git", "Skip repository init (jj/git)")
   .option("--no-ai", "Exclude AI workflow system")
   .option("--no-provision", "Exclude provisioning script")
-  .option("--web", "Include Next.js web app (default: true)")
-  .option("--no-web", "Exclude Next.js web app")
+  .option(
+    "--web",
+    "Include the web app: TanStack Start + Effect on Cloudflare Workers with D1 (default: true)",
+  )
+  .option("--no-web", "Exclude the web app (mobile-only scaffold)")
   .option("--mobile", "Include Expo mobile app (default: true)")
   .option("--no-mobile", "Exclude Expo mobile app")
-  .option("--tanstack-start", "Include TanStack Start app")
-  .option("--no-tanstack-start", "Exclude TanStack Start app (default)")
   .option("--saas-collaboration", "Add collaboration layers to the SaaS app")
   .option("--saas-billing", "Add billing and plans to the SaaS app")
   .option("--saas-metering", "Add metering and usage rollups to the SaaS app")
@@ -34,14 +81,13 @@ program
     "--saas-operator-apis",
     "Add operator APIs (CLI + MCP wrappers) to the SaaS app",
   )
-  .option("--vinext", "Add experimental vinext support to the Next.js app")
   .option(
     "--saas-bootstrap",
     "Add optional Claude SaaS bootstrap skills and post-setup playbook",
   )
   .option(
-    "--trpc-operators",
-    "Add optional CLI + MCP wrappers around the app's tRPC API",
+    "--operator-lane",
+    "Add the optional operator lane: CLI + MCP wrappers over the app's HTTP API (admin-scoped API keys)",
   )
   .option(
     "--integrations <list>",
@@ -52,19 +98,11 @@ program
     "--forgegraph",
     "Enable ForgeGraph integrations (health, logging, OTEL)",
   )
-  .option("--storage-provider <provider>", "Storage provider (uploadthing)")
+  .option("--storage-provider <provider>", "Storage provider (r2)")
   .option("--package-scope <scope>", "Package scope (default: @gmacko)")
   .option(
     "--forgegraph-server <url>",
     "ForgeGraph server URL to write into .forgegraph.yaml",
-  )
-  .option(
-    "--forgegraph-staging-node <id>",
-    "ForgeGraph staging node placeholder to write into .forgegraph.yaml",
-  )
-  .option(
-    "--forgegraph-production-node <id>",
-    "ForgeGraph production node placeholder to write into .forgegraph.yaml",
   )
   .option(
     "--forgegraph-preview-domain <domain>",
@@ -74,7 +112,7 @@ program
     "--forgegraph-production-domain <domain>",
     "ForgeGraph production domain placeholder to write into .forgegraph.yaml",
   )
-  .action(async (appName: string, opts: Record<string, unknown>) => {
+  .action(async (appName: string, opts: CliFlags) => {
     const validation = validateNpmPackageName(appName);
     if (!validation.validForNewPackages) {
       console.error(pc.red(`Invalid package name: ${appName}`));
@@ -97,49 +135,28 @@ program
       if (opts.web !== undefined) options.platforms.web = opts.web === true;
       if (opts.mobile !== undefined)
         options.platforms.mobile = opts.mobile === true;
-      if (opts.tanstackStart !== undefined)
-        options.platforms.tanstackStart = opts.tanstackStart === true;
-      options.vinext = opts.vinext === true;
       applySaasCapabilityFlags(options, opts);
       applyOperatorLaneFlags(options, opts);
       options.saasBootstrap = opts.saasBootstrap === true;
-      if (opts.forgegraphServer) {
-        options.forgegraphServer = opts.forgegraphServer as string;
-      }
-      if (opts.forgegraphStagingNode) {
-        options.forgegraphStagingNode = opts.forgegraphStagingNode as string;
-      }
-      if (opts.forgegraphProductionNode) {
-        options.forgegraphProductionNode =
-          opts.forgegraphProductionNode as string;
-      }
-      if (opts.forgegraphPreviewDomain) {
-        options.forgegraphPreviewDomain =
-          opts.forgegraphPreviewDomain as string;
-      }
-      if (opts.forgegraphProductionDomain) {
-        options.forgegraphProductionDomain =
-          opts.forgegraphProductionDomain as string;
-      }
-      if (opts.packageScope) options.packageScope = opts.packageScope as string;
+      applyForgeGraphFlags(options, opts);
+      if (opts.packageScope) options.packageScope = opts.packageScope;
       if (opts.forgegraph !== undefined) {
         options.integrations.forgegraph = opts.forgegraph === true;
       }
       if (opts.integrations !== undefined) {
         options.integrations = parseIntegrations(
-          opts.integrations as string,
-          opts.emailProvider as string | undefined,
+          opts.integrations,
+          opts.emailProvider,
           opts.forgegraph === true,
         );
       }
     } else {
       options = await runPrompts(appName, {
-        packageScope: opts.packageScope as string | undefined,
+        packageScope: opts.packageScope,
       });
       if (opts.prune !== undefined) options.prune = opts.prune === true;
       if (opts.install !== undefined) options.install = opts.install !== false;
       if (opts.git !== undefined) options.git = opts.git !== false;
-      options.vinext = opts.vinext === true;
       applySaasCapabilityFlags(options, opts);
       applyOperatorLaneFlags(options, opts);
       if (opts.saasBootstrap !== undefined) {
@@ -148,28 +165,28 @@ program
       if (opts.forgegraph !== undefined) {
         options.integrations.forgegraph = opts.forgegraph === true;
       }
-      if (opts.forgegraphServer) {
-        options.forgegraphServer = opts.forgegraphServer as string;
-      }
-      if (opts.forgegraphStagingNode) {
-        options.forgegraphStagingNode = opts.forgegraphStagingNode as string;
-      }
-      if (opts.forgegraphProductionNode) {
-        options.forgegraphProductionNode =
-          opts.forgegraphProductionNode as string;
-      }
-      if (opts.forgegraphPreviewDomain) {
-        options.forgegraphPreviewDomain =
-          opts.forgegraphPreviewDomain as string;
-      }
-      if (opts.forgegraphProductionDomain) {
-        options.forgegraphProductionDomain =
-          opts.forgegraphProductionDomain as string;
-      }
+      applyForgeGraphFlags(options, opts);
+    }
+
+    if (!options.platforms.web && !options.platforms.mobile) {
+      console.error(
+        pc.red(
+          "Nothing to scaffold: pass at most one of --no-web / --no-mobile.",
+        ),
+      );
+      process.exit(1);
     }
 
     await scaffold(options);
   });
+
+/**
+ * `--email-provider` is free text on the command line; anything other than the
+ * one alternative provider falls back to the default the prompts use.
+ */
+function emailProviderFrom(value: string | undefined): "resend" | "sendgrid" {
+  return value === "sendgrid" ? "sendgrid" : "resend";
+}
 
 function parseIntegrations(
   list: string,
@@ -188,9 +205,7 @@ function parseIntegrations(
     notifications: set.has("notifications"),
     email: {
       enabled: set.has("email"),
-      provider: set.has("email")
-        ? ((emailProvider as "resend" | "sendgrid") ?? "resend")
-        : "none",
+      provider: set.has("email") ? emailProviderFrom(emailProvider) : "none",
     },
     realtime: {
       enabled: set.has("realtime"),
@@ -198,15 +213,12 @@ function parseIntegrations(
     },
     storage: {
       enabled: set.has("storage"),
-      provider: set.has("storage") ? "uploadthing" : "none",
+      provider: set.has("storage") ? "r2" : "none",
     },
   };
 }
 
-function applySaasCapabilityFlags(
-  options: CliOptions,
-  opts: Record<string, unknown>,
-): void {
+function applySaasCapabilityFlags(options: CliOptions, opts: CliFlags): void {
   if (opts.saasCollaboration !== undefined) {
     options.saasCollaboration = opts.saasCollaboration === true;
   }
@@ -230,20 +242,29 @@ function applySaasCapabilityFlags(
   }
 }
 
-function applyOperatorLaneFlags(
-  options: CliOptions,
-  opts: Record<string, unknown>,
-): void {
+function applyOperatorLaneFlags(options: CliOptions, opts: CliFlags): void {
   if (opts.saasOperatorApis !== undefined) {
     const requested = opts.saasOperatorApis === true;
     options.saasOperatorApis = requested;
     if (requested) {
-      options.trpcOperators = true;
+      options.operatorLane = true;
     }
   }
 
-  if (opts.trpcOperators !== undefined) {
-    options.trpcOperators = opts.trpcOperators === true;
+  if (opts.operatorLane !== undefined) {
+    options.operatorLane = opts.operatorLane === true;
+  }
+}
+
+function applyForgeGraphFlags(options: CliOptions, opts: CliFlags): void {
+  if (opts.forgegraphServer) {
+    options.forgegraphServer = opts.forgegraphServer;
+  }
+  if (opts.forgegraphPreviewDomain) {
+    options.forgegraphPreviewDomain = opts.forgegraphPreviewDomain;
+  }
+  if (opts.forgegraphProductionDomain) {
+    options.forgegraphProductionDomain = opts.forgegraphProductionDomain;
   }
 }
 

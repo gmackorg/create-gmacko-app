@@ -51,9 +51,9 @@ function getApiUrl(): string {
       const debuggerHost = Constants.expoConfig?.hostUri;
       const localhost = debuggerHost?.split(":")[0];
       if (localhost) {
-        return `http://${localhost}:3000`;
+        return `http://${localhost}:3001`;
       }
-      return "http://localhost:3000";
+      return "http://localhost:3001";
     }
   }
 }

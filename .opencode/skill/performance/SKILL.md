@@ -13,80 +13,63 @@ Build polished, production-quality features with proper preloading, caching, opt
 2. **Show something immediately** — use skeletons and Suspense boundaries
 3. **Optimistic updates** — update the UI before the server confirms
 4. **Cache aggressively** — minimize redundant network requests
-5. **Measure, don't guess** — use PostHog and Web Vitals to verify
+5. **Measure, don't guess** — use PostHog, Web Vitals, and the OTLP endpoint spans to verify
 
-## Server-Side Prefetching (Next.js)
+## Server-Side Prefetching (TanStack Start)
 
-### Page-Level Prefetch
+### Route-Level Prefetch
 
-Every page that displays tRPC data MUST prefetch on the server:
+Every route that displays API data MUST prefetch in its loader. On the server the loader calls the API in-process (no network hop, one `RequestContext` per render); the query cache is dehydrated into the HTML and hydrated in the browser:
 
 ```typescript
-// apps/nextjs/src/app/features/page.tsx
-import { Suspense } from "react";
+// apps/web/src/routes/features.tsx
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
+import { queries } from "~/lib/api";
 
-import { HydrateClient, prefetch, trpc } from "~/trpc/server";
-import { FeatureList, FeatureListSkeleton } from "./_components/feature-list";
+export const Route = createFileRoute("/features")({
+  loader: async ({ context: { queryClient } }) => {
+    // Block on what the first paint needs
+    await queryClient.ensureQueryData(queries.feature.list());
+  },
+  component: FeaturesPage,
+});
 
-export default function FeaturesPage() {
-  // ✅ Prefetch on the server — zero client-side loading
-  prefetch(trpc.feature.list.queryOptions({ limit: 20 }));
-
-  return (
-    <HydrateClient>
-      <Suspense fallback={<FeatureListSkeleton />}>
-        <FeatureList />
-      </Suspense>
-    </HydrateClient>
-  );
+function FeaturesPage() {
+  const { data } = useSuspenseQuery(queries.feature.list());
+  return <FeatureList features={data} />;
 }
 ```
 
-### Detail Page Prefetch
+### Detail Route Prefetch
 
 ```typescript
-// apps/nextjs/src/app/features/[id]/page.tsx
-import { notFound } from "next/navigation";
-
-import { HydrateClient, prefetch, trpc } from "~/trpc/server";
-
-export default async function FeatureDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-
-  // Prefetch the specific resource
-  prefetch(trpc.feature.byId.queryOptions({ id }));
-
-  return (
-    <HydrateClient>
-      <FeatureDetail id={id} />
-    </HydrateClient>
-  );
-}
+// apps/web/src/routes/features.$id.tsx
+export const Route = createFileRoute("/features/$id")({
+  loader: async ({ context: { queryClient }, params }) => {
+    await queryClient.ensureQueryData(queries.feature.byId(params.id));
+  },
+  component: FeatureDetail,
+});
 ```
 
-### Prefetching Related Data
+### Blocking vs. streaming
 
-When you know the user will navigate to a detail page, prefetch in the list:
+`ensureQueryData` blocks the loader for data the page cannot render without; `prefetchQuery` starts the request without blocking so a lower section can stream in under a Suspense boundary:
 
 ```typescript
-// Server component that renders a list of links
-export default function FeaturesPage() {
-  // Prefetch list AND the first few detail pages
-  prefetch(trpc.feature.list.queryOptions({ limit: 20 }));
-
-  return (
-    <HydrateClient>
-      <Suspense fallback={<FeatureListSkeleton />}>
-        <FeatureList />
-      </Suspense>
-    </HydrateClient>
-  );
-}
+loader: async ({ context: { queryClient } }) => {
+  await Promise.all([
+    queryClient.ensureQueryData(queries.auth.session()),
+    queryClient.ensureQueryData(queries.settings.launchState()),
+  ]);
+  void queryClient.prefetchQuery(queries.posts.list());
+},
 ```
+
+### Prefetching on Navigation
+
+`<Link preload="intent">` runs the target route's loader on hover/focus, so its `ensureQueryData` fills the cache before the click.
 
 ## Suspense Boundaries & Skeletons
 
@@ -118,17 +101,6 @@ export function FeatureListSkeleton() {
     </div>
   );
 }
-
-export function FeatureDetailSkeleton() {
-  return (
-    <div className="animate-pulse space-y-4">
-      <div className="bg-muted h-8 w-64 rounded" />
-      <div className="bg-muted h-4 w-full rounded" />
-      <div className="bg-muted h-4 w-full rounded" />
-      <div className="bg-muted h-4 w-3/4 rounded" />
-    </div>
-  );
-}
 ```
 
 ### Independent Suspense Zones
@@ -136,86 +108,54 @@ export function FeatureDetailSkeleton() {
 Split pages into independent loading zones so fast queries don't wait for slow ones:
 
 ```typescript
-export default function DashboardPage() {
-  prefetch(trpc.admin.stats.queryOptions());
-  prefetch(trpc.post.all.queryOptions());
-  prefetch(trpc.admin.listUsers.queryOptions());
-
+function DashboardPage() {
   return (
-    <HydrateClient>
+    <>
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Stats load independently of user list */}
         <Suspense fallback={<StatsSkeleton />}>
-          <StatsCards />
+          <StatsCards />   {/* useSuspenseQuery(queries.admin.stats()) */}
         </Suspense>
         <Suspense fallback={<RecentUsersSkeleton />}>
-          <RecentUsers />
+          <RecentUsers />  {/* useSuspenseQuery(queries.admin.listUsers()) */}
         </Suspense>
       </div>
       <Suspense fallback={<PostListSkeleton />}>
-        <RecentPosts />
+        <RecentPosts />    {/* useSuspenseQuery(queries.posts.list()) */}
       </Suspense>
-    </HydrateClient>
+    </>
   );
 }
 ```
 
 ## Optimistic Updates
 
-Update the UI immediately before the server responds:
+Update the UI immediately before the server responds. Keys come from `queryKeys` in `@gmacko/api-client/queries`; invalidation after settle is applied by the `QueryClient` from the mutation's meta, so only the optimistic part is written here:
 
 ```typescript
-"use client";
-
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-
-import { useTRPC } from "~/trpc/react";
+import { queryKeys } from "@gmacko/api-client/queries";
+import { mutations } from "~/lib/api";
 
 export function CreateFeatureForm() {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  const createMutation = useMutation(
-    trpc.feature.create.mutationOptions({
-      // Optimistic update: add to list immediately
-      onMutate: async (newFeature) => {
-        await queryClient.cancelQueries({
-          queryKey: trpc.feature.list.queryKey(),
-        });
-
-        const previous = queryClient.getQueryData(
-          trpc.feature.list.queryKey(),
-        );
-
-        queryClient.setQueryData(
-          trpc.feature.list.queryKey(),
-          (old: any) => [
-            { id: "temp-" + Date.now(), ...newFeature, createdAt: new Date() },
-            ...(old ?? []),
-          ],
-        );
-
-        return { previous };
-      },
-
-      // Rollback on error
-      onError: (_err, _vars, context) => {
-        if (context?.previous) {
-          queryClient.setQueryData(
-            trpc.feature.list.queryKey(),
-            context.previous,
-          );
-        }
-      },
-
-      // Refetch after settle
-      onSettled: () => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.feature.list.queryKey(),
-        });
-      },
-    }),
-  );
+  const createMutation = useMutation({
+    ...mutations.feature.create(),
+    onMutate: async (newFeature) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.feature.list() });
+      const previous = queryClient.getQueryData(queryKeys.feature.list());
+      queryClient.setQueryData(queryKeys.feature.list(), (old) => [
+        { id: "temp-" + Date.now(), ...newFeature, createdAt: new Date() },
+        ...(old ?? []),
+      ]);
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.feature.list(), context.previous);
+      }
+    },
+  });
 
   // ...
 }
@@ -223,103 +163,65 @@ export function CreateFeatureForm() {
 
 ## Image & Asset Optimization
 
-### Next.js Images
-
-Always use `next/image` for optimized loading:
-
-```typescript
-import Image from "next/image";
-
-// ✅ Optimized with lazy loading, responsive sizing, and modern formats
-<Image
-  src={user.avatar}
-  alt={user.name}
-  width={40}
-  height={40}
-  className="rounded-full"
-/>
-
-// ✅ For hero images, use priority to preload
-<Image src="/hero.png" alt="Hero" width={1200} height={600} priority />
-```
+Vite fingerprints and serves static assets from the Worker's assets binding. Use plain `<img>` with explicit `width`/`height` (no layout shift) and `loading="lazy"` below the fold; put `fetchpriority="high"` on the hero image. Cloudflare Images or a resizing origin can be added per app.
 
 ### Font Loading
 
-Fonts are loaded via `next/font` with swap display:
-
-```typescript
-// Already configured in layout.tsx
-const geistSans = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
-```
+Fonts are self-hosted through Vite (`apps/web/src/styles.css`) with `font-display: swap`; preload the primary face in `__root.tsx`'s `head`.
 
 ## Caching Strategy
 
-### tRPC Query Stale Times
+### Query Stale Times
 
-Configure appropriate stale times for different data types:
+`queryOptions` from the query layer can be extended per use:
 
 ```typescript
-// Static data (plans, config) — cache for 5 minutes
-const { data: plans } = useQuery(
-  trpc.subscription.plans.queryOptions(undefined, {
-    staleTime: 5 * 60 * 1000,
-  }),
-);
+// Static data (launch state, plans) — cache for 5 minutes
+const { data: launch } = useQuery({
+  ...queries.settings.launchState(),
+  staleTime: 5 * 60 * 1000,
+});
 
 // User-specific data — cache for 1 minute
-const { data: prefs } = useQuery(
-  trpc.settings.getPreferences.queryOptions(undefined, {
-    staleTime: 60 * 1000,
-  }),
-);
+const { data: prefs } = useQuery({
+  ...queries.settings.getPreferences(),
+  staleTime: 60 * 1000,
+});
 
-// Frequently changing data — no stale time (always refetch)
-const { data: posts } = useQuery(trpc.post.all.queryOptions());
+// Frequently changing data — default stale time (refetch on mount)
+const { data: posts } = useQuery(queries.posts.list());
 ```
 
-### Revalidation Patterns
+### Invalidation
 
-```typescript
-// Invalidate specific queries after mutations
-onSuccess: () => {
-  void queryClient.invalidateQueries({
-    queryKey: trpc.feature.list.queryKey(),
-  });
-},
+`invalidation` in `@gmacko/api-client/queries` maps every mutation to the queries it makes stale; `makeQueryClient` applies it on success. Add a new mutation's targets there rather than invalidating by hand in components.
 
-// Invalidate all queries for a router
-onSuccess: () => {
-  void queryClient.invalidateQueries({
-    queryKey: [["feature"]],  // All feature.* queries
-  });
-},
-```
+### HTTP caching
+
+Public GET endpoints can set `Cache-Control` from the handler; the Worker sits behind Cloudflare's cache for static assets automatically.
 
 ## Web Vitals Monitoring
 
-Track Core Web Vitals with PostHog:
+Track Core Web Vitals with PostHog (add the `web-vitals` package to `apps/web`):
 
 ```typescript
-// apps/nextjs/src/app/layout.tsx or providers.tsx
-"use client";
-
-import { useReportWebVitals } from "next/web-vitals";
-
+// apps/web/src/client.tsx (browser only)
+import { onCLS, onINP, onLCP } from "web-vitals";
 import { trackEvent } from "@gmacko/analytics/web";
 
-export function WebVitalsReporter() {
-  useReportWebVitals((metric) => {
+for (const on of [onCLS, onINP, onLCP]) {
+  on((metric) => {
     trackEvent("web_vitals", {
-      name: metric.name,     // CLS, FID, FCP, LCP, TTFB
+      name: metric.name,
       value: metric.value,
       rating: metric.rating, // good, needs-improvement, poor
       delta: metric.delta,
     });
   });
-
-  return null;
 }
 ```
+
+Server-side latency is already recorded per endpoint (`http.server.duration`, one span per `group.endpoint`) when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; `x-trace-id` on the response links a slow page to its trace.
 
 ## Mobile Performance (Expo)
 
@@ -377,9 +279,9 @@ Before shipping any feature:
 - [ ] Responsive on mobile viewport sizes
 
 ### Performance
-- [ ] Server-side prefetching for all page data
+- [ ] Loader prefetching for all route data
 - [ ] Suspense boundaries around async components
-- [ ] Images use `next/image` with appropriate sizing
+- [ ] Images have explicit dimensions and lazy-load below the fold
 - [ ] No unnecessary client-side data fetching
 - [ ] Optimistic updates for mutations
 - [ ] Appropriate stale times on queries
@@ -392,6 +294,6 @@ Before shipping any feature:
 - [ ] Screen reader friendly
 
 ### SEO (public pages)
-- [ ] Metadata exported from page
+- [ ] `head` metadata on the route
 - [ ] Semantic heading hierarchy (h1 → h2 → h3)
 - [ ] Open Graph tags for social sharing
