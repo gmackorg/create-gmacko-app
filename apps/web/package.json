@@ -38,6 +38,7 @@
     "@gmacko/api": "workspace:*",
     "@gmacko/api-client": "workspace:*",
     "@gmacko/auth": "workspace:*",
+    "@gmacko/config": "workspace:*",
     "@gmacko/db": "workspace:*",
     "@gmacko/domain": "workspace:*",
     "@gmacko/monitoring": "workspace:*",
@@ -56,6 +57,7 @@
     "effect": "catalog:",
     "react": "catalog:react19",
     "react-dom": "catalog:react19",
+    "react-qr-code": "^2.2.0",
     "zod": "catalog:"
   },
   "devDependencies": {

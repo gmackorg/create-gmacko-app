@@ -11,7 +11,7 @@
  * cron ticks can overlap.
  */
 import { Database, type DatabaseError } from "@gmacko/db";
-import { rateLimitWindow } from "@gmacko/db/schema";
+import { deviceCode, rateLimitWindow } from "@gmacko/db/schema";
 import { lt } from "drizzle-orm";
 import { Context, Effect, Layer } from "effect";
 
@@ -22,6 +22,13 @@ export interface JobsShape {
    * start), so this is housekeeping, not correctness.
    */
   readonly pruneRateLimitWindows: Effect.Effect<number, DatabaseError>;
+  /**
+   * Deletes the `device_code` rows past their `expires_at`, and answers how
+   * many. better-auth's device-authorization plugin deletes a code only when
+   * that one code is polled after expiry, so abandoned pairing flows would
+   * otherwise accumulate forever.
+   */
+  readonly pruneDeviceCodes: Effect.Effect<number, DatabaseError>;
   /**
    * Everything the nightly tick runs. Never fails: a job's failure is logged
    * and the next one still runs, because a cron tick has nobody to report to.
@@ -43,16 +50,37 @@ export class Jobs extends Context.Service<Jobs, JobsShape>()(
           ),
         ),
       );
+      const pruneDeviceCodes = Effect.clockWith((clock) =>
+        Effect.flatMap(clock.currentTimeMillis, (now) =>
+          database.updateWhere(
+            database.db
+              .delete(deviceCode)
+              .where(lt(deviceCode.expiresAt, new Date(now))),
+          ),
+        ),
+      );
       return Jobs.of({
         pruneRateLimitWindows,
-        runScheduled: pruneRateLimitWindows.pipe(
-          Effect.flatMap((deleted) =>
-            Effect.logInfo("pruned rate limit windows", { deleted }),
+        pruneDeviceCodes,
+        runScheduled: Effect.andThen(
+          pruneRateLimitWindows.pipe(
+            Effect.flatMap((deleted) =>
+              Effect.logInfo("pruned rate limit windows", { deleted }),
+            ),
+            Effect.ignoreCause({
+              log: true,
+              message: "pruning rate limit windows failed",
+            }),
           ),
-          Effect.ignoreCause({
-            log: true,
-            message: "pruning rate limit windows failed",
-          }),
+          pruneDeviceCodes.pipe(
+            Effect.flatMap((deleted) =>
+              Effect.logInfo("pruned expired device codes", { deleted }),
+            ),
+            Effect.ignoreCause({
+              log: true,
+              message: "pruning expired device codes failed",
+            }),
+          ),
         ),
       });
     }),

@@ -56,6 +56,13 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const sentryPlugin = getSentryConfig();
   const plugins: ExpoConfig["plugins"] = [
     "expo-apple-authentication",
+    [
+      "expo-camera",
+      {
+        cameraPermission:
+          "Allow $(PRODUCT_NAME) to use the camera to scan sign-in QR codes.",
+      },
+    ],
     "expo-localization",
     "expo-router",
     "expo-secure-store",

@@ -14,7 +14,7 @@
 import { applyD1Migrations } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { Database } from "@gmacko/db";
-import { rateLimitWindow } from "@gmacko/db/schema";
+import { deviceCode, rateLimitWindow } from "@gmacko/db/schema";
 import { RateLimited } from "@gmacko/domain";
 import { Cause, Effect, Exit, Layer, ManagedRuntime, Option } from "effect";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -132,5 +132,40 @@ describe("Jobs.pruneRateLimitWindows", () => {
     );
     expect(rows.some((row) => row.key.endsWith(":stale"))).toBe(false);
     expect(rows.some((row) => row.key.includes(client))).toBe(true);
+  });
+});
+
+describe("Jobs.pruneDeviceCodes", () => {
+  it("deletes expired device codes and leaves the live ones", async () => {
+    const suffix = crypto.randomUUID();
+    await runtime.runPromise(
+      Effect.flatMap(Database, ({ db }) =>
+        db.insert(deviceCode).values([
+          {
+            id: `stale-${suffix}`,
+            deviceCode: `device-stale-${suffix}`,
+            userCode: `STALE${suffix.slice(0, 3)}`,
+            expiresAt: new Date(Date.now() - 60_000),
+            status: "pending",
+          },
+          {
+            id: `live-${suffix}`,
+            deviceCode: `device-live-${suffix}`,
+            userCode: `LIVE${suffix.slice(0, 4)}`,
+            expiresAt: new Date(Date.now() + 60_000),
+            status: "pending",
+          },
+        ]),
+      ),
+    );
+    const deleted = await runtime.runPromise(
+      Effect.flatMap(Jobs, (jobs) => jobs.pruneDeviceCodes),
+    );
+    expect(deleted).toBeGreaterThanOrEqual(1);
+    const rows = await runtime.runPromise(
+      Effect.flatMap(Database, ({ db }) => db.select().from(deviceCode)),
+    );
+    expect(rows.some((row) => row.id === `stale-${suffix}`)).toBe(false);
+    expect(rows.some((row) => row.id === `live-${suffix}`)).toBe(true);
   });
 });

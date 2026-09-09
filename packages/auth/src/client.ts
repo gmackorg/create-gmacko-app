@@ -9,9 +9,16 @@
  * `genericOAuthClient` / `signIn.oauth2` in 1.7.2.
  */
 import { createAuthClient as createBetterAuthClient } from "better-auth/client";
-import { magicLinkClient } from "better-auth/client/plugins";
+import {
+  deviceAuthorizationClient,
+  magicLinkClient,
+} from "better-auth/client/plugins";
 
-export const authClientPlugins = () => [magicLinkClient()];
+/** Magic link, plus the device grant (`authClient.device.*`) behind mobile pairing. */
+export const authClientPlugins = () => [
+  magicLinkClient(),
+  deviceAuthorizationClient(),
+];
 
 /**
  * `baseURL` is always passed, `undefined` included: the client resolves it

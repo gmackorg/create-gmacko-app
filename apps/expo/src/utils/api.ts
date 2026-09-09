@@ -1,8 +1,8 @@
 /**
  * The typed API client for the app, plus the TanStack Query layer over it.
- * Auth is the better-auth Expo client's cookie (see api-headers.ts); the
- * `QueryClient` applies each mutation's `invalidates` on success, so screens
- * never invalidate by hand.
+ * Auth is the better-auth Expo client's cookie, or the device-paired bearer
+ * token (see api-headers.ts); the `QueryClient` applies each mutation's
+ * `invalidates` on success, so screens never invalidate by hand.
  */
 import { makeApiClient } from "@gmacko/api-client";
 import {
@@ -11,14 +11,15 @@ import {
   makeQueryClient,
 } from "@gmacko/api-client/queries";
 
-import { headersFromCookie } from "./api-headers";
+import { headersFromCredentials } from "./api-headers";
 import { authClient } from "./auth";
 import { getBaseUrl } from "./base-url";
+import { getToken } from "./session-store";
 
 export const api = makeApiClient({
   baseUrl: getBaseUrl(),
   // @better-auth/expo 1.7 reads SecureStore asynchronously.
-  headers: headersFromCookie(() => authClient.getCookie()),
+  headers: headersFromCredentials(() => authClient.getCookie(), getToken),
 });
 
 export const queries = makeQueries(api);

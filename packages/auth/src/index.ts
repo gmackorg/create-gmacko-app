@@ -10,6 +10,8 @@ import * as schema from "@gmacko/db/schema";
 import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { bearer } from "better-auth/plugins/bearer";
+import { deviceAuthorization } from "better-auth/plugins/device-authorization";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { magicLink } from "better-auth/plugins/magic-link";
 import { oAuthProxy } from "better-auth/plugins/oauth-proxy";
@@ -74,6 +76,13 @@ export interface AuthOptions {
     readonly send: (link: MagicLink) => Promise<void>;
   };
   /**
+   * The RFC 8628 device-authorization grant behind mobile pairing (QR and
+   * user-code): the allow-list a `/device/code` request's `client_id` must be
+   * on (`@gmacko/config`'s `PAIRING_CLIENT_ID` for the mobile app). Unset
+   * accepts any client id.
+   */
+  readonly deviceClientIds?: ReadonlyArray<string> | undefined;
+  /**
    * Framework plugins the app adds (e.g. `tanstackStartCookies()`). Typed
    * loosely on purpose: pnpm installs one `better-auth` copy per distinct
    * peer set, so a plugin created in an app resolves to a different copy of
@@ -92,6 +101,7 @@ export interface AuthOptions {
  * than leaking `unknown` to the sink.
  */
 export type AuthApiError = Error;
+
 
 const toAuthApiError = (cause: unknown): AuthApiError =>
   cause instanceof Error
@@ -185,6 +195,20 @@ export function makeAuth(options: AuthOptions, db: PlainDatabase) {
   const googleTokenUrl =
     options.google.tokenUrl ?? "https://oauth2.googleapis.com/token";
   const appleUrl = options.apple?.url ?? "https://appleid.apple.com";
+  // A code lives 15 minutes and is polled every 5 seconds: long enough to
+  // walk to a browser and type it, short enough that a photographed QR goes
+  // stale. `validateClient` only exists when there is a list to check.
+  const deviceClientIds = options.deviceClientIds;
+  const devicePairing = deviceAuthorization(
+    deviceClientIds
+      ? {
+          expiresIn: "15m",
+          interval: "5s",
+          validateClient: (clientId: string) =>
+            deviceClientIds.includes(clientId),
+        }
+      : { expiresIn: "15m", interval: "5s" },
+  );
   const onError =
     options.onError ??
     ((error: AuthApiError) => {
@@ -267,6 +291,18 @@ export function makeAuth(options: AuthOptions, db: PlainDatabase) {
           },
         ],
       }),
+      // Lets mobile and CLI clients authenticate with `Authorization: Bearer
+      // <session token>` — the credential the device grant below hands out.
+      // Any raw session token is thereby replayable as a header, so a
+      // session-token leak (a DB snapshot, a log) is a credential leak.
+      // `requireSignature` cannot be on: the device grant returns the
+      // unsigned token.
+      bearer(),
+      // RFC 8628 device-authorization grant. Powers both mobile pairing
+      // paths: QR (the web app starts + pre-approves a flow, the phone
+      // redeems the device code) and user-code entry (the phone starts a
+      // flow, the user approves it at /device).
+      devicePairing,
       // SAFETY: `AuthPluginLike` names the whole of what better-auth requires
       // of a plugin object at this position (`id`, optional `version`); the
       // structural mismatch `BetterAuthPlugin` reports is nominal only —

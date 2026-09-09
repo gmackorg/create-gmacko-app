@@ -24,12 +24,19 @@ export const relations = defineRelations(schema, (r) => ({
       from: r.user.id,
       to: r.workspaceMembership.userId,
     }),
+    deviceCodes: r.many.deviceCode({
+      from: r.user.id,
+      to: r.deviceCode.userId,
+    }),
   },
   session: {
     user: r.one.user({ from: r.session.userId, to: r.user.id }),
   },
   account: {
     user: r.one.user({ from: r.account.userId, to: r.user.id }),
+  },
+  deviceCode: {
+    user: r.one.user({ from: r.deviceCode.userId, to: r.user.id }),
   },
   userPreferences: {
     user: r.one.user({ from: r.userPreferences.userId, to: r.user.id }),

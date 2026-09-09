@@ -25,7 +25,13 @@
  * backfill, then tighten; never drop-and-recreate a table with rows behind
  * foreign keys. See packages/db/README.md, "Migrations".
  */
-import { index, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 import { bool, timestampMs } from "./columns";
 
@@ -102,3 +108,28 @@ export const verification = sqliteTable(
   },
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
+
+export const deviceCodeStatusEnum = ["pending", "approved", "denied"] as const;
+export type DeviceCodeStatus = (typeof deviceCodeStatusEnum)[number];
+
+/**
+ * RFC 8628 device-authorization grant (better-auth's `deviceAuthorization`
+ * plugin; field names and NOT NULLs are the plugin's own schema). Backs the
+ * mobile app's QR pairing and user-code sign-in. `deviceCode` and `userCode`
+ * are single-use credentials the plugin looks up on every poll and approval:
+ * unique gives the correctness AND the index for those hot paths. Rows past
+ * `expires_at` are housekeeping for the nightly Cron tick
+ * (`Jobs.pruneDeviceCodes`); the plugin only deletes the one it is asked for.
+ */
+export const deviceCode = sqliteTable("device_code", {
+  id: text().primaryKey(),
+  deviceCode: text("device_code").notNull().unique(),
+  userCode: text("user_code").notNull().unique(),
+  userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+  expiresAt: timestampMs("expires_at").notNull(),
+  status: text().$type<DeviceCodeStatus>().notNull(),
+  lastPolledAt: timestampMs("last_polled_at"),
+  pollingInterval: integer("polling_interval"),
+  clientId: text("client_id"),
+  scope: text(),
+});

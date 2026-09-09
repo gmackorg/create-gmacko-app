@@ -6,6 +6,7 @@ import { RouterLink } from "~/components/router-link";
 import { ApiKeysSection } from "~/components/settings/api-keys";
 import { BillingSections } from "~/components/settings/billing";
 import { DeleteAccountSection } from "~/components/settings/delete-account";
+import { PairDeviceSection } from "~/components/settings/pair-device";
 import { PreferencesSection } from "~/components/settings/preferences";
 import { WorkspaceSection } from "~/components/settings/workspace";
 import { queries } from "~/lib/api";
@@ -75,6 +76,7 @@ function SettingsPage() {
         <Suspense fallback={<SettingsSkeleton title="Preferences" />}>
           <PreferencesSection />
         </Suspense>
+        <PairDeviceSection />
         <Suspense fallback={<SettingsSkeleton title="API Keys" />}>
           <ApiKeysSection />
         </Suspense>

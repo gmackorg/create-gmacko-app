@@ -7,6 +7,7 @@ delete from "application_settings";
 delete from "billing_plan_limit";
 delete from "workspace_subscription";
 delete from "billing_plan";
+delete from "device_code";
 delete from "post";
 delete from "rate_limit_window";
 delete from "session";

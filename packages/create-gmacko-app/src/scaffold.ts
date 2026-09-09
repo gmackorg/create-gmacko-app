@@ -136,6 +136,7 @@ export async function scaffold(options: CliOptions): Promise<void> {
   if (options.platforms.mobile) {
     configureExpoApp(targetDir, options.appName, options.displayName);
   }
+  configurePairingSurfaces(targetDir, options);
 
   customizeGeneratedReadme(targetDir, options);
   pruneOptionalLanes(targetDir, options);
@@ -1367,6 +1368,92 @@ ${posthogWrap}
 }
 `,
   );
+}
+
+/**
+ * The device-pairing UI spans both platforms: the web app generates the QR
+ * (settings' "Pair Mobile Device" panel) and hosts the /device approval page,
+ * and the mobile app scans it. Each half is a dead end without the other, so
+ * when a platform is pruned the orphaned entry points go too, rather than
+ * shipping links and panels that cannot work.
+ */
+function configurePairingSurfaces(
+  targetDir: string,
+  options: CliOptions,
+): void {
+  if (options.platforms.web && !options.platforms.mobile) {
+    // No mobile app to pair: drop the "Pair Mobile Device" settings panel
+    // (its copy tells the user to open a mobile app that does not exist) and
+    // the QR renderer only it used. The generic /device approval page and
+    // the device-authorization plugin stay: a CLI or other device client can
+    // still use the user-code flow.
+    fs.removeSync(
+      path.join(
+        targetDir,
+        `${WEB_APP_DIR}/src/components/settings/pair-device.tsx`,
+      ),
+    );
+    const settingsRoute = path.join(
+      targetDir,
+      `${WEB_APP_DIR}/src/routes/settings.tsx`,
+    );
+    removeSnippet(
+      settingsRoute,
+      'import { PairDeviceSection } from "~/components/settings/pair-device";\n',
+    );
+    removeSnippet(settingsRoute, "        <PairDeviceSection />\n");
+    removeSnippet(
+      path.join(targetDir, `${WEB_APP_DIR}/package.json`),
+      '    "react-qr-code": "^2.2.0",\n',
+    );
+  }
+
+  if (options.platforms.mobile && !options.platforms.web) {
+    // No web app to generate or approve pairing codes: drop the mobile QR
+    // sign-in entry point (and the now-unused scanner dependency) so it does
+    // not dead-end.
+    for (const file of [
+      "src/app/pair.tsx",
+      "src/utils/pairing.ts",
+      "src/utils/pairing.test.ts",
+    ]) {
+      fs.removeSync(path.join(targetDir, `${MOBILE_APP_DIR}/${file}`));
+    }
+    removeSnippet(
+      path.join(targetDir, `${MOBILE_APP_DIR}/src/app/index.tsx`),
+      `      {!session ? (
+        <Link asChild href="/pair">
+          <Pressable className="border-input mt-3 flex items-center rounded-sm border p-2">
+            <Text className="text-foreground">Sign in with QR Code</Text>
+          </Pressable>
+        </Link>
+      ) : null}
+`,
+    );
+    removeSnippet(
+      path.join(targetDir, `${MOBILE_APP_DIR}/app.config.ts`),
+      `    [
+      "expo-camera",
+      {
+        cameraPermission:
+          "Allow $(PRODUCT_NAME) to use the camera to scan sign-in QR codes.",
+      },
+    ],
+`,
+    );
+    removeSnippet(
+      path.join(targetDir, `${MOBILE_APP_DIR}/package.json`),
+      '    "expo-camera": "~56.0.8",\n',
+    );
+  }
+}
+
+/** Deletes one exact snippet from a file, if both exist; a no-op otherwise. */
+function removeSnippet(filePath: string, snippet: string): void {
+  if (!fs.existsSync(filePath)) return;
+  const content = fs.readFileSync(filePath, "utf-8");
+  if (!content.includes(snippet)) return;
+  fs.writeFileSync(filePath, content.replace(snippet, ""));
 }
 
 /**

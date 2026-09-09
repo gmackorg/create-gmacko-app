@@ -6,6 +6,7 @@
 import { AppConfig, type AppConfigShape } from "@gmacko/api";
 import { type AuthOptions, logMagicLink, type MagicLink } from "@gmacko/auth";
 import { Auth } from "@gmacko/auth/service";
+import { PAIRING_CLIENT_ID } from "@gmacko/config";
 import type { Database } from "@gmacko/db";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { Effect, Layer } from "effect";
@@ -43,6 +44,9 @@ export const makeAuthOptions = (
   magicLink: overrides?.magicLink ?? {
     send: config.auth.bypassMagicLink ? logMagicLink : emailNotWired,
   },
+  // The mobile app is the one device-grant client (settings' "Pair Mobile
+  // Device" QR and the app's pairing screen both present this id).
+  deviceClientIds: [PAIRING_CLIENT_ID],
   extraPlugins: [tanstackStartCookies()],
 });
 

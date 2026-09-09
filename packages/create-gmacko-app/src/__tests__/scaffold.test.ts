@@ -1807,6 +1807,66 @@ describe("create-gmacko-app scaffold", () => {
       expect(fileExists(result.appPath, "apps/web")).toBe(true);
     }, 120000);
 
+    it("should drop the mobile pairing panel from web when --no-mobile", async () => {
+      const appName = generateAppName("no-mobile-pairing");
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-install", "--no-git", "--no-mobile"],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+      // The "Pair Mobile Device" panel tells the user to open a mobile app
+      // that no longer exists — it must be stripped, with its QR renderer.
+      expect(
+        fileExists(
+          result.appPath,
+          "apps/web/src/components/settings/pair-device.tsx",
+        ),
+      ).toBe(false);
+      const settings = readFile(
+        result.appPath,
+        "apps/web/src/routes/settings.tsx",
+      );
+      expect(settings).not.toContain("PairDeviceSection");
+      expect(readFile(result.appPath, "apps/web/package.json")).not.toContain(
+        "react-qr-code",
+      );
+      // The generic /device approval page stays (usable by non-mobile clients).
+      expect(fileExists(result.appPath, "apps/web/src/routes/device.tsx")).toBe(
+        true,
+      );
+    }, 120000);
+
+    it("should drop the mobile QR sign-in when web is absent (--no-web + mobile)", async () => {
+      const appName = generateAppName("no-web-pairing");
+      const result = await runCli({
+        appName,
+        flags: ["--yes", "--no-install", "--no-git", "--no-web"],
+        cwd: tempDir,
+      });
+
+      appsToClean.push(result.appPath);
+
+      expect(result.exitCode).toBe(0);
+      expect(fileExists(result.appPath, "apps/expo")).toBe(true);
+      // No web app to generate/approve pairing codes — the QR entry point
+      // and its scanner dependency must be gone.
+      expect(fileExists(result.appPath, "apps/expo/src/app/pair.tsx")).toBe(
+        false,
+      );
+      const home = readFile(result.appPath, "apps/expo/src/app/index.tsx");
+      expect(home).not.toContain('href="/pair"');
+      expect(home).not.toContain("Sign in with QR Code");
+      const expoPkg = readFile(result.appPath, "apps/expo/package.json");
+      expect(expoPkg).not.toContain("expo-camera");
+      expect(readFile(result.appPath, "apps/expo/app.config.ts")).not.toContain(
+        "expo-camera",
+      );
+    }, 120000);
+
     it("should refuse to scaffold nothing when both platforms are excluded", async () => {
       const appName = generateAppName("no-platforms");
       const result = await runCli({

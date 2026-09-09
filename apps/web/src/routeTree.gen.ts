@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from "./routes/index";
 import { Route as AdminRouteImport } from "./routes/admin";
 import { Route as ChangelogRouteImport } from "./routes/changelog";
 import { Route as ContactRouteImport } from "./routes/contact";
+import { Route as DeviceRouteImport } from "./routes/device";
 import { Route as FaqRouteImport } from "./routes/faq";
 import { Route as PricingRouteImport } from "./routes/pricing";
 import { Route as PrivacyRouteImport } from "./routes/privacy";
@@ -44,6 +45,11 @@ const ChangelogRoute = ChangelogRouteImport.update({
 const ContactRoute = ContactRouteImport.update({
   id: "/contact",
   path: "/contact",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const DeviceRoute = DeviceRouteImport.update({
+  id: "/device",
+  path: "/device",
   getParentRoute: () => rootRouteImport,
 } as any);
 const FaqRoute = FaqRouteImport.update({
@@ -112,6 +118,7 @@ export interface FileRoutesByFullPath {
   "/admin": typeof AdminRouteWithChildren;
   "/changelog": typeof ChangelogRoute;
   "/contact": typeof ContactRoute;
+  "/device": typeof DeviceRoute;
   "/faq": typeof FaqRoute;
   "/pricing": typeof PricingRoute;
   "/privacy": typeof PrivacyRoute;
@@ -129,6 +136,7 @@ export interface FileRoutesByTo {
   "/": typeof IndexRoute;
   "/changelog": typeof ChangelogRoute;
   "/contact": typeof ContactRoute;
+  "/device": typeof DeviceRoute;
   "/faq": typeof FaqRoute;
   "/pricing": typeof PricingRoute;
   "/privacy": typeof PrivacyRoute;
@@ -148,6 +156,7 @@ export interface FileRoutesById {
   "/admin": typeof AdminRouteWithChildren;
   "/changelog": typeof ChangelogRoute;
   "/contact": typeof ContactRoute;
+  "/device": typeof DeviceRoute;
   "/faq": typeof FaqRoute;
   "/pricing": typeof PricingRoute;
   "/privacy": typeof PrivacyRoute;
@@ -168,6 +177,7 @@ export interface FileRouteTypes {
     | "/admin"
     | "/changelog"
     | "/contact"
+    | "/device"
     | "/faq"
     | "/pricing"
     | "/privacy"
@@ -185,6 +195,7 @@ export interface FileRouteTypes {
     | "/"
     | "/changelog"
     | "/contact"
+    | "/device"
     | "/faq"
     | "/pricing"
     | "/privacy"
@@ -203,6 +214,7 @@ export interface FileRouteTypes {
     | "/admin"
     | "/changelog"
     | "/contact"
+    | "/device"
     | "/faq"
     | "/pricing"
     | "/privacy"
@@ -222,6 +234,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren;
   ChangelogRoute: typeof ChangelogRoute;
   ContactRoute: typeof ContactRoute;
+  DeviceRoute: typeof DeviceRoute;
   FaqRoute: typeof FaqRoute;
   PricingRoute: typeof PricingRoute;
   PrivacyRoute: typeof PrivacyRoute;
@@ -262,6 +275,13 @@ declare module "@tanstack/react-router" {
       path: "/contact";
       fullPath: "/contact";
       preLoaderRoute: typeof ContactRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/device": {
+      id: "/device";
+      path: "/device";
+      fullPath: "/device";
+      preLoaderRoute: typeof DeviceRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/faq": {
@@ -368,6 +388,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   ChangelogRoute: ChangelogRoute,
   ContactRoute: ContactRoute,
+  DeviceRoute: DeviceRoute,
   FaqRoute: FaqRoute,
   PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
