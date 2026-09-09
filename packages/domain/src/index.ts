@@ -1,7 +1,9 @@
 /**
  * `@gmacko/domain`: the API contract. Pure data (Schema models, status-
  * annotated errors, middleware declarations, the `AppApi` definition); no
- * implementation and no dependency beyond `effect`.
+ * implementation and no dependency beyond `effect` and the ForgeGraph
+ * annotation vocabulary (`@forgegraph/contract/effect`: `Sla`, `IsPublic`,
+ * `Authentication`), which is itself pure data.
  */
 export * from "./admin";
 export * from "./api";
