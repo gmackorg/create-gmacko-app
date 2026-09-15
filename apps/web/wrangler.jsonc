@@ -15,7 +15,7 @@
   //     the request context);
   //   - better-auth: `node:async_hooks`.
   "compatibility_flags": [],
-  "observability": { "enabled": true },
+  "observability": { "logs": { "enabled": true, "destinations": ["signoz-logs"] }, "enabled": true },
   // Nightly maintenance tick, handled by `scheduled` in src/server/worker.ts.
   // Locally: `curl http://localhost:3001/cdn-cgi/handler/scheduled?cron=0+3+*+*+*`.
   "triggers": { "crons": ["0 3 * * *"] },
