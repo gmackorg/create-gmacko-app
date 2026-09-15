@@ -1,3 +1,4 @@
+import { IsPublic } from "@forgegraph/contract/effect";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi";
 
@@ -13,7 +14,7 @@ export class AuthApi extends HttpApiGroup.make("auth")
   .add(
     HttpApiEndpoint.get("session", "/session", {
       success: SessionState,
-    }),
+    }).annotate(IsPublic, true),
   )
   .add(
     HttpApiEndpoint.get("secret", "/secret", {

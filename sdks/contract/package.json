@@ -1,0 +1,17 @@
+{
+  "name": "@gmacko/contract-spec",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "tsx generate-contract.ts",
+    "clean": "rm -f contract.json"
+  },
+  "dependencies": {
+    "@forgegraph/contract": "^0.1.0",
+    "@gmacko/domain": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0"
+  }
+}

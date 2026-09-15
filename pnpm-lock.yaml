@@ -862,6 +862,9 @@ importers:
 
   packages/domain:
     dependencies:
+      '@forgegraph/contract':
+        specifier: ^0.1.0
+        version: 0.1.0(effect@4.0.0-rc.112)
       effect:
         specifier: 'catalog:'
         version: 4.0.0-rc.112
@@ -1412,6 +1415,22 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.3.6
+
+  sdks/contract:
+    dependencies:
+      '@forgegraph/contract':
+        specifier: ^0.1.0
+        version: 0.1.0(effect@4.0.0-rc.112)
+      '@gmacko/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.112
+    devDependencies:
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
 
   sdks/openapi:
     dependencies:
@@ -3487,6 +3506,14 @@ packages:
   '@forgegraph/cli@0.3.0':
     resolution: {integrity: sha512-OSaHvuvNwuA2wrK4tgUIhZ4dsRK9Kk6tRU4mpb9UkqWs6oIlXZutpe+M73f0TpKi7jpsEPwc2aEcUWMPRs2pPQ==}
     hasBin: true
+
+  '@forgegraph/contract@0.1.0':
+    resolution: {integrity: sha512-6f1d+N55xWUdIhJQsHmYtLG2+FBcV9c/cFy/1rkYv9oMFNJ15DdPY2rIu3as14zaB7P34lIiUa36FrQGWbsR1g==}
+    peerDependencies:
+      effect: '>=4.0.0-rc.112 <5'
+    peerDependenciesMeta:
+      effect:
+        optional: true
 
   '@gmacko/cloudfault@0.1.0':
     resolution: {integrity: sha512-y2uj6i+yMhpmgz4HnfvY8SBxriVwhVqlUnV+vfuUCUgnLsUYRCuoHUT244GrgVJQ1x3qChsPfEcRcxMk2TkTBQ==}
@@ -14427,6 +14454,12 @@ snapshots:
       '@forgegraph/cli-darwin-x64': 0.3.0
       '@forgegraph/cli-linux-arm64': 0.3.0
       '@forgegraph/cli-linux-x64': 0.3.0
+
+  '@forgegraph/contract@0.1.0(effect@4.0.0-rc.112)':
+    dependencies:
+      zod: 4.5.4
+    optionalDependencies:
+      effect: 4.0.0-rc.112
 
   '@gmacko/cloudfault@0.1.0(fast-check@4.9.0)(miniflare@4.20260730.0(bufferutil@4.1.0)(utf-8-validate@6.0.4))(wrangler@4.128.0(@cloudflare/workers-types@5.20260903.1)(bufferutil@4.1.0)(utf-8-validate@6.0.4))':
     optionalDependencies:

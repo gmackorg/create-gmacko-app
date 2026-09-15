@@ -1,3 +1,4 @@
+import { IsPublic } from "@forgegraph/contract/effect";
 import { Schema } from "effect";
 import {
   HttpApiEndpoint,
@@ -14,14 +15,14 @@ export class PostsApi extends HttpApiGroup.make("posts")
   .add(
     HttpApiEndpoint.get("list", "/", {
       success: Schema.Array(Post),
-    }),
+    }).annotate(IsPublic, true),
   )
   .add(
     HttpApiEndpoint.get("byId", "/:id", {
       params: { id: PostId },
       success: Post,
       error: NotFound,
-    }),
+    }).annotate(IsPublic, true),
   )
   .add(
     HttpApiEndpoint.post("create", "/", {

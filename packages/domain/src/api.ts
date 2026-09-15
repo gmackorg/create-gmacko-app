@@ -1,3 +1,4 @@
+import { Sla } from "@forgegraph/contract/effect";
 import { HttpApi, OpenApi } from "effect/unstable/httpapi";
 
 import pkg from "../package.json" with { type: "json" };
@@ -18,6 +19,11 @@ import { SettingsApi } from "./settings/api";
  * reaches only the endpoints present when it is called, so the health probes
  * keep their own 503 shapes (see errors.ts). The OpenAPI `info` block is the
  * package name and version, so the document says which contract it describes.
+ *
+ * The ForgeGraph `Sla` here is the service-level default every operation
+ * inherits leaf by leaf; a group or endpoint overrides single leaves with its
+ * own `Sla` annotation. Visibility is `IsPublic` per endpoint (private by
+ * default); authentication is derived from the security middleware.
  */
 export class AppApi extends HttpApi.make("gmacko")
   .add(AuthApi)
@@ -27,6 +33,9 @@ export class AppApi extends HttpApi.make("gmacko")
   .prefix("/api")
   .middleware(EndpointBoundary)
   .add(HealthApi)
-  .annotateMerge(
-    OpenApi.annotations({ title: "gmacko", version: pkg.version }),
-  ) {}
+  .annotateMerge(OpenApi.annotations({ title: "gmacko", version: pkg.version }))
+  .annotate(Sla, {
+    availability: 0.999,
+    latency: { p95Ms: 300, p99Ms: 800 },
+    timeoutMs: 10_000,
+  }) {}

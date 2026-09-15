@@ -108,6 +108,14 @@ observability) and by the health tests (`packages/api/src/health/health.test.ts`
   `packages/domain/src/**/api.ts` a non-public endpoint declares exactly one of
   `Session` or `SessionOrKey(scope)`, after any role check (`AdminOnly`,
   `WorkspaceRole`) so the credential runs outermost (`docs/API_AUTH.md`, rule 6).
+- **Visibility and SLA are annotations on the contract, never a second file**
+  (convention; pinned by `packages/domain/src/__tests__/contract.test.ts`). An
+  endpoint is private unless it carries `IsPublic` from
+  `@forgegraph/contract/effect`; authentication is derived from its security
+  middleware (annotate `Authentication` only to override, which flags a
+  mismatch); `Sla` patches merge leaf by leaf from `AppApi` down to the
+  endpoint. `pnpm -F @gmacko/contract-spec generate` compiles the contract
+  ForgeGraph ingests; the snapshot in `__snapshots__/contract.json` must match.
 - **`Database.plain` is for better-auth only** (`no-plain-drizzle-in-api`). The
   promise-based drizzle bypasses the `DatabaseError` mapping and tracing; only
   `packages/auth` (the adapter) may use it. Everything else goes through

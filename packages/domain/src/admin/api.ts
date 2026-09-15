@@ -1,3 +1,4 @@
+import { IsPublic } from "@forgegraph/contract/effect";
 import { Schema } from "effect";
 import {
   HttpApiEndpoint,
@@ -81,7 +82,7 @@ export class AdminApi extends HttpApiGroup.make("admin")
   .add(
     HttpApiEndpoint.get("bootstrapStatus", "/bootstrap", {
       success: BootstrapStatus,
-    }),
+    }).annotate(IsPublic, true),
   )
   .add(
     HttpApiEndpoint.post("completeBootstrap", "/bootstrap/complete", {

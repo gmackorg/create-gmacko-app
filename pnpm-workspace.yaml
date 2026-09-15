@@ -3,6 +3,7 @@ packages:
   - packages/*
   - tooling/*
   - sdks/openapi
+  - sdks/contract
 
 catalog:
   '@better-auth/expo': 1.7.2
