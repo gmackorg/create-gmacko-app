@@ -40,6 +40,7 @@ export const makeAuthOptions = (
   github: config.auth.github,
   google: config.auth.google,
   apple: config.auth.apple,
+  ssoTrustedIssuers: config.auth.ssoTrustedIssuers,
   magicLink: overrides?.magicLink ?? {
     send: config.auth.bypassMagicLink ? logMagicLink : emailNotWired,
   },
