@@ -32,6 +32,7 @@ jobs:
   generate-spec:
     name: Generate OpenAPI Spec
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -77,6 +78,7 @@ jobs:
     name: Generate SDKs
     needs: generate-spec
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -125,6 +127,7 @@ jobs:
     needs: generate-sdks
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
       packages: write

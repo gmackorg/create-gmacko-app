@@ -21,6 +21,7 @@ jobs:
   audit:
     name: Vulnerability Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,6 +57,7 @@ jobs:
   outdated:
     name: Outdated Check
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -88,6 +90,7 @@ jobs:
   bundle-size:
     name: Bundle Size Check
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: github.event_name == 'pull_request'
     steps:
       - name: Checkout

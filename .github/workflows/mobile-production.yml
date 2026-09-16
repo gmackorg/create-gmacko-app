@@ -32,6 +32,7 @@ jobs:
   build:
     name: EAS production build
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: apps/expo

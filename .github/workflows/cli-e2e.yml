@@ -58,6 +58,7 @@ jobs:
   build-cli:
     name: Build CLI
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -625,6 +626,7 @@ jobs:
     name: Report Results
     needs: [e2e-default, e2e-operators, e2e-minimal, e2e-custom-scope, e2e-full, e2e-mobile-only, e2e-mobile-pruned]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: always()
     steps:
       - name: Check results
