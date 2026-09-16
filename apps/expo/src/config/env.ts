@@ -5,6 +5,7 @@ import {
   collectEnvironmentErrors,
   type EnvironmentConfig,
   type ObservabilityConfig,
+  type PreflightConfig,
   validateEnvironment,
 } from "./env-validation";
 
@@ -15,6 +16,7 @@ export {
   collectEnvironmentErrors,
   type EnvironmentConfig,
   type ObservabilityConfig,
+  type PreflightConfig,
   validateEnvironment,
 };
 
@@ -78,7 +80,28 @@ function getObservabilityConfig(): ObservabilityConfig {
     sentryDsn,
     posthogKey,
     posthogHost,
+    preflight: getPreflightConfig(),
   };
+}
+
+// Preflight crash/error reporter config. Read in the same style as the Sentry
+// DSN above: `expoConfig.extra` first, then the EXPO_PUBLIC_* env var. The
+// reporter no-ops when appId/ingestKey are missing.
+function getPreflightConfig(): PreflightConfig {
+  const ingestUrl =
+    Constants.expoConfig?.extra?.PREFLIGHT_INGEST_URL ??
+    process.env.EXPO_PUBLIC_PREFLIGHT_INGEST_URL ??
+    "https://preflight.forgegraph.com";
+
+  const appId =
+    Constants.expoConfig?.extra?.PREFLIGHT_APP_ID ??
+    process.env.EXPO_PUBLIC_PREFLIGHT_APP_ID;
+
+  const ingestKey =
+    Constants.expoConfig?.extra?.PREFLIGHT_INGEST_KEY ??
+    process.env.EXPO_PUBLIC_PREFLIGHT_INGEST_KEY;
+
+  return { ingestUrl, appId, ingestKey };
 }
 
 function getSentryDsnForEnvironment(

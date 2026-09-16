@@ -25,7 +25,13 @@
  * backfill, then tighten; never drop-and-recreate a table with rows behind
  * foreign keys. See packages/db/README.md, "Migrations".
  */
-import { index, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 import { bool, timestampMs } from "./columns";
 
@@ -101,4 +107,44 @@ export const verification = sqliteTable(
     updatedAt: timestampMs("updated_at").notNull(),
   },
   (table) => [index("verification_identifier_idx").on(table.identifier)],
+);
+
+export const deviceCodeStatusEnum = ["pending", "approved", "denied"] as const;
+export type DeviceCodeStatus = (typeof deviceCodeStatusEnum)[number];
+
+// RFC 8628 device-authorization grant (better-auth `deviceAuthorization`
+// plugin). Backs mobile QR pairing and user-code device sign-in. deviceCode and
+// userCode are single-use credentials the plugin looks up on every poll and
+// approval — unique gives correctness AND the index for those hot paths.
+export const deviceCode = sqliteTable("device_code", {
+  id: text().primaryKey(),
+  deviceCode: text("device_code").notNull().unique(),
+  userCode: text("user_code").notNull().unique(),
+  userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+  expiresAt: timestampMs("expires_at").notNull(),
+  status: text().$type<DeviceCodeStatus>().notNull(),
+  lastPolledAt: timestampMs("last_polled_at"),
+  pollingInterval: integer("polling_interval"),
+  clientId: text("client_id"),
+  scope: text(),
+});
+
+// Bring-your-own SSO identity providers (better-auth `sso` plugin), registered
+// at runtime by platform admins and matched to sign-ins by email domain.
+// oidcConfig/samlConfig are JSON strings managed by the plugin. userId is the
+// registering admin — set null on deletion so removing that admin's account
+// doesn't lock the whole email domain out of SSO.
+export const ssoProvider = sqliteTable(
+  "sso_provider",
+  {
+    id: text().primaryKey(),
+    issuer: text().notNull(),
+    domain: text().notNull(),
+    oidcConfig: text("oidc_config"),
+    samlConfig: text("saml_config"),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    providerId: text("provider_id").notNull().unique(),
+    organizationId: text("organization_id"),
+  },
+  (table) => [index("sso_provider_domain_idx").on(table.domain)],
 );

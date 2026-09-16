@@ -43,4 +43,7 @@ export function captureExceptionNative(error: Error): void {
   Sentry.captureException(error);
 }
 
+// Preflight crash/error reporter — a dual sink beside Sentry (never a
+// replacement). See ./preflight.ts.
+export * from "./preflight";
 export { Sentry as SentryNative };

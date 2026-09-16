@@ -5,10 +5,21 @@
 
 export type AppEnvironment = "development" | "preview" | "production";
 
+export interface PreflightConfig {
+  /** Ingest host; defaults to https://preflight.forgegraph.com. */
+  ingestUrl: string;
+  /** Preflight app id. Reporter no-ops when unset. */
+  appId?: string;
+  /** Per-install write-only ingest key (`pfik_<hex>`). Reporter no-ops when unset. */
+  ingestKey?: string;
+}
+
 export interface ObservabilityConfig {
   sentryDsn?: string;
   posthogKey?: string;
   posthogHost: string;
+  // Preflight crash/error reporter — additive dual sink beside Sentry.
+  preflight?: PreflightConfig;
 }
 
 export interface EnvironmentConfig {

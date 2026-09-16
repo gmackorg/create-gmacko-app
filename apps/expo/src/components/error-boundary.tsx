@@ -1,5 +1,8 @@
 import { integrations } from "@gmacko/config";
-import { captureExceptionNative } from "@gmacko/monitoring/native";
+import {
+  captureExceptionNative,
+  capturePreflightException,
+} from "@gmacko/monitoring/native";
 import type { ErrorInfo, ReactNode } from "react";
 import { Component } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -39,6 +42,11 @@ export class ErrorBoundary extends Component<
     // Report to Sentry if enabled
     if (integrations.sentry) {
       captureExceptionNative(error);
+    }
+
+    // Dual-report to Preflight (non-fatal — the boundary recovered the tree).
+    if (integrations.preflight) {
+      capturePreflightException(error, { isFatal: false });
     }
 
     // Log to console in development

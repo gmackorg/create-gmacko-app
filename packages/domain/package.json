@@ -25,6 +25,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.scripts.json"
   },
   "dependencies": {
+    "@forgegraph/contract": "^0.1.0",
     "effect": "catalog:"
   },
   "devDependencies": {

@@ -1,3 +1,4 @@
+import { IsPublic } from "@forgegraph/contract/effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi";
 
 import {
@@ -41,4 +42,5 @@ export class HealthApi extends HttpApiGroup.make("health")
       success: ForgeHealth,
       error: ForgeUnhealthy,
     }),
-  ) {}
+  )
+  .annotate(IsPublic, true) {}

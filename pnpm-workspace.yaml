@@ -3,6 +3,7 @@ packages:
   - packages/*
   - tooling/*
   - sdks/openapi
+  - sdks/contract
 
 catalog:
   '@better-auth/expo': 1.7.2
@@ -10,6 +11,8 @@ catalog:
   '@cloudflare/vite-plugin': 1.54.3
   '@cloudflare/vitest-pool-workers': 0.22.0
   '@cloudflare/workers-types': 5.20260903.1
+  '@better-auth/cli': 1.4.21
+  '@better-auth/sso': 1.7.0-beta.2
   '@commitlint/cli': ^20.5.0
   '@commitlint/config-conventional': ^20.5.0
   # Editor-only TypeScript language-service plugin (tooling/typescript/base.json

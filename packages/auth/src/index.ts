@@ -3,17 +3,25 @@
  * options and an injected promise-drizzle instance so nothing here reads the
  * environment or opens a database at import time.
  */
+import { sso } from "@better-auth/sso";
 import { expo } from "@better-auth/expo";
+import { lt } from "drizzle-orm";
 import type { PlainDatabase } from "@gmacko/db";
 import type { UserRole, WorkspaceRole } from "@gmacko/db/schema";
+import { deviceCode } from "@gmacko/db/schema";
 import * as schema from "@gmacko/db/schema";
 import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { createAuthMiddleware } from "better-auth/api";
+import { bearer } from "better-auth/plugins/bearer";
+import { deviceAuthorization } from "better-auth/plugins/device-authorization";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { magicLink } from "better-auth/plugins/magic-link";
 import { oAuthProxy } from "better-auth/plugins/oauth-proxy";
 import { Schema } from "effect";
+
+export { parseSsoTrustedIssuers } from "./sso-issuers";
 
 export function isPlatformAdminRole(
   role: UserRole | null | undefined,
@@ -50,6 +58,13 @@ export interface AuthOptions {
   /** Origin registered with the OAuth providers; `oAuthProxy` relays previews to it. */
   readonly productionUrl: string;
   readonly secret: string | undefined;
+  /**
+   * Origins of bring-your-own SSO identity providers (issuer base URLs).
+   * OIDC discovery rejects issuers outside better-auth's trusted origins, so
+   * each customer IdP origin must be allow-listed here (usually from
+   * AUTH_SSO_TRUSTED_ISSUERS via parseSsoTrustedIssuers).
+   */
+  readonly ssoTrustedIssuers?: ReadonlyArray<string>;
   /** Origins allowed to send credentials (the app URL, the Expo dev origin). */
   readonly allowedOrigins: ReadonlyArray<string>;
   /** `url`/`apiUrl` default to github.com; emulate overrides them (AUTH_GITHUB_URL, AUTH_GITHUB_API_URL). */
@@ -230,6 +245,25 @@ export function makeAuth(options: AuthOptions, db: PlainDatabase) {
     },
     plugins: [
       oAuthProxy({ productionURL: options.productionUrl }),
+      // Lets mobile/CLI clients authenticate with `Authorization: Bearer
+      // <session token>` — the credential the device grant below hands out.
+      // Note: this makes any raw session token directly replayable as a header
+      // across every app built from this scaffold, so treat session-token leaks
+      // (database snapshots, logs) as credential leaks. requireSignature can't
+      // be enabled alongside it because the device grant returns the unsigned
+      // token.
+      bearer(),
+      // RFC 8628 device-authorization grant. Powers both mobile pairing paths:
+      // QR (web starts + approves a flow, the phone redeems the device code)
+      // and user-code entry (the phone starts a flow, the user approves at
+      // /device).
+      deviceAuthorization({ expiresIn: "15m", interval: "5s" }),
+      // Bring-your-own SSO: OIDC providers registered at runtime and matched by
+      // email domain. Registration is restricted to platform admins.
+      sso({
+        providersLimit: (user) =>
+          isPlatformAdminRole((user as { role?: UserRole }).role) ? 10 : 0,
+      }),
       expo(),
       magicLink({
         sendMagicLink: ({ email, url, token }) =>
@@ -293,7 +327,27 @@ export function makeAuth(options: AuthOptions, db: PlainDatabase) {
       "expo://",
       ...options.allowedOrigins,
       ...(options.apple ? [appleUrl] : []),
+      // Note: better-auth also treats trusted origins as valid redirect
+      // targets, so SSO issuer entries broaden more than OIDC discovery —
+      // keep the allow-list to exact IdP origins.
+      ...(options.ssoTrustedIssuers ?? []),
     ],
+    hooks: {
+      // The deviceAuthorization plugin only deletes a device-code row when that
+      // specific code is polled after expiry, so abandoned flows would
+      // otherwise accumulate forever. Sweep expired rows whenever a new flow
+      // starts — amortized cleanup with no cron dependency. Uses the injected
+      // `db`, never a module-level client, so this file still opens nothing at
+      // import time.
+      after: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== "/device/code") return;
+        try {
+          await db.delete(deviceCode).where(lt(deviceCode.expiresAt, new Date()));
+        } catch (thrown) {
+          onError(toAuthApiError(thrown));
+        }
+      }),
+    },
     onAPIError: {
       onError(thrown) {
         onError(toAuthApiError(thrown));

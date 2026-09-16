@@ -37,6 +37,12 @@ export interface AuthConfig {
         readonly url?: string | undefined;
       })
     | undefined;
+  /**
+   * Origins of bring-your-own SSO identity providers, from
+   * AUTH_SSO_TRUSTED_ISSUERS. OIDC discovery rejects issuers outside
+   * better-auth's trusted origins, so each customer IdP must be listed here.
+   */
+  readonly ssoTrustedIssuers?: ReadonlyArray<string> | undefined;
 }
 
 /**

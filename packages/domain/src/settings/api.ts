@@ -1,3 +1,4 @@
+import { IsPublic } from "@forgegraph/contract/effect";
 import { Schema } from "effect";
 import {
   HttpApiEndpoint,
@@ -44,7 +45,7 @@ export class SettingsApi extends HttpApiGroup.make("settings")
   .add(
     HttpApiEndpoint.get("launchState", "/launch-state", {
       success: LaunchState,
-    }),
+    }).annotate(IsPublic, true),
   )
   .add(
     HttpApiEndpoint.post("submitWaitlistEntry", "/waitlist", {
@@ -52,6 +53,7 @@ export class SettingsApi extends HttpApiGroup.make("settings")
       success: WaitlistSubmission.pipe(HttpApiSchema.status(201)),
     })
       .annotate(RateLimitScopeAnnotation, "contact")
+      .annotate(IsPublic, true)
       .middleware(RateLimit),
   )
   .add(

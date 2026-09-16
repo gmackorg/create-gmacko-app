@@ -6,6 +6,7 @@ on:
     paths:
       - "packages/domain/**"
       - "sdks/openapi/**"
+      - "sdks/contract/**"
       - "tooling/openapi-generator/**"
       - ".github/workflows/sdk.yml"
   pull_request:
@@ -13,6 +14,7 @@ on:
     paths:
       - "packages/domain/**"
       - "sdks/openapi/**"
+      - "sdks/contract/**"
       - "tooling/openapi-generator/**"
       - ".github/workflows/sdk.yml"
   release:
@@ -51,7 +53,9 @@ jobs:
       - name: Generate OpenAPI spec
         # OpenApi.fromApi(AppApi) over @gmacko/domain: the contract's own
         # package version is the spec version.
-        run: pnpm -F @gmacko/openapi-spec generate
+        run: |
+          pnpm -F @gmacko/config build
+          pnpm -F @gmacko/openapi-spec generate
 
       - name: Upload spec artifact
         uses: actions/upload-artifact@v4
@@ -72,6 +76,47 @@ jobs:
             echo "::error::OpenAPI spec drifted from packages/domain's snapshot. Run 'pnpm -F @gmacko/domain test -- -u' and commit the snapshot."
             exit 1
           }
+
+      - name: Generate ForgeGraph contract
+        # compileHttpApi(AppApi) from @forgegraph/contract: stable operation
+        # ids, SLA with provenance, IsPublic and derived authentication.
+        run: pnpm -F @gmacko/contract-spec generate
+
+      - name: Upload contract artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: forgegraph-contract
+          path: sdks/contract/contract.json
+          if-no-files-found: error
+
+      - name: Check for contract drift (PR only)
+        if: github.event_name == 'pull_request'
+        run: |
+          diff -u packages/domain/src/__tests__/__snapshots__/contract.json sdks/contract/contract.json || {
+            echo "::error::ForgeGraph contract drifted from packages/domain's snapshot. Run 'pnpm -F @gmacko/domain test -- -u' and commit the snapshot."
+            exit 1
+          }
+
+      - name: Publish the contract to ForgeGraph
+        # Records the contract against this commit and satisfies the
+        # api_contract gate on the changeset.
+        #
+        # The guard is in the shell, not an `if:` expression: a step-level
+        # `if` cannot see that step's own `env`, and Forgejo Actions supports
+        # only a subset of expressions. A repo without the secret (a fork, or
+        # one where `forge ci provision` has not run) is a setup state, not a
+        # broken build, so it skips rather than fails.
+        #
+        # `forge ci provision` writes the secret as FORGEGRAPH_TOKEN; the CLI
+        # reads FG_API_TOKEN. The server comes from .forgegraph.yaml.
+        env:
+          FG_API_TOKEN: ${{ secrets.FORGEGRAPH_TOKEN }}
+        run: |
+          if [ -z "${FG_API_TOKEN:-}" ]; then
+            echo "No FORGEGRAPH_TOKEN secret — skipping the contract publish."
+            exit 0
+          fi
+          pnpm exec forge contract publish
 
   generate-sdks:
     name: Generate SDKs

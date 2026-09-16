@@ -11,6 +11,7 @@ import {
 } from "@gmacko/api";
 import { Stage as StageSchema } from "@gmacko/domain/health";
 import { Schema } from "effect";
+import { parseSsoTrustedIssuers } from "@gmacko/auth";
 
 export { AppConfig, type AppConfigShape, type Stage } from "@gmacko/api";
 
@@ -40,6 +41,7 @@ export const Bindings = Schema.Struct({
   AUTH_GOOGLE_URL: Optional,
   AUTH_GOOGLE_TOKEN_URL: Optional,
   AUTH_APPLE_URL: Optional,
+  AUTH_SSO_TRUSTED_ISSUERS: Optional,
   BYPASS_MAGIC_LINK: Optional,
   OTEL_EXPORTER_OTLP_ENDPOINT: Optional,
   /** `key=value,key2=value2`, as the OTel spec defines it. */
@@ -183,6 +185,9 @@ export const fromBindings = (
         url: env.AUTH_GOOGLE_URL,
         tokenUrl: env.AUTH_GOOGLE_TOKEN_URL,
       },
+      // Origins of customer identity providers, allow-listed for OIDC
+      // discovery and (necessarily) trusted as redirect targets.
+      ssoTrustedIssuers: parseSsoTrustedIssuers(env.AUTH_SSO_TRUSTED_ISSUERS),
       apple:
         env.AUTH_APPLE_ID && env.AUTH_APPLE_SECRET
           ? {
