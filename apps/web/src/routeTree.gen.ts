@@ -15,6 +15,7 @@ import { Route as ChangelogRouteImport } from "./routes/changelog";
 import { Route as ContactRouteImport } from "./routes/contact";
 import { Route as DeviceRouteImport } from "./routes/device";
 import { Route as FaqRouteImport } from "./routes/faq";
+import { Route as IntegrateRouteImport } from "./routes/integrate";
 import { Route as PricingRouteImport } from "./routes/pricing";
 import { Route as PrivacyRouteImport } from "./routes/privacy";
 import { Route as SettingsRouteImport } from "./routes/settings";
@@ -55,6 +56,11 @@ const DeviceRoute = DeviceRouteImport.update({
 const FaqRoute = FaqRouteImport.update({
   id: "/faq",
   path: "/faq",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const IntegrateRoute = IntegrateRouteImport.update({
+  id: "/integrate",
+  path: "/integrate",
   getParentRoute: () => rootRouteImport,
 } as any);
 const PricingRoute = PricingRouteImport.update({
@@ -120,6 +126,7 @@ export interface FileRoutesByFullPath {
   "/contact": typeof ContactRoute;
   "/device": typeof DeviceRoute;
   "/faq": typeof FaqRoute;
+  "/integrate": typeof IntegrateRoute;
   "/pricing": typeof PricingRoute;
   "/privacy": typeof PrivacyRoute;
   "/settings": typeof SettingsRoute;
@@ -138,6 +145,7 @@ export interface FileRoutesByTo {
   "/contact": typeof ContactRoute;
   "/device": typeof DeviceRoute;
   "/faq": typeof FaqRoute;
+  "/integrate": typeof IntegrateRoute;
   "/pricing": typeof PricingRoute;
   "/privacy": typeof PrivacyRoute;
   "/settings": typeof SettingsRoute;
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   "/contact": typeof ContactRoute;
   "/device": typeof DeviceRoute;
   "/faq": typeof FaqRoute;
+  "/integrate": typeof IntegrateRoute;
   "/pricing": typeof PricingRoute;
   "/privacy": typeof PrivacyRoute;
   "/settings": typeof SettingsRoute;
@@ -179,6 +188,7 @@ export interface FileRouteTypes {
     | "/contact"
     | "/device"
     | "/faq"
+    | "/integrate"
     | "/pricing"
     | "/privacy"
     | "/settings"
@@ -197,6 +207,7 @@ export interface FileRouteTypes {
     | "/contact"
     | "/device"
     | "/faq"
+    | "/integrate"
     | "/pricing"
     | "/privacy"
     | "/settings"
@@ -216,6 +227,7 @@ export interface FileRouteTypes {
     | "/contact"
     | "/device"
     | "/faq"
+    | "/integrate"
     | "/pricing"
     | "/privacy"
     | "/settings"
@@ -236,6 +248,7 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute;
   DeviceRoute: typeof DeviceRoute;
   FaqRoute: typeof FaqRoute;
+  IntegrateRoute: typeof IntegrateRoute;
   PricingRoute: typeof PricingRoute;
   PrivacyRoute: typeof PrivacyRoute;
   SettingsRoute: typeof SettingsRoute;
@@ -289,6 +302,13 @@ declare module "@tanstack/react-router" {
       path: "/faq";
       fullPath: "/faq";
       preLoaderRoute: typeof FaqRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/integrate": {
+      id: "/integrate";
+      path: "/integrate";
+      fullPath: "/integrate";
+      preLoaderRoute: typeof IntegrateRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/pricing": {
@@ -390,6 +410,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   DeviceRoute: DeviceRoute,
   FaqRoute: FaqRoute,
+  IntegrateRoute: IntegrateRoute,
   PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
   SettingsRoute: SettingsRoute,

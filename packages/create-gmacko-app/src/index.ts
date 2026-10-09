@@ -54,7 +54,7 @@ const program = new Command();
 program
   .name("create-gmacko-app")
   .description(
-    "Create a new Gmacko app: TanStack Start + Effect on Cloudflare Workers with D1, Expo, and agent-native DX defaults",
+    "Create a new Gmacko app. Partners integrate through a Forge API. The web app is TanStack Start on Cloudflare Workers with D1, plus Expo.",
   )
   .version(version)
   .argument("<app-name>", "Name of the app to create")

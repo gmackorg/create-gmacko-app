@@ -7,6 +7,7 @@ import { hydrated } from "./helpers/nav";
 const PUBLIC_PATHS = [
   "/",
   "/pricing",
+  "/integrate",
   "/faq",
   "/contact",
   "/changelog",

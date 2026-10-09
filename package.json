@@ -30,6 +30,7 @@
     "forge:apply": "forge apply",
     "forge:pull": "forge pull",
     "forge:stages": "forge stage list",
+    "forge:api": "forgec check forge && forgec build forge --out forge/generated --service-id gmacko",
     "forge:deploy:staging": "forge deploy create staging --wait",
     "forge:deploy:production": "forge deploy create production --wait",
     "api:ops": "pnpm --filter @gmacko/api-cli exec tsx src/index.ts",

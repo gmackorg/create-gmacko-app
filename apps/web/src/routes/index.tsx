@@ -132,6 +132,12 @@ function HomePage() {
             See pricing
           </RouterLink>
           <RouterLink
+            href="/integrate"
+            className="border-border hover:bg-muted rounded-full border px-4 py-2 text-sm transition-colors"
+          >
+            Partner API
+          </RouterLink>
+          <RouterLink
             href="/contact"
             className="border-border hover:bg-muted rounded-full border px-4 py-2 text-sm transition-colors"
           >
@@ -145,7 +151,8 @@ function HomePage() {
           <h2 className="text-xl font-semibold">Product surface</h2>
           <div className="text-muted-foreground mt-4 space-y-3 text-sm leading-6">
             <p>
-              Landing, pricing, FAQ, changelog, contact, privacy, and terms.
+              Landing, pricing, integrate, FAQ, changelog, contact, privacy, and
+              terms.
             </p>
             <p>Admin launch toggles for maintenance mode and signup control.</p>
             <p>

@@ -49,6 +49,7 @@ test.describe("Home page", () => {
     ).toBeVisible();
     for (const [name, href] of [
       ["Pricing", "/pricing"],
+      ["Integrate", "/integrate"],
       ["FAQ", "/faq"],
       ["Changelog", "/changelog"],
       ["Contact", "/contact"],

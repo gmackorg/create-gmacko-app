@@ -1,0 +1,14 @@
+shape NotifyPartnerInput {
+  customer : Customer
+  event : text length 1..64
+}
+
+shape NotifyPartnerResult {
+  accepted : boolean
+}
+
+/// Tell a partner that a customer changed. The caller is another business system.
+export function NotifyPartner @http(POST, "/v1/integrations/notify") {
+  input NotifyPartnerInput
+  output NotifyPartnerResult
+}

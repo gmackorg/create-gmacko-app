@@ -4,7 +4,8 @@ A fork of [create-t3-turbo](https://github.com/t3-oss/create-t3-turbo) rebuilt a
 
 - the web app (`apps/web`) is TanStack Start (React 19, Vite) plus an Effect `HttpApi` serving `/api/*`, deployed as a single Worker per stage
 - the database is Cloudflare D1 (SQLite) through Drizzle's Effect API; migrations are checked in and applied before every deploy
-- one API contract (`packages/domain`) shared by the browser, the SSR loader, Expo, the operator CLI/MCP server, and the generated SDKs
+- the partner integration API is Forge (`forge/`). `forgec` emits the contract, OpenAPI, and client. See [`docs/INTEGRATE.md`](./docs/INTEGRATE.md)
+- the in-app API (`packages/domain`) is still the Effect `HttpApi` the browser, SSR loader, Expo, and operator tools call today
 - better-auth for magic-link, GitHub/Google/Apple sign-in, the Expo client, and scoped API keys
 - ForgeGraph as the deployment control plane (Workers + D1 per stage, secrets pushed from ForgeGraph)
 - `jj`-first repository setup with colocated Git compatibility
@@ -16,7 +17,7 @@ A fork of [create-t3-turbo](https://github.com/t3-oss/create-t3-turbo) rebuilt a
 - optional operator surfaces where both the CLI and MCP server are wrappers over the same HTTP API
 - Storybook in `packages/ui` for isolated UI development
 
-The decision record for the stack is [`docs/adr/0001-tanstack-effect-d1.md`](./docs/adr/0001-tanstack-effect-d1.md); the architecture is in [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
+The decision record for the Worker stack is [`docs/adr/0001-tanstack-effect-d1.md`](./docs/adr/0001-tanstack-effect-d1.md). The partner API is Forge: [`docs/adr/0002-forge-is-the-integration-api.md`](./docs/adr/0002-forge-is-the-integration-api.md). The architecture is in [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
 
 ## Installation
 
@@ -46,6 +47,8 @@ It uses [Turborepo](https://turborepo.com) and contains:
 .github
   └─ workflows
         └─ CI, previews, CLI E2E, releases
+forge
+  └─ the partner integration API (Forge). `pnpm forge:api` checks it and writes the contract
 apps
   ├─ expo
   │   ├─ Expo SDK 56, React Native 0.85, React 19

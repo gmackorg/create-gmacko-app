@@ -813,6 +813,7 @@ function buildScaffoldProfileBlock(options: CliOptions): string {
 > - Default deploy path: ${deployPath}
 > - Claude SaaS bootstrap pack: ${options.saasBootstrap ? "enabled" : "not scaffolded"}
 > - Operator lane: ${options.operatorLane ? "CLI + MCP wrappers over the same HTTP API" : "not scaffolded"}
+> - Integration API: Forge (\`forge/\`, \`docs/INTEGRATE.md\`)
 >
 > **Recommended first commands**
 ${preferredDevCommands}

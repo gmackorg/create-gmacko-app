@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/create-gmacko-app.svg)](https://www.npmjs.com/package/create-gmacko-app)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-Create a new Gmacko app: TanStack Start + Effect on Cloudflare Workers with D1, Expo, Storybook, ForgeGraph deployment guidance, and shared agent-native workflows.
+Create a new Gmacko app. Partners integrate through the Forge API in `forge/`. The web app is TanStack Start on Cloudflare Workers with D1, plus Expo, Storybook, ForgeGraph deployment guidance, and shared agent-native workflows.
 
 ## Quick Start
 
@@ -13,7 +13,7 @@ pnpm dlx create-gmacko-app@latest my-app
 
 ## Description
 
-create-gmacko-app is a CLI tool that bootstraps a production-ready, full-stack application as a Turborepo + pnpm monorepo. The web app is one Cloudflare Worker: TanStack Start for rendering and routing plus an Effect `HttpApi` serving `/api/*`, backed by Cloudflare D1. The Expo app, the operator CLI and the MCP server all consume that same API through the typed `@gmacko/api-client`.
+create-gmacko-app is a CLI tool that bootstraps a production-ready, full-stack application as a Turborepo + pnpm monorepo. Partners call the Forge API in `forge/` (`docs/INTEGRATE.md`). The web app is one Cloudflare Worker: TanStack Start for rendering and routing plus an Effect `HttpApi` serving `/api/*` for the app itself, backed by Cloudflare D1. The Expo app, the operator CLI and the MCP server still consume that in-app API through the typed `@gmacko/api-client`.
 
 ## CLI Options
 

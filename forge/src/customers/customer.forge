@@ -1,0 +1,10 @@
+/// A customer of the business. Partners read and create these.
+export resource Customer
+  @tenant
+  @timestamps
+  @crud("/v1/customers")
+{
+  id : id
+  name : text length 1..200
+  email : email?
+}

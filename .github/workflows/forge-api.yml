@@ -1,0 +1,48 @@
+name: Forge API
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: forgec 0.5.0
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install forgec 0.5.0
+        run: |
+          curl -fsSL -o forgec.tar.gz https://github.com/gmackie/forgec/releases/download/v0.5.0/forgec-0.5.0-x86_64-unknown-linux-gnu.tar.gz
+          echo "683854945966686d7f6080e518a292b5dbc5eca3915a4b0e3e148a4a3a27601f  forgec.tar.gz" | sha256sum -c -
+          tar xzf forgec.tar.gz
+          install -m 755 "$(find . -name forgec -type f | head -1)" /usr/local/bin/forgec
+          forgec --version
+
+      - name: Check and build the partner API
+        run: |
+          forgec check forge
+          forgec build forge --out forge/generated --service-id gmacko
+          python3 - << 'PY'
+          import json
+          spec = json.load(open("forge/generated/openapi.json"))
+          paths = set(spec["paths"])
+          need = {"/v1/customers", "/v1/customers/{id}", "/v1/integrations/notify"}
+          missing = need - paths
+          if missing:
+              raise SystemExit(f"missing paths: {sorted(missing)}")
+          notify = spec["paths"]["/v1/integrations/notify"]["post"]["requestBody"]
+          body = notify["content"]["application/json"]["schema"]
+          required = set(body["required"])
+          if required != {"customer", "event"}:
+              raise SystemExit(f"notify body required {sorted(required)}")
+          print("partner API ok")
+          PY
