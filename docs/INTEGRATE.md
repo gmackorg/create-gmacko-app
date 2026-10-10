@@ -2,7 +2,7 @@
 
 A partner does not receive a hand-written OpenAPI file. The API they call is the Forge package in [`forge/`](../forge). The compiler writes the contract, the OpenAPI document, and a TypeScript client from those declarations.
 
-The running web Worker still serves the Effect `HttpApi` at `/api/*`. That is the app the browser and Expo use today. The Forge package is the integration API new apps ship to other businesses. [ADR 0002](./adr/0002-forge-is-the-integration-api.md) records that split.
+[`apps/forge`](../apps/forge) hosts that package. The sample product (posts) and the partner calls (customers, one notification) are the same declarations. The web Worker still serves the Effect `HttpApi` for auth, settings, admin, launch, and health. [ADR 0002](./adr/0002-forge-is-the-integration-api.md) and [ADR 0003](./adr/0003-forge-hosts-the-product-api.md) record that split.
 
 ## What you declare
 
@@ -37,10 +37,29 @@ shape NotifyPartnerResult {
 export function NotifyPartner @http(POST, "/v1/integrations/notify") {
   input NotifyPartnerInput
   output NotifyPartnerResult
+
+  uses {
+    Customer read
+  }
 }
 ```
 
-That is the whole integration surface: [`forge/src/customers/customer.forge`](../forge/src/customers/customer.forge) and [`forge/src/partner/notify.forge`](../forge/src/partner/notify.forge).
+The partner surface is [`forge/src/customers/customer.forge`](../forge/src/customers/customer.forge) and [`forge/src/partner/notify.forge`](../forge/src/partner/notify.forge). The sample product is the same package:
+
+```forge
+/// A post in the sample product. The web and Expo screens call this resource.
+export resource Post
+  @tenant
+  @timestamps
+  @crud("/v1/posts")
+{
+  id : id
+  title : text length 1..256
+  content : text length 0..256
+}
+```
+
+[`forge/src/posts/post.forge`](../forge/src/posts/post.forge).
 
 ## What a partner can call
 
@@ -54,8 +73,15 @@ That is the whole integration surface: [`forge/src/customers/customer.forge`](..
 | Update a customer | `PATCH /v1/customers/{id}` |
 | Delete a customer | `DELETE /v1/customers/{id}` |
 | Notify a partner | `POST /v1/integrations/notify` |
+| Create a post | `POST /v1/posts` |
+| List posts | `GET /v1/posts` |
+| Read one post | `GET /v1/posts/{id}` |
+| Update a post | `PATCH /v1/posts/{id}` |
+| Delete a post | `DELETE /v1/posts/{id}` |
 
-`POST /v1/integrations/notify` takes a customer reference and an event name (`1..64` characters) and returns `{ "accepted": true }` or `{ "accepted": false }`.
+`POST /v1/integrations/notify` takes a customer reference and an event name (`1..64` characters) and returns `{ "accepted": true }` or `{ "accepted": false }`. The sample host reads that customer and returns `accepted: false` when the customer cannot be read, or when the event is missing or outside 1–64 characters. Replace `apps/forge/src/notify.ts` with the integration you actually run.
+
+A post takes `title` (1–256 characters) and `content` (0–256 characters). `Post` is not a versioned resource, so the host accepts `DELETE` without `If-Match`. The OpenAPI document still lists that header. The web and Expo screens call `http://127.0.0.1:8787`. That address is the local Forge worker. The iOS simulator and a browser on this machine reach it. A physical device or the Android emulator needs the machine's reachable address. Local calls send `x-forge-tenant: local` and `x-forge-actor: web` (`FORGE_AUTH=dev-headers`, local only).
 
 Create accepts `name` (1–200 characters) and an optional `email`. Reads and writes are scoped to the caller's tenant.
 
@@ -107,7 +133,7 @@ forgec check forge
 forgec build forge --out forge/generated --service-id gmacko
 ```
 
-`pnpm forge:api` runs both. The build writes:
+`pnpm forge:api` runs both, then copies `app.json` and the D1 migration into `apps/forge`. The build writes:
 
 - `forge/generated/contract.json` — the ForgeGraph contract
 - `forge/generated/openapi.json` — OpenAPI 3.1 for the same operations

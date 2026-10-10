@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gmacko-forge",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-09-01",
+  // Local scaffold only. Dev headers trust x-forge-tenant and x-forge-actor.
+  // A reachable deployment replaces FORGE_AUTH with a real auth host.
+  "vars": {
+    "FORGE_AUTH": "dev-headers",
+    "FORGE_CORS": "http://localhost:3001,http://127.0.0.1:3001,http://localhost:3111,http://127.0.0.1:3111,https://gmacko.localhost",
+    "CURSOR_SECRET": "dev-only-cursor-secret"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "gmacko-forge",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

@@ -1,7 +1,8 @@
+import { forgePosts } from "@gmacko/api-client";
 import { expect, test } from "@playwright/test";
 
 import { alice, signInAsAdmin } from "./helpers/auth";
-import { countRows, reset } from "./helpers/db";
+import { reset } from "./helpers/db";
 import { gotoReady } from "./helpers/nav";
 
 test.describe("Interaction edges", () => {
@@ -20,7 +21,7 @@ test.describe("Interaction edges", () => {
     await expect(page.getByTestId("post-card")).toHaveCount(1);
     await expect(page.getByTestId("post-card")).toContainText("Only once");
     await page.waitForTimeout(500);
-    expect(countRows("post")).toBe(1);
+    expect(await forgePosts.list()).toHaveLength(1);
   });
 
   test("leaving the page during a slow mutation raises no error and leaves no orphan toast", async ({
@@ -29,12 +30,11 @@ test.describe("Interaction edges", () => {
     const errors: Array<string> = [];
     page.on("pageerror", (error) => errors.push(error.message));
 
-    // Honoured by the API only when STAGE=development: hold the create.
-    await page.route("**/api/posts", async (route) => {
+    // Hold the browser's create so navigation happens while it is in flight.
+    await page.route("http://127.0.0.1:8787/v1/posts", async (route) => {
       if (route.request().method() !== "POST") return route.continue();
-      await route.continue({
-        headers: { ...route.request().headers(), "x-test-delay": "2500" },
-      });
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+      await route.continue();
     });
 
     await gotoReady(page, "/");

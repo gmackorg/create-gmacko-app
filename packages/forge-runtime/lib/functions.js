@@ -1,0 +1,184 @@
+/**
+ * Implemented functions (plan §5.4, §8). The application supplies bodies with
+ * defineFunction(); the runtime constructs a FunctionContext exposing exactly
+ * the declared dependencies. Publications are staged and committed with the
+ * function's next mutation (or in a final outbox-only commit), never sent
+ * directly.
+ */
+import { Effect } from "effect";
+import { canonicalize } from "./decode.js";
+import { sha256, stableJson } from "./engine.js";
+import { err, ForgeError } from "./errors.js";
+import { Clock, IdGen, Storage } from "./services.js";
+import { SubscriptionDelivery } from "./subscription-delivery.js";
+export function defineFunction(id, body) {
+    return { id, body };
+}
+export class Functions {
+    engine;
+    externals;
+    impls = new Map();
+    constructor(engine, impls, externals) {
+        this.engine = engine;
+        this.externals = externals;
+        for (const i of impls)
+            this.impls.set(i.id, i);
+    }
+    has(id) {
+        return this.impls.has(id);
+    }
+    invoke(decl, input, ctx, delivery) {
+        const impl = this.impls.get(decl.id);
+        if (!impl)
+            return Effect.fail(err("Internal", `no implementation registered for ${decl.id}; add one under impl/ (a production build refuses to deploy without it)`));
+        const self = this;
+        return Effect.gen(function* () {
+            // A function's own writes and its publications form ONE atomic commit at the end of the body
+            // (plan §9 step 6). Reads inside the body see committed state; planned writes are validated
+            // against current state when the body finishes and committed together, or not at all.
+            const pending = [];
+            const plans = [];
+            const deps = self.context(decl, input, ctx, pending, plans, delivery);
+            const result = yield* impl.body(deps).pipe(Effect.provide(self.engine.layer));
+            if (plans.length || pending.length || delivery) {
+                const storage = yield* Storage;
+                const now = (yield* Clock).now();
+                const opId = plans[0]?.opId ?? (yield* IdGen).opId();
+                const host = plans[0];
+                const outbox = pending.map((p, i) => ({ ...p, opId, ordinal: (host?.outbox.length ?? 0) + i, createdAt: now, ...(ctx.trace ? { trace: ctx.trace } : {}) }));
+                if (host) {
+                    // An idempotency key stores the function's result with its first plan: a replay returns it
+                    // instead of re-running the body (plan §15 activity retries rely on this).
+                    const receipt = ctx.idempotencyKey
+                        ? { receipt: { tenant: ctx.tenant, operation: decl.id, key: ctx.idempotencyKey, requestHash: yield* Effect.promise(() => sha256(stableJson((input ?? {})))), status: 200, response: (result ?? {}), createdAt: now } }
+                        : {};
+                    plans[0] = { ...host, outbox: [...host.outbox, ...outbox], ...receipt, ...(delivery ? { completion: delivery.completion() } : {}) };
+                    yield* storage.commitAll(plans);
+                }
+                else {
+                    yield* self.commitOutboxOnly(decl, ctx, outbox, opId, now, delivery);
+                }
+            }
+            return (result ?? {});
+        });
+    }
+    context(decl, input, ctx, pending, plans, delivery) {
+        const engine = this.engine;
+        const layer = engine.layer;
+        const run = (e) => e.pipe(Effect.provide(layer));
+        const resources = {};
+        const transitions = {};
+        const externalIds = new Set();
+        // Plan now (validation, version check against current state), commit with the function at the end.
+        const mutate = (op, body) => run(Effect.gen(function* () {
+            const plan = yield* engine.planFor(op, body, ctx);
+            plans.push(plan);
+            return engine.resultOf(plan);
+        }));
+        for (const u of decl.uses) {
+            if (u.kind === "resource") {
+                const r = engine.model.resource(u.resource);
+                const reader = {
+                    get: (id) => run(engine.callInternal(`${r.id}.get`, { id }, ctx)),
+                    find: (q, params) => run(engine.callInternal(`${r.id}.find.${q}`, { params }, ctx)),
+                    list: (q, params, page) => run(engine.callInternal(`${r.id}.list.${q}`, { params, ...page }, ctx)),
+                };
+                const cap = u.capability;
+                const writer = {
+                    ...reader,
+                    create: (input) => (cap === "create" || cap === "write" ? mutate(`${r.id}.create`, input) : Effect.fail(err("Forbidden", `${decl.name} did not declare create on ${r.name}`))),
+                    update: (id, expectedVersion, patch) => (cap === "write" ? mutate(`${r.id}.update`, { id, expectedVersion, patch }) : Effect.fail(err("Forbidden", `${decl.name} did not declare write on ${r.name}`))),
+                    delete: (id, expectedVersion) => (cap === "delete" || cap === "write" ? mutate(`${r.id}.delete`, { id, expectedVersion }) : Effect.fail(err("Forbidden", `${decl.name} did not declare delete on ${r.name}`))),
+                };
+                resources[r.name] = writer;
+            }
+            else if (u.kind === "transition") {
+                const r = engine.model.resource(u.resource);
+                transitions[r.name] ??= {};
+                transitions[r.name][u.action] = (id, expectedVersion, input) => mutate(`${r.id}.status.${u.action}`, { id, expectedVersion, input });
+                // a transition implies reading the resource
+                resources[r.name] ??= { get: (id) => run(engine.callInternal(`${r.id}.get`, { id }, ctx)), find: () => Effect.fail(err("Forbidden", "not declared")), list: () => Effect.fail(err("Forbidden", "not declared")), create: () => Effect.fail(err("Forbidden", "not declared")), update: () => Effect.fail(err("Forbidden", "not declared")), delete: () => Effect.fail(err("Forbidden", "not declared")) };
+            }
+            else {
+                externalIds.add(u.function);
+            }
+        }
+        const self = this;
+        const allowedSends = new Set(decl.sends.map((s) => `${s.channel}#${s.message}`));
+        return {
+            input,
+            ctx,
+            resources,
+            transitions,
+            external: (id, i) => {
+                if (!externalIds.has(id))
+                    return Effect.fail(err("Forbidden", `${decl.name} did not declare a dependency on ${id}`));
+                const binding = self.externals[id];
+                if (!binding)
+                    return Effect.fail(err("DependencyUnavailable", `no binding for external ${id}`));
+                return Effect.gen(function* () {
+                    if (delivery)
+                        yield* delivery.beforeExternal();
+                    return yield* Effect.tryPromise({ try: () => binding(i, ctx), catch: (e) => err("DependencyUnavailable", String(e.message ?? e)) });
+                });
+            },
+            send: (channelRef, message, payload) => {
+                const ch = engine.model.channel(channelRef);
+                if (!ch)
+                    return Effect.fail(err("Forbidden", `unknown channel ${channelRef}`));
+                if (!allowedSends.has(`${ch.id}#${message}`))
+                    return Effect.fail(err("Forbidden", `${decl.name} may not send ${message} to ${channelRef}; declare it under sends { }`));
+                if (ch.direction === "recv-only")
+                    return Effect.fail(err("Forbidden", `${channelRef} is recv-only`));
+                pending.push({ tenant: ctx.tenant, opId: "", ordinal: 0, channel: ch.id, message, payload, createdAt: "" });
+                return Effect.void;
+            },
+            fail: (name, detail) => {
+                if (!decl.errors.includes(name))
+                    return Effect.fail(err("Internal", `${decl.name} raised undeclared error ${name}`));
+                return Effect.fail(new ForgeError({ code: `${decl.id}.${name}`, ...(detail ? { detail } : {}) }));
+            },
+        };
+    }
+    commitOutboxOnly(decl, ctx, outbox, opId, at, delivery) {
+        const engine = this.engine;
+        return Effect.gen(function* () {
+            const storage = yield* Storage;
+            // A commit with no record change: adapters treat `kind: "publish"` as outbox + audit only.
+            const r = engine.model.resources[0];
+            const plan = {
+                tenant: ctx.tenant, opId, actor: ctx.actor, at, resource: r, kind: "publish", id: decl.id, expectedVersion: null, before: null, after: {},
+                claims: [], references: [], dependents: [], hardDelete: false,
+                audit: { tenant: ctx.tenant, opId, resource: decl.id, recordId: decl.id, kind: "function.publish", newVersion: null, actor: ctx.actor, at },
+                outbox,
+                ...(delivery ? { completion: delivery.completion() } : {}),
+            };
+            yield* storage.commit(plan);
+        });
+    }
+    /** Subscription consumer: claim, execute, then atomically complete with the handler writes. */
+    async consume(subscription, env) {
+        const sub = this.engine.model.subscription(subscription);
+        if (!sub)
+            return "unknown-subscription";
+        const decl = this.engine.model.function(sub.handler);
+        if (!decl)
+            return "unknown-subscription";
+        const storage = await Effect.runPromise(Effect.service(Storage).pipe(Effect.provide(this.engine.layer)));
+        const clock = await Effect.runPromise(Effect.service(Clock).pipe(Effect.provide(this.engine.layer)));
+        const requestHash = await sha256(stableJson({ channel: env.channel, message: env.message, payload: env.payload }));
+        const delivery = await SubscriptionDelivery.claim(storage, env.tenant, sub.name, env.messageId, requestHash, () => Date.parse(clock.now()));
+        if (!delivery)
+            return "duplicate";
+        const ctx = { tenant: env.tenant, actor: `subscription:${sub.name}`, requestId: env.messageId };
+        try {
+            await Effect.runPromise(this.invoke(decl, env.payload, ctx, delivery).pipe(Effect.provide(this.engine.layer)));
+        }
+        catch (e) {
+            await delivery.failed();
+            throw e;
+        }
+        return "processed";
+    }
+}
+export { canonicalize };

@@ -37,7 +37,9 @@ function IntegratePage() {
             A customer is one resource. <code>@crud</code> is the list, read,
             create, update, and delete API. A change notification is one
             function. You do not write those routes, and you do not write an
-            OpenAPI file.
+            OpenAPI file. The sample product, posts, is the same kind of
+            declaration. The app calls <code>/v1/posts</code> on the Forge
+            worker.
           </p>
           <pre className="bg-muted mt-4 max-w-full overflow-x-auto rounded-xl p-4 text-xs leading-5">
             {`export resource Customer

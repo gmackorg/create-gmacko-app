@@ -1,0 +1,404 @@
+/**
+ * Views (§17), projections (§17) and caches (§16). All three are built on the
+ * primitives every adapter already provides: bounded list queries and opaque
+ * documents with optimistic versions, so no adapter grows a new storage shape.
+ */
+import { Cause, Effect } from "effect";
+import { formatMinor, toMinor } from "./codecs.js";
+import { scaleOf } from "./model.js";
+import { canonicalize, evalExpr } from "./decode.js";
+import { err, ForgeError } from "./errors.js";
+import { Clock, Storage } from "./services.js";
+const PROJ = "projection";
+const CACHE = "cache";
+/** Composite group key separator (never appears in identifiers). */
+const SEP = String.fromCharCode(1);
+/**
+ * Route `projection:*` subscriptions to the in-process projection applier and everything
+ * else to the host's queue transport, so projections ride the same durable outbox.
+ */
+export function withProjections(engine, fallback) {
+    const local = engine.projectionTransport();
+    const workflows = engine.workflows.transport();
+    const realtime = engine.realtime.transport();
+    return {
+        name: `${fallback.name}+internal`,
+        send: (d) => (d.subscription.startsWith("projection:") ? local.send(d) : d.subscription.startsWith("workflow:") ? workflows.send(d) : d.subscription.startsWith("realtime:") ? realtime.send(d) : fallback.send(d)),
+    };
+}
+/** Every in-process consumer's subscriptions (projections and workflow waits) merged over the host's. */
+export function internalSubscriptions(engine, base = {}) {
+    return engine.realtime.subscriptions(engine.workflows.subscriptions(engine.projectionSubscriptions(base)));
+}
+export class ReadModels {
+    engine;
+    constructor(engine) {
+        this.engine = engine;
+    }
+    // ------------------------------------------------------------------ views
+    /** Lower the view onto the source's bounded list for its `by` fields, then filter and project fields. */
+    view(v, body, ctx) {
+        const self = this;
+        return Effect.gen(function* () {
+            const r = self.engine.model.resource(v.source);
+            const params = (body["params"] ?? {});
+            const missing = v.by.filter((f) => params[f] === undefined || params[f] === null);
+            if (missing.length) {
+                return yield* Effect.fail(err("ValidationFailed", "view partition parameters are required", { fields: missing.map((f) => ({ path: `params.${f}`, code: "Required", message: `${v.name} is partitioned by ${f}` })) }));
+            }
+            const list = r.lists.find((l) => l.fields.join(",") === v.by.join(","));
+            if (!list)
+                return yield* Effect.fail(err("Internal", `view ${v.name} has no bounded access path on ${r.name}`));
+            const limit = Math.min(Math.max(Number(body["limit"] ?? 50), 1), 100);
+            // Walk the bounded working set page by page so the filter never shrinks a page below `limit` while rows remain.
+            const items = [];
+            let cursor = body["cursor"] ?? null;
+            let next = null;
+            for (let pages = 0; pages < 100; pages++) {
+                const page = yield* self.engine.callInternal(`${r.id}.list.${list.name}`, { params: Object.fromEntries(v.by.map((f) => [f, params[f]])), limit: 100, ...(cursor ? { cursor } : {}) }, ctx);
+                for (const rec of page.items) {
+                    if (v.where && !evalExpr(self.engine.model, r, v.where, rec))
+                        continue;
+                    items.push(Object.fromEntries(v.fields.map((f) => [f, rec[f] ?? null])));
+                    if (items.length === limit)
+                        break;
+                }
+                next = page.next ?? null;
+                if (items.length === limit || !next)
+                    break;
+                cursor = next;
+            }
+            return { items, next: items.length === limit ? next : null, limit };
+        });
+    }
+    // ------------------------------------------------------------ projections
+    groupKey(p, rec) {
+        return p.by.map((f) => String(rec[f])).join(SEP);
+    }
+    contributes(p, rec) {
+        return p.where ? Boolean(evalExpr(this.engine.model, this.engine.model.resource(p.source), p.where, rec)) : true;
+    }
+    /** Exact contribution of one record: counts as "1", sums as minor-unit integers. */
+    contribution(p, rec) {
+        const out = {};
+        for (const a of p.aggregates) {
+            if (a.filter && !evalExpr(this.engine.model, this.engine.model.resource(p.source), a.filter, rec))
+                continue;
+            if (["count", "exists", "notExists"].includes(a.function))
+                out[a.alias] = "1";
+            else if (rec[a.field] !== null && rec[a.field] !== undefined) {
+                const value = a.scale !== undefined ? toMinor(String(rec[a.field]), a.scale).toString() : String(rec[a.field]);
+                // `latest x by t`: one entry per record, keyed by its ordering value and id, so a removal
+                // retracts exactly that record and the greatest entry is the most recent value (#198).
+                out[a.alias] = a.function === "latest" && a.by ? JSON.stringify([this.orderKey(p, a.by, rec[a.by]), String(rec["id"]), value]) : value;
+            }
+        }
+        return out;
+    }
+    /** Sortable form of a `latest ... by` ordering value: minor units for numbers, ISO text for dates. */
+    orderKey(p, by, raw) {
+        const field = this.engine.model.resource(p.source).fields.find((f) => f.name === by);
+        const base = field?.type.base;
+        if (base?.kind === "scalar" && ["integer", "decimal", "money"].includes(base.name))
+            return toMinor(String(raw), base.name === "integer" ? 0 : scaleOf(field.type)).toString();
+        return String(raw);
+    }
+    orderNumeric(p, by) {
+        const base = this.engine.model.resource(p.source).fields.find((f) => f.name === by)?.type.base;
+        return base?.kind === "scalar" && ["integer", "decimal", "money"].includes(base.name);
+    }
+    adjust(p, doc, values, sign) {
+        for (const a of p.aggregates) {
+            const value = values[a.alias];
+            if (value === undefined)
+                continue;
+            if (["min", "max", "latest"].includes(a.function)) {
+                const key = `__values:${a.alias}`;
+                const counts = { ...(doc[key] ?? {}) };
+                const count = (counts[value] ?? 0) + sign;
+                if (count > 0)
+                    counts[value] = count;
+                else
+                    delete counts[value];
+                if (Object.keys(counts).length > 256)
+                    throw err("BudgetExceeded", "an extrema group supports at most 256 distinct values per aggregate");
+                doc[key] = counts;
+            }
+            else {
+                doc[a.alias] = (BigInt(String(doc[a.alias] ?? "0")) + BigInt(sign) * BigInt(value)).toString();
+            }
+        }
+        if (new TextEncoder().encode(JSON.stringify(doc)).length > 256 * 1024)
+            throw err("BudgetExceeded", "projection group exceeds 256 KiB");
+    }
+    meta(p, tenant) {
+        return Effect.gen(function* () {
+            return (yield* (yield* Storage).getDocument(tenant, PROJ, `${p.name}:meta`));
+        });
+    }
+    render(p, key, doc, generation) {
+        const out = {};
+        const parts = key.split(SEP);
+        p.by.forEach((f, i) => (out[f] = parts[i] ?? null));
+        for (const a of p.aggregates) {
+            if (["min", "max", "latest"].includes(a.function)) {
+                let values = Object.keys((doc?.[`__values:${a.alias}`] ?? {}));
+                if (a.function === "latest" && a.by) {
+                    const numeric = this.orderNumeric(p, a.by);
+                    const cmp = (x, y) => numeric ? (BigInt(x) < BigInt(y) ? -1 : BigInt(x) > BigInt(y) ? 1 : 0) : x < y ? -1 : x > y ? 1 : 0;
+                    const entries = values.map((v) => JSON.parse(v));
+                    entries.sort((x, y) => cmp(x[0], y[0]) || (x[1] < y[1] ? -1 : x[1] > y[1] ? 1 : 0));
+                    values = entries.length ? [entries.at(-1)[2]] : [];
+                }
+                const resource = this.engine.model.resource(p.source);
+                const field = resource.fields.find(f => f.name === a.field);
+                const numeric = a.scale !== undefined || (field?.type.base.kind === "scalar" && field.type.base.name === "integer");
+                values.sort((a, b) => numeric ? (BigInt(a) < BigInt(b) ? -1 : BigInt(a) > BigInt(b) ? 1 : 0) : a < b ? -1 : a > b ? 1 : 0);
+                const value = a.function === "min" ? values[0] : values.at(-1);
+                out[a.alias] = value === undefined ? null : a.scale !== undefined ? formatMinor(BigInt(value), a.scale) : numeric ? Number(value) : value;
+            }
+            else {
+                const raw = BigInt(String(doc?.[a.alias] ?? "0"));
+                out[a.alias] = a.function === "exists" ? raw > 0n : a.function === "notExists" ? raw === 0n : a.function === "count" || a.scale === undefined ? Number(raw) : formatMinor(raw, a.scale);
+            }
+        }
+        out["generation"] = generation;
+        return out;
+    }
+    status(p, ctx) {
+        const self = this;
+        return Effect.gen(function* () {
+            const m = yield* self.meta(p, ctx.tenant);
+            if (!m)
+                return { generation: 0, status: "not-built", lastProcessed: null };
+            const { _version, reservedGeneration, ...rest } = m;
+            void _version;
+            void reservedGeneration;
+            return rest;
+        });
+    }
+    get(p, body, ctx) {
+        const self = this;
+        return Effect.gen(function* () {
+            const m = yield* self.meta(p, ctx.tenant);
+            if (!m || m.status !== "active")
+                return yield* Effect.fail(err("ProjectionNotReady", `${p.name} has no active generation; run rebuild`));
+            const key = String(body["id"] ?? "");
+            const doc = yield* (yield* Storage).getDocument(ctx.tenant, PROJ, `${p.name}:${m.generation}:group:${key}`);
+            return self.render(p, key, doc, m.generation);
+        });
+    }
+    /**
+     * Apply one source change event. The contribution ledger is keyed by source id
+     * and carries the record revision, so replays and out-of-order deliveries are
+     * ignored and a moved or filtered-out record is subtracted before being re-added.
+     */
+    applyEvent(p, env) {
+        const self = this;
+        // Concurrent sweeps may apply different events to one group: the loser of a CAS reloads and retries
+        // (the ledger makes the retry idempotent) instead of leaving the row to a lease timeout.
+        return Effect.gen(function* () {
+            for (let attempt = 0;; attempt++) {
+                const exit = yield* Effect.exit(self.applyEventOnce(p, env));
+                if (exit._tag === "Success")
+                    return exit.value;
+                const e = Cause.squash(exit.cause);
+                if (e instanceof ForgeError && (e.code === "VersionConflict" || e.code === "TransientConflict") && attempt < 8)
+                    continue;
+                return yield* Effect.fail(e instanceof ForgeError ? e : err("Internal", String(e)));
+            }
+        });
+    }
+    applyEventOnce(p, env) {
+        const self = this;
+        return Effect.gen(function* () {
+            const tenant = env.tenant;
+            const m = yield* self.meta(p, tenant);
+            if (!m)
+                return "ignored";
+            // Once the initial scan starts, acknowledging an event could lose a write
+            // made after its source page was read. Keep it retryable until activation.
+            if (m.status !== "active")
+                return yield* Effect.fail(err("ProjectionNotReady", `${p.name} is building its first generation`));
+            const storage = yield* Storage;
+            const r = self.engine.model.resource(p.source);
+            const id = String(env.payload?.id ?? "");
+            const version = Number(env.payload?.version ?? 0);
+            const ledgerId = `${p.name}:${m.generation}:contrib:${id}`;
+            const ledger = (yield* storage.getDocument(tenant, PROJ, ledgerId));
+            if (ledger && ledger.version >= version)
+                return "stale";
+            const stored = yield* storage.get(tenant, r, id);
+            const canon = stored && !stored["deletedAt"] ? canonicalize(self.engine.model, r, stored) : null;
+            const live = canon !== null && self.contributes(p, canon);
+            const newKey = live ? self.groupKey(p, canon) : undefined;
+            const newValues = live ? self.contribution(p, canon) : undefined;
+            const adjustments = new Map();
+            if (ledger?.key !== undefined && ledger.values)
+                adjustments.set(ledger.key, [{ values: ledger.values, sign: -1 }]);
+            if (newKey !== undefined && newValues)
+                adjustments.set(newKey, [...(adjustments.get(newKey) ?? []), { values: newValues, sign: 1 }]);
+            const writes = [];
+            for (const [key, changes] of adjustments) {
+                const gid = `${p.name}:${m.generation}:group:${key}`;
+                const doc = (yield* storage.getDocument(tenant, PROJ, gid));
+                const next = { ...doc };
+                try {
+                    for (const change of changes)
+                        self.adjust(p, next, change.values, change.sign);
+                }
+                catch (e) {
+                    return yield* Effect.fail(e instanceof ForgeError ? e : err("Internal", String(e)));
+                }
+                writes.push({ kind: PROJ, id: gid, doc: next, expectedVersion: doc?._version ?? null });
+            }
+            const entry = { version: Math.max(version, canon ? Number(canon["version"] ?? 0) : 0) };
+            if (newKey !== undefined && newValues)
+                Object.assign(entry, { key: newKey, values: newValues });
+            writes.push({ kind: PROJ, id: ledgerId, doc: entry, expectedVersion: ledger?._version ?? null });
+            const { _version, ...meta } = m;
+            writes.push({ kind: PROJ, id: `${p.name}:meta`, doc: { ...meta, lastProcessed: { messageId: env.messageId, at: env.createdAt } }, expectedVersion: _version ?? null });
+            yield* storage.putDocuments(tenant, writes);
+            return "applied";
+        });
+    }
+    /** Rebuild into a fresh generation from the source's bounded default list, then switch the active pointer. */
+    rebuild(p, ctx) {
+        const self = this;
+        return Effect.gen(function* () {
+            const storage = yield* Storage;
+            const r = self.engine.model.resource(p.source);
+            const prev = yield* self.meta(p, ctx.tenant);
+            // Reserve a never-reused generation before writing any candidate rows. The
+            // active pointer remains readable; failed hosts only abandon their candidate.
+            const generation = Math.max(prev?.generation ?? 0, prev?.reservedGeneration ?? 0) + 1;
+            if (!Number.isSafeInteger(generation))
+                return yield* Effect.fail(err("BudgetExceeded", "projection generation exhausted"));
+            const reserved = {
+                ...(prev ?? { generation: 0, status: "building", builtAt: (yield* Clock).now(), lastProcessed: null }),
+                reservedGeneration: generation,
+            };
+            yield* storage.putDocument(ctx.tenant, PROJ, `${p.name}:meta`, reserved, prev?._version ?? null);
+            const reservedVersion = (prev?._version ?? 0) + 1;
+            const groups = new Map();
+            let cursor = null;
+            for (let pages = 0; pages < 10_000; pages++) {
+                const page = yield* self.engine.callInternal(`${r.id}.list.all`, { params: {}, limit: 100, ...(cursor ? { cursor } : {}) }, ctx);
+                for (const rec of page.items) {
+                    if (!self.contributes(p, rec))
+                        continue;
+                    const key = self.groupKey(p, rec);
+                    const values = self.contribution(p, rec);
+                    const g = groups.get(key) ?? {};
+                    try {
+                        self.adjust(p, g, values, 1);
+                    }
+                    catch (e) {
+                        return yield* Effect.fail(e instanceof ForgeError ? e : err("Internal", String(e)));
+                    }
+                    groups.set(key, g);
+                    const entry = { version: Number(rec["version"] ?? 0), key, values };
+                    yield* storage.putDocument(ctx.tenant, PROJ, `${p.name}:${generation}:contrib:${rec["id"]}`, entry, null);
+                }
+                cursor = page.next ?? null;
+                if (!cursor)
+                    break;
+                if (pages === 9999)
+                    return yield* Effect.fail(err("BudgetExceeded", "projection rebuild exceeds its bounded source working set"));
+            }
+            for (const [key, g] of groups) {
+                yield* storage.putDocument(ctx.tenant, PROJ, `${p.name}:${generation}:group:${key}`, g, null);
+            }
+            const meta = { generation, status: "active", builtAt: (yield* Clock).now(), lastProcessed: null };
+            // Event application and competing reservations change this version. A stale
+            // snapshot must fail publication rather than overwrite acknowledged progress.
+            yield* storage.putDocument(ctx.tenant, PROJ, `${p.name}:meta`, { ...meta, reservedGeneration: generation }, reservedVersion);
+            return meta;
+        });
+    }
+    // ------------------------------------------------------------------ cache
+    /** In-process single-flight: concurrent misses for one key share a loader run (a local optimisation, not a global lock). */
+    inflight = new Map();
+    read(c, body, ctx) {
+        const self = this;
+        return Effect.gen(function* () {
+            const key = (body["key"] ?? {});
+            const missing = c.keys.filter((k) => key[k.name] === undefined || key[k.name] === null);
+            if (missing.length) {
+                return yield* Effect.fail(err("ValidationFailed", "every input that affects the cached value is part of its key", { fields: missing.map((k) => ({ path: `key.${k.name}`, code: "Required", message: `${c.name} is keyed by ${k.name}` })) }));
+            }
+            const storage = yield* Storage;
+            const now = (yield* Clock).now();
+            const docId = `${c.name}:${c.keys.map((k) => String(key[k.name])).join(SEP)}`;
+            const cached = (yield* storage.getDocument(ctx.tenant, CACHE, docId));
+            // Expired entries are rejected on read regardless of physical cleanup (§16).
+            if (cached && cached.freshUntil > now)
+                return { value: cached.value, source: "cache", freshUntil: cached.freshUntil };
+            const flightKey = `${ctx.tenant}|${docId}`;
+            const existing = self.inflight.get(flightKey);
+            if (existing) {
+                const v = yield* Effect.promise(() => existing);
+                return { ...v, source: "cache" };
+            }
+            const flight = Effect.runPromise(self.load(c, key, ctx, now, docId, cached?._version ?? null).pipe(Effect.provide(self.engine.layer)));
+            self.inflight.set(flightKey, flight);
+            return yield* Effect.tryPromise({ try: () => flight, catch: (e) => (e instanceof Error && "code" in e ? e : err("Internal", String(e))) }).pipe(Effect.ensuring(Effect.sync(() => self.inflight.delete(flightKey))));
+        });
+    }
+    load(c, key, ctx, now, docId, docVersion) {
+        const self = this;
+        return Effect.gen(function* () {
+            const { value, nextBoundary } = yield* self.runLoader(c, key, ctx, now);
+            const freshUntil = self.freshness(c.freshUntil, now, nextBoundary);
+            const entry = { value, freshUntil, loadedAt: now };
+            // A concurrent writer stored an equally fresh value: losing that race is harmless.
+            yield* (yield* Storage).putDocument(ctx.tenant, CACHE, docId, entry, docVersion).pipe(Effect.catch(() => Effect.void));
+            return { value, source: "loader", freshUntil };
+        });
+    }
+    /** Loader `Resource.effective(key..., now)` lowers to the resource's effective query and yields the next boundary. */
+    runLoader(c, key, ctx, now) {
+        const self = this;
+        return Effect.gen(function* () {
+            const loader = c.loader;
+            if (loader.kind !== "call" || loader.callee.length !== 2 || loader.callee[1] !== "effective") {
+                return yield* Effect.fail(err("Internal", `cache ${c.name}: only <Resource>.effective(...) loaders are supported`));
+            }
+            const r = self.engine.model.resources.find((x) => x.name === loader.callee[0]);
+            const ed = r?.decorators.effectiveDated;
+            if (!r || !ed)
+                return yield* Effect.fail(err("Internal", `cache ${c.name}: ${loader.callee[0]} is not effective-dated`));
+            const params = { at: now };
+            ed.uniqueBy.forEach((f, i) => {
+                const arg = loader.args[i];
+                params[f] = arg && arg.kind === "name" ? key[arg.path[0]] : key[f];
+            });
+            const query = `by${ed.uniqueBy.map((f) => f[0].toUpperCase() + f.slice(1)).join("")}`;
+            const value = (yield* self.engine.callInternal(`${r.id}.effective.${query}`, { params }, ctx));
+            return { value, nextBoundary: value["effectiveUntil"] ?? null };
+        });
+    }
+    /** `freshUntil` is a duration, `nextEffectiveBoundary`, or `min(...)` of those; an unknown boundary contributes nothing. */
+    freshness(e, now, nextBoundary) {
+        const nowMs = Date.parse(now);
+        const at = (x) => {
+            if (x.kind === "literal" && x.literal.type === "duration")
+                return nowMs + durationMs(x.literal.value);
+            if (x.kind === "name" && x.path[0] === "nextEffectiveBoundary")
+                return nextBoundary ? Date.parse(nextBoundary) : null;
+            if (x.kind === "call" && x.callee[0] === "min") {
+                const vals = x.args.map(at).filter((v) => v !== null);
+                return vals.length ? Math.min(...vals) : null;
+            }
+            return null;
+        };
+        return new Date(at(e) ?? nowMs).toISOString();
+    }
+}
+export function durationMs(d) {
+    const m = /^(\d+)(ms|s|m|h|d)$/.exec(d);
+    if (!m)
+        return 0;
+    const n = Number(m[1]);
+    return { ms: n, s: n * 1_000, m: n * 60_000, h: n * 3_600_000, d: n * 86_400_000 }[m[2]];
+}

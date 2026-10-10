@@ -1,0 +1,901 @@
+/**
+ * One mutation engine for every interface (plan §9). Operations are resolved
+ * by stable id, inputs decoded through the common pipeline, and every write
+ * becomes a CommitPlan executed atomically by the storage adapter.
+ */
+import { Cause, Effect } from "effect";
+import { encodeIdentity, sortKey } from "./codecs.js";
+import { decodeCursor, encodeCursor } from "./cursor.js";
+import { canonicalize, decodeObject, evalExpr, SELF_REFERENCE } from "./decode.js";
+import { err, ForgeError } from "./errors.js";
+import { fieldOf, scaleOf } from "./model.js";
+import { Clock, CursorSecret, IdGen, Storage } from "./services.js";
+import { Changesets } from "./changeset.js";
+import { Blobs } from "./blobs.js";
+import { Imports } from "./imports.js";
+import { Functions } from "./functions.js";
+import { Temporal } from "./temporal.js";
+import { ReadModels } from "./readmodels.js";
+import { Workflows } from "./workflows.js";
+import { Schedules } from "./schedules.js";
+import { Realtime } from "./realtime.js";
+import { Telemetry } from "./telemetry.js";
+import { Portability } from "./portability.js";
+import { Governance } from "./governance.js";
+import { Scope } from "./scope.js";
+import { Gatekeeper } from "./gatekeeper.js";
+import { Suppression } from "./suppression.js";
+import { jumpTestClock } from "./testing.js";
+export const PAGE_DEFAULT = 50;
+export const PAGE_MAX = 100;
+export async function sha256(text) {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+/** Stable JSON for request hashing (sorted keys). */
+export function stableJson(v) {
+    if (Array.isArray(v))
+        return `[${v.map(stableJson).join(",")}]`;
+    if (v && typeof v === "object")
+        return `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${stableJson(v[k])}`).join(",")}}`;
+    return JSON.stringify(v);
+}
+export class Engine {
+    model;
+    layer;
+    functions;
+    secrets;
+    constructor(model, layer, options = {}) {
+        this.model = model;
+        this.layer = layer;
+        this.secrets = options.secrets;
+        this.functions = new Functions(this, options.functions ?? [], options.externals ?? {});
+    }
+    call(opId, input, ctx) {
+        const self = this;
+        // Every public logical operation — generated or handwritten — emits exactly one telemetry event.
+        const started = performance.now();
+        return self.program(opId, input, ctx).pipe(Effect.provide(self.layer), Effect.tap(() => Effect.sync(() => self.telemetry.emit(opId, ctx, started, self.successStatus(opId)))), Effect.tapError((e) => Effect.sync(() => self.telemetry.emit(opId, ctx, started, e.status, e.code))));
+    }
+    successStatus(opId) {
+        const k = this.telemetry.entry(opId).kind;
+        return k === "create" || k === "changeset.propose" ? 201 : 200;
+    }
+    /** Same as call() but without providing the layer (for use inside function bodies that share it). */
+    callInternal(opId, input, ctx) {
+        return this.program(opId, input, ctx);
+    }
+    consume(subscription, env) {
+        return this.functions.consume(subscription, env);
+    }
+    program(opId, input, ctx) {
+        const self = this;
+        if (/\/changesets\.(propose|preview|approve|commit|get)$/.test(opId)) {
+            return self.changesets.handle(opId.slice(opId.lastIndexOf(".") + 1), (input ?? {}), ctx);
+        }
+        if (/\/imports\.(inspect|stage)$/.test(opId)) {
+            return self.imports.handle(opId.slice(opId.lastIndexOf(".") + 1), (input ?? {}), ctx);
+        }
+        if (/\/admin\.(export|import|verify|fence)$/.test(opId)) {
+            return self.portability.handle(opId.slice(opId.lastIndexOf(".") + 1), (input ?? {}), ctx);
+        }
+        if (/\/admin\.(subjects\.locate|inspect)$/.test(opId)) {
+            return self.governance.handle(opId.slice(opId.indexOf("admin.") + 6), (input ?? {}), ctx);
+        }
+        const ref = self.model.operation(opId);
+        if (!ref) {
+            const fn = self.model.function(opId);
+            if (fn)
+                return self.withIdempotency(opId, (input ?? {}), ctx, self.functions.invoke(fn, input, ctx));
+            const rm = self.readModel(opId, (input ?? {}), ctx);
+            if (rm)
+                return rm;
+            return Effect.fail(err("MethodNotAllowed", `unknown operation ${opId}`));
+        }
+        const { op, resource } = ref;
+        if (resource.decorators.writeOnce && ["update", "delete", "restore", "move", "transition"].includes(op.kind))
+            return Effect.fail(err("MethodNotAllowed", `${resource.name} has write-once content`));
+        if (resource.decorators.appendOnly && !["create", "get", "find", "list", "effective"].includes(op.kind))
+            return Effect.fail(err("MethodNotAllowed", `${resource.name} is append-only`));
+        const body = (input ?? {});
+        return self.scope.resolve(resource, ctx).pipe(Effect.flatMap((surface) => (surface ? self.scopedOperation(surface, op, resource, body, ctx) : self.operation(opId, op, resource, body, ctx))));
+    }
+    /** A resource operation under a purpose surface: authority checked first, result projected last (plan §8.4–8.5). */
+    scopedOperation(surface, op, resource, body, ctx) {
+        const self = this;
+        const project = (e) => e.pipe(Effect.map((v) => self.scope.project(surface, v)));
+        const projectPage = (e) => e.pipe(Effect.map((v) => self.scope.projectPage(surface, v)));
+        const run = (check, then) => check.pipe(Effect.flatMap(() => then));
+        switch (op.kind) {
+            case "get":
+                return project(self.get(resource, String(body["id"]), ctx));
+            case "find": {
+                const f = resource.finds.find((x) => x.name === op.query);
+                return run(self.scope.checkQuery(surface, resource, Object.fromEntries(f.fields.map((k) => [k, true])), []), project(self.find(resource, op.query, body, ctx)));
+            }
+            case "list": {
+                const l = resource.lists.find((x) => x.name === op.query);
+                return run(self.scope.checkQuery(surface, resource, Object.fromEntries(l.fields.map((k) => [k, true])), l.order.map((o) => o.field)), projectPage(self.list(resource, op.id, op.query, body, ctx)));
+            }
+            case "create":
+                return run(self.scope.checkCreate(surface, resource, body), project(self.withIdempotency(op.id, body, ctx, self.mutate(op.id, body, ctx))));
+            case "update":
+                return run(self.scope.checkPatch(surface, resource, (body["patch"] ?? {})), project(self.withIdempotency(op.id, body, ctx, self.mutate(op.id, body, ctx))));
+            case "transition":
+                return run(self.scope.checkAction(surface, resource, op.action), project(self.withIdempotency(op.id, body, ctx, self.mutate(op.id, body, ctx))));
+            case "delete":
+            case "restore":
+                return run(self.scope.checkAction(surface, resource, op.kind), project(self.withIdempotency(op.id, body, ctx, self.mutate(op.id, body, ctx))));
+            default:
+                // Temporal, hierarchy and blob operations expose record shapes too: project what they return.
+                return project(self.operation(op.id, op, resource, body, ctx));
+        }
+    }
+    operation(opId, op, resource, body, ctx) {
+        const self = this;
+        switch (op.kind) {
+            case "get":
+                return self.get(resource, String(body["id"]), ctx);
+            case "find":
+                return self.find(resource, op.query, body, ctx);
+            case "list":
+                return self.list(resource, op.id, op.query, body, ctx);
+            case "create":
+            case "update":
+            case "delete":
+            case "restore":
+            case "transition":
+                return self.withIdempotency(op.id, body, ctx, self.mutate(opId, body, ctx));
+            case "effective":
+                return self.temporal.effective(resource, op.query, body, ctx);
+            case "move":
+                return self.withIdempotency(op.id, body, ctx, Effect.gen(function* () {
+                    const plan = yield* self.temporal.move(resource, body, ctx);
+                    yield* (yield* Storage).commit(plan);
+                    return self.resultOf(plan);
+                }));
+            case "children":
+                return self.temporal.children(resource, body, ctx);
+            case "ancestors":
+                return self.temporal.ancestors(resource, body, ctx);
+            case "beginUpload":
+                return self.blobs.beginUpload(resource, body, ctx);
+            case "finalizeUpload":
+                return self.blobs.finalizeUpload(resource, body, ctx);
+            case "download":
+                return self.blobs.download(resource, body, ctx);
+            default:
+                return Effect.fail(err("MethodNotAllowed", `operation kind ${op.kind} is not executable`));
+        }
+    }
+    /** Views (`.query`), projections (`.get|.status|.rebuild`) and caches (`.read`). */
+    readModel(opId, body, ctx) {
+        const dot = opId.lastIndexOf(".");
+        const [base, action] = [opId.slice(0, dot), opId.slice(dot + 1)];
+        const view = this.model.views.find((v) => v.id === base);
+        if (view && action === "query")
+            return this.readModels.view(view, body, ctx);
+        const proj = this.model.projections.find((p) => p.id === base);
+        if (proj && action === "get")
+            return this.readModels.get(proj, body, ctx);
+        if (proj && action === "status")
+            return this.readModels.status(proj, ctx);
+        if (proj && action === "rebuild")
+            return this.readModels.rebuild(proj, ctx);
+        const cache = this.model.caches.find((c) => c.id === base);
+        if (cache && action === "read") {
+            // PAR-143: a cached value is stored as loaded, but disclosed only through the caller's *current* surface
+            // on the value's resource: a purpose narrowed since the load never sees what the broader load stored.
+            const loader = cache.loader;
+            const valueResource = loader.kind === "call" && loader.callee ? this.model.resources.find((r) => r.name === loader.callee[0]) : undefined;
+            if (!valueResource)
+                return this.readModels.read(cache, body, ctx);
+            const self = this;
+            return self.scope.resolve(valueResource, ctx).pipe(Effect.flatMap((surface) => self.readModels.read(cache, body, ctx).pipe(Effect.map((out) => (surface && out && typeof out["value"] === "object" && out["value"] !== null ? { ...out, value: self.scope.project(surface, out["value"]) } : out)))));
+        }
+        const src = this.model.sources.find((s) => s.id === base);
+        if (src && action === "tick")
+            return Effect.promise(() => Effect.runPromise(this.schedules.tick(ctx.tenant, String(body["now"] ?? new Date().toISOString())))).pipe(Effect.map((results) => ({ results })));
+        if (src && action === "status")
+            return Effect.promise(() => Effect.runPromise(this.schedules.status(ctx.tenant))).pipe(Effect.map((all) => all.find((x) => x.source === src.id) ?? { source: src.id, lastOccurrence: null, next: null, skipped: [] }));
+        const wf = this.model.workflows.find((w) => w.id === base);
+        if (wf && action === "start")
+            return this.workflows.start(wf, body, ctx);
+        if (wf && action === "get")
+            return this.workflows.get(wf, String(body["id"]), ctx);
+        if (wf && action === "cancel")
+            return this.workflows.cancel(wf, String(body["id"]), ctx);
+        if (wf && action === "signal")
+            return this.workflows.signal(wf, String(body["message"]), String(body["messageId"] ?? crypto.randomUUID()), (body["payload"] ?? {}), ctx);
+        return null;
+    }
+    /** Build the commit plan for a mutation without persisting it (used by single calls and changeset preview). */
+    planFor(opId, body, ctx, preview = false) {
+        const self = this;
+        const ref = self.model.operation(opId);
+        if (!ref)
+            return Effect.fail(err("MethodNotAllowed", `unknown operation ${opId}`));
+        const { op, resource } = ref;
+        if (resource.decorators.writeOnce && ["update", "delete", "restore", "move", "transition"].includes(op.kind))
+            return Effect.fail(err("MethodNotAllowed", `${resource.name} has write-once content`));
+        if (resource.decorators.appendOnly && op.kind !== "create")
+            return Effect.fail(err("MethodNotAllowed", `${resource.name} is append-only`));
+        if (preview && resource.fields.some(f => f.secret) && ["create", "update"].includes(op.kind))
+            return Effect.fail(err("ValidationFailed", "credential writes cannot be previewed"));
+        switch (op.kind) {
+            case "create":
+                if (preview && resource.fields.some(f => f.sequence))
+                    return Effect.fail(err("SequencePreviewUnsupported", "sequence allocation requires a committed create; changeset previews cannot reserve numbers"));
+                return self.create(resource, body, ctx);
+            case "update":
+                return self.update(resource, body, ctx);
+            case "delete":
+                return self.deleteOrRestore(resource, body, ctx, "delete");
+            case "restore":
+                return self.deleteOrRestore(resource, body, ctx, "restore");
+            case "transition":
+                return self.transition(resource, op.action, body, ctx);
+            default:
+                return Effect.fail(err("MethodNotAllowed", `${opId} is not a mutation`));
+        }
+    }
+    /** Canonical public result of a committed plan. */
+    resultOf(plan) {
+        return canonicalize(this.model, plan.resource, plan.hardDelete ? plan.before : plan.after);
+    }
+    /** Authorized, bounded composition of independent mutations against durable references.
+     * No staged reads/references or repeated-record composition is implied. Callers
+     * use immutable unique publication facts for retries; receipt keys are rejected. */
+    atomic(mutations, ctx, options = {}) {
+        const self = this;
+        const started = performance.now();
+        return Effect.gen(function* () {
+            if (ctx.idempotencyKey)
+                return yield* Effect.fail(err("ValidationFailed", "Atomic mutations require a durable application command key, not a per-operation receipt"));
+            if (!mutations.length || mutations.length > 32)
+                return yield* Effect.fail(err("BudgetExceeded", "Atomic mutations require 1..32 operations"));
+            const storage = yield* Storage;
+            const absent = [];
+            if ((options.absent?.length ?? 0) > 32)
+                return yield* Effect.fail(err("BudgetExceeded", "Atomic mutations support at most 32 absence guards"));
+            if (options.absent?.length && !storage.atomicAbsenceGuards)
+                return yield* Effect.fail(err("ValidationFailed", "Storage profile does not support atomic absence guards"));
+            for (const guard of options.absent ?? []) {
+                const resource = self.model.resources.find(r => r.id === guard.resource);
+                const unique = resource?.uniques.find(u => u.name === guard.unique);
+                const finder = resource?.finds.find(f => f.coveredBy === guard.unique);
+                if (!resource?.decorators.appendOnly || !unique || unique.condition || !finder)
+                    return yield* Effect.fail(err("ValidationFailed", "Absence guards require an unconditional unique finder on an append-only resource"));
+                const fields = [...unique.within, ...unique.fields];
+                if (Object.keys(guard.values).some(field => !fields.includes(field)))
+                    return yield* Effect.fail(err("ValidationFailed", "Absence guard contains fields outside its unique key"));
+                const values = yield* self.queryValues(resource, fields, guard.values);
+                const claimKey = self.claimKey(resource, unique, values);
+                if (!claimKey)
+                    return yield* Effect.fail(err("ValidationFailed", "Absence guards require a complete non-null unique key"));
+                const surface = yield* self.scope.resolve(resource, ctx);
+                if (surface)
+                    yield* self.scope.checkQuery(surface, resource, values, []);
+                // No synthetic record and no filtered pre-read: row-dependent authority cannot
+                // establish absence of every matching fact, so it must fail closed.
+                const decision = yield* self.gatekeeper.decide(`${resource.id}.find.${finder.name}`, "read", resource, ctx);
+                if (decision.effect !== "allow" || decision.rowFilter?.length)
+                    return yield* Effect.fail(err("NotPermitted", "Atomic absence guard requires unfiltered read authority"));
+                if (!absent.some(g => g.claimKey === claimKey))
+                    absent.push({ tenant: ctx.tenant, resource, unique, claimKey, values });
+            }
+            const plans = [], surfaces = [];
+            for (const mutation of mutations) {
+                const ref = self.model.operation(mutation.operation);
+                if (!ref)
+                    return yield* Effect.fail(err("MethodNotAllowed", "Atomic operation is not a resource mutation"));
+                if (ref.resource.fields.some(f => f.sequence || f.secret))
+                    return yield* Effect.fail(err("ValidationFailed", "Atomic mutations do not support sequence allocation or credential sealing"));
+                const surface = yield* self.scope.resolve(ref.resource, ctx);
+                if (surface) {
+                    switch (ref.op.kind) {
+                        case "create":
+                            yield* self.scope.checkCreate(surface, ref.resource, mutation.input);
+                            break;
+                        case "update":
+                            yield* self.scope.checkPatch(surface, ref.resource, (mutation.input["patch"] ?? {}));
+                            break;
+                        case "transition":
+                            yield* self.scope.checkAction(surface, ref.resource, ref.op.action);
+                            break;
+                        case "delete":
+                        case "restore":
+                            yield* self.scope.checkAction(surface, ref.resource, ref.op.kind);
+                            break;
+                        default: return yield* Effect.fail(err("MethodNotAllowed", "Unsupported atomic mutation"));
+                    }
+                }
+                const plan = yield* self.authorizedPlan(mutation.operation, mutation.input, ctx);
+                if (plans.some(p => p.resource.id === plan.resource.id && p.id === plan.id))
+                    return yield* Effect.fail(err("ValidationFailed", "Atomic operations cannot mutate the same record twice"));
+                plans.push(plan);
+                surfaces.push(surface);
+            }
+            if (plans.some(plan => absent.some(guard => plan.tenant === guard.tenant && plan.claims.some(claim => claim.after === guard.claimKey))))
+                return yield* Effect.fail(err("ValidationFailed", "Atomic mutation creates a fact required to be absent"));
+            const budget = storage.budget(plans, absent);
+            if (budget.actions > budget.limit)
+                return yield* Effect.fail(err("BudgetExceeded", "Atomic mutations exceed provider transaction budget"));
+            yield* storage.commitAll(plans, absent);
+            return plans.map((plan, i) => surfaces[i] ? self.scope.project(surfaces[i], self.resultOf(plan)) : self.resultOf(plan));
+        }).pipe(Effect.provide(self.layer), Effect.tap(() => Effect.sync(() => { for (const mutation of mutations)
+            self.telemetry.emit(mutation.operation, ctx, started, self.successStatus(mutation.operation)); })), Effect.tapError(error => Effect.sync(() => { for (const mutation of mutations)
+            self.telemetry.emit(mutation.operation, ctx, started, error.status, error.code); })));
+    }
+    authorizedPlan(opId, body, ctx) {
+        const self = this;
+        return Effect.gen(function* () {
+            if (yield* self.portability.isFenced(ctx.tenant))
+                return yield* Effect.fail(err("WriteFenced", "writes are fenced for a data migration; retry after cutover"));
+            const ref = self.model.operation(opId);
+            if (ref?.op.kind === "create")
+                yield* self.suppression.guard(ref.resource, "create", body, ctx);
+            const plan = yield* self.planFor(opId, body, ctx);
+            yield* self.gatekeeper.requireWrite(opId, plan.resource, ctx, plan.before ? canonicalize(self.model, plan.resource, plan.before) : null, canonicalize(self.model, plan.resource, plan.after));
+            yield* self.suppression.guard(plan.resource, plan.kind, plan.after, ctx);
+            return plan;
+        });
+    }
+    mutate(opId, body, ctx) {
+        const self = this;
+        return Effect.gen(function* () {
+            const plan = yield* self.authorizedPlan(opId, body, ctx);
+            yield* (yield* Storage).commit(plan);
+            return self.resultOf(plan);
+        });
+    }
+    changesets = new Changesets(this);
+    blobs = new Blobs(this);
+    temporal = new Temporal(this);
+    imports = new Imports(this);
+    readModels = new ReadModels(this);
+    workflows = new Workflows(this);
+    schedules = new Schedules(this);
+    realtime = new Realtime(this);
+    telemetry = new Telemetry(this);
+    portability = new Portability(this);
+    governance = new Governance(this);
+    scope = new Scope(this);
+    gatekeeper = new Gatekeeper(this);
+    suppression = new Suppression(this);
+    /** Test hook: advance the deterministic test clock (no effect with production clocks). */
+    testClockJump(ms) {
+        jumpTestClock(this.layer, ms);
+    }
+    /** Every projection is one durable logical subscription on its source's change channel. */
+    projectionSubscriptions(base = {}) {
+        const out = Object.fromEntries(Object.entries(base).map(([k, v]) => [k, [...v]]));
+        for (const p of this.model.projections)
+            (out[`${p.source}.changes`] ??= []).push(`projection:${p.name}`);
+        return out;
+    }
+    /** In-process transport that applies change events to projections (the cloud hosts route queue batches here). */
+    projectionTransport() {
+        const self = this;
+        return {
+            name: "projections",
+            send: (d) => {
+                const p = self.model.projections.find((x) => `projection:${x.name}` === d.subscription);
+                if (!p)
+                    return Effect.fail(new Error(`unknown projection subscription ${d.subscription}`));
+                return self.readModels.applyEvent(p, d.envelope).pipe(Effect.provide(self.layer), Effect.asVoid, Effect.mapError((e) => new Error(e.message)));
+            },
+        };
+    }
+    applyProjectionEvent(projectionId, env) {
+        const p = this.model.projections.find((x) => x.id === projectionId);
+        if (!p)
+            return Promise.reject(new Error(`unknown projection ${projectionId}`));
+        return Effect.runPromise(this.readModels.applyEvent(p, env).pipe(Effect.provide(this.layer)));
+    }
+    // ------------------------------------------------------------ helpers
+    claimKey(r, u, rec) {
+        if (u.condition && !u.condition.values.includes(String(rec[u.condition.field])))
+            return null;
+        const self = this;
+        const fields = [...u.within, ...u.fields];
+        const values = fields.map((f) => rec[f]);
+        if (values.some((v) => v === null || v === undefined))
+            return null; // optional nulls reserve no claim
+        return encodeIdentity([r.id, u.name, ...values.map(String)]);
+    }
+    /** Claims and guards for an imported record (plan §22): the same rules a create would apply. */
+    claimChangesFor(r, rec) {
+        return this.claimChanges(r, null, rec);
+    }
+    referenceGuardsFor(r, rec) {
+        return this.referenceGuards(r, rec, null);
+    }
+    claimChanges(r, before, after) {
+        const self = this;
+        return r.uniques.map((unique) => ({ unique, before: before ? self.claimKey(r, unique, before) : null, after: self.claimKey(r, unique, after) }));
+    }
+    /** Resolve `$self` reference inputs to the written record's id; only a same-resource reference may use it. */
+    resolveSelfReferences(r, after, id) {
+        const invalid = [];
+        for (const f of r.fields) {
+            if (f.type.base.kind !== "reference" || after[f.name] !== SELF_REFERENCE)
+                continue;
+            if (f.type.base.resource === r.id)
+                after[f.name] = id;
+            else
+                invalid.push(f.name);
+        }
+        return invalid.length
+            ? err("ValidationFailed", `${SELF_REFERENCE} may only reference the record being written`, { fields: invalid.map((path) => ({ path, code: "InvalidSelfReference", message: `${path} does not reference ${r.name}` })) })
+            : null;
+    }
+    referenceGuards(r, after, changed) {
+        const self = this;
+        const out = [];
+        for (const f of r.fields) {
+            if (f.type.base.kind !== "reference" || (f.synthesized && f.name !== "parent"))
+                continue;
+            if (changed && !changed.has(f.name))
+                continue;
+            const id = after[f.name];
+            // A record referencing itself is written by this same plan, so there is nothing to look up.
+            if (typeof id === "string" && f.type.base.resource === r.id && id === after["id"])
+                continue;
+            if (typeof id === "string")
+                out.push({ field: f.name, resource: self.model.resource(f.type.base.resource), id });
+        }
+        return out;
+    }
+    /** Load referenced records (for rules) and verify they exist in this tenant and are live. */
+    loadReferences(r, after, ctx, guards) {
+        const self = this;
+        return Effect.gen(function* () {
+            const storage = yield* Storage;
+            const refs = {};
+            const missing = [];
+            for (const g of guards) {
+                const rec = yield* storage.get(ctx.tenant, g.resource, g.id);
+                if (!rec || rec["deletedAt"])
+                    missing.push(g.field);
+                refs[g.field] = rec;
+            }
+            if (missing.length) {
+                return yield* Effect.fail(err("ReferenceMissing", `referenced record not found: ${missing.join(", ")}`, { fields: missing.map((f) => ({ path: f, code: "ReferenceMissing", message: `${f} does not reference a live record in this tenant` })) }));
+            }
+            // Rules need every reference, not only changed ones.
+            for (const f of r.fields) {
+                if (f.type.base.kind === "reference" && !(f.name in refs) && typeof after[f.name] === "string") {
+                    refs[f.name] = yield* storage.get(ctx.tenant, self.model.resource(f.type.base.resource), after[f.name]);
+                }
+            }
+            return refs;
+        });
+    }
+    checkRules(r, after, refs) {
+        const self = this;
+        if (self.model.bundle.ir.requires?.includes("collections/1") && new TextEncoder().encode(JSON.stringify(after)).length > 256 * 1024) {
+            return Effect.fail(err("ValidationFailed", "record exceeds the 256 KiB collection profile limit"));
+        }
+        const failures = r.rules.filter((rule) => !evalExpr(self.model, r, rule, after, undefined, refs));
+        if (failures.length === 0)
+            return Effect.void;
+        return Effect.fail(err("ValidationFailed", "a row rule was violated", { fields: failures.map((rule) => ({ path: "", code: "RuleViolation", message: describeRule(rule) })) }));
+    }
+    expectedVersion(r, body) {
+        const self = this;
+        if (!r.decorators.versioned)
+            return Effect.succeed(null);
+        const v = body["expectedVersion"];
+        if (typeof v !== "number" || !Number.isInteger(v) || v < 1)
+            return Effect.fail(err("PreconditionRequired", "expectedVersion (If-Match) is required for this operation"));
+        return Effect.succeed(v);
+    }
+    loadCurrent(r, id, ctx, expected) {
+        const self = this;
+        return Effect.gen(function* () {
+            const storage = yield* Storage;
+            const rec = yield* storage.get(ctx.tenant, r, id);
+            if (!rec)
+                return yield* Effect.fail(err("NotFound", `${r.name} ${id} not found`));
+            if (expected !== null && rec["version"] !== expected) {
+                return yield* Effect.fail(err("VersionConflict", `expected version ${expected}, current is ${rec["version"]}`));
+            }
+            return rec;
+        });
+    }
+    audit(kind, r, id, after, ctx, opId, at) {
+        return { tenant: ctx.tenant, opId, resource: r.id, recordId: id, kind, newVersion: typeof after["version"] === "number" ? after["version"] : null, actor: ctx.actor, at };
+    }
+    /** Audited resources stage one change event per commit on their implicit `<Resource>.changes` channel. */
+    changeEvent(r, kind, id, after, ctx, opId, at) {
+        if (!r.decorators.audited)
+            return [];
+        const message = { create: "Created", update: "Updated", delete: "Deleted", restore: "Restored" }[kind] ?? "Transitioned";
+        const extra = kind.startsWith("status.") && r.lifecycle ? { action: kind.slice(7), status: after[r.lifecycle.field] } : {};
+        return [{ tenant: ctx.tenant, opId, ordinal: 0, channel: `${r.id}.changes`, message, payload: { id, version: after["version"] ?? null, ...extra }, createdAt: at, ...(ctx.trace ? { trace: ctx.trace } : {}) }];
+    }
+    sealSecrets(r, record, changed, ctx) {
+        const self = this;
+        return Effect.gen(function* () {
+            for (const field of r.fields) {
+                if (!field.secret || !Object.hasOwn(changed, field.name) || record[field.name] === null)
+                    continue;
+                if (!self.secrets)
+                    return yield* Effect.fail(err("DependencyUnavailable", "credential sealing adapter is not configured"));
+                record[field.name] = yield* Effect.tryPromise({ try: () => self.secrets.seal({ tenant: ctx.tenant, resource: r.id, record: String(record["id"]), field: field.name }, String(record[field.name])), catch: () => err("DependencyUnavailable", "credential sealing failed") });
+            }
+        });
+    }
+    // ------------------------------------------------------------ create
+    create(r, body, ctx) {
+        const self = this;
+        return Effect.gen(function* () {
+            const { value, errors } = decodeObject(self.model, body, { mode: "create", fields: r.fields });
+            if (errors)
+                return yield* Effect.fail(errors);
+            const clock = yield* Clock;
+            const ids = yield* IdGen;
+            const now = clock.now();
+            const id = ids.next(r);
+            const after = { ...value, id };
+            if (r.decorators.versioned)
+                after["version"] = 1;
+            if (r.decorators.timestamps) {
+                after["createdAt"] = now;
+                after["updatedAt"] = now;
+            }
+            if (r.decorators.softDelete)
+                after["deletedAt"] = null;
+            if (r.lifecycle)
+                after[r.lifecycle.field] = r.lifecycle.initial;
+            if (r.kind === "blob") {
+                after["uploadState"] = "intent";
+                after["mediaType"] = null;
+                after["byteCount"] = null;
+                after["digest"] = null;
+            }
+            for (const field of r.fields) {
+                if (!field.sequence)
+                    continue;
+                const sequence = field.sequence;
+                const partition = sequence.partition ? after[sequence.partition] : null;
+                const key = JSON.stringify([r.id, field.name, partition]);
+                const storage = yield* Storage;
+                let allocated = false;
+                for (let attempt = 0; attempt < 64; attempt++) {
+                    const current = yield* storage.getDocument(ctx.tenant, "sequence", key);
+                    const last = current?.["last"];
+                    const next = last === undefined ? sequence.start : Number(last) + 1;
+                    if (!Number.isSafeInteger(next) || next < sequence.start || next > sequence.max) {
+                        return yield* Effect.fail(err("SequenceExhausted", `sequence ${r.name}.${field.name} is exhausted or requires migration`));
+                    }
+                    const reservation = yield* storage.putDocument(ctx.tenant, "sequence", key, { last: next }, current?.["_version"] ?? null).pipe(Effect.exit);
+                    if (reservation._tag === "Success") {
+                        after[field.name] = next;
+                        allocated = true;
+                        break;
+                    }
+                    const error = Cause.squash(reservation.cause);
+                    if (!(error instanceof ForgeError) || error.code !== "VersionConflict")
+                        return yield* Effect.fail(error instanceof ForgeError ? error : err("Internal", "sequence reservation failed"));
+                }
+                if (!allocated)
+                    return yield* Effect.fail(err("TransientConflict", "sequence contention; retry the operation"));
+            }
+            const selfReference = self.resolveSelfReferences(r, after, id);
+            if (selfReference)
+                return yield* Effect.fail(selfReference);
+            yield* self.sealSecrets(r, after, value, ctx);
+            const guards = self.referenceGuards(r, after, null);
+            const refs = yield* self.loadReferences(r, after, ctx, guards);
+            yield* self.checkRules(r, after, refs);
+            const interval = yield* self.temporal.intervalGuard(r, after, id);
+            yield* self.temporal.checkOverlap(r, interval, ctx);
+            const tree = yield* self.temporal.treeGuard(r, id, typeof after["parent"] === "string" ? after["parent"] : null, ctx);
+            const opId = ids.opId();
+            const plan = {
+                tenant: ctx.tenant, opId, actor: ctx.actor, at: now, resource: r, kind: "create", id, expectedVersion: null, before: null, after,
+                claims: self.claimChanges(r, null, after), references: guards, dependents: [], hardDelete: false,
+                ...(interval ? { interval } : {}), ...(tree ? { tree } : {}),
+                audit: self.audit("create", r, id, after, ctx, opId, now), outbox: self.changeEvent(r, "create", id, after, ctx, opId, now),
+            };
+            return plan;
+        });
+    }
+    // ------------------------------------------------------------ get/find/list
+    get(r, id, ctx) {
+        const self = this;
+        return Effect.gen(function* () {
+            const storage = yield* Storage;
+            const rec = yield* storage.get(ctx.tenant, r, id);
+            if (!rec || rec["deletedAt"])
+                return yield* Effect.fail(err("NotFound", `${r.name} ${id} not found`));
+            const canon = canonicalize(self.model, r, rec);
+            yield* self.gatekeeper.requireRead(`${r.id}.get`, r, ctx, canon); // per record, every time (PAR-109)
+            return canon;
+        });
+    }
+    queryValues(r, fields, params) {
+        const self = this;
+        const p = (params ?? {});
+        const subset = r.fields.filter((f) => fields.includes(f.name)).map((f) => ({ ...f, immutable: false, serverOwned: false, synthesized: false }));
+        const { value, errors } = decodeObject(self.model, Object.fromEntries(fields.map((f) => [f, p[f]])), { mode: "input", fields: subset });
+        return errors ? Effect.fail(errors) : Effect.succeed(value);
+    }
+    find(r, query, body, ctx) {
+        const self = this;
+        return Effect.gen(function* () {
+            const f = r.finds.find((x) => x.name === query);
+            const unique = r.uniques.find((u) => u.name === f.coveredBy);
+            const values = yield* self.queryValues(r, f.fields, body["params"]);
+            const key = self.claimKey(r, unique, values);
+            const storage = yield* Storage;
+            const rec = key ? yield* storage.findUnique(ctx.tenant, r, unique, key, values) : null;
+            if (!rec || rec["deletedAt"])
+                return yield* Effect.fail(err("NotFound", `${r.name} not found`));
+            const canon = canonicalize(self.model, r, rec);
+            yield* self.gatekeeper.requireRead(`${r.id}.find.${query}`, r, ctx, canon);
+            return canon;
+        });
+    }
+    sortKeys(r, l) {
+        const self = this;
+        return (rec) => l.order.map((o) => {
+            const f = fieldOf(r, o.field);
+            const type = f.type.base.kind === "scalar" ? f.type.base.name : f.type.base.kind;
+            const k = sortKey(rec[o.field], type, { scale: scaleOf(f.type) });
+            return k;
+        });
+    }
+    list(r, opId, query, body, ctx) {
+        const self = this;
+        return Effect.gen(function* () {
+            const l = r.lists.find((x) => x.name === query);
+            const values = yield* self.queryValues(r, l.fields, body["params"]);
+            const cursorQuery = l.searchMode ? `${opId}:${yield* Effect.promise(() => sha256(stableJson(values)))}` : opId;
+            const rawLimit = body["limit"];
+            const limit = typeof rawLimit === "number" && rawLimit > 0 ? Math.min(Math.floor(rawLimit), PAGE_MAX) : PAGE_DEFAULT;
+            const secret = (yield* CursorSecret).key;
+            let after = null;
+            if (typeof body["cursor"] === "string" && body["cursor"]) {
+                const state = yield* decodeCursor(secret, body["cursor"], { q: cursorQuery, t: ctx.tenant });
+                after = { keys: state.k, values: state.r, id: state.id };
+            }
+            const storage = yield* Storage;
+            const keys = self.sortKeys(r, l);
+            const page = yield* storage.list(ctx.tenant, r, { list: l, values, after, limit }, keys);
+            let items = page.records.map((rec) => canonicalize(self.model, r, rec));
+            // Policy filtering (plan §9.2): exact when the predicate is on the query's own parameters, otherwise a
+            // bounded residual check per row of this page; an unresolvable predicate is refused, never a hidden scan.
+            const plan = self.gatekeeper.listPlan(opId, r, ctx, values);
+            if (plan.kind === "unsupported")
+                return yield* Effect.fail(err("NotPermitted", plan.reason ?? "policy filter cannot be planned"));
+            if (plan.kind === "exact") {
+                const denied = plan.filter.some((c) => (c.op === "in" && !c.values.includes(values[c.field])) || (c.op === "eq" && values[c.field] !== c.values[0]) || (c.op === "ne" && c.values.includes(values[c.field])));
+                if (denied)
+                    items = [];
+            }
+            // Query predicates are only a prefilter; freshness and obligations still require decisions.
+            if (self.gatekeeper.authorizer) {
+                const kept = [];
+                for (const it of items) {
+                    const d = yield* self.gatekeeper.decide(opId, "read", r, ctx, it);
+                    if (d.effect === "allow")
+                        kept.push(it);
+                }
+                items = kept;
+            }
+            let next = null;
+            if (page.hasMore && page.records.length) {
+                const last = page.records[page.records.length - 1];
+                next = yield* encodeCursor(secret, { q: cursorQuery, v: 1, t: ctx.tenant, k: keys(last), r: l.order.map((o) => last[o.field] ?? null), id: String(last["id"]) });
+            }
+            return { items, next, limit, ...(plan.kind !== "none" ? { plan: { kind: plan.kind, ...(plan.policy ? { policy: plan.policy } : {}) } } : {}) };
+        });
+    }
+    // ------------------------------------------------------------ update
+    update(r, body, ctx) {
+        const self = this;
+        return Effect.gen(function* () {
+            const id = String(body["id"]);
+            const expected = yield* self.expectedVersion(r, body);
+            const { value: patch, errors } = decodeObject(self.model, body["patch"] ?? {}, { mode: "patch", fields: r.fields });
+            if (errors)
+                return yield* Effect.fail(errors);
+            const before = yield* self.loadCurrent(r, id, ctx, expected);
+            if (before["deletedAt"])
+                return yield* Effect.fail(err("NotFound", `${r.name} ${id} not found`));
+            const clock = yield* Clock;
+            const ids = yield* IdGen;
+            const now = clock.now();
+            const after = { ...before, ...patch };
+            if (r.decorators.versioned)
+                after["version"] = before["version"] + 1;
+            if (r.decorators.timestamps)
+                after["updatedAt"] = now;
+            const selfReference = self.resolveSelfReferences(r, after, id);
+            if (selfReference)
+                return yield* Effect.fail(selfReference);
+            yield* self.sealSecrets(r, after, patch, ctx);
+            const guards = self.referenceGuards(r, after, new Set(Object.keys(patch)));
+            const refs = yield* self.loadReferences(r, after, ctx, guards);
+            yield* self.checkRules(r, after, refs);
+            const intervalChanged = "effectiveFrom" in patch || "effectiveUntil" in patch || r.decorators.effectiveDated?.uniqueBy.some((f) => f in patch);
+            const interval = intervalChanged ? yield* self.temporal.intervalGuard(r, after, id) : undefined;
+            yield* self.temporal.checkOverlap(r, interval, ctx);
+            const tree = "parent" in patch ? yield* self.temporal.treeGuard(r, id, typeof after["parent"] === "string" ? after["parent"] : null, ctx) : undefined;
+            const opId = ids.opId();
+            const plan = {
+                tenant: ctx.tenant, opId, actor: ctx.actor, at: now, resource: r, kind: "update", id, expectedVersion: expected, before, after,
+                claims: self.claimChanges(r, before, after), references: guards, dependents: [], hardDelete: false,
+                ...(interval ? { interval } : {}), ...(tree ? { tree } : {}),
+                audit: self.audit("update", r, id, after, ctx, opId, now), outbox: self.changeEvent(r, "update", id, after, ctx, opId, now),
+            };
+            return plan;
+        });
+    }
+    // ------------------------------------------------------------ delete/restore
+    deleteOrRestore(r, body, ctx, kind) {
+        const self = this;
+        return Effect.gen(function* () {
+            const id = String(body["id"]);
+            const expected = yield* self.expectedVersion(r, body);
+            const before = yield* self.loadCurrent(r, id, ctx, expected);
+            const clock = yield* Clock;
+            const ids = yield* IdGen;
+            const now = clock.now();
+            if (!r.decorators.softDelete && kind === "restore")
+                return yield* Effect.fail(err("MethodNotAllowed", `${r.name} is not soft-deletable`));
+            if (kind === "delete" && before["deletedAt"])
+                return yield* Effect.fail(err("AlreadyDeleted", `${r.name} ${id} is already deleted`));
+            if (kind === "restore" && !before["deletedAt"])
+                return yield* Effect.fail(err("NotDeleted", `${r.name} ${id} is not deleted`));
+            const hardDelete = kind === "delete" && !r.decorators.softDelete;
+            const after = { ...before };
+            if (r.decorators.softDelete)
+                after["deletedAt"] = kind === "delete" ? now : null;
+            if (r.decorators.versioned)
+                after["version"] = before["version"] + 1;
+            if (r.decorators.timestamps)
+                after["updatedAt"] = now;
+            // restrict-delete: pre-check for a good error, then the adapter re-checks at commit
+            const dependents = kind === "delete" ? self.model.dependentsOf(r.id) : [];
+            if (kind === "delete") {
+                const storage = yield* Storage;
+                for (const d of dependents) {
+                    const n = yield* storage.countDependents(ctx.tenant, d.resource, d.field, id);
+                    if (n > 0)
+                        return yield* Effect.fail(err("HasDependents", `${r.name} ${id} is referenced by ${n} live ${d.resource.name} record(s) through ${d.resource.name}.${d.field}`));
+                }
+            }
+            const opId = ids.opId();
+            const plan = {
+                tenant: ctx.tenant, opId, actor: ctx.actor, at: now, resource: r, kind, id, expectedVersion: expected, before, after,
+                claims: hardDelete ? self.claimChanges(r, before, {}) : [], references: [], dependents, hardDelete,
+                audit: self.audit(kind, r, id, after, ctx, opId, now), outbox: self.changeEvent(r, kind, id, after, ctx, opId, now),
+            };
+            return plan;
+        });
+    }
+    // ------------------------------------------------------------ transition
+    transition(r, action, body, ctx) {
+        const self = this;
+        return Effect.gen(function* () {
+            const lc = r.lifecycle;
+            const t = lc.transitions.find((x) => x.action === action);
+            const id = String(body["id"]);
+            const expected = yield* self.expectedVersion(r, body);
+            const { value: input, errors } = decodeObject(self.model, body["input"] ?? {}, { mode: "input", fields: t.input });
+            if (errors)
+                return yield* Effect.fail(errors);
+            const before = yield* self.loadCurrent(r, id, ctx, expected);
+            if (before["deletedAt"])
+                return yield* Effect.fail(err("NotFound", `${r.name} ${id} not found`));
+            const current = String(before[lc.field]);
+            if (!t.from.includes(current))
+                return yield* Effect.fail(err("InvalidTransition", `${action} is not allowed from ${current}`));
+            const clock = yield* Clock;
+            const ids = yield* IdGen;
+            const now = clock.now();
+            const after = { ...before, [lc.field]: t.to };
+            if (r.decorators.versioned)
+                after["version"] = before["version"] + 1;
+            if (r.decorators.timestamps)
+                after["updatedAt"] = now;
+            const opId = ids.opId();
+            const plan = {
+                tenant: ctx.tenant, opId, actor: ctx.actor, at: now, resource: r, kind: "transition", id, expectedVersion: expected, before, after,
+                claims: self.claimChanges(r, before, after), references: [], dependents: [], hardDelete: false,
+                audit: { ...self.audit(`status.${action}`, r, id, after, ctx, opId, now), payload: input }, outbox: self.changeEvent(r, `status.${action}`, id, after, ctx, opId, now),
+            };
+            return plan;
+        });
+    }
+    // ------------------------------------------------------------ idempotency
+    /** Run a mutation under an idempotency receipt: replay on the same key + request, conflict on a different request. */
+    withIdempotency(operation, body, ctx, run, explicitKey) {
+        const self = this;
+        const key = explicitKey ?? ctx.idempotencyKey;
+        if (!key)
+            return run;
+        return Effect.gen(function* () {
+            const storage = yield* Storage;
+            const requestHash = yield* Effect.promise(() => sha256(stableJson(body)));
+            const replay = (existing) => Effect.gen(function* () {
+                if (existing.requestHash !== requestHash)
+                    return yield* Effect.fail(err("IdempotencyMismatch", "idempotency key reused with a different request"));
+                // Reuse repeats no effect, but the stored response is disclosed only under current authority (PAR-112).
+                const ref = self.model.operation(operation);
+                const stored = existing.response;
+                const d = yield* self.gatekeeper.decide(operation, "replay", ref?.resource ?? null, ctx, stored && typeof stored === "object" && "id" in stored ? stored : undefined);
+                if (d.effect !== "allow")
+                    return yield* Effect.fail(err("NotPermitted", "the stored result of this request is no longer accessible under current authority"));
+                return stored;
+            });
+            const existing = yield* storage.getReceipt(ctx.tenant, operation, key);
+            if (existing)
+                return yield* replay(existing);
+            const clock = yield* Clock;
+            const receipt = { tenant: ctx.tenant, operation, key, requestHash, status: 200, response: null, createdAt: clock.now() };
+            return yield* runWithReceipt(run, receipt).pipe(Effect.catch((error) => Effect.gen(function* () {
+                if (error.code !== "VersionConflict")
+                    return yield* Effect.fail(error);
+                // Another caller may commit after our initial receipt miss but before we read
+                // the record. Its durable receipt distinguishes a replay from a stale request.
+                const committed = yield* storage.getReceipt(ctx.tenant, operation, key);
+                return committed ? yield* replay(committed) : yield* Effect.fail(error);
+            })));
+        });
+        function runWithReceipt(inner, receipt) {
+            // The receipt is attached to the plan by intercepting Storage.commit: we wrap the storage service.
+            return Effect.gen(function* () {
+                const storage = yield* Storage;
+                // Explicit delegation: spreading a class instance would drop prototype methods.
+                const wrapped = {
+                    name: storage.name,
+                    ...(storage.atomicAbsenceGuards ? { atomicAbsenceGuards: true } : {}),
+                    get: (...a) => storage.get(...a),
+                    findUnique: (...a) => storage.findUnique(...a),
+                    list: (...a) => storage.list(...a),
+                    countDependents: (...a) => storage.countDependents(...a),
+                    getReceipt: (...a) => storage.getReceipt(...a),
+                    commitAll: (...a) => storage.commitAll(...a),
+                    budget: (...a) => storage.budget(...a),
+                    getDocument: (...a) => storage.getDocument(...a),
+                    exportPage: (...a) => storage.exportPage(...a),
+                    putDocument: (...a) => storage.putDocument(...a),
+                    putDocuments: (...a) => storage.putDocuments(...a),
+                    outboxSweep: (...a) => storage.outboxSweep(...a),
+                    outboxTenants: () => storage.outboxTenants(),
+                    outboxClaim: (...a) => storage.outboxClaim(...a),
+                    outboxProgress: (...a) => storage.outboxProgress(...a),
+                    outboxDead: (...a) => storage.outboxDead(...a),
+                    outboxRedrive: (...a) => storage.outboxRedrive(...a),
+                    ...(storage.atomicCompletion ? { atomicCompletion: true } : {}),
+                    hasProcessed: (...a) => storage.hasProcessed(...a),
+                    markProcessed: (...a) => storage.markProcessed(...a),
+                    overlapping: (...a) => storage.overlapping(...a),
+                    effectiveAt: (...a) => storage.effectiveAt(...a),
+                    children: (...a) => storage.children(...a),
+                    commit: (plan) => storage.commit({ ...plan, receipt: { ...receipt, response: self.resultOf(plan) } }),
+                };
+                return yield* inner.pipe(Effect.provideService(Storage, wrapped));
+            });
+        }
+    }
+}
+function describeRule(e) {
+    switch (e.kind) {
+        case "binary":
+            return `${describeRule(e.lhs)} ${e.op} ${describeRule(e.rhs)}`;
+        case "unary":
+            return `${e.op}${describeRule(e.operand)}`;
+        case "name":
+            return e.path.join(".");
+        case "literal":
+            return "literal" in e ? JSON.stringify(e.literal.value ?? null) : "";
+        case "call":
+            return `${e.callee.join(".")}(...)`;
+    }
+}

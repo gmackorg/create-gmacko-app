@@ -1,4 +1,4 @@
-import { NotFound } from "@gmacko/domain";
+import { MissingForgePost } from "@gmacko/api-client";
 import { useQuery } from "@tanstack/react-query";
 import { Stack, useGlobalSearchParams } from "expo-router";
 import { SafeAreaView, Text, View } from "react-native";
@@ -9,9 +9,8 @@ export default function Post() {
   const { id } = useGlobalSearchParams<{ id: string }>();
   const { data, error, isPending } = useQuery(queries.posts.byId(id));
 
-  // The contract answers 404 `NotFound{resource: "post"}` for an unknown id
-  // (the legacy client returned `undefined`); anything else is a real failure.
-  if (error instanceof NotFound) {
+  // The Forge host has no such post. Anything else is a real failure.
+  if (error instanceof MissingForgePost) {
     return (
       <SafeAreaView className="bg-background">
         <Stack.Screen options={{ title: "Post not found" }} />

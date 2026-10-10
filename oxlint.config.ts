@@ -117,5 +117,8 @@ export default defineConfig({
     // The vendored plugin is upstream source, linted upstream, and re-synced
     // verbatim. Linting it here would make every re-sync a fix-up commit.
     "tools/oxlint/anti-slop/**",
+    // Vendored forgec 0.5.0 build. Lint it upstream.
+    "packages/forge-runtime/**",
+    "packages/forge-capability-manifest/**",
   ],
 });

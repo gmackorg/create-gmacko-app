@@ -1,0 +1,74 @@
+import { Effect } from 'effect';
+import { err } from '../errors.js';
+import { decodeDatetime } from '../codecs.js';
+import { findTerminalFact } from './facts.js';
+const p = '@forgegraph/foundation/party-relationship/_/';
+/** A Party profile over ConceptIR's typed Relationship carrier; this grants no authority. */
+export class PartyRelationships {
+    engine;
+    constructor(engine) {
+        this.engine = engine;
+    }
+    call(op, input, ctx) { return this.engine.call(p + op, input, ctx); }
+    dependencies(row, ctx) {
+        const self = this;
+        return Effect.gen(function* () {
+            const definition = yield* self.call('PartyRelationshipDefinition.get', { id: row.definition }, ctx);
+            yield* self.engine.call('@forgegraph/foundation/specification/_/SpecificationPin.get', { id: definition.pin }, ctx);
+            for (const id of [row.fromParty, row.toParty])
+                yield* self.engine.call('@forgegraph/foundation/party/_/Party.get', { id }, ctx);
+            if (row.scope)
+                yield* self.call('PartyRelationshipScope.get', { id: row.scope }, ctx);
+            if (row.support)
+                yield* self.engine.call('@forgegraph/foundation/evidence/_/EvidenceSeal.get', { id: row.support }, ctx);
+            return definition;
+        });
+    }
+    record(input, ctx) {
+        const self = this;
+        return Effect.gen(function* () {
+            yield* self.dependencies(input, ctx);
+            return yield* self.call('PartyRelationship.create', { ...input, scope: input.scope ?? null, validUntil: input.validUntil ?? null, support: input.support ?? null }, ctx);
+        });
+    }
+    end(relationship, effectiveAt, reason, ctx, replacement) {
+        const self = this;
+        return Effect.gen(function* () {
+            const row = yield* self.call('PartyRelationship.get', { id: relationship }, ctx);
+            yield* self.dependencies(row, ctx);
+            if (replacement) {
+                const next = yield* self.call('PartyRelationship.get', { id: replacement }, ctx);
+                yield* self.dependencies(next, ctx);
+            }
+            return yield* self.call('PartyRelationshipEnd.create', { relationship, replacement: replacement ?? null, effectiveAt, reason, recordedBy: ctx.actor }, ctx);
+        });
+    }
+    current(id, at, ctx) {
+        const self = this;
+        return Effect.gen(function* () {
+            const instant = yield* Effect.try({ try: () => Date.parse(decodeDatetime(at)), catch: () => err('ValidationFailed', 'Invalid relationship instant') });
+            const row = yield* self.call('PartyRelationship.get', { id }, ctx);
+            yield* self.dependencies(row, ctx);
+            const end = yield* findTerminalFact(self.engine, p + 'PartyRelationshipEnd', 'relationship', id, ctx);
+            return instant < Date.parse(String(row.validFrom)) || row.validUntil != null && instant >= Date.parse(String(row.validUntil)) || end && instant >= Date.parse(String(end.effectiveAt)) ? null : row;
+        });
+    }
+    /** Inverse perspectives return the same authoritative relationship ID. Exhaust every cursor. */
+    listAt(party, perspective, at, ctx, page = {}) {
+        const self = this;
+        return Effect.gen(function* () {
+            yield* Effect.try({ try: () => decodeDatetime(at), catch: () => err('ValidationFailed', 'Invalid relationship instant') });
+            yield* self.engine.call('@forgegraph/foundation/party/_/Party.get', { id: party }, ctx);
+            const records = yield* self.call(perspective === 'forward' ? 'PartyRelationship.list.byFromParty' : 'PartyRelationship.list.byToParty', { params: { [perspective === 'forward' ? 'fromParty' : 'toParty']: party }, ...page }, ctx);
+            const items = [];
+            for (const row of records.items) {
+                const current = yield* self.current(String(row.id), at, ctx);
+                if (!current)
+                    continue;
+                const definition = yield* self.call('PartyRelationshipDefinition.get', { id: row.definition }, ctx);
+                items.push({ ...current, label: perspective === 'forward' ? definition.forwardLabel : definition.inverseLabel, otherParty: perspective === 'forward' ? row.toParty : row.fromParty });
+            }
+            return { items, next: records.next };
+        });
+    }
+}

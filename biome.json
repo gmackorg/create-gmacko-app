@@ -20,7 +20,10 @@
       "!docs/plans/**/*.html",
       "!apps/web/src/routeTree.gen.ts",
       "!**/__snapshots__/**",
-      "!tools/oxlint/anti-slop/**"
+      "!tools/oxlint/anti-slop/**",
+      "!packages/forge-runtime/**",
+      "!packages/forge-capability-manifest/**",
+      "!apps/forge/src/app.json"
     ]
   },
   "formatter": {

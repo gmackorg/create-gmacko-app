@@ -1,5 +1,5 @@
 import { ApiClientError } from "@gmacko/api-client";
-import { type Post, Unauthorized } from "@gmacko/domain";
+import { Unauthorized } from "@gmacko/domain";
 import { useTranslationsNative } from "@gmacko/i18n/native";
 import { LegendList } from "@legendapp/list";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -13,7 +13,10 @@ import { mutations, queries } from "~/utils/api";
 import { authClient } from "~/utils/auth";
 import { deleteToken } from "~/utils/session-store";
 
-function PostCard(props: { post: Post; onDelete: () => void }) {
+function PostCard(props: {
+  post: { id: string; title: string; content: string };
+  onDelete: () => void;
+}) {
   const t = useTranslationsNative();
 
   return (
