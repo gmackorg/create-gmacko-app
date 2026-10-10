@@ -1,6 +1,7 @@
+import { forgePosts } from "@gmacko/api-client";
 import { expect, type Page, test } from "@playwright/test";
 
-import { alice, api, signInAsAdmin } from "./helpers/auth";
+import { alice, signInAsAdmin } from "./helpers/auth";
 import { reset } from "./helpers/db";
 import { hydrated } from "./helpers/nav";
 
@@ -24,11 +25,11 @@ test.describe("Server rendering", () => {
     page,
   }) => {
     await signInAsAdmin(page, alice);
-    const created = await api(page).post("/api/posts", {
+    const created = await forgePosts.create({
       title: "Rendered on the server",
       content: "no client refetch",
     });
-    expect(created.status()).toBe(201);
+    expect(created.title).toBe("Rendered on the server");
 
     const seen = watchApi(page);
     const response = await page.goto("/");

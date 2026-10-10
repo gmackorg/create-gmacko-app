@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-import { BASE_URL, E2E_PORT, serverEnv } from "./e2e/helpers/env";
+import { BASE_URL, E2E_PORT, REPO_DIR, serverEnv } from "./e2e/helpers/env";
 
 /**
  * The browser suite runs the app the way a developer does, `vite dev` on
@@ -32,12 +32,21 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
-  webServer: {
-    command: `pnpm exec vite dev --port ${E2E_PORT} --strictPort`,
-    // Liveness only: the database is prepared by global-setup.
-    url: `${BASE_URL}/api/health/live`,
-    reuseExistingServer: false,
-    timeout: 120 * 1000,
-    env: serverEnv(),
-  },
+  webServer: [
+    {
+      command: "pnpm -F @gmacko/forge-host dev",
+      cwd: REPO_DIR,
+      url: "http://127.0.0.1:8787/healthz",
+      reuseExistingServer: false,
+      timeout: 120 * 1000,
+    },
+    {
+      command: `pnpm exec vite dev --port ${E2E_PORT} --strictPort`,
+      // Liveness only: the database is prepared by global-setup.
+      url: `${BASE_URL}/api/health/live`,
+      reuseExistingServer: false,
+      timeout: 120 * 1000,
+      env: serverEnv(),
+    },
+  ],
 });

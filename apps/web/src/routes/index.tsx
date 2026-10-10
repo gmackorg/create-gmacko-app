@@ -197,7 +197,7 @@ function HomePage() {
   );
 }
 
-/** The signed-in home: the posts demo, as the T3 scaffold shipped it. */
+/** The signed-in home. Posts are read and written on the Forge host. */
 function AppHome() {
   return (
     <main className="container min-h-screen py-16">

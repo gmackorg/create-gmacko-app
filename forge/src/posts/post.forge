@@ -1,0 +1,10 @@
+/// A post in the sample product. The web and Expo screens call this resource.
+export resource Post
+  @tenant
+  @timestamps
+  @crud("/v1/posts")
+{
+  id : id
+  title : text length 1..256
+  content : text length 0..256
+}

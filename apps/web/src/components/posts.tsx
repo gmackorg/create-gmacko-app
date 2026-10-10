@@ -1,4 +1,4 @@
-import { CreatePostForm as CreatePostSchema, type Post } from "@gmacko/domain";
+import { CreatePostForm as CreatePostSchema } from "@gmacko/domain";
 import { cn } from "@gmacko/ui";
 import { Button } from "@gmacko/ui/button";
 import {
@@ -143,7 +143,9 @@ export function PostList() {
   );
 }
 
-export function PostCard(props: { post: Post }) {
+export function PostCard(props: {
+  post: { id: string; title: string; content: string };
+}) {
   const deletePost = useMutation({
     ...mutations.posts.remove(),
     onError: (error) => toastApiError(error, "Failed to delete post"),

@@ -17,6 +17,7 @@ export {
   type RequestTrace,
   traceOf,
 } from "./errors";
+export { FORGE_ORIGIN, forgePosts, MissingForgePost } from "./forge-posts";
 export {
   FORWARDED_HEADERS,
   forwardedHeaders,

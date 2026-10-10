@@ -4,8 +4,8 @@ A fork of [create-t3-turbo](https://github.com/t3-oss/create-t3-turbo) rebuilt a
 
 - the web app (`apps/web`) is TanStack Start (React 19, Vite) plus an Effect `HttpApi` serving `/api/*`, deployed as a single Worker per stage
 - the database is Cloudflare D1 (SQLite) through Drizzle's Effect API; migrations are checked in and applied before every deploy
-- the partner integration API is Forge (`forge/`). `forgec` emits the contract, OpenAPI, and client. See [`docs/INTEGRATE.md`](./docs/INTEGRATE.md)
-- the in-app API (`packages/domain`) is still the Effect `HttpApi` the browser, SSR loader, Expo, and operator tools call today
+- the product API is Forge (`forge/`), hosted by `apps/forge`. Posts, customers, and the partner notification are that package. See [`docs/INTEGRATE.md`](./docs/INTEGRATE.md)
+- auth, settings, admin, launch, and health stay on the Effect `HttpApi` in the web Worker. Effect still publishes `/api/posts` as the database fixture the security tests use. The product screens call `/v1/posts`
 - better-auth for magic-link, GitHub/Google/Apple sign-in, the Expo client, and scoped API keys
 - ForgeGraph as the deployment control plane (Workers + D1 per stage, secrets pushed from ForgeGraph)
 - `jj`-first repository setup with colocated Git compatibility
@@ -17,7 +17,7 @@ A fork of [create-t3-turbo](https://github.com/t3-oss/create-t3-turbo) rebuilt a
 - optional operator surfaces where both the CLI and MCP server are wrappers over the same HTTP API
 - Storybook in `packages/ui` for isolated UI development
 
-The decision record for the Worker stack is [`docs/adr/0001-tanstack-effect-d1.md`](./docs/adr/0001-tanstack-effect-d1.md). The partner API is Forge: [`docs/adr/0002-forge-is-the-integration-api.md`](./docs/adr/0002-forge-is-the-integration-api.md). The architecture is in [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
+The decision record for the Worker stack is [`docs/adr/0001-tanstack-effect-d1.md`](./docs/adr/0001-tanstack-effect-d1.md). The partner API is Forge: [`docs/adr/0002-forge-is-the-integration-api.md`](./docs/adr/0002-forge-is-the-integration-api.md). The product host is [`docs/adr/0003-forge-hosts-the-product-api.md`](./docs/adr/0003-forge-hosts-the-product-api.md). The architecture is in [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
 
 ## Installation
 

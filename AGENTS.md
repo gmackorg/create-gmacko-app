@@ -9,7 +9,7 @@ This repository is set up to work well with `Codex`, `Claude Code`, and `OpenCod
 - Prefer `jj` for local version control workflows. The repo is colocated with Git for interoperability.
 - Use `pnpm`, `oxlint`, `biome`, and `turbo` as the default tooling surface.
 - Use ForgeGraph for deployment workflows and `forge` from [`../ForgeGraph`](../ForgeGraph) when working against the real deployment control plane.
-- The partner integration API is Forge, in `forge/`. Add a resource or `@http` function there, then run `pnpm forge:api` (forgec 0.5.0). Read `docs/INTEGRATE.md`. The Worker still serves the Effect `HttpApi` at `/api/*` until that package is hosted on the Forge runtime.
+- The product API is Forge, in `forge/`, hosted by `apps/forge`. Add a product resource or `@http` function there, then run `pnpm forge:api` (forgec 0.5.0). That refreshes the worker bundle. Read `docs/INTEGRATE.md` and `docs/adr/0003-forge-hosts-the-product-api.md`. Auth, settings, admin, launch, and health stay on the Effect `HttpApi`. Do not add a product route only in `packages/domain`.
 - Treat [docs/ai/DEVELOPER_EXPERIENCE.md](./docs/ai/DEVELOPER_EXPERIENCE.md) as the current support matrix for agent tooling, Cloudflare Workers, ForgeGraph, Nix, and mobile DX choices.
 - When the optional SaaS bootstrap pack is scaffolded, keep the generated bootstrap playbook feature-aware across `Claude-only`, `Codex`, and `OpenCode` sections, and keep Claude-only slash commands labeled as such.
 
@@ -22,7 +22,7 @@ This repository is set up to work well with `Codex`, `Claude Code`, and `OpenCod
 
 ## Local Development (emulate + portless + wrangler)
 
-`pnpm dev` runs two things: [`@gmacko/emulate`](https://www.npmjs.com/package/@gmacko/emulate) (GitHub/Google/Apple/Stripe/Resend service emulators, no Postgres, no Redis) and the web app (`apps/web`, TanStack Start on workerd via the Cloudflare Vite plugin) under `portless`, at `https://gmacko.localhost`. The database is a local D1 in `apps/web/.wrangler/state`: `pnpm db:migrate:local && pnpm db:seed` once, then sign in with the emulated GitHub.
+`pnpm dev` runs three things: [`@gmacko/emulate`](https://www.npmjs.com/package/@gmacko/emulate) (GitHub/Google/Apple/Stripe/Resend service emulators, no Postgres, no Redis), the Forge product host (`apps/forge`, wrangler on `http://127.0.0.1:8787`, its own D1 `gmacko-forge`), and the web app (`apps/web`, TanStack Start on workerd via the Cloudflare Vite plugin) under `portless`, at `https://gmacko.localhost`. The web database is a local D1 in `apps/web/.wrangler/state`: `pnpm db:migrate:local && pnpm db:seed` once, then sign in with the emulated GitHub. The Forge host applies its migration when it starts. `FORGE_AUTH=dev-headers` is local only.
 
 **How the Worker gets its variables:** Wrangler and the Vite plugin load `.env` from the directory of `wrangler.jsonc` and never from the repo root, and `process.env` is not copied into the Worker. So `apps/web/.env` is a symlink to the repo-root `.env` (created by the app's `predev`), `.env.example` documents the keys, and `AppConfig.fromBindings` (`apps/web/src/server/config.ts`) is the only reader. Under `pnpm dev`, `apps/web/scripts/dev-portless.mjs` also writes `PORTLESS_URL` into `apps/web/.env.local` so the Worker knows its public origin. **Never create `apps/web/.dev.vars`**: its presence disables `.env` loading; `pnpm check:standards` (`no-dev-vars`) fails on one.
 

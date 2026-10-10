@@ -1,0 +1,3841 @@
+{
+  "version": "app-bundle/1",
+  "buildHash": "5abac365701c2ab243967ec581d3b6e1fa46bc4b904e47cb078eac3b13699cc2",
+  "digests": {
+    "source": "0129b684997ee6b32b1135a8771fd39a7ff3b5dca54d78beb1e70a4d38b7e88f",
+    "wire": "8b1c67240ce5d4eb59b76f6d1a27a1d0d416665a07b0dcddf95504984157d69f",
+    "docs": "12900cf36f5e2df2cf028f3445438889242a9939657ad8e5c2dd0a0314aa300b",
+    "security": "21030677e840deb1865feffd809a6586cb3eefefa1e254a20e32795c2393a7f2"
+  },
+  "ir": {
+    "version": "domain-ir/1",
+    "package": {
+      "name": "@gmacko/api",
+      "version": "0.1.0",
+      "edition": "2026",
+      "profile": "portable-v1",
+      "targets": [
+        "cloudflare-d1",
+        "aws-dynamodb"
+      ],
+      "observability": {
+        "window": "28d",
+        "slo": []
+      }
+    },
+    "imports": [],
+    "modules": [
+      {
+        "id": "_",
+        "enums": [],
+        "types": [],
+        "shapes": [
+          {
+            "id": "@gmacko/api/_/NotifyPartnerInput",
+            "name": "NotifyPartnerInput",
+            "exported": false,
+            "fields": [
+              {
+                "name": "customer",
+                "type": {
+                  "base": {
+                    "kind": "reference",
+                    "resource": "@gmacko/api/_/Customer"
+                  },
+                  "optional": false,
+                  "normalizers": [],
+                  "constraints": []
+                },
+                "immutable": false,
+                "serverOwned": false,
+                "synthesized": false
+              },
+              {
+                "name": "event",
+                "type": {
+                  "base": {
+                    "kind": "scalar",
+                    "name": "text",
+                    "args": []
+                  },
+                  "optional": false,
+                  "normalizers": [],
+                  "constraints": [
+                    {
+                      "kind": "length",
+                      "min": 1,
+                      "max": 64
+                    }
+                  ]
+                },
+                "immutable": false,
+                "serverOwned": false,
+                "synthesized": false
+              }
+            ]
+          },
+          {
+            "id": "@gmacko/api/_/NotifyPartnerResult",
+            "name": "NotifyPartnerResult",
+            "exported": false,
+            "fields": [
+              {
+                "name": "accepted",
+                "type": {
+                  "base": {
+                    "kind": "scalar",
+                    "name": "boolean",
+                    "args": []
+                  },
+                  "optional": false,
+                  "normalizers": [],
+                  "constraints": []
+                },
+                "immutable": false,
+                "serverOwned": false,
+                "synthesized": false
+              }
+            ]
+          }
+        ],
+        "resources": [
+          {
+            "id": "@gmacko/api/_/Customer",
+            "name": "Customer",
+            "kind": "resource",
+            "exported": true,
+            "doc": "A customer of the business. Partners read and create these.",
+            "decorators": {
+              "tenant": true,
+              "timestamps": true,
+              "softDelete": false,
+              "versioned": false,
+              "audited": false,
+              "crud": {
+                "path": "/v1/customers",
+                "actions": []
+              },
+              "hierarchical": false,
+              "purposeScoped": false
+            },
+            "fields": [
+              {
+                "name": "id",
+                "type": {
+                  "base": {
+                    "kind": "scalar",
+                    "name": "id",
+                    "args": []
+                  },
+                  "optional": false,
+                  "normalizers": [],
+                  "constraints": []
+                },
+                "immutable": true,
+                "serverOwned": true,
+                "synthesized": false
+              },
+              {
+                "name": "name",
+                "type": {
+                  "base": {
+                    "kind": "scalar",
+                    "name": "text",
+                    "args": []
+                  },
+                  "optional": false,
+                  "normalizers": [],
+                  "constraints": [
+                    {
+                      "kind": "length",
+                      "min": 1,
+                      "max": 200
+                    }
+                  ]
+                },
+                "immutable": false,
+                "serverOwned": false,
+                "synthesized": false
+              },
+              {
+                "name": "email",
+                "type": {
+                  "base": {
+                    "kind": "scalar",
+                    "name": "email",
+                    "args": []
+                  },
+                  "optional": true,
+                  "normalizers": [],
+                  "constraints": []
+                },
+                "immutable": false,
+                "serverOwned": false,
+                "synthesized": false
+              },
+              {
+                "name": "createdAt",
+                "type": {
+                  "base": {
+                    "kind": "scalar",
+                    "name": "datetime",
+                    "args": []
+                  },
+                  "optional": false,
+                  "normalizers": [],
+                  "constraints": []
+                },
+                "immutable": false,
+                "serverOwned": true,
+                "synthesized": true
+              },
+              {
+                "name": "updatedAt",
+                "type": {
+                  "base": {
+                    "kind": "scalar",
+                    "name": "datetime",
+                    "args": []
+                  },
+                  "optional": false,
+                  "normalizers": [],
+                  "constraints": []
+                },
+                "immutable": false,
+                "serverOwned": true,
+                "synthesized": true
+              }
+            ],
+            "uniques": [],
+            "finds": [],
+            "lists": [
+              {
+                "name": "all",
+                "fields": [],
+                "order": [
+                  {
+                    "field": "id",
+                    "direction": "asc"
+                  }
+                ]
+              }
+            ],
+            "rules": [],
+            "operations": [
+              {
+                "id": "@gmacko/api/_/Customer.create",
+                "kind": "create",
+                "http": {
+                  "method": "POST",
+                  "path": "/v1/customers"
+                }
+              },
+              {
+                "id": "@gmacko/api/_/Customer.get",
+                "kind": "get",
+                "http": {
+                  "method": "GET",
+                  "path": "/v1/customers/{id}"
+                }
+              },
+              {
+                "id": "@gmacko/api/_/Customer.update",
+                "kind": "update",
+                "http": {
+                  "method": "PATCH",
+                  "path": "/v1/customers/{id}"
+                }
+              },
+              {
+                "id": "@gmacko/api/_/Customer.delete",
+                "kind": "delete",
+                "http": {
+                  "method": "DELETE",
+                  "path": "/v1/customers/{id}"
+                }
+              },
+              {
+                "id": "@gmacko/api/_/Customer.list.all",
+                "kind": "list",
+                "query": "all",
+                "http": {
+                  "method": "GET",
+                  "path": "/v1/customers"
+                }
+              }
+            ],
+            "capabilities": [],
+            "purposeBindings": []
+          },
+          {
+            "id": "@gmacko/api/_/Post",
+            "name": "Post",
+            "kind": "resource",
+            "exported": true,
+            "doc": "A post in the sample product. The web and Expo screens call this resource.",
+            "decorators": {
+              "tenant": true,
+              "timestamps": true,
+              "softDelete": false,
+              "versioned": false,
+              "audited": false,
+              "crud": {
+                "path": "/v1/posts",
+                "actions": []
+              },
+              "hierarchical": false,
+              "purposeScoped": false
+            },
+            "fields": [
+              {
+                "name": "id",
+                "type": {
+                  "base": {
+                    "kind": "scalar",
+                    "name": "id",
+                    "args": []
+                  },
+                  "optional": false,
+                  "normalizers": [],
+                  "constraints": []
+                },
+                "immutable": true,
+                "serverOwned": true,
+                "synthesized": false
+              },
+              {
+                "name": "title",
+                "type": {
+                  "base": {
+                    "kind": "scalar",
+                    "name": "text",
+                    "args": []
+                  },
+                  "optional": false,
+                  "normalizers": [],
+                  "constraints": [
+                    {
+                      "kind": "length",
+                      "min": 1,
+                      "max": 256
+                    }
+                  ]
+                },
+                "immutable": false,
+                "serverOwned": false,
+                "synthesized": false
+              },
+              {
+                "name": "content",
+                "type": {
+                  "base": {
+                    "kind": "scalar",
+                    "name": "text",
+                    "args": []
+                  },
+                  "optional": false,
+                  "normalizers": [],
+                  "constraints": [
+                    {
+                      "kind": "length",
+                      "min": 0,
+                      "max": 256
+                    }
+                  ]
+                },
+                "immutable": false,
+                "serverOwned": false,
+                "synthesized": false
+              },
+              {
+                "name": "createdAt",
+                "type": {
+                  "base": {
+                    "kind": "scalar",
+                    "name": "datetime",
+                    "args": []
+                  },
+                  "optional": false,
+                  "normalizers": [],
+                  "constraints": []
+                },
+                "immutable": false,
+                "serverOwned": true,
+                "synthesized": true
+              },
+              {
+                "name": "updatedAt",
+                "type": {
+                  "base": {
+                    "kind": "scalar",
+                    "name": "datetime",
+                    "args": []
+                  },
+                  "optional": false,
+                  "normalizers": [],
+                  "constraints": []
+                },
+                "immutable": false,
+                "serverOwned": true,
+                "synthesized": true
+              }
+            ],
+            "uniques": [],
+            "finds": [],
+            "lists": [
+              {
+                "name": "all",
+                "fields": [],
+                "order": [
+                  {
+                    "field": "id",
+                    "direction": "asc"
+                  }
+                ]
+              }
+            ],
+            "rules": [],
+            "operations": [
+              {
+                "id": "@gmacko/api/_/Post.create",
+                "kind": "create",
+                "http": {
+                  "method": "POST",
+                  "path": "/v1/posts"
+                }
+              },
+              {
+                "id": "@gmacko/api/_/Post.get",
+                "kind": "get",
+                "http": {
+                  "method": "GET",
+                  "path": "/v1/posts/{id}"
+                }
+              },
+              {
+                "id": "@gmacko/api/_/Post.update",
+                "kind": "update",
+                "http": {
+                  "method": "PATCH",
+                  "path": "/v1/posts/{id}"
+                }
+              },
+              {
+                "id": "@gmacko/api/_/Post.delete",
+                "kind": "delete",
+                "http": {
+                  "method": "DELETE",
+                  "path": "/v1/posts/{id}"
+                }
+              },
+              {
+                "id": "@gmacko/api/_/Post.list.all",
+                "kind": "list",
+                "query": "all",
+                "http": {
+                  "method": "GET",
+                  "path": "/v1/posts"
+                }
+              }
+            ],
+            "capabilities": [],
+            "purposeBindings": []
+          }
+        ],
+        "functions": [
+          {
+            "id": "@gmacko/api/_/NotifyPartner",
+            "name": "NotifyPartner",
+            "exported": true,
+            "doc": "Tell a partner that a customer changed. The caller is another business system.",
+            "input": {
+              "base": {
+                "kind": "shape",
+                "id": "@gmacko/api/_/NotifyPartnerInput"
+              },
+              "optional": false,
+              "normalizers": [],
+              "constraints": []
+            },
+            "output": {
+              "base": {
+                "kind": "shape",
+                "id": "@gmacko/api/_/NotifyPartnerResult"
+              },
+              "optional": false,
+              "normalizers": [],
+              "constraints": []
+            },
+            "uses": [
+              {
+                "kind": "resource",
+                "resource": "@gmacko/api/_/Customer",
+                "capability": "read"
+              }
+            ],
+            "sends": [],
+            "errors": [],
+            "slo": [],
+            "http": {
+              "method": "POST",
+              "path": "/v1/integrations/notify"
+            },
+            "generated": false
+          }
+        ],
+        "channels": [],
+        "sources": [],
+        "subscriptions": [],
+        "views": [],
+        "projections": [],
+        "caches": [],
+        "workflows": [],
+        "purposes": [],
+        "dataClasses": []
+      }
+    ],
+    "requires": []
+  },
+  "contracts": {
+    "version": "contracts/1",
+    "package": "@gmacko/api",
+    "resources": [
+      {
+        "id": "@gmacko/api/_/Customer",
+        "name": "Customer",
+        "wireName": "customer",
+        "tenantScoped": true,
+        "softDelete": false,
+        "versioned": false,
+        "record": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "x-forge-type": "id",
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "readOnly": true
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time",
+              "x-forge-type": "datetime",
+              "x-forge-precision": "ms",
+              "readOnly": true
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time",
+              "x-forge-type": "datetime",
+              "x-forge-precision": "ms",
+              "readOnly": true
+            },
+            "name": {
+              "type": "string",
+              "x-forge-type": "text",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "email": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "email",
+              "x-forge-type": "email"
+            }
+          },
+          "required": [
+            "id",
+            "createdAt",
+            "updatedAt",
+            "name",
+            "email"
+          ],
+          "additionalProperties": false
+        },
+        "create": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "x-forge-type": "text",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "email": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "email",
+              "x-forge-type": "email"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "patch": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "x-forge-type": "text",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "email": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "email",
+              "x-forge-type": "email"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "queries": [
+          {
+            "name": "all",
+            "kind": "list",
+            "params": [],
+            "order": [
+              {
+                "field": "id",
+                "direction": "asc"
+              }
+            ]
+          }
+        ],
+        "operations": [
+          {
+            "id": "@gmacko/api/_/Customer.create",
+            "kind": "create",
+            "http": {
+              "method": "POST",
+              "path": "/v1/customers"
+            }
+          },
+          {
+            "id": "@gmacko/api/_/Customer.get",
+            "kind": "get",
+            "http": {
+              "method": "GET",
+              "path": "/v1/customers/{id}"
+            }
+          },
+          {
+            "id": "@gmacko/api/_/Customer.update",
+            "kind": "update",
+            "http": {
+              "method": "PATCH",
+              "path": "/v1/customers/{id}"
+            }
+          },
+          {
+            "id": "@gmacko/api/_/Customer.delete",
+            "kind": "delete",
+            "http": {
+              "method": "DELETE",
+              "path": "/v1/customers/{id}"
+            }
+          },
+          {
+            "id": "@gmacko/api/_/Customer.list.all",
+            "kind": "list",
+            "query": "all",
+            "http": {
+              "method": "GET",
+              "path": "/v1/customers"
+            }
+          }
+        ]
+      },
+      {
+        "id": "@gmacko/api/_/Post",
+        "name": "Post",
+        "wireName": "post",
+        "tenantScoped": true,
+        "softDelete": false,
+        "versioned": false,
+        "record": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "x-forge-type": "id",
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "readOnly": true
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time",
+              "x-forge-type": "datetime",
+              "x-forge-precision": "ms",
+              "readOnly": true
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time",
+              "x-forge-type": "datetime",
+              "x-forge-precision": "ms",
+              "readOnly": true
+            },
+            "title": {
+              "type": "string",
+              "x-forge-type": "text",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "content": {
+              "type": "string",
+              "x-forge-type": "text",
+              "minLength": 0,
+              "maxLength": 256
+            }
+          },
+          "required": [
+            "id",
+            "createdAt",
+            "updatedAt",
+            "title",
+            "content"
+          ],
+          "additionalProperties": false
+        },
+        "create": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "x-forge-type": "text",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "content": {
+              "type": "string",
+              "x-forge-type": "text",
+              "minLength": 0,
+              "maxLength": 256
+            }
+          },
+          "required": [
+            "title",
+            "content"
+          ],
+          "additionalProperties": false
+        },
+        "patch": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "x-forge-type": "text",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "content": {
+              "type": "string",
+              "x-forge-type": "text",
+              "minLength": 0,
+              "maxLength": 256
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "queries": [
+          {
+            "name": "all",
+            "kind": "list",
+            "params": [],
+            "order": [
+              {
+                "field": "id",
+                "direction": "asc"
+              }
+            ]
+          }
+        ],
+        "operations": [
+          {
+            "id": "@gmacko/api/_/Post.create",
+            "kind": "create",
+            "http": {
+              "method": "POST",
+              "path": "/v1/posts"
+            }
+          },
+          {
+            "id": "@gmacko/api/_/Post.get",
+            "kind": "get",
+            "http": {
+              "method": "GET",
+              "path": "/v1/posts/{id}"
+            }
+          },
+          {
+            "id": "@gmacko/api/_/Post.update",
+            "kind": "update",
+            "http": {
+              "method": "PATCH",
+              "path": "/v1/posts/{id}"
+            }
+          },
+          {
+            "id": "@gmacko/api/_/Post.delete",
+            "kind": "delete",
+            "http": {
+              "method": "DELETE",
+              "path": "/v1/posts/{id}"
+            }
+          },
+          {
+            "id": "@gmacko/api/_/Post.list.all",
+            "kind": "list",
+            "query": "all",
+            "http": {
+              "method": "GET",
+              "path": "/v1/posts"
+            }
+          }
+        ]
+      }
+    ],
+    "functions": [
+      {
+        "id": "@gmacko/api/_/NotifyPartner",
+        "name": "NotifyPartner",
+        "http": {
+          "method": "POST",
+          "path": "/v1/integrations/notify"
+        },
+        "errors": [],
+        "input": {
+          "type": "object",
+          "properties": {
+            "customer": {
+              "type": "string",
+              "x-forge-reference": "@gmacko/api/_/Customer"
+            },
+            "event": {
+              "type": "string",
+              "x-forge-type": "text",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          "required": [
+            "customer",
+            "event"
+          ],
+          "additionalProperties": false
+        },
+        "output": {
+          "type": "object",
+          "properties": {
+            "accepted": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "accepted"
+          ],
+          "additionalProperties": false
+        },
+        "generated": false
+      }
+    ],
+    "views": [],
+    "projections": [],
+    "caches": [],
+    "workflows": [],
+    "schedules": [],
+    "surfaces": []
+  },
+  "sql": {
+    "version": "sql-schema/1",
+    "dialect": "sqlite",
+    "tables": [
+      {
+        "name": "customer",
+        "resource": "@gmacko/api/_/Customer",
+        "columns": [
+          {
+            "name": "tenant",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "id",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "field": "id",
+            "storage": "text"
+          },
+          {
+            "name": "name",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "field": "name",
+            "storage": "text"
+          },
+          {
+            "name": "email",
+            "sqlType": "TEXT",
+            "nullable": true,
+            "field": "email",
+            "storage": "text"
+          },
+          {
+            "name": "created_at",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "field": "createdAt",
+            "storage": "text"
+          },
+          {
+            "name": "updated_at",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "field": "updatedAt",
+            "storage": "text"
+          }
+        ],
+        "primaryKey": [
+          "tenant",
+          "id"
+        ],
+        "foreignKeys": [],
+        "checks": []
+      },
+      {
+        "name": "post",
+        "resource": "@gmacko/api/_/Post",
+        "columns": [
+          {
+            "name": "tenant",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "id",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "field": "id",
+            "storage": "text"
+          },
+          {
+            "name": "title",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "field": "title",
+            "storage": "text"
+          },
+          {
+            "name": "content",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "field": "content",
+            "storage": "text"
+          },
+          {
+            "name": "created_at",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "field": "createdAt",
+            "storage": "text"
+          },
+          {
+            "name": "updated_at",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "field": "updatedAt",
+            "storage": "text"
+          }
+        ],
+        "primaryKey": [
+          "tenant",
+          "id"
+        ],
+        "foreignKeys": [],
+        "checks": []
+      }
+    ],
+    "indexes": [],
+    "systemTables": [
+      {
+        "name": "_forge_assert",
+        "columns": [
+          {
+            "name": "op_id",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "satisfied",
+            "sqlType": "INTEGER",
+            "nullable": false,
+            "storage": "text"
+          }
+        ],
+        "primaryKey": [
+          "op_id"
+        ],
+        "foreignKeys": [],
+        "checks": [
+          {
+            "name": "forge_precondition",
+            "expression": "satisfied = 1"
+          }
+        ]
+      },
+      {
+        "name": "forge_audit",
+        "columns": [
+          {
+            "name": "tenant",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "op_id",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "resource",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "record_id",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "kind",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "new_version",
+            "sqlType": "INTEGER",
+            "nullable": true,
+            "storage": "text"
+          },
+          {
+            "name": "actor",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "at",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "payload",
+            "sqlType": "TEXT",
+            "nullable": true,
+            "storage": "text"
+          }
+        ],
+        "primaryKey": [
+          "tenant",
+          "op_id"
+        ],
+        "foreignKeys": [],
+        "checks": []
+      },
+      {
+        "name": "forge_outbox",
+        "columns": [
+          {
+            "name": "tenant",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "op_id",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "ordinal",
+            "sqlType": "INTEGER",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "channel",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "message",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "payload",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "status",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "lease_owner",
+            "sqlType": "TEXT",
+            "nullable": true,
+            "storage": "text"
+          },
+          {
+            "name": "lease_until",
+            "sqlType": "INTEGER",
+            "nullable": true,
+            "storage": "text"
+          },
+          {
+            "name": "attempts",
+            "sqlType": "INTEGER",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "created_at",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "delivered",
+            "sqlType": "TEXT",
+            "nullable": true,
+            "storage": "text"
+          },
+          {
+            "name": "trace",
+            "sqlType": "TEXT",
+            "nullable": true,
+            "storage": "text"
+          }
+        ],
+        "primaryKey": [
+          "tenant",
+          "op_id",
+          "ordinal"
+        ],
+        "foreignKeys": [],
+        "checks": []
+      },
+      {
+        "name": "forge_processed",
+        "columns": [
+          {
+            "name": "tenant",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "subscription",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "message_id",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "at",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          }
+        ],
+        "primaryKey": [
+          "tenant",
+          "subscription",
+          "message_id"
+        ],
+        "foreignKeys": [],
+        "checks": []
+      },
+      {
+        "name": "forge_document",
+        "columns": [
+          {
+            "name": "tenant",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "kind",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "id",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "version",
+            "sqlType": "INTEGER",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "body",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          }
+        ],
+        "primaryKey": [
+          "tenant",
+          "kind",
+          "id"
+        ],
+        "foreignKeys": [],
+        "checks": []
+      },
+      {
+        "name": "forge_receipt",
+        "columns": [
+          {
+            "name": "tenant",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "operation",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "key",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "request_hash",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "status",
+            "sqlType": "INTEGER",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "response",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          },
+          {
+            "name": "created_at",
+            "sqlType": "TEXT",
+            "nullable": false,
+            "storage": "text"
+          }
+        ],
+        "primaryKey": [
+          "tenant",
+          "operation",
+          "key"
+        ],
+        "foreignKeys": [],
+        "checks": []
+      }
+    ]
+  },
+  "dynamo": {
+    "version": "dynamo-plan/1",
+    "identityCodec": "identity.v1",
+    "sortCodec": "sort.v1",
+    "table": "data",
+    "pendingIndex": "pending-index",
+    "resources": [
+      {
+        "id": "@gmacko/api/_/Customer",
+        "name": "Customer",
+        "wireName": "customer",
+        "tenantScoped": true,
+        "claims": [],
+        "access": [
+          {
+            "name": "all",
+            "kind": "list",
+            "partitionFields": [],
+            "sortFields": [
+              "id"
+            ],
+            "sortDirections": [
+              "asc"
+            ],
+            "projection": [
+              "id"
+            ]
+          }
+        ],
+        "references": [],
+        "createActions": 4
+      },
+      {
+        "id": "@gmacko/api/_/Post",
+        "name": "Post",
+        "wireName": "post",
+        "tenantScoped": true,
+        "claims": [],
+        "access": [
+          {
+            "name": "all",
+            "kind": "list",
+            "partitionFields": [],
+            "sortFields": [
+              "id"
+            ],
+            "sortDirections": [
+              "asc"
+            ],
+            "projection": [
+              "id"
+            ]
+          }
+        ],
+        "references": [],
+        "createActions": 4
+      }
+    ]
+  },
+  "ui": {
+    "version": "ui/1",
+    "package": "@gmacko/api",
+    "resources": [
+      {
+        "id": "@gmacko/api/_/Customer",
+        "name": "Customer",
+        "kind": "resource",
+        "label": "Customer",
+        "plural": "Customers",
+        "route": "customers",
+        "titleField": "name",
+        "fields": [
+          {
+            "name": "id",
+            "label": "Id",
+            "widget": "readonly",
+            "required": false,
+            "editableOnCreate": false,
+            "editableOnUpdate": false,
+            "sortable": true
+          },
+          {
+            "name": "name",
+            "label": "Name",
+            "widget": "text",
+            "required": true,
+            "editableOnCreate": true,
+            "editableOnUpdate": true,
+            "sortable": true,
+            "minLength": 1,
+            "maxLength": 200
+          },
+          {
+            "name": "email",
+            "label": "Email",
+            "widget": "email",
+            "required": false,
+            "editableOnCreate": true,
+            "editableOnUpdate": true,
+            "sortable": true
+          },
+          {
+            "name": "createdAt",
+            "label": "Created At",
+            "widget": "readonly",
+            "required": false,
+            "editableOnCreate": false,
+            "editableOnUpdate": false,
+            "sortable": true
+          },
+          {
+            "name": "updatedAt",
+            "label": "Updated At",
+            "widget": "readonly",
+            "required": false,
+            "editableOnCreate": false,
+            "editableOnUpdate": false,
+            "sortable": true
+          }
+        ],
+        "tableColumns": [
+          "name",
+          "email"
+        ],
+        "lists": [
+          {
+            "name": "all",
+            "op": "@gmacko/api/_/Customer.list.all",
+            "params": [],
+            "label": "All"
+          }
+        ],
+        "finds": [],
+        "actions": [],
+        "softDelete": false,
+        "versioned": false
+      },
+      {
+        "id": "@gmacko/api/_/Post",
+        "name": "Post",
+        "kind": "resource",
+        "label": "Post",
+        "plural": "Posts",
+        "route": "posts",
+        "titleField": "title",
+        "fields": [
+          {
+            "name": "id",
+            "label": "Id",
+            "widget": "readonly",
+            "required": false,
+            "editableOnCreate": false,
+            "editableOnUpdate": false,
+            "sortable": true
+          },
+          {
+            "name": "title",
+            "label": "Title",
+            "widget": "textarea",
+            "required": true,
+            "editableOnCreate": true,
+            "editableOnUpdate": true,
+            "sortable": true,
+            "minLength": 1,
+            "maxLength": 256
+          },
+          {
+            "name": "content",
+            "label": "Content",
+            "widget": "textarea",
+            "required": true,
+            "editableOnCreate": true,
+            "editableOnUpdate": true,
+            "sortable": true,
+            "minLength": 0,
+            "maxLength": 256
+          },
+          {
+            "name": "createdAt",
+            "label": "Created At",
+            "widget": "readonly",
+            "required": false,
+            "editableOnCreate": false,
+            "editableOnUpdate": false,
+            "sortable": true
+          },
+          {
+            "name": "updatedAt",
+            "label": "Updated At",
+            "widget": "readonly",
+            "required": false,
+            "editableOnCreate": false,
+            "editableOnUpdate": false,
+            "sortable": true
+          }
+        ],
+        "tableColumns": [
+          "title",
+          "content"
+        ],
+        "lists": [
+          {
+            "name": "all",
+            "op": "@gmacko/api/_/Post.list.all",
+            "params": [],
+            "label": "All"
+          }
+        ],
+        "finds": [],
+        "actions": [],
+        "softDelete": false,
+        "versioned": false
+      }
+    ]
+  },
+  "messaging": {
+    "version": "messaging/1",
+    "channels": [],
+    "subscriptions": [],
+    "senders": []
+  },
+  "workflows": {
+    "version": "workflows/1",
+    "workflows": []
+  },
+  "schedules": {
+    "version": "schedules/1",
+    "schedules": [],
+    "cloudflareCrons": []
+  },
+  "realtime": {
+    "version": "realtime/1",
+    "profile": {
+      "frame": "text/json",
+      "maxFrameBytes": 65536,
+      "replayDepth": 256,
+      "delivery": "at-least-once",
+      "heartbeatSeconds": 30
+    },
+    "streams": [],
+    "cloudflare": {
+      "binding": "REALTIME",
+      "className": "ForgeRealtime"
+    },
+    "aws": {
+      "apiName": "forge-gmacko-api-realtime",
+      "routes": [
+        "$connect",
+        "$disconnect",
+        "$default"
+      ]
+    }
+  },
+  "observability": {
+    "version": "observability/1",
+    "dimensions": [
+      "forge.operation",
+      "forge.kind",
+      "forge.resource",
+      "forge.outcome",
+      "forge.target"
+    ],
+    "classification": {
+      "good": "status < 400",
+      "excluded": "4xx client errors except TransientConflict",
+      "bad": "5xx, TransientConflict, timeouts, undeclared failures",
+      "business": "declared domain errors: served, counted separately",
+      "counting": "one event per logical operation; retries are attempts on the same event, never new events"
+    },
+    "window": "28d",
+    "operations": [
+      {
+        "operation": "@gmacko/api/_/Customer.create",
+        "kind": "create",
+        "resource": "@gmacko/api/_/Customer",
+        "class": "crud-write",
+        "slo": {
+          "availability": "99.9%",
+          "latencyGood": "99%",
+          "latencyWithinMs": 1000,
+          "window": "28d"
+        },
+        "histogramBoundariesMs": [
+          5,
+          10,
+          25,
+          50,
+          100,
+          250,
+          500,
+          1000,
+          2500,
+          5000,
+          10000
+        ],
+        "businessErrors": []
+      },
+      {
+        "operation": "@gmacko/api/_/Customer.get",
+        "kind": "get",
+        "resource": "@gmacko/api/_/Customer",
+        "class": "crud-read",
+        "slo": {
+          "availability": "99.9%",
+          "latencyGood": "99%",
+          "latencyWithinMs": 500,
+          "window": "28d"
+        },
+        "histogramBoundariesMs": [
+          5,
+          10,
+          25,
+          50,
+          100,
+          250,
+          500,
+          1000,
+          2500,
+          5000,
+          10000
+        ],
+        "businessErrors": []
+      },
+      {
+        "operation": "@gmacko/api/_/Customer.update",
+        "kind": "update",
+        "resource": "@gmacko/api/_/Customer",
+        "class": "crud-write",
+        "slo": {
+          "availability": "99.9%",
+          "latencyGood": "99%",
+          "latencyWithinMs": 1000,
+          "window": "28d"
+        },
+        "histogramBoundariesMs": [
+          5,
+          10,
+          25,
+          50,
+          100,
+          250,
+          500,
+          1000,
+          2500,
+          5000,
+          10000
+        ],
+        "businessErrors": []
+      },
+      {
+        "operation": "@gmacko/api/_/Customer.delete",
+        "kind": "delete",
+        "resource": "@gmacko/api/_/Customer",
+        "class": "crud-write",
+        "slo": {
+          "availability": "99.9%",
+          "latencyGood": "99%",
+          "latencyWithinMs": 1000,
+          "window": "28d"
+        },
+        "histogramBoundariesMs": [
+          5,
+          10,
+          25,
+          50,
+          100,
+          250,
+          500,
+          1000,
+          2500,
+          5000,
+          10000
+        ],
+        "businessErrors": []
+      },
+      {
+        "operation": "@gmacko/api/_/Customer.list.all",
+        "kind": "list",
+        "resource": "@gmacko/api/_/Customer",
+        "class": "crud-read",
+        "slo": {
+          "availability": "99.9%",
+          "latencyGood": "99%",
+          "latencyWithinMs": 500,
+          "window": "28d"
+        },
+        "histogramBoundariesMs": [
+          5,
+          10,
+          25,
+          50,
+          100,
+          250,
+          500,
+          1000,
+          2500,
+          5000,
+          10000
+        ],
+        "businessErrors": []
+      },
+      {
+        "operation": "@gmacko/api/_/Post.create",
+        "kind": "create",
+        "resource": "@gmacko/api/_/Post",
+        "class": "crud-write",
+        "slo": {
+          "availability": "99.9%",
+          "latencyGood": "99%",
+          "latencyWithinMs": 1000,
+          "window": "28d"
+        },
+        "histogramBoundariesMs": [
+          5,
+          10,
+          25,
+          50,
+          100,
+          250,
+          500,
+          1000,
+          2500,
+          5000,
+          10000
+        ],
+        "businessErrors": []
+      },
+      {
+        "operation": "@gmacko/api/_/Post.get",
+        "kind": "get",
+        "resource": "@gmacko/api/_/Post",
+        "class": "crud-read",
+        "slo": {
+          "availability": "99.9%",
+          "latencyGood": "99%",
+          "latencyWithinMs": 500,
+          "window": "28d"
+        },
+        "histogramBoundariesMs": [
+          5,
+          10,
+          25,
+          50,
+          100,
+          250,
+          500,
+          1000,
+          2500,
+          5000,
+          10000
+        ],
+        "businessErrors": []
+      },
+      {
+        "operation": "@gmacko/api/_/Post.update",
+        "kind": "update",
+        "resource": "@gmacko/api/_/Post",
+        "class": "crud-write",
+        "slo": {
+          "availability": "99.9%",
+          "latencyGood": "99%",
+          "latencyWithinMs": 1000,
+          "window": "28d"
+        },
+        "histogramBoundariesMs": [
+          5,
+          10,
+          25,
+          50,
+          100,
+          250,
+          500,
+          1000,
+          2500,
+          5000,
+          10000
+        ],
+        "businessErrors": []
+      },
+      {
+        "operation": "@gmacko/api/_/Post.delete",
+        "kind": "delete",
+        "resource": "@gmacko/api/_/Post",
+        "class": "crud-write",
+        "slo": {
+          "availability": "99.9%",
+          "latencyGood": "99%",
+          "latencyWithinMs": 1000,
+          "window": "28d"
+        },
+        "histogramBoundariesMs": [
+          5,
+          10,
+          25,
+          50,
+          100,
+          250,
+          500,
+          1000,
+          2500,
+          5000,
+          10000
+        ],
+        "businessErrors": []
+      },
+      {
+        "operation": "@gmacko/api/_/Post.list.all",
+        "kind": "list",
+        "resource": "@gmacko/api/_/Post",
+        "class": "crud-read",
+        "slo": {
+          "availability": "99.9%",
+          "latencyGood": "99%",
+          "latencyWithinMs": 500,
+          "window": "28d"
+        },
+        "histogramBoundariesMs": [
+          5,
+          10,
+          25,
+          50,
+          100,
+          250,
+          500,
+          1000,
+          2500,
+          5000,
+          10000
+        ],
+        "businessErrors": []
+      },
+      {
+        "operation": "@gmacko/api/_/NotifyPartner",
+        "kind": "function",
+        "class": "function",
+        "slo": {
+          "availability": "99.9%",
+          "latencyGood": "99%",
+          "latencyWithinMs": 1000,
+          "window": "28d"
+        },
+        "histogramBoundariesMs": [
+          5,
+          10,
+          25,
+          50,
+          100,
+          250,
+          500,
+          1000,
+          2500,
+          5000,
+          10000
+        ],
+        "businessErrors": []
+      }
+    ]
+  },
+  "dataSemantics": {
+    "version": "data-semantics/1",
+    "taxonomy": "data-taxonomy/1",
+    "fields": [
+      {
+        "resource": "@gmacko/api/_/Customer",
+        "field": "id",
+        "class": "data.structural",
+        "ancestors": [
+          "data.structural",
+          "data"
+        ],
+        "kinds": [
+          "structural"
+        ],
+        "identifiability": "none",
+        "handling": "internal",
+        "personal": "no",
+        "evidence": "structural",
+        "completeness": "structural"
+      },
+      {
+        "resource": "@gmacko/api/_/Customer",
+        "field": "name",
+        "class": "data.unknown",
+        "ancestors": [
+          "data.unknown",
+          "data"
+        ],
+        "kinds": [
+          "unknown"
+        ],
+        "identifiability": "unknown",
+        "handling": "restricted",
+        "personal": "unknown",
+        "evidence": "none",
+        "completeness": "unclassified"
+      },
+      {
+        "resource": "@gmacko/api/_/Customer",
+        "field": "email",
+        "class": "data.contact.email",
+        "ancestors": [
+          "data.contact.email",
+          "data.contact",
+          "data"
+        ],
+        "kinds": [
+          "contact",
+          "identifier"
+        ],
+        "identifiability": "direct",
+        "handling": "confidential",
+        "personal": "yes",
+        "evidence": "inferred-from-type",
+        "completeness": "inferred"
+      },
+      {
+        "resource": "@gmacko/api/_/Customer",
+        "field": "createdAt",
+        "class": "data.structural",
+        "ancestors": [
+          "data.structural",
+          "data"
+        ],
+        "kinds": [
+          "structural"
+        ],
+        "identifiability": "none",
+        "handling": "internal",
+        "personal": "no",
+        "evidence": "structural",
+        "completeness": "structural"
+      },
+      {
+        "resource": "@gmacko/api/_/Customer",
+        "field": "updatedAt",
+        "class": "data.structural",
+        "ancestors": [
+          "data.structural",
+          "data"
+        ],
+        "kinds": [
+          "structural"
+        ],
+        "identifiability": "none",
+        "handling": "internal",
+        "personal": "no",
+        "evidence": "structural",
+        "completeness": "structural"
+      },
+      {
+        "resource": "@gmacko/api/_/Post",
+        "field": "id",
+        "class": "data.structural",
+        "ancestors": [
+          "data.structural",
+          "data"
+        ],
+        "kinds": [
+          "structural"
+        ],
+        "identifiability": "none",
+        "handling": "internal",
+        "personal": "no",
+        "evidence": "structural",
+        "completeness": "structural"
+      },
+      {
+        "resource": "@gmacko/api/_/Post",
+        "field": "title",
+        "class": "data.unknown",
+        "ancestors": [
+          "data.unknown",
+          "data"
+        ],
+        "kinds": [
+          "unknown"
+        ],
+        "identifiability": "unknown",
+        "handling": "restricted",
+        "personal": "unknown",
+        "evidence": "none",
+        "completeness": "unclassified"
+      },
+      {
+        "resource": "@gmacko/api/_/Post",
+        "field": "content",
+        "class": "data.unknown",
+        "ancestors": [
+          "data.unknown",
+          "data"
+        ],
+        "kinds": [
+          "unknown"
+        ],
+        "identifiability": "unknown",
+        "handling": "restricted",
+        "personal": "unknown",
+        "evidence": "none",
+        "completeness": "unclassified"
+      },
+      {
+        "resource": "@gmacko/api/_/Post",
+        "field": "createdAt",
+        "class": "data.structural",
+        "ancestors": [
+          "data.structural",
+          "data"
+        ],
+        "kinds": [
+          "structural"
+        ],
+        "identifiability": "none",
+        "handling": "internal",
+        "personal": "no",
+        "evidence": "structural",
+        "completeness": "structural"
+      },
+      {
+        "resource": "@gmacko/api/_/Post",
+        "field": "updatedAt",
+        "class": "data.structural",
+        "ancestors": [
+          "data.structural",
+          "data"
+        ],
+        "kinds": [
+          "structural"
+        ],
+        "identifiability": "none",
+        "handling": "internal",
+        "personal": "no",
+        "evidence": "structural",
+        "completeness": "structural"
+      }
+    ],
+    "subjects": [],
+    "summary": {
+      "inferred": 1,
+      "structural": 6,
+      "unclassified": 3
+    }
+  },
+  "lineage": {
+    "version": "lineage/1",
+    "operations": [
+      {
+        "operation": "@gmacko/api/_/Customer.create",
+        "kind": "create",
+        "resource": "@gmacko/api/_/Customer",
+        "outputs": [
+          "id",
+          "name",
+          "email",
+          "createdAt",
+          "updatedAt"
+        ],
+        "writes": [
+          "name",
+          "email"
+        ],
+        "filters": [],
+        "orders": [],
+        "groups": [],
+        "externalSinks": [],
+        "publishes": [],
+        "coverage": "modeled"
+      },
+      {
+        "operation": "@gmacko/api/_/Customer.get",
+        "kind": "get",
+        "resource": "@gmacko/api/_/Customer",
+        "outputs": [
+          "id",
+          "name",
+          "email",
+          "createdAt",
+          "updatedAt"
+        ],
+        "writes": [],
+        "filters": [
+          "id"
+        ],
+        "orders": [],
+        "groups": [],
+        "externalSinks": [],
+        "publishes": [],
+        "coverage": "modeled"
+      },
+      {
+        "operation": "@gmacko/api/_/Customer.update",
+        "kind": "update",
+        "resource": "@gmacko/api/_/Customer",
+        "outputs": [
+          "id",
+          "name",
+          "email",
+          "createdAt",
+          "updatedAt"
+        ],
+        "writes": [
+          "name",
+          "email"
+        ],
+        "filters": [
+          "id",
+          "version"
+        ],
+        "orders": [],
+        "groups": [],
+        "externalSinks": [],
+        "publishes": [],
+        "coverage": "modeled"
+      },
+      {
+        "operation": "@gmacko/api/_/Customer.delete",
+        "kind": "delete",
+        "resource": "@gmacko/api/_/Customer",
+        "outputs": [
+          "id",
+          "name",
+          "email",
+          "createdAt",
+          "updatedAt"
+        ],
+        "writes": [
+          "deletedAt",
+          "version"
+        ],
+        "filters": [
+          "id",
+          "version"
+        ],
+        "orders": [],
+        "groups": [],
+        "externalSinks": [],
+        "publishes": [],
+        "coverage": "modeled"
+      },
+      {
+        "operation": "@gmacko/api/_/Customer.list.all",
+        "kind": "list",
+        "resource": "@gmacko/api/_/Customer",
+        "outputs": [
+          "id",
+          "name",
+          "email",
+          "createdAt",
+          "updatedAt"
+        ],
+        "writes": [],
+        "filters": [],
+        "orders": [
+          "id"
+        ],
+        "groups": [],
+        "externalSinks": [],
+        "publishes": [],
+        "coverage": "modeled"
+      },
+      {
+        "operation": "@gmacko/api/_/Post.create",
+        "kind": "create",
+        "resource": "@gmacko/api/_/Post",
+        "outputs": [
+          "id",
+          "title",
+          "content",
+          "createdAt",
+          "updatedAt"
+        ],
+        "writes": [
+          "title",
+          "content"
+        ],
+        "filters": [],
+        "orders": [],
+        "groups": [],
+        "externalSinks": [],
+        "publishes": [],
+        "coverage": "modeled"
+      },
+      {
+        "operation": "@gmacko/api/_/Post.get",
+        "kind": "get",
+        "resource": "@gmacko/api/_/Post",
+        "outputs": [
+          "id",
+          "title",
+          "content",
+          "createdAt",
+          "updatedAt"
+        ],
+        "writes": [],
+        "filters": [
+          "id"
+        ],
+        "orders": [],
+        "groups": [],
+        "externalSinks": [],
+        "publishes": [],
+        "coverage": "modeled"
+      },
+      {
+        "operation": "@gmacko/api/_/Post.update",
+        "kind": "update",
+        "resource": "@gmacko/api/_/Post",
+        "outputs": [
+          "id",
+          "title",
+          "content",
+          "createdAt",
+          "updatedAt"
+        ],
+        "writes": [
+          "title",
+          "content"
+        ],
+        "filters": [
+          "id",
+          "version"
+        ],
+        "orders": [],
+        "groups": [],
+        "externalSinks": [],
+        "publishes": [],
+        "coverage": "modeled"
+      },
+      {
+        "operation": "@gmacko/api/_/Post.delete",
+        "kind": "delete",
+        "resource": "@gmacko/api/_/Post",
+        "outputs": [
+          "id",
+          "title",
+          "content",
+          "createdAt",
+          "updatedAt"
+        ],
+        "writes": [
+          "deletedAt",
+          "version"
+        ],
+        "filters": [
+          "id",
+          "version"
+        ],
+        "orders": [],
+        "groups": [],
+        "externalSinks": [],
+        "publishes": [],
+        "coverage": "modeled"
+      },
+      {
+        "operation": "@gmacko/api/_/Post.list.all",
+        "kind": "list",
+        "resource": "@gmacko/api/_/Post",
+        "outputs": [
+          "id",
+          "title",
+          "content",
+          "createdAt",
+          "updatedAt"
+        ],
+        "writes": [],
+        "filters": [],
+        "orders": [
+          "id"
+        ],
+        "groups": [],
+        "externalSinks": [],
+        "publishes": [],
+        "coverage": "modeled"
+      },
+      {
+        "operation": "@gmacko/api/_/NotifyPartner",
+        "kind": "function",
+        "outputs": [],
+        "writes": [],
+        "filters": [],
+        "orders": [],
+        "groups": [],
+        "externalSinks": [],
+        "publishes": [],
+        "coverage": "declared"
+      }
+    ]
+  },
+  "capabilities": {
+    "version": "capabilities/1",
+    "surfaces": []
+  },
+  "openapi": {
+    "openapi": "3.1.0",
+    "info": {
+      "title": "@gmacko/api",
+      "version": "contracts/1",
+      "description": "Generated by forgec build; a projection of the same contracts the runtime enforces on every target.",
+      "x-forge-contracts": "contracts/1"
+    },
+    "servers": [],
+    "components": {
+      "schemas": {
+        "Problem": {
+          "type": "object",
+          "required": [
+            "type",
+            "title",
+            "status",
+            "code"
+          ],
+          "properties": {
+            "type": {
+              "type": "string",
+              "format": "uri"
+            },
+            "title": {
+              "type": "string"
+            },
+            "status": {
+              "type": "integer"
+            },
+            "code": {
+              "type": "string",
+              "description": "Stable machine-readable error code (see specs/portable-profile/errors.md)"
+            },
+            "detail": {
+              "type": "string"
+            },
+            "requestId": {
+              "type": "string"
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "CustomerRecord": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "x-forge-type": "id",
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "readOnly": true
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time",
+              "x-forge-type": "datetime",
+              "x-forge-precision": "ms",
+              "readOnly": true
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time",
+              "x-forge-type": "datetime",
+              "x-forge-precision": "ms",
+              "readOnly": true
+            },
+            "name": {
+              "type": "string",
+              "x-forge-type": "text",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "email": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "email",
+              "x-forge-type": "email"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "createdAt",
+            "updatedAt",
+            "name",
+            "email"
+          ]
+        },
+        "CustomerCreate": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "x-forge-type": "text",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "email": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "email",
+              "x-forge-type": "email"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "name"
+          ]
+        },
+        "CustomerPatch": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "x-forge-type": "text",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "email": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "email",
+              "x-forge-type": "email"
+            }
+          },
+          "additionalProperties": false
+        },
+        "PostRecord": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "x-forge-type": "id",
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "readOnly": true
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time",
+              "x-forge-type": "datetime",
+              "x-forge-precision": "ms",
+              "readOnly": true
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time",
+              "x-forge-type": "datetime",
+              "x-forge-precision": "ms",
+              "readOnly": true
+            },
+            "title": {
+              "type": "string",
+              "x-forge-type": "text",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "content": {
+              "type": "string",
+              "x-forge-type": "text",
+              "minLength": 0,
+              "maxLength": 256
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "createdAt",
+            "updatedAt",
+            "title",
+            "content"
+          ]
+        },
+        "PostCreate": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "x-forge-type": "text",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "content": {
+              "type": "string",
+              "x-forge-type": "text",
+              "minLength": 0,
+              "maxLength": 256
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "title",
+            "content"
+          ]
+        },
+        "PostPatch": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "x-forge-type": "text",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "content": {
+              "type": "string",
+              "x-forge-type": "text",
+              "minLength": 0,
+              "maxLength": 256
+            }
+          },
+          "additionalProperties": false
+        },
+        "WorkflowInstance": {
+          "type": "object",
+          "required": [
+            "id",
+            "workflow",
+            "version",
+            "status"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "workflow": {
+              "type": "string"
+            },
+            "version": {
+              "type": "integer"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "running",
+                "waiting",
+                "sleeping",
+                "completed",
+                "failed",
+                "cancelled"
+              ]
+            },
+            "bindings": {
+              "type": "object"
+            },
+            "history": {
+              "type": "array"
+            },
+            "output": {},
+            "error": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "securitySchemes": {
+        "bearer": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT"
+        }
+      }
+    },
+    "security": [
+      {
+        "bearer": []
+      }
+    ],
+    "paths": {
+      "/v1/customers": {
+        "post": {
+          "operationId": "@gmacko/api/_/Customer.create",
+          "tags": [
+            "Customer"
+          ],
+          "x-forge-kind": "create",
+          "parameters": [
+            {
+              "name": "X-Forge-Purpose",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string"
+              },
+              "description": "Purpose surface for this invocation (edition 2027; exactly one)"
+            },
+            {
+              "name": "Idempotency-Key",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string"
+              },
+              "description": "Replay returns the stored result; reuse with a different body is 409 IdempotencyMismatch"
+            }
+          ],
+          "responses": {
+            "401": {
+              "description": "Unauthenticated",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "NotPermitted",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "201": {
+              "description": "Created",
+              "headers": {
+                "ETag": {
+                  "schema": {
+                    "type": "string"
+                  },
+                  "description": "Record version as a strong ETag"
+                }
+              },
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/CustomerRecord"
+                  }
+                }
+              }
+            },
+            "409": {
+              "description": "UniqueConflict / ReferenceMissing",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "ValidationFailed",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            }
+          },
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerCreate"
+                }
+              }
+            }
+          },
+          "x-forge-slo": {
+            "availability": "99.9%",
+            "latencyGood": "99%",
+            "latencyWithinMs": 1000,
+            "window": "28d",
+            "class": "crud-write"
+          }
+        },
+        "get": {
+          "operationId": "@gmacko/api/_/Customer.list.all",
+          "tags": [
+            "Customer"
+          ],
+          "x-forge-kind": "list",
+          "parameters": [
+            {
+              "name": "X-Forge-Purpose",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string"
+              },
+              "description": "Purpose surface for this invocation (edition 2027; exactly one)"
+            },
+            {
+              "name": "cursor",
+              "in": "query",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "limit",
+              "in": "query",
+              "schema": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 50
+              }
+            }
+          ],
+          "responses": {
+            "401": {
+              "description": "Unauthenticated",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "NotPermitted",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "200": {
+              "description": "Page",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "required": [
+                      "items",
+                      "next",
+                      "limit"
+                    ],
+                    "properties": {
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/CustomerRecord"
+                        }
+                      },
+                      "next": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "limit": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "InvalidCursor",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            }
+          },
+          "x-forge-slo": {
+            "availability": "99.9%",
+            "latencyGood": "99%",
+            "latencyWithinMs": 500,
+            "window": "28d",
+            "class": "crud-read"
+          }
+        }
+      },
+      "/v1/customers/{id}": {
+        "get": {
+          "operationId": "@gmacko/api/_/Customer.get",
+          "tags": [
+            "Customer"
+          ],
+          "x-forge-kind": "get",
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "X-Forge-Purpose",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string"
+              },
+              "description": "Purpose surface for this invocation (edition 2027; exactly one)"
+            }
+          ],
+          "responses": {
+            "401": {
+              "description": "Unauthenticated",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "NotPermitted",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "200": {
+              "description": "OK",
+              "headers": {
+                "ETag": {
+                  "schema": {
+                    "type": "string"
+                  },
+                  "description": "Record version as a strong ETag"
+                }
+              },
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/CustomerRecord"
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "NotFound",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            }
+          },
+          "x-forge-slo": {
+            "availability": "99.9%",
+            "latencyGood": "99%",
+            "latencyWithinMs": 500,
+            "window": "28d",
+            "class": "crud-read"
+          }
+        },
+        "patch": {
+          "operationId": "@gmacko/api/_/Customer.update",
+          "tags": [
+            "Customer"
+          ],
+          "x-forge-kind": "update",
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "X-Forge-Purpose",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string"
+              },
+              "description": "Purpose surface for this invocation (edition 2027; exactly one)"
+            },
+            {
+              "name": "If-Match",
+              "in": "header",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "description": "Expected record version; 412 on mismatch, 428 when missing"
+            },
+            {
+              "name": "Idempotency-Key",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string"
+              },
+              "description": "Replay returns the stored result; reuse with a different body is 409 IdempotencyMismatch"
+            }
+          ],
+          "responses": {
+            "401": {
+              "description": "Unauthenticated",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "NotPermitted",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "200": {
+              "description": "OK",
+              "headers": {
+                "ETag": {
+                  "schema": {
+                    "type": "string"
+                  },
+                  "description": "Record version as a strong ETag"
+                }
+              },
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/CustomerRecord"
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "NotFound",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "412": {
+              "description": "VersionConflict (stale If-Match)",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "ValidationFailed",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "428": {
+              "description": "Precondition required (If-Match)",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            }
+          },
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerPatch"
+                }
+              }
+            }
+          },
+          "x-forge-slo": {
+            "availability": "99.9%",
+            "latencyGood": "99%",
+            "latencyWithinMs": 1000,
+            "window": "28d",
+            "class": "crud-write"
+          }
+        },
+        "delete": {
+          "operationId": "@gmacko/api/_/Customer.delete",
+          "tags": [
+            "Customer"
+          ],
+          "x-forge-kind": "delete",
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "X-Forge-Purpose",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string"
+              },
+              "description": "Purpose surface for this invocation (edition 2027; exactly one)"
+            },
+            {
+              "name": "If-Match",
+              "in": "header",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "description": "Expected record version; 412 on mismatch, 428 when missing"
+            },
+            {
+              "name": "Idempotency-Key",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string"
+              },
+              "description": "Replay returns the stored result; reuse with a different body is 409 IdempotencyMismatch"
+            }
+          ],
+          "responses": {
+            "401": {
+              "description": "Unauthenticated",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "NotPermitted",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "200": {
+              "description": "OK",
+              "headers": {
+                "ETag": {
+                  "schema": {
+                    "type": "string"
+                  },
+                  "description": "Record version as a strong ETag"
+                }
+              },
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/CustomerRecord"
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "NotFound",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "409": {
+              "description": "HasDependents / InvalidTransition",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "412": {
+              "description": "VersionConflict",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "428": {
+              "description": "Precondition required (If-Match)",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            }
+          },
+          "x-forge-slo": {
+            "availability": "99.9%",
+            "latencyGood": "99%",
+            "latencyWithinMs": 1000,
+            "window": "28d",
+            "class": "crud-write"
+          }
+        }
+      },
+      "/v1/posts": {
+        "post": {
+          "operationId": "@gmacko/api/_/Post.create",
+          "tags": [
+            "Post"
+          ],
+          "x-forge-kind": "create",
+          "parameters": [
+            {
+              "name": "X-Forge-Purpose",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string"
+              },
+              "description": "Purpose surface for this invocation (edition 2027; exactly one)"
+            },
+            {
+              "name": "Idempotency-Key",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string"
+              },
+              "description": "Replay returns the stored result; reuse with a different body is 409 IdempotencyMismatch"
+            }
+          ],
+          "responses": {
+            "401": {
+              "description": "Unauthenticated",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "NotPermitted",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "201": {
+              "description": "Created",
+              "headers": {
+                "ETag": {
+                  "schema": {
+                    "type": "string"
+                  },
+                  "description": "Record version as a strong ETag"
+                }
+              },
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/PostRecord"
+                  }
+                }
+              }
+            },
+            "409": {
+              "description": "UniqueConflict / ReferenceMissing",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "ValidationFailed",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            }
+          },
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostCreate"
+                }
+              }
+            }
+          },
+          "x-forge-slo": {
+            "availability": "99.9%",
+            "latencyGood": "99%",
+            "latencyWithinMs": 1000,
+            "window": "28d",
+            "class": "crud-write"
+          }
+        },
+        "get": {
+          "operationId": "@gmacko/api/_/Post.list.all",
+          "tags": [
+            "Post"
+          ],
+          "x-forge-kind": "list",
+          "parameters": [
+            {
+              "name": "X-Forge-Purpose",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string"
+              },
+              "description": "Purpose surface for this invocation (edition 2027; exactly one)"
+            },
+            {
+              "name": "cursor",
+              "in": "query",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "limit",
+              "in": "query",
+              "schema": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 50
+              }
+            }
+          ],
+          "responses": {
+            "401": {
+              "description": "Unauthenticated",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "NotPermitted",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "200": {
+              "description": "Page",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "required": [
+                      "items",
+                      "next",
+                      "limit"
+                    ],
+                    "properties": {
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/PostRecord"
+                        }
+                      },
+                      "next": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "limit": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "InvalidCursor",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            }
+          },
+          "x-forge-slo": {
+            "availability": "99.9%",
+            "latencyGood": "99%",
+            "latencyWithinMs": 500,
+            "window": "28d",
+            "class": "crud-read"
+          }
+        }
+      },
+      "/v1/posts/{id}": {
+        "get": {
+          "operationId": "@gmacko/api/_/Post.get",
+          "tags": [
+            "Post"
+          ],
+          "x-forge-kind": "get",
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "X-Forge-Purpose",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string"
+              },
+              "description": "Purpose surface for this invocation (edition 2027; exactly one)"
+            }
+          ],
+          "responses": {
+            "401": {
+              "description": "Unauthenticated",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "NotPermitted",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "200": {
+              "description": "OK",
+              "headers": {
+                "ETag": {
+                  "schema": {
+                    "type": "string"
+                  },
+                  "description": "Record version as a strong ETag"
+                }
+              },
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/PostRecord"
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "NotFound",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            }
+          },
+          "x-forge-slo": {
+            "availability": "99.9%",
+            "latencyGood": "99%",
+            "latencyWithinMs": 500,
+            "window": "28d",
+            "class": "crud-read"
+          }
+        },
+        "patch": {
+          "operationId": "@gmacko/api/_/Post.update",
+          "tags": [
+            "Post"
+          ],
+          "x-forge-kind": "update",
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "X-Forge-Purpose",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string"
+              },
+              "description": "Purpose surface for this invocation (edition 2027; exactly one)"
+            },
+            {
+              "name": "If-Match",
+              "in": "header",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "description": "Expected record version; 412 on mismatch, 428 when missing"
+            },
+            {
+              "name": "Idempotency-Key",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string"
+              },
+              "description": "Replay returns the stored result; reuse with a different body is 409 IdempotencyMismatch"
+            }
+          ],
+          "responses": {
+            "401": {
+              "description": "Unauthenticated",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "NotPermitted",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "200": {
+              "description": "OK",
+              "headers": {
+                "ETag": {
+                  "schema": {
+                    "type": "string"
+                  },
+                  "description": "Record version as a strong ETag"
+                }
+              },
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/PostRecord"
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "NotFound",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "412": {
+              "description": "VersionConflict (stale If-Match)",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "ValidationFailed",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "428": {
+              "description": "Precondition required (If-Match)",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            }
+          },
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostPatch"
+                }
+              }
+            }
+          },
+          "x-forge-slo": {
+            "availability": "99.9%",
+            "latencyGood": "99%",
+            "latencyWithinMs": 1000,
+            "window": "28d",
+            "class": "crud-write"
+          }
+        },
+        "delete": {
+          "operationId": "@gmacko/api/_/Post.delete",
+          "tags": [
+            "Post"
+          ],
+          "x-forge-kind": "delete",
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "X-Forge-Purpose",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string"
+              },
+              "description": "Purpose surface for this invocation (edition 2027; exactly one)"
+            },
+            {
+              "name": "If-Match",
+              "in": "header",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "description": "Expected record version; 412 on mismatch, 428 when missing"
+            },
+            {
+              "name": "Idempotency-Key",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string"
+              },
+              "description": "Replay returns the stored result; reuse with a different body is 409 IdempotencyMismatch"
+            }
+          ],
+          "responses": {
+            "401": {
+              "description": "Unauthenticated",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "NotPermitted",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "200": {
+              "description": "OK",
+              "headers": {
+                "ETag": {
+                  "schema": {
+                    "type": "string"
+                  },
+                  "description": "Record version as a strong ETag"
+                }
+              },
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/PostRecord"
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "NotFound",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "409": {
+              "description": "HasDependents / InvalidTransition",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "412": {
+              "description": "VersionConflict",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "428": {
+              "description": "Precondition required (If-Match)",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            }
+          },
+          "x-forge-slo": {
+            "availability": "99.9%",
+            "latencyGood": "99%",
+            "latencyWithinMs": 1000,
+            "window": "28d",
+            "class": "crud-write"
+          }
+        }
+      },
+      "/v1/integrations/notify": {
+        "post": {
+          "operationId": "@gmacko/api/_/NotifyPartner",
+          "tags": [
+            "functions"
+          ],
+          "x-forge-kind": "function",
+          "parameters": [
+            {
+              "name": "X-Forge-Purpose",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string"
+              },
+              "description": "Purpose surface for this invocation (edition 2027; exactly one)"
+            },
+            {
+              "name": "Idempotency-Key",
+              "in": "header",
+              "required": false,
+              "schema": {
+                "type": "string"
+              },
+              "description": "Replay returns the stored result; reuse with a different body is 409 IdempotencyMismatch"
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "customer": {
+                      "type": "string",
+                      "x-forge-reference": "@gmacko/api/_/Customer"
+                    },
+                    "event": {
+                      "type": "string",
+                      "x-forge-type": "text",
+                      "minLength": 1,
+                      "maxLength": 64
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "customer",
+                    "event"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "OK",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "accepted": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "accepted"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Unauthenticated",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "NotPermitted",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "412": {
+              "description": "VersionConflict",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "ValidationFailed",
+              "content": {
+                "application/problem+json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Problem"
+                  }
+                }
+              }
+            }
+          },
+          "x-forge-slo": {
+            "availability": "99.9%",
+            "latencyGood": "99%",
+            "latencyWithinMs": 1000,
+            "window": "28d",
+            "class": "function"
+          }
+        }
+      }
+    }
+  }
+}

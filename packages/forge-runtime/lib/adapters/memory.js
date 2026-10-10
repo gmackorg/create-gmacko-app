@@ -1,0 +1,338 @@
+/**
+ * In-memory storage adapter: the deterministic semantic model every other
+ * adapter is compared against (plan §26). Single-threaded, so "atomic" is
+ * trivially true; the semantics (version guard, claims, references, soft
+ * delete retention, ordering) are the contract.
+ */
+import { Effect } from "effect";
+import { absenceWriteConflict } from "../atomic-guards.js";
+import { compareBytes, encodeIdentity } from "../codecs.js";
+import { err } from "../errors.js";
+export class MemoryStorage {
+    name = "memory";
+    atomicAbsenceGuards = true;
+    atomicCompletion = true;
+    tables = new Map(); // key: tenant|resource
+    claims = new Map(); // tenant|claimKey -> record id
+    audits = [];
+    outbox = [];
+    processed = new Set();
+    receipts = new Map();
+    documents = new Map();
+    table(tenant, r) {
+        const k = `${tenant}|${r.id}`;
+        let t = this.tables.get(k);
+        if (!t)
+            this.tables.set(k, (t = new Map()));
+        return t;
+    }
+    get(tenant, r, id) {
+        const rec = this.table(tenant, r).get(id);
+        return Effect.succeed(rec ? { ...rec } : null);
+    }
+    findUnique(tenant, r, _u, claimKey, _values) {
+        const id = this.claims.get(`${tenant}|${claimKey}`);
+        return this.get(tenant, r, id ?? "");
+    }
+    list(tenant, r, q, sortKeys) {
+        const l = q.list;
+        const rows = [...this.table(tenant, r).values()].filter((rec) => !rec["deletedAt"] && l.fields.every((f) => rec[f] === q.values[f]));
+        const keyed = rows.map((rec) => ({ rec, k: sortKeys(rec), id: String(rec["id"]) }));
+        const dirs = l.order.map((o) => (o.direction === "desc" ? -1 : 1));
+        const cmp = (a, b) => {
+            for (let i = 0; i < a.k.length; i++) {
+                const c = compareBytes(a.k[i], b.k[i]) * (dirs[i] ?? 1);
+                if (c !== 0)
+                    return c;
+            }
+            return compareBytes(a.id, b.id);
+        };
+        keyed.sort(cmp);
+        let start = 0;
+        if (q.after) {
+            const after = { k: q.after.keys, id: q.after.id };
+            start = keyed.findIndex((x) => cmp(x, after) > 0);
+            if (start < 0)
+                start = keyed.length;
+        }
+        const page = keyed.slice(start, start + q.limit);
+        return Effect.succeed({ records: page.map((x) => ({ ...x.rec })), hasMore: start + q.limit < keyed.length });
+    }
+    countDependents(tenant, child, field, id) {
+        let n = 0;
+        for (const rec of this.table(tenant, child).values())
+            if (!rec["deletedAt"] && rec[field] === id)
+                n++;
+        return Effect.succeed(n);
+    }
+    getReceipt(tenant, operation, key) {
+        return Effect.succeed(this.receipts.get(`${tenant}|${operation}|${key}`) ?? null);
+    }
+    overlapSync(tenant, r, g) {
+        const out = [];
+        for (const rec of this.table(tenant, r).values()) {
+            if (rec["deletedAt"] || rec["id"] === g.excludeId)
+                continue;
+            if (!g.groupFields.every((f, i) => rec[f] === g.groupValues[i]))
+                continue;
+            const from = String(rec["effectiveFrom"]);
+            const until = rec["effectiveUntil"] ?? null;
+            // half-open intervals overlap iff a.from < b.until && b.from < a.until (null until = +inf)
+            const aBeforeBEnd = until === null || g.from < until;
+            const bBeforeAEnd = g.until === null || from < g.until;
+            if (aBeforeBEnd && bBeforeAEnd)
+                out.push({ ...rec });
+        }
+        return out;
+    }
+    overlapping(tenant, r, g) {
+        return Effect.succeed(this.overlapSync(tenant, r, g));
+    }
+    effectiveAt(tenant, r, groupFields, groupValues, at) {
+        for (const rec of this.table(tenant, r).values()) {
+            if (rec["deletedAt"])
+                continue;
+            if (!groupFields.every((f, i) => rec[f] === groupValues[i]))
+                continue;
+            const from = String(rec["effectiveFrom"]);
+            const until = rec["effectiveUntil"] ?? null;
+            if (from <= at && (until === null || at < until))
+                return Effect.succeed({ ...rec });
+        }
+        return Effect.succeed(null);
+    }
+    children(tenant, r, parentField, id, limit) {
+        const rows = [...this.table(tenant, r).values()].filter((x) => !x["deletedAt"] && x[parentField] === id).sort((a, b) => compareBytes(String(a["name"] ?? a["id"]), String(b["name"] ?? b["id"])) || compareBytes(String(a["id"]), String(b["id"])));
+        return Effect.succeed(rows.slice(0, limit).map((x) => ({ ...x })));
+    }
+    row(r) {
+        return this.outbox.find((o) => o.tenant === r.tenant && o.opId === r.opId && o.ordinal === r.ordinal);
+    }
+    outboxTenants() {
+        return Effect.succeed([...new Set(this.outbox.filter((o) => o.status === "pending").map((o) => o.tenant))]);
+    }
+    outboxSweep(tenant, now, limit) {
+        return Effect.succeed(this.outbox.filter((o) => o.tenant === tenant && o.status === "pending" && (o.leaseUntil === null || o.leaseUntil < now)).slice(0, limit).map((o) => ({ ...o, delivered: [...o.delivered] })));
+    }
+    outboxClaim(r, owner, now, leaseMs) {
+        const o = this.row(r);
+        if (!o || o.status !== "pending" || (o.leaseUntil !== null && o.leaseUntil >= now))
+            return Effect.succeed(false);
+        o.leaseOwner = owner;
+        o.leaseUntil = now + leaseMs;
+        o.attempts += 1;
+        return Effect.succeed(true);
+    }
+    outboxProgress(r, owner, u) {
+        const o = this.row(r);
+        if (!o || o.status !== "pending" || o.leaseOwner !== owner)
+            return Effect.succeed(false);
+        o.delivered = [...new Set([...o.delivered, ...u.delivered])];
+        if (u.done)
+            o.status = "delivered";
+        if (u.dead)
+            o.status = "dead";
+        if (u.done || u.dead || u.releaseLease) {
+            o.leaseOwner = null;
+            o.leaseUntil = null;
+        }
+        return Effect.succeed(true);
+    }
+    outboxDead(tenant) {
+        return Effect.succeed(this.outbox.filter((o) => o.tenant === tenant && o.status === "dead").map((o) => ({ ...o })));
+    }
+    outboxRedrive(r) {
+        const o = this.row(r);
+        if (!o || o.status !== "dead")
+            return Effect.succeed(false);
+        o.status = "pending";
+        o.attempts = 0;
+        return Effect.succeed(true);
+    }
+    hasProcessed(tenant, subscription, messageId) {
+        return Effect.sync(() => this.processed.has(`${tenant}|${subscription}|${messageId}`));
+    }
+    markProcessed(tenant, subscription, messageId) {
+        const k = `${tenant}|${subscription}|${messageId}`;
+        if (this.processed.has(k))
+            return Effect.succeed(false);
+        this.processed.add(k);
+        return Effect.succeed(true);
+    }
+    budget(plans, absent = []) {
+        // The reference model has no physical ceiling; report the portable default so previews are comparable.
+        return { actions: absent.length + plans.reduce((n, p) => n + (p.completion ? 1 : 0) + 1 + p.claims.length + p.references.length + 2, 0), limit: 100 };
+    }
+    exportPage(tenant, r, cursor, limit) {
+        const rows = [...this.table(tenant, r).values()].sort((a, b) => String(a["id"]).localeCompare(String(b["id"]))).filter((x) => !cursor || String(x["id"]) > cursor);
+        const page = rows.slice(0, limit).map((x) => structuredClone(x));
+        return Effect.succeed({ records: page, next: rows.length > limit ? String(page[page.length - 1]["id"]) : null });
+    }
+    getDocument(tenant, kind, id) {
+        const d = this.documents.get(`${tenant}|${kind}|${id}`);
+        return Effect.succeed(d ? structuredClone({ ...d.doc, _version: d.version }) : null);
+    }
+    putDocuments(tenant, writes) {
+        if (writes.length > 24 || new Set(writes.map(w => JSON.stringify([w.kind, w.id]))).size !== writes.length)
+            return Effect.fail(err("BudgetExceeded", "document batch must contain at most 24 distinct keys"));
+        for (const w of writes) {
+            if ((this.documents.get(`${tenant}|${w.kind}|${w.id}`)?.version ?? null) !== w.expectedVersion)
+                return Effect.fail(err("VersionConflict", "document changed concurrently"));
+        }
+        const prepared = writes.map(w => {
+            const { _version, ...rest } = w.doc;
+            void _version;
+            return { key: `${tenant}|${w.kind}|${w.id}`, value: { version: (w.expectedVersion ?? 0) + 1, doc: structuredClone(rest) } };
+        });
+        for (const entry of prepared)
+            this.documents.set(entry.key, entry.value);
+        return Effect.void;
+    }
+    putDocument(tenant, kind, id, doc, expectedVersion) {
+        const k = `${tenant}|${kind}|${id}`;
+        const cur = this.documents.get(k);
+        if ((cur?.version ?? null) !== expectedVersion)
+            return Effect.fail(err("VersionConflict", "document changed concurrently"));
+        const { _version, ...rest } = doc;
+        void _version;
+        this.documents.set(k, { version: (cur?.version ?? 0) + 1, doc: structuredClone(rest) });
+        return Effect.void;
+    }
+    /** Validate every plan against durable state first, then apply all: single-threaded, so atomic. */
+    commitAll(plans, absent = []) {
+        return Effect.suspend(() => {
+            const conflict = absenceWriteConflict(plans, absent);
+            if (conflict)
+                return Effect.fail(conflict);
+            for (const guard of absent)
+                if (this.claims.has(`${guard.tenant}|${guard.claimKey}`))
+                    return Effect.fail(err("VersionConflict", "Atomic absence guard failed"));
+            const snapshot = { tables: structuredClone(this.tables), claims: new Map(this.claims), audits: [...this.audits], outbox: [...this.outbox], receipts: new Map(this.receipts), documents: new Map(this.documents) };
+            for (const p of plans) {
+                const r = this.commitSync(p);
+                if (r) {
+                    this.tables = snapshot.tables;
+                    this.claims = snapshot.claims;
+                    this.audits = snapshot.audits;
+                    this.outbox = snapshot.outbox;
+                    this.receipts = snapshot.receipts;
+                    this.documents = snapshot.documents;
+                    return Effect.fail(r);
+                }
+            }
+            return Effect.void;
+        });
+    }
+    commit(plan) {
+        if (plan.completion)
+            return this.commitAll([plan]);
+        const e = this.commitSync(plan);
+        return e ? Effect.fail(e) : Effect.void;
+    }
+    commitSync(plan) {
+        if (plan.completion) {
+            const w = plan.completion;
+            const key = `${plan.tenant}|${w.kind}|${w.id}`;
+            if ((this.documents.get(key)?.version ?? null) !== w.expectedVersion)
+                return err("VersionConflict", "subscription claim changed");
+            const { _version, ...doc } = w.doc;
+            void _version;
+            this.documents.set(key, { version: (w.expectedVersion ?? 0) + 1, doc: structuredClone(doc) });
+        }
+        if (plan.receipt) {
+            const key = `${plan.tenant}|${plan.receipt.operation}|${plan.receipt.key}`;
+            if (this.receipts.has(key))
+                return err("UniqueConflict", "idempotency receipt already committed", { constraint: "forge_receipt" });
+        }
+        if (plan.kind === "publish") {
+            this.audits.push(plan.audit);
+            this.outbox.push(...plan.outbox.map((o) => ({ ...o, status: "pending", attempts: 0, leaseOwner: null, leaseUntil: null, delivered: [] })));
+            if (plan.receipt)
+                this.receipts.set(`${plan.tenant}|${plan.receipt.operation}|${plan.receipt.key}`, plan.receipt);
+            return null;
+        }
+        const table = this.table(plan.tenant, plan.resource);
+        const current = table.get(plan.id) ?? null;
+        // version guard, evaluated against durable state (not the engine's earlier read)
+        if (plan.kind === "create") {
+            if (current)
+                return (err("TransientConflict", "id collision"));
+        }
+        else {
+            if (!current)
+                return (err("NotFound", `${plan.resource.name} ${plan.id} not found`));
+            if (plan.expectedVersion !== null && current["version"] !== plan.expectedVersion)
+                return (err("VersionConflict", `expected version ${plan.expectedVersion}, current is ${current["version"]}`));
+        }
+        // unique claims (retained by soft-deleted records)
+        for (const c of plan.claims) {
+            if (c.after && c.after !== c.before) {
+                const holder = this.claims.get(`${plan.tenant}|${c.after}`);
+                if (holder && holder !== plan.id)
+                    return (err("UniqueConflict", "a record with the same unique key exists", { constraint: `${plan.resource.id}.unique.${c.unique.name}` }));
+            }
+        }
+        // reference guards: live in the same tenant at commit time
+        for (const g of plan.references) {
+            const target = this.table(plan.tenant, g.resource).get(g.id);
+            if (!target || target["deletedAt"])
+                return (err("ReferenceMissing", `${g.field} does not reference a live record`));
+        }
+        // effective interval guard, re-evaluated against durable state
+        if (plan.interval && this.overlapSync(plan.tenant, plan.resource, plan.interval).length)
+            return err("ValidationFailed", "interval overlaps a concurrently written record", { fields: [{ path: "effectiveFrom", code: "IntervalOverlap", message: "overlap at commit" }] });
+        // tree guard: the observed ancestor chain of the new parent must still hold and must not include this id
+        if (plan.tree) {
+            let cur = plan.tree.parentId;
+            const seen = new Set();
+            for (let i = 0; i < 64 && cur; i++) {
+                if (cur === plan.id)
+                    return err("ValidationFailed", "move would create a cycle", { fields: [{ path: "parent", code: "Cycle", message: "cycle at commit" }] });
+                if (seen.has(cur))
+                    return err("ValidationFailed", "cycle in hierarchy", { fields: [{ path: "parent", code: "Cycle", message: "existing cycle" }] });
+                seen.add(cur);
+                const rec = table.get(cur);
+                if (!rec || rec["deletedAt"])
+                    return err("ReferenceMissing", "parent is not live");
+                cur = rec[plan.tree.parentField] ?? null;
+            }
+        }
+        // restrict-delete guard at commit time
+        for (const d of plan.dependents) {
+            for (const rec of this.table(plan.tenant, d.resource).values()) {
+                if (!rec["deletedAt"] && rec[d.field] === plan.id)
+                    return (err("HasDependents", `${plan.resource.name} ${plan.id} has live dependents`));
+            }
+        }
+        // apply
+        for (const c of plan.claims) {
+            if (c.before && c.before !== c.after)
+                this.claims.delete(`${plan.tenant}|${c.before}`);
+            if (c.after)
+                this.claims.set(`${plan.tenant}|${c.after}`, plan.id);
+        }
+        if (plan.hardDelete)
+            table.delete(plan.id);
+        else
+            table.set(plan.id, { ...plan.after });
+        this.audits.push(plan.audit);
+        this.outbox.push(...plan.outbox.map((o) => ({ ...o, status: "pending", attempts: 0, leaseOwner: null, leaseUntil: null, delivered: [] })));
+        if (plan.receipt)
+            this.receipts.set(`${plan.tenant}|${plan.receipt.operation}|${plan.receipt.key}`, plan.receipt);
+        return null;
+    }
+    /** Test helper. */
+    async dump(tenant) {
+        const out = { audit: this.audits.filter((a) => a.tenant === tenant), outbox: this.outbox.filter((o) => o.tenant === tenant) };
+        for (const [k, t] of this.tables) {
+            const [ten, res] = k.split("|");
+            if (ten !== tenant)
+                continue;
+            out[res.split("/").pop().toLowerCase()] = [...t.values()];
+        }
+        return out;
+    }
+    static claimKey(resource, unique, values) {
+        return encodeIdentity([resource, unique, ...values]);
+    }
+}

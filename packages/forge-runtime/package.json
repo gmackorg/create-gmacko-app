@@ -1,0 +1,190 @@
+{
+  "name": "@forgegraph/runtime",
+  "version": "0.5.0",
+  "description": "Snapshot of @forgegraph/runtime 0.5.0. Public npm does not have this version yet, so the template vendors the build.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "lib",
+    "LICENSE",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "import": "./lib/index.js",
+      "default": "./lib/index.js"
+    },
+    "./codecs": {
+      "types": "./lib/codecs.d.ts",
+      "import": "./lib/codecs.js",
+      "default": "./lib/codecs.js"
+    },
+    "./memory": {
+      "types": "./lib/adapters/memory.d.ts",
+      "import": "./lib/adapters/memory.js",
+      "default": "./lib/adapters/memory.js"
+    },
+    "./d1": {
+      "types": "./lib/adapters/d1.d.ts",
+      "import": "./lib/adapters/d1.js",
+      "default": "./lib/adapters/d1.js"
+    },
+    "./dynamodb": {
+      "types": "./lib/adapters/dynamodb.d.ts",
+      "import": "./lib/adapters/dynamodb.js",
+      "default": "./lib/adapters/dynamodb.js"
+    },
+    "./cloudflare": {
+      "types": "./lib/hosts/cloudflare.d.ts",
+      "import": "./lib/hosts/cloudflare.js",
+      "default": "./lib/hosts/cloudflare.js"
+    },
+    "./aws": {
+      "types": "./lib/hosts/aws.d.ts",
+      "import": "./lib/hosts/aws.js",
+      "default": "./lib/hosts/aws.js"
+    },
+    "./r2": {
+      "types": "./lib/adapters/r2.d.ts",
+      "import": "./lib/adapters/r2.js",
+      "default": "./lib/adapters/r2.js"
+    },
+    "./s3": {
+      "types": "./lib/adapters/s3.d.ts",
+      "import": "./lib/adapters/s3.js",
+      "default": "./lib/adapters/s3.js"
+    },
+    "./node": {
+      "types": "./lib/hosts/node.d.ts",
+      "import": "./lib/hosts/node.js",
+      "default": "./lib/hosts/node.js"
+    },
+    "./postgres": {
+      "types": "./lib/adapters/postgres.d.ts",
+      "import": "./lib/adapters/postgres.js",
+      "default": "./lib/adapters/postgres.js"
+    },
+    "./compose": {
+      "types": "./lib/hosts/compose.d.ts",
+      "import": "./lib/hosts/compose.js",
+      "default": "./lib/hosts/compose.js"
+    },
+    "./sql-executor": {
+      "types": "./lib/adapters/sql-executor.d.ts",
+      "import": "./lib/adapters/sql-executor.js",
+      "default": "./lib/adapters/sql-executor.js"
+    },
+    "./readmodels": {
+      "types": "./lib/readmodels.d.ts",
+      "import": "./lib/readmodels.js",
+      "default": "./lib/readmodels.js"
+    },
+    "./dispatch": {
+      "types": "./lib/dispatch.d.ts",
+      "import": "./lib/dispatch.js",
+      "default": "./lib/dispatch.js"
+    },
+    "./testing": {
+      "types": "./lib/testing.d.ts",
+      "import": "./lib/testing.js",
+      "default": "./lib/testing.js"
+    },
+    "./memory-objects": {
+      "types": "./lib/adapters/memory-objects.d.ts",
+      "import": "./lib/adapters/memory-objects.js",
+      "default": "./lib/adapters/memory-objects.js"
+    },
+    "./git-specification": {
+      "types": "./lib/foundation/git-specification.d.ts",
+      "import": "./lib/foundation/git-specification.js",
+      "default": "./lib/foundation/git-specification.js"
+    },
+    "./foundation/apps/bob": {
+      "types": "./lib/foundation/apps/bob.d.ts",
+      "import": "./lib/foundation/apps/bob.js",
+      "default": "./lib/foundation/apps/bob.js"
+    },
+    "./foundation/apps/forgegraph": {
+      "types": "./lib/foundation/apps/forgegraph.d.ts",
+      "import": "./lib/foundation/apps/forgegraph.js",
+      "default": "./lib/foundation/apps/forgegraph.js"
+    },
+    "./foundation/apps/kanbanger": {
+      "types": "./lib/foundation/apps/kanbanger.d.ts",
+      "import": "./lib/foundation/apps/kanbanger.js",
+      "default": "./lib/foundation/apps/kanbanger.js"
+    },
+    "./foundation/apps/latchflow": {
+      "types": "./lib/foundation/apps/latchflow.d.ts",
+      "import": "./lib/foundation/apps/latchflow.js",
+      "default": "./lib/foundation/apps/latchflow.js"
+    },
+    "./foundation/apps/levelforge": {
+      "types": "./lib/foundation/apps/levelforge.d.ts",
+      "import": "./lib/foundation/apps/levelforge.js",
+      "default": "./lib/foundation/apps/levelforge.js"
+    },
+    "./foundation/apps/stream-conductor": {
+      "types": "./lib/foundation/apps/stream-conductor.d.ts",
+      "import": "./lib/foundation/apps/stream-conductor.js",
+      "default": "./lib/foundation/apps/stream-conductor.js"
+    },
+    "./versioned-artifacts": {
+      "types": "./lib/versioned-artifacts.d.ts",
+      "import": "./lib/versioned-artifacts.js",
+      "default": "./lib/versioned-artifacts.js"
+    },
+    "./cloudflare-artifacts": {
+      "types": "./lib/adapters/cloudflare-artifacts.d.ts",
+      "import": "./lib/adapters/cloudflare-artifacts.js",
+      "default": "./lib/adapters/cloudflare-artifacts.js"
+    },
+    "./artifact-publication": {
+      "types": "./lib/artifact-publication.d.ts",
+      "import": "./lib/artifact-publication.js",
+      "default": "./lib/artifact-publication.js"
+    },
+    "./artifact-publication-sql": {
+      "types": "./lib/adapters/artifact-publication-sql.d.ts",
+      "import": "./lib/adapters/artifact-publication-sql.js",
+      "default": "./lib/adapters/artifact-publication-sql.js"
+    },
+    "./artifact-publication-git": {
+      "types": "./lib/adapters/artifact-publication-git.d.ts",
+      "import": "./lib/adapters/artifact-publication-git.js",
+      "default": "./lib/adapters/artifact-publication-git.js"
+    },
+    "./artifact-workspace-git": {
+      "types": "./lib/adapters/artifact-workspace-git.d.ts",
+      "import": "./lib/adapters/artifact-workspace-git.js",
+      "default": "./lib/adapters/artifact-workspace-git.js"
+    },
+    "./libsql-executor": {
+      "types": "./lib/adapters/libsql-executor.d.ts",
+      "import": "./lib/adapters/libsql-executor.js",
+      "default": "./lib/adapters/libsql-executor.js"
+    },
+    "./artifact-functions": {
+      "types": "./lib/artifact-functions.d.ts",
+      "import": "./lib/artifact-functions.js",
+      "default": "./lib/artifact-functions.js"
+    }
+  },
+  "dependencies": {
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.1136.0",
+    "@aws-sdk/client-dynamodb": "^3.1136.0",
+    "@aws-sdk/client-s3": "^3.1136.0",
+    "@aws-sdk/client-sfn": "^3.1136.0",
+    "@aws-sdk/client-sqs": "^3.1136.0",
+    "@aws-sdk/lib-dynamodb": "^3.1136.0",
+    "@aws-sdk/s3-request-presigner": "^3.1136.0",
+    "@aws-sdk/util-dynamodb": "3.996.9",
+    "@forgegraph/capability-manifest": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "effect": "4.0.0-rc.116",
+    "pg": "^8.23.0",
+    "ws": "^8.21.3"
+  }
+}

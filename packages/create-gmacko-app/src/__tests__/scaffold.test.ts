@@ -557,11 +557,14 @@ describe("create-gmacko-app scaffold", () => {
         "Platforms: Web (TanStack Start + Effect on Cloudflare Workers, D1), Expo",
       );
       expect(rootReadme).toContain(
-        "Integration API: Forge (`forge/`, `docs/INTEGRATE.md`)",
+        "Product API: Forge (`forge/` hosted by `apps/forge`, `docs/INTEGRATE.md`)",
       );
       expect(
         fileExists(result.appPath, "forge/src/customers/customer.forge"),
       ).toBe(true);
+      expect(fileExists(result.appPath, "forge/src/posts/post.forge")).toBe(
+        true,
+      );
       expect(fileExists(result.appPath, "docs/INTEGRATE.md")).toBe(true);
       expect(rootReadme).toContain(
         "Default deploy path: ForgeGraph → one Cloudflare Worker + one D1 per stage (migrate, then deploy)",

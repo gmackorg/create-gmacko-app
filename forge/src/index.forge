@@ -1,3 +1,5 @@
-/// The API a business partner integrates with.
+/// The product API. Posts, customers, and the partner notification are
+/// declared here. apps/forge hosts the compiled bundle.
+/// Posts are declared in posts/post.forge.
 /// Customers are declared in customers/customer.forge.
 /// The partner notification is declared in partner/notify.forge.

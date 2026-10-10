@@ -11,4 +11,8 @@ shape NotifyPartnerResult {
 export function NotifyPartner @http(POST, "/v1/integrations/notify") {
   input NotifyPartnerInput
   output NotifyPartnerResult
+
+  uses {
+    Customer read
+  }
 }

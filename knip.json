@@ -4,7 +4,13 @@
   // `tools/oxlint/anti-slop/**` is a verbatim vendored copy of an oxlint
   // plugin (see its README). oxlint loads it by path from oxlint.config.ts,
   // which knip cannot see, so every rule module reads as unused.
-  "ignore": [".claude/**", "sdks/generated/**", "tools/oxlint/anti-slop/**"],
+  "ignore": [
+    ".claude/**",
+    "sdks/generated/**",
+    "tools/oxlint/anti-slop/**",
+    "packages/forge-runtime/**",
+    "packages/forge-capability-manifest/**"
+  ],
   // `postgres` is imported dynamically by scripts/pg-to-d1.mjs and is
   // deliberately NOT a dependency: that script runs once, against a legacy
   // database, and is invoked with `pnpm dlx --package=postgres`.
@@ -17,6 +23,9 @@
   "workspaces": {
     ".": {
       "entry": ["scripts/*.mjs", "turbo/generators/config.ts"]
+    },
+    "apps/forge": {
+      "entry": ["src/worker.ts"]
     },
     "apps/web": {
       "entry": [
