@@ -1,5 +1,6 @@
 {
   "name": "@forgegraph/capability-manifest",
+  "private": true,
   "version": "0.5.0",
   "description": "Snapshot of @forgegraph/capability-manifest 0.5.0, vendored with the runtime.",
   "license": "Apache-2.0",

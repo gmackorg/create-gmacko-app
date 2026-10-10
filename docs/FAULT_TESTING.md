@@ -60,7 +60,7 @@ ordinary `pnpm typecheck` (there is no side tsconfig) and audited by
 not look like a lane that passed. If `@gmacko/cloudfault` does not resolve it
 prints what is wrong and **exits non-zero**; `CLOUDFAULT_REQUIRED=0` is the
 only way to turn that back into a skip. Both workflows
-(`.github/workflows/ci.yml`, `.github/workflows/fault.yml`) set
+(`.forgejo/workflows/ci.yml`, `.forgejo/workflows/fault.yml`) set
 `CLOUDFAULT_REQUIRED: 1` explicitly so the intent is visible at the job.
 
 `apps/web/fault/helpers/cloudfault.ts` is the lane's single import surface —

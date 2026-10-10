@@ -22,13 +22,13 @@ jobs:
       id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-pnpm@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-node@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -46,21 +46,11 @@ jobs:
       - name: Verify CLI publish tarball
         run: pnpm release:cli:dry-run
 
-      - name: Create Release Pull Request or Publish
-        id: changesets
-        uses: changesets/action@v1
-        with:
-          version: pnpm version-packages
-          publish: pnpm release
-          title: "chore: version packages"
-          commit: "chore: version packages"
+      - name: Create Forgejo release PR or publish packages
+        run: node scripts/ci/forgejo.mjs release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORGEJO_SERVER_URL: ${{ github.server_url }}
+          FORGEJO_REPOSITORY: ${{ github.repository }}
+          FORGEJO_TOKEN: ${{ github.token }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Notify on publish
-        if: steps.changesets.outputs.published == 'true'
-        run: |
-          echo "Published packages:"
-          echo '${{ steps.changesets.outputs.publishedPackages }}'

@@ -70,5 +70,5 @@ URL at the Worker's public origin.
 ## Previews
 
 GitHub Actions deploys one Worker per pull request on the shared preview
-database (`.github/workflows/preview.yml`); ForgeGraph is not involved until
+database (`.forgejo/workflows/preview.yml`); ForgeGraph is not involved until
 Phase 9 gives previews their own databases and a ForgeGraph stage.

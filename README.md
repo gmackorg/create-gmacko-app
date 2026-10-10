@@ -144,7 +144,7 @@ pnpm check:release
 pnpm e2e:cli:full
 ```
 
-`pnpm check:release` keeps validation scoped to the publishable CLI surface. `pnpm e2e:cli:full` runs the slower generated-app Vitest suite locally with `RUN_E2E=true`. Generated-app coverage also lives in [`.github/workflows/cli-e2e.yml`](./.github/workflows/cli-e2e.yml), which scaffolds and checks a matrix of profiles nightly and on demand: default (web + mobile), operators (`--operator-lane`), minimal (web only), custom-scope, full (all integrations), and mobile-only. Each job runs the doctor, ForgeGraph metadata checks, auth/db bootstrap checks, health-route assertions, and Expo dev-client/config smoke checks where the profile includes them. The same workflow also exposes a manual full-suite job that runs `src/__tests__/e2e.test.ts` with `RUN_E2E=true`.
+`pnpm check:release` keeps validation scoped to the publishable CLI surface. `pnpm e2e:cli:full` runs the slower generated-app Vitest suite locally with `RUN_E2E=true`. Generated-app coverage also lives in [`.forgejo/workflows/cli-e2e.yml`](./.forgejo/workflows/cli-e2e.yml), which scaffolds and checks a matrix of profiles nightly and on demand: default (web + mobile), operators (`--operator-lane`), minimal (web only), custom-scope, full (all integrations), and mobile-only. Each job runs the doctor, ForgeGraph metadata checks, auth/db bootstrap checks, health-route assertions, and Expo dev-client/config smoke checks where the profile includes them. The same workflow also exposes a manual full-suite job that runs `src/__tests__/e2e.test.ts` with `RUN_E2E=true`.
 
 ## Quick Start
 
@@ -351,7 +351,7 @@ The web app deploys as one Cloudflare Worker per stage with one D1 database per 
 3. Push the stage secrets into the Worker: `pnpm secrets:push --stage staging`.
 4. Deploy: `pnpm forge:deploy:staging` / `pnpm forge:deploy:production` (or directly `pnpm deploy:staging` / `pnpm deploy:production`). Both run `scripts/deploy-stage.mjs`: apply the pending D1 migrations, and only if that succeeds, build and `wrangler deploy`.
 5. Point your production domain at the Worker so the Expo app can use a stable backend URL.
-6. Every pull request gets a preview Worker on a shared preview D1 (`.github/workflows/preview.yml`).
+6. Every pull request gets a preview Worker on a shared preview D1 (`.forgejo/workflows/preview.yml`).
 
 Migrations are forward-only and expand/contract (`docs/drizzle-migrations.md`); rollback is a Worker version rollback or a D1 Time Travel restore (`docs/RUNBOOK.md`).
 

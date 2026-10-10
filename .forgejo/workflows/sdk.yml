@@ -8,7 +8,7 @@ on:
       - "sdks/openapi/**"
       - "tooling/openapi-generator/**"
       # This file is listed so a shared install-gate fix re-runs generation.
-      - ".github/workflows/sdk.yml"
+      - ".forgejo/workflows/sdk.yml"
   pull_request:
     branches: [main]
     paths:
@@ -16,7 +16,7 @@ on:
       - "sdks/openapi/**"
       - "tooling/openapi-generator/**"
       # This file is listed so a shared install-gate fix re-runs generation.
-      - ".github/workflows/sdk.yml"
+      - ".forgejo/workflows/sdk.yml"
   release:
     types: [published]
   workflow_dispatch:
@@ -37,13 +37,13 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-pnpm@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-node@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -58,7 +58,7 @@ jobs:
 
       - name: Upload spec artifact
         # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
-        uses: actions/upload-artifact@v3
+        uses: https://git.forgegraf.com/gmackie/ci-actions/upload-artifact@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           name: openapi-spec
           path: sdks/openapi/openapi.json
@@ -88,26 +88,26 @@ jobs:
         language: [typescript, python, go, java, kotlin, swift, rust, ruby]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-pnpm@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-node@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
 
       - name: Setup Java (for openapi-generator)
-        uses: actions/setup-java@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-java@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           distribution: "temurin"
           java-version: "17"
 
       - name: Download OpenAPI spec
         # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
-        uses: actions/download-artifact@v3
+        uses: https://git.forgegraf.com/gmackie/ci-actions/download-artifact@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           name: openapi-spec
           path: sdks/openapi
@@ -122,7 +122,7 @@ jobs:
 
       - name: Upload SDK artifact
         # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
-        uses: actions/upload-artifact@v3
+        uses: https://git.forgegraf.com/gmackie/ci-actions/upload-artifact@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           name: sdk-${{ matrix.language }}
           path: sdks/generated/${{ matrix.language }}
@@ -138,17 +138,22 @@ jobs:
       packages: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Download all SDK artifacts
-        uses: actions/download-artifact@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/download-artifact@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           path: sdks/generated
-          pattern: sdk-*
-          merge-multiple: true
+
+      - name: Restore SDK directories
+        run: |
+          for artifact in sdks/generated/sdk-*; do
+            language="${artifact##*/sdk-}"
+            mv "$artifact" "sdks/generated/$language"
+          done
 
       - name: Setup Python (for PyPI publish)
-        uses: actions/setup-python@v5
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-python@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           python-version: "3.11"
 
@@ -164,7 +169,7 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
 
       - name: Setup Go (for Go module)
-        uses: actions/setup-go@v5
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-go@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           go-version: "1.22"
 
@@ -175,10 +180,10 @@ jobs:
           git tag go/v${{ github.event.release.tag_name }}
           git push origin go/v${{ github.event.release.tag_name }}
 
-      - name: Create GitHub Release assets
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            sdks/generated/*/README.md
+      - name: Attach SDK assets to Forgejo release
+        run: node scripts/ci/forgejo.mjs release-assets
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORGEJO_SERVER_URL: ${{ github.server_url }}
+          FORGEJO_REPOSITORY: ${{ github.repository }}
+          FORGEJO_TOKEN: ${{ github.token }}
+          FORGEJO_RELEASE_TAG: ${{ github.event.release.tag_name }}

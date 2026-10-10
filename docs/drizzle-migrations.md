@@ -102,7 +102,7 @@ through `--remote`, and then asserts that
 - no `__new_<table>` survived (the rebuild recipe below),
 - re-applying is a no-op, which is what makes a failed deploy safe to retry.
 
-CI runs it on every PR (`.github/workflows/ci.yml`, the
+CI runs it on every PR (`.forgejo/workflows/ci.yml`, the
 `D1 Remote Migration Rehearsal` job). It is **not** a second copy of
 `pnpm -F @gmacko/db test:workers`: that suite applies the files the way *local*
 wrangler does — wrangler reads each file, splits it on `;` and sends the

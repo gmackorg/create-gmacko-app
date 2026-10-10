@@ -20,7 +20,7 @@ The full guide is [`docs/DEPLOYMENT.md`](../docs/DEPLOYMENT.md). In short:
 4. Stage secrets live in ForgeGraph and reach the Worker with
    `pnpm secrets:push --stage <stage>` (`wrangler secret put` under the hood).
 5. Previews are one Worker per pull request on a shared preview D1
-   (`.github/workflows/preview.yml`); per-PR databases are Phase 9.
+   (`.forgejo/workflows/preview.yml`); per-PR databases are Phase 9.
 
 D1 is created with `wrangler d1 create`, never with `forge db create` (which
 provisions Postgres + Hyperdrive for VPS-hosted apps).

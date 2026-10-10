@@ -1,5 +1,6 @@
 {
   "name": "@forgegraph/runtime",
+  "private": true,
   "version": "0.5.0",
   "description": "Snapshot of @forgegraph/runtime 0.5.0. Public npm does not have this version yet, so the template vendors the build.",
   "license": "Apache-2.0",

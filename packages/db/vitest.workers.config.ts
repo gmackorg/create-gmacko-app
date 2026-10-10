@@ -39,6 +39,8 @@ export default defineConfig(async () => {
     ],
     test: {
       include: ["src/**/*.workers.test.ts"],
+      // Migration setup crosses workerd RPC and shares CI with the remote rehearsal.
+      hookTimeout: 30_000,
     },
   };
 });
