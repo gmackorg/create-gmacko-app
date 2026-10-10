@@ -13,25 +13,74 @@ import { APP_DIR, REPO_DIR, STATE_DIR } from "./env";
 
 const wrangler = resolve(APP_DIR, "node_modules/.bin/wrangler");
 
-const d1 = (args: ReadonlyArray<string>): string =>
-  execFileSync(
-    wrangler,
-    [
-      "d1",
-      ...args,
-      "--local",
-      "--persist-to",
-      STATE_DIR,
-      "--config",
-      resolve(APP_DIR, "wrangler.jsonc"),
-    ],
-    {
-      cwd: APP_DIR,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, CI: "1", WRANGLER_SEND_METRICS: "false" },
-    },
-  );
+const D1_ATTEMPTS = 3;
+
+const TRANSIENT_D1_FAILURE = [
+  "fetch failed",
+  "connectivity issue",
+  "ECONNREFUSED",
+  "EAI_AGAIN",
+  "SQLITE_BUSY",
+  "database is locked",
+];
+
+interface CommandFailure extends Error {
+  readonly stdout?: string | Buffer;
+  readonly stderr?: string | Buffer;
+}
+
+const sleep = (ms: number): void => {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+};
+
+const streamText = (value: string | Buffer | undefined): string => {
+  if (value == null) return "";
+  return String(value).trim();
+};
+
+/**
+ * Local `d1 execute` starts a short-lived workerd. A refused socket and a
+ * dropped DNS lookup both come back as `fetch failed`, often with empty
+ * stderr. Those are worth another try. Output from wrangler is a real failure.
+ */
+const d1 = (args: ReadonlyArray<string>): string => {
+  const command = [
+    "d1",
+    ...args,
+    "--local",
+    "--persist-to",
+    STATE_DIR,
+    "--config",
+    resolve(APP_DIR, "wrangler.jsonc"),
+  ];
+  let failure = "wrangler d1 failed";
+  for (let attempt = 1; attempt <= D1_ATTEMPTS; attempt += 1) {
+    try {
+      return execFileSync(wrangler, command, {
+        cwd: APP_DIR,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        env: { ...process.env, CI: "1", WRANGLER_SEND_METRICS: "false" },
+      });
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      const failureError: CommandFailure = error;
+      const stdout = streamText(failureError.stdout);
+      const stderr = streamText(failureError.stderr);
+      const cause =
+        failureError.cause instanceof Error ? failureError.cause.message : "";
+      failure = [failureError.message, stdout, stderr, cause]
+        .filter((part) => part.length > 0)
+        .join("\n");
+      const transient =
+        (stdout.length === 0 && stderr.length === 0) ||
+        TRANSIENT_D1_FAILURE.some((needle) => failure.includes(needle));
+      if (!transient || attempt === D1_ATTEMPTS) throw new Error(failure);
+      sleep(400 * attempt);
+    }
+  }
+  throw new Error(failure);
+};
 
 interface ExecuteResult<Row> {
   readonly results: ReadonlyArray<Row>;
@@ -81,12 +130,57 @@ delete from verification;
 delete from user;
 `;
 
+/**
+ * The product UI reads Forge posts from the host on :8787, not the web D1
+ * `post` table. Drop those rows too, or a later spec counts leftovers.
+ * Global setup calls `reset` before that host is listening, so a refused
+ * connection is skipped. A host that answers and then fails still throws.
+ */
+const clearForgePosts = (): void => {
+  const script = `
+const headers = {
+  accept: "application/json",
+  "x-forge-tenant": "local",
+  "x-forge-actor": "web",
+};
+const origin = "http://127.0.0.1:8787";
+try {
+  for (let round = 0; round < 20; round += 1) {
+    const list = await fetch(origin + "/v1/posts", { headers });
+    if (!list.ok) throw new Error("forge list failed: " + list.status);
+    const body = await list.json();
+    const items = Array.isArray(body.items) ? body.items : [];
+    if (items.length === 0) break;
+    for (const item of items) {
+      if (typeof item.id !== "string" || item.id.length === 0) continue;
+      const del = await fetch(
+        origin + "/v1/posts/" + encodeURIComponent(item.id),
+        { method: "DELETE", headers },
+      );
+      if (!del.ok && del.status !== 404) {
+        throw new Error("forge delete failed: " + del.status);
+      }
+    }
+  }
+} catch (error) {
+  const code = error && error.cause && error.cause.code;
+  if (code === "ECONNREFUSED") process.exit(0);
+  throw error;
+}
+`;
+  execFileSync(process.execPath, ["--input-type=module", "-e", script], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+};
+
 /** Empties every user-created row; the seeded plans, meters and settings row stay. */
 export const reset = (): void => {
   mkdirSync(STATE_DIR, { recursive: true });
   const path = resolve(STATE_DIR, "reset.sql");
   writeFileSync(path, RESET_SQL);
   runFile(path);
+  clearForgePosts();
 };
 
 const literal = (value: string): string => `'${value.replaceAll("'", "''")}'`;

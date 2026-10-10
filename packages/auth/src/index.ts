@@ -102,7 +102,6 @@ export interface AuthOptions {
  */
 export type AuthApiError = Error;
 
-
 const toAuthApiError = (cause: unknown): AuthApiError =>
   cause instanceof Error
     ? cause

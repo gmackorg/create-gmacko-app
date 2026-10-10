@@ -388,7 +388,9 @@ function checkHostIncludes() {
     const lines = linesOf(read(f));
     lines.forEach((ln, i) => {
       if (
-        /\b(apiUrl|url|origin|host|endpoint)\b[^\n]*\.includes\(/i.test(ln) &&
+        // The host-like name has to be the receiver. An allowlist such as
+        // `["origin"].includes(key)` is a key check, not a URL substring check.
+        /\b(apiUrl|url|origin|host|endpoint)\s*\.includes\s*\(/i.test(ln) &&
         /(host|HOST|origin|domain|classcheck|\.io|\.com|https?:)/.test(ln) &&
         !isDisabled(lines, i, "exact-host-check")
       ) {

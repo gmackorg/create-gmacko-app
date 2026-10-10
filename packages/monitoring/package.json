@@ -34,9 +34,9 @@
   "dependencies": {
     "@gmacko/config": "workspace:*",
     "@sentry/cloudflare": "catalog:",
-    "effect": "catalog:",
     "@sentry/react": "catalog:",
-    "@sentry/react-native": "^8.4.0"
+    "@sentry/react-native": "^8.4.0",
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",

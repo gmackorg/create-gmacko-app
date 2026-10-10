@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Option, Schema } from "effect";
 
 import { DeviceApprovalForm } from "~/components/device-approval-form";
 import { queries } from "~/lib/api";
@@ -10,8 +11,14 @@ interface DeviceSearch {
   user_code?: string | undefined;
 }
 
-const codeOf = (value: SearchValue): string | undefined =>
-  typeof value === "string" && value.length > 0 ? value : undefined;
+/** A device code is a non-empty string. Anything else in the query is absent. */
+const UserCode = Schema.String.pipe(Schema.check(Schema.isMinLength(1)));
+const decodeUserCode = Schema.decodeUnknownOption(UserCode);
+
+const codeOf = (value: SearchValue): string | undefined => {
+  const decoded = decodeUserCode(value);
+  return Option.isSome(decoded) ? decoded.value : undefined;
+};
 
 /**
  * RFC 8628 verification page. A device (the mobile app, a CLI) shows its

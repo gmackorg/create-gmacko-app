@@ -6,9 +6,14 @@ on:
   pull_request:
     branches: [main]
 
+# Shares a group with E2E Tests. hetzner-bob accepts two jobs, and the
+# production build plus the Playwright workerd pair on that runner killed
+# the Forge host mid-suite (GET /v1/posts 500, then nothing on :8787).
+# cancel-in-progress stays false so the two workflows queue instead of
+# cancelling each other.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: workerd-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
 
 env:
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
@@ -114,7 +119,8 @@ jobs:
 
       - name: Upload coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
+        uses: actions/upload-artifact@v3
         with:
           name: coverage
           path: |

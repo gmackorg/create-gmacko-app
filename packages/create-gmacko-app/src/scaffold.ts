@@ -1641,8 +1641,11 @@ const notEnabled = (): Promise<Response> =>
     Response.json({ error: "storage is not enabled" }, { status: 404 }),
   );
 
+/** The call site passes \`undefined\` once the R2 binding is gone. */
+type PrunedBucket = undefined;
+
 export const createStorageHandlers = (
-  _bucket: unknown,
+  _bucket: PrunedBucket,
   _authorize: Authorize,
 ): StorageHandlers => ({ upload: notEnabled, download: notEnabled });
 `,
@@ -1744,11 +1747,17 @@ function isLocalTemplatePath(templateRepo: string): boolean {
   return fs.existsSync(templateRepo) && fs.statSync(templateRepo).isDirectory();
 }
 
-/** Skipped when copying a local template: VCS state, installs, build and dev-server output. */
+/**
+ * Skipped when copying a local template: VCS state, installs, build and
+ * dev-server output. CI's pnpm store lives at `.pnpm-store` inside the
+ * checkout. Copying it once per scaffold both fills the runner disk and
+ * spends the unit-test job's time budget.
+ */
 const SKIPPED_TEMPLATE_DIRS = new Set([
   ".git",
   ".jj",
   "node_modules",
+  ".pnpm-store",
   ".turbo",
   ".cache",
   "dist",
@@ -1762,6 +1771,7 @@ const SKIPPED_TEMPLATE_DIRS = new Set([
   "storybook-static",
 ]);
 
-function shouldCopyTemplatePath(src: string): boolean {
+/** True when a local template copy should include this path. */
+export function shouldCopyTemplatePath(src: string): boolean {
   return !SKIPPED_TEMPLATE_DIRS.has(path.basename(src));
 }
