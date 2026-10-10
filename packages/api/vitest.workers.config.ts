@@ -40,6 +40,11 @@ export default defineConfig(async () => {
     ],
     test: {
       include: ["src/**/*.workers.test.ts"],
+      // The default 5s is Vitest's own cliff. These calls cross the workerd
+      // RPC bridge, and CI runs this suite on the same host as the D1
+      // migration rehearsal. A guarded-write race that is ~10ms locally
+      // timed out there with no assertion failure.
+      testTimeout: 20_000,
     },
   };
 });

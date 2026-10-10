@@ -1,6 +1,7 @@
 import path from "node:path";
 import fs from "fs-extra";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { shouldCopyTemplatePath } from "../scaffold.js";
 import type { IntegrationConfig, PlatformConfig } from "../types.js";
 import {
   cleanupApp,
@@ -71,6 +72,14 @@ describe("create-gmacko-app scaffold", () => {
     }
   }, 900000);
 
+  it("does not copy the pnpm store that CI keeps inside the checkout", () => {
+    expect(shouldCopyTemplatePath("/workspace/app/.pnpm-store")).toBe(false);
+    expect(
+      shouldCopyTemplatePath("/workspace/app/packages/ui/src/index.ts"),
+    ).toBe(true);
+    expect(shouldCopyTemplatePath("/workspace/app/.github")).toBe(true);
+  });
+
   describe("basic scaffolding", () => {
     it("should scaffold a new app with defaults", async () => {
       const appName = generateAppName("basic");
@@ -82,7 +91,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
       expect(fileExists(result.appPath, "package.json")).toBe(true);
 
       // Check root package.json
@@ -120,7 +132,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
       for (const file of EXPECTED_FILES.legacy) {
         expect(fileExists(result.appPath, file)).toBe(false);
       }
@@ -130,7 +145,9 @@ describe("create-gmacko-app scaffold", () => {
         result.appPath,
         "package.json",
       );
-      expect(workspace).not.toContain("next");
+      // The overrides block floors better-auth's optional `next` peer. That
+      // is not a Next.js app, so match the old workspace path instead.
+      expect(workspace).not.toContain("apps/next");
       expect(workspace).not.toContain("postgres");
       expect(rootPkg.scripts?.["dev:next"]).toBeUndefined();
       expect(rootPkg.scripts?.["db:legacy:push"]).toBeUndefined();
@@ -147,7 +164,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       for (const file of EXPECTED_FILES.withWeb) {
         expect(fileExists(result.appPath, file)).toBe(true);
@@ -178,7 +198,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       const dbPackage = readJson<{
         dependencies?: Record<string, string>;
@@ -226,7 +249,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       for (const file of EXPECTED_FILES.withStorybook) {
         expect(fileExists(result.appPath, file)).toBe(true);
@@ -249,7 +275,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       for (const file of EXPECTED_FILES.withMobile) {
         expect(fileExists(result.appPath, file)).toBe(true);
@@ -266,7 +295,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       for (const file of EXPECTED_FILES.withAi) {
         expect(fileExists(result.appPath, file)).toBe(true);
@@ -283,7 +315,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       const agentsInstructions = readFile(result.appPath, "AGENTS.md");
       const claudeInstructions = readFile(result.appPath, "CLAUDE.md");
@@ -320,7 +355,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       const claudeInstructions = readFile(result.appPath, "CLAUDE.md");
       const repoSkill = readFile(
@@ -348,7 +386,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       const forgeGraphConfig = readFile(result.appPath, ".forgegraph.yaml");
 
@@ -418,7 +459,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       const forgeGraphConfig = readFile(result.appPath, ".forgegraph.yaml");
 
@@ -438,7 +482,10 @@ describe("create-gmacko-app scaffold", () => {
       });
 
       appsToClean.push(result.appPath);
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       const integrationsConfig = readFile(
         result.appPath,
@@ -480,7 +527,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
       expect(fileExists(result.appPath, "apps/expo/README.md")).toBe(true);
 
       const expoPkg = readJson<{
@@ -587,7 +637,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
       expect(
         fileExists(
           result.appPath,
@@ -618,7 +671,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       const webEnv = readFile(result.appPath, "apps/web/src/env.ts");
 
@@ -636,7 +692,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       const turboConfig = readFile(result.appPath, "turbo.json");
       const analyticsWeb = readFile(
@@ -670,7 +729,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
       expect(fileExists(result.appPath, "deploy/README.md")).toBe(true);
       expect(fileExists(result.appPath, "deploy/k8s")).toBe(false);
       expect(fileExists(result.appPath, "deploy/sst")).toBe(false);
@@ -686,7 +748,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       const previewWorkflow = readFile(
         result.appPath,
@@ -717,7 +782,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       const agentsInstructions = readFile(result.appPath, "AGENTS.md");
       const claudeInstructions = readFile(result.appPath, "CLAUDE.md");
@@ -777,7 +845,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
       expect(
         fileExists(result.appPath, ".claude/skills/bootstrap-saas/SKILL.md"),
       ).toBe(true);
@@ -866,7 +937,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       const bootstrapPlaybook = readFile(
         result.appPath,
@@ -929,7 +1003,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
       expect(
         fileExists(result.appPath, "packages/operator-core/package.json"),
       ).toBe(true);
@@ -977,7 +1054,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
       for (const route of [
         "pricing",
         "faq",
@@ -1026,7 +1106,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
       expect(
         fileExists(result.appPath, "packages/operator-core/package.json"),
       ).toBe(true);
@@ -1126,7 +1209,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       const rootReadme = readFile(result.appPath, "README.md");
       expect(rootReadme).not.toContain("## Agent quickstart");
@@ -1142,7 +1228,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
       expect(fileExists(result.appPath, "apps/expo/docs/mobile-qa.md")).toBe(
         true,
       );
@@ -1168,7 +1257,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
       expect(fileExists(result.appPath, "apps/expo/docs/mobile-qa.md")).toBe(
         false,
       );
@@ -1184,7 +1276,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       const sourceFiles = [
         "apps/web/src/lib/api.ts",
@@ -1257,7 +1352,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
       expect(fileExists(result.appPath, "biome.json")).toBe(true);
       expect(fileExists(result.appPath, "oxlint.config.ts")).toBe(true);
       // The oxlint config registers the vendored anti-slop plugin by relative
@@ -1447,7 +1545,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       const doctorScript = readFile(result.appPath, "scripts/doctor.sh");
       const integrationsConfig = readFile(
@@ -1476,7 +1577,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
       expect(fileExists(result.appPath, "packages/realtime/package.json")).toBe(
         true,
       );
@@ -1503,7 +1607,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
       expect(fileExists(result.appPath, ".git")).toBe(true);
       // jj creates a colocated repo (.jj + .git) when installed; otherwise the
       // scaffolder falls back to a plain git repo. Don't require jj on the runner
@@ -1525,7 +1632,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
       expect(fileExists(result.appPath, "tooling/eslint")).toBe(false);
       expect(fileExists(result.appPath, "tooling/prettier")).toBe(false);
       expect(fileExists(result.appPath, "apps/web/eslint.config.ts")).toBe(
@@ -1761,7 +1871,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
       expect(fileExists(result.appPath, "apps/web")).toBe(false);
       expect(fileExists(result.appPath, "apps/expo")).toBe(true);
       expect(fileExists(result.appPath, ".github/workflows/preview.yml")).toBe(
@@ -1812,7 +1925,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
       expect(fileExists(result.appPath, "apps/expo")).toBe(false);
       expect(fileExists(result.appPath, "apps/web")).toBe(true);
     }, 120000);
@@ -1827,7 +1943,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
       // The "Pair Mobile Device" panel tells the user to open a mobile app
       // that no longer exists — it must be stripped, with its QR renderer.
       expect(
@@ -1860,7 +1979,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
       expect(fileExists(result.appPath, "apps/expo")).toBe(true);
       // No web app to generate/approve pairing codes — the QR entry point
       // and its scanner dependency must be gone.
@@ -1902,7 +2024,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
       expect(fileExists(result.appPath, ".opencode")).toBe(false);
       expect(fileExists(result.appPath, "opencode.json")).toBe(false);
       expect(fileExists(result.appPath, ".claude")).toBe(false);
@@ -1928,7 +2053,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       // Check integrations.ts was updated
       const integrationsPath = path.join(
@@ -1973,7 +2101,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       // These packages should be removed when their integrations are disabled
       for (const pkg of [
@@ -2121,7 +2252,10 @@ describe("create-gmacko-app scaffold", () => {
       });
 
       appsToClean.push(result.appPath);
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
       expect(fileExists(result.appPath, "packages/storage")).toBe(true);
 
       // Cloudflare environments do not inherit bindings, so the binding is
@@ -2161,7 +2295,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       // Check that @gmacko was replaced with @myorg
       for (const [pkgPath, expected] of [
@@ -2219,7 +2356,10 @@ describe("create-gmacko-app scaffold", () => {
       });
 
       appsToClean.push(result.appPath);
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       // The dependency is declared, so `pnpm install` is the whole setup.
       const webPkg = readJson<{
@@ -2267,7 +2407,10 @@ describe("create-gmacko-app scaffold", () => {
       });
 
       appsToClean.push(result.appPath);
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
 
       // pnpm warns (and, with strict-dep-builds, fails) about every build it
       // skipped that is in neither list. redis-memory-server arrives with
@@ -2291,7 +2434,10 @@ describe("create-gmacko-app scaffold", () => {
 
       appsToClean.push(result.appPath);
 
-      expect(result.exitCode).toBe(0);
+      expect(
+        result.exitCode,
+        `${result.stderr}\n${result.stdout}`.slice(-2000),
+      ).toBe(0);
       expect(fileExists(result.appPath, "gmacko.integrations.json")).toBe(true);
 
       const manifest = readJson<IntegrationManifest>(

@@ -79,7 +79,8 @@ jobs:
         run: pnpm --dir packages/create-gmacko-app build
 
       - name: Upload CLI dist
-        uses: actions/upload-artifact@v4
+        # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
+        uses: actions/upload-artifact@v3
         with:
           name: cli-dist
           path: packages/create-gmacko-app/dist
@@ -95,7 +96,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download CLI dist
-        uses: actions/download-artifact@v4
+        # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
+        uses: actions/download-artifact@v3
         with:
           name: cli-dist
           path: packages/create-gmacko-app/dist
@@ -212,7 +214,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download CLI dist
-        uses: actions/download-artifact@v4
+        # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
+        uses: actions/download-artifact@v3
         with:
           name: cli-dist
           path: packages/create-gmacko-app/dist
@@ -284,7 +287,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download CLI dist
-        uses: actions/download-artifact@v4
+        # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
+        uses: actions/download-artifact@v3
         with:
           name: cli-dist
           path: packages/create-gmacko-app/dist
@@ -347,7 +351,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download CLI dist
-        uses: actions/download-artifact@v4
+        # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
+        uses: actions/download-artifact@v3
         with:
           name: cli-dist
           path: packages/create-gmacko-app/dist
@@ -422,7 +427,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download CLI dist
-        uses: actions/download-artifact@v4
+        # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
+        uses: actions/download-artifact@v3
         with:
           name: cli-dist
           path: packages/create-gmacko-app/dist
@@ -507,7 +513,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download CLI dist
-        uses: actions/download-artifact@v4
+        # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
+        uses: actions/download-artifact@v3
         with:
           name: cli-dist
           path: packages/create-gmacko-app/dist
@@ -572,7 +579,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download CLI dist
-        uses: actions/download-artifact@v4
+        # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
+        uses: actions/download-artifact@v3
         with:
           name: cli-dist
           path: packages/create-gmacko-app/dist

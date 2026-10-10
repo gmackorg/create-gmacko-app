@@ -92,11 +92,22 @@ export function cleanupApp(appPath: string): void {
 }
 
 /**
- * Run the CLI with given options
+ * Run the CLI with given options.
+ *
+ * Each scaffold is a full copy of this repo. Keeping every copy until
+ * `afterAll` fills a small CI disk after about a dozen apps, and every later
+ * scaffold then exits 1. Drop the previous app once the next one starts;
+ * the calling test has already read the previous result.
  */
+let previousAppPath: string | undefined;
+
 export async function runCli(
   options: ScaffoldOptions = {},
 ): Promise<ScaffoldResult> {
+  if (previousAppPath) {
+    cleanupApp(previousAppPath);
+    previousAppPath = undefined;
+  }
   const appName = options.appName || generateAppName();
   const cwd = options.cwd || ensureTempDir();
   const appPath = path.join(cwd, appName);
@@ -139,6 +150,7 @@ export async function runCli(
 
     child.on("close", (code) => {
       clearTimeout(timer);
+      previousAppPath = appPath;
       resolve({
         appName,
         appPath,

@@ -358,6 +358,14 @@ describe("exact-host-check", () => {
     ]);
   });
 
+  it("does not flag an allowlist that mentions origin", () => {
+    const violations = check({
+      "packages/forge-runtime/lib/foundation/availability.js":
+        'check(Object.keys(input).every(k => ["calendar", "timezone", "weekly", "exceptions", "overrides", "origin"].includes(k)), "Unsupported");\n',
+    });
+    expect(rules(violations)).toEqual([]);
+  });
+
   it("accepts a parsed-hostname comparison and disabled lines", () => {
     const violations = check({
       "apps/expo/src/utils/base-url.ts": [

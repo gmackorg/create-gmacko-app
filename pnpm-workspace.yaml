@@ -188,12 +188,15 @@ overrides:
   lightningcss: 1.30.1
   # Force patched versions of transitive deps with critical advisories
   # (GHSA arbitrary-code-exec / DoS / type-confusion). See deps.yml audit gate.
+  # `next` is pulled in by better-auth, not by the TanStack app.
+  next: '>=16.3.6'
   protobufjs: '>=7.5.5'
+  proxy-addr: '>=2.0.8'
   react-native: 0.85.3
   # Transitive native modules that resolved below SDK-56 canonical and fail to
   # compile against RN 0.85.3 (react-native-svg's RCTImageResponseObserverProxy
   # C++ API changed; expo-image 55 predates RN 0.85).
   react-native-svg: 15.15.4
-  seroval: '>=1.5.3'
-  shell-quote: '>=1.8.4'
+  seroval: '>=1.6.2'
+  shell-quote: '>=1.11.0'
   tar: '>=7.5.19'
