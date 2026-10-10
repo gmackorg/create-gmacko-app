@@ -1,8 +1,12 @@
 # Architecture & Conventions
 
 This document describes the system architecture, design decisions, and conventions
-used across all products built from the create-gmacko-app template. The decision
-record is [`adr/0001-tanstack-effect-d1.md`](./adr/0001-tanstack-effect-d1.md).
+used across all products built from the create-gmacko-app template. The Worker
+decision is [`adr/0001-tanstack-effect-d1.md`](./adr/0001-tanstack-effect-d1.md).
+The API other businesses call is the Forge package in [`../forge`](../forge);
+see [`INTEGRATE.md`](./INTEGRATE.md) and
+[`adr/0002-forge-is-the-integration-api.md`](./adr/0002-forge-is-the-integration-api.md).
+The diagram below is the Worker that still serves `/api/*`.
 
 ## System Architecture
 

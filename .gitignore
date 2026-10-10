@@ -11,6 +11,7 @@ coverage
 # build output
 out/
 storybook-static/
+forge/generated/
 
 # nitro
 .nitro/

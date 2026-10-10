@@ -1,7 +1,7 @@
 {
   "name": "create-gmacko-app",
   "version": "0.2.0",
-  "description": "Create a Gmacko app: TanStack Start + Effect on Cloudflare Workers with D1, Expo, ForgeGraph deployment guidance, and agent-native DX defaults",
+  "description": "Create a Gmacko app. Partners integrate through a Forge API. The web app is TanStack Start on Cloudflare Workers with D1, plus Expo and ForgeGraph deployment guidance.",
   "type": "module",
   "engines": {
     "node": "^24.0.0",

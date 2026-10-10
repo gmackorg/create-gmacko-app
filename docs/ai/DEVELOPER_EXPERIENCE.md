@@ -3,6 +3,7 @@
 This repo is designed around a few stable assumptions:
 
 - The web app is one Cloudflare Worker per stage (TanStack Start + Effect `HttpApi`) with a D1 database per stage; ForgeGraph is the deployment control plane.
+- The API other businesses call is Forge, in `forge/`. `pnpm forge:api` needs forgec 0.5.0 and writes the contract. Read `docs/INTEGRATE.md`.
 - There is no database server to run: development uses a local D1 under `apps/web/.wrangler/state`, and the service emulators come from `@gmacko/emulate`.
 - `jj` is the default local VCS, with Git compatibility kept for GitHub and external tooling.
 - Shared repo instructions belong in `AGENTS.md`, not split across tool-specific files.

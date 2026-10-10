@@ -9,6 +9,7 @@ This repository is set up to work well with `Codex`, `Claude Code`, and `OpenCod
 - Prefer `jj` for local version control workflows. The repo is colocated with Git for interoperability.
 - Use `pnpm`, `oxlint`, `biome`, and `turbo` as the default tooling surface.
 - Use ForgeGraph for deployment workflows and `forge` from [`../ForgeGraph`](../ForgeGraph) when working against the real deployment control plane.
+- The partner integration API is Forge, in `forge/`. Add a resource or `@http` function there, then run `pnpm forge:api` (forgec 0.5.0). Read `docs/INTEGRATE.md`. The Worker still serves the Effect `HttpApi` at `/api/*` until that package is hosted on the Forge runtime.
 - Treat [docs/ai/DEVELOPER_EXPERIENCE.md](./docs/ai/DEVELOPER_EXPERIENCE.md) as the current support matrix for agent tooling, Cloudflare Workers, ForgeGraph, Nix, and mobile DX choices.
 - When the optional SaaS bootstrap pack is scaffolded, keep the generated bootstrap playbook feature-aware across `Claude-only`, `Codex`, and `OpenCode` sections, and keep Claude-only slash commands labeled as such.
 

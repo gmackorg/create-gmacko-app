@@ -14,6 +14,7 @@ export type LinkRenderer = React.ComponentType<{
 
 export const marketingNav: ReadonlyArray<MarketingNavItem> = [
   { label: "Pricing", href: "/pricing" },
+  { label: "Integrate", href: "/integrate" },
   { label: "FAQ", href: "/faq" },
   { label: "Changelog", href: "/changelog" },
   { label: "Contact", href: "/contact" },
@@ -75,7 +76,7 @@ export function MarketingPage(props: {
         </header>
 
         <section className="grid flex-1 items-center gap-10 py-14 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="space-y-6">
+          <div className="min-w-0 space-y-6">
             <p className="text-primary text-sm font-semibold uppercase tracking-[0.3em]">
               {props.eyebrow}
             </p>
@@ -95,7 +96,8 @@ export function MarketingPage(props: {
               </p>
               <div className="space-y-3 text-sm">
                 <p>
-                  Public landing, FAQ, changelog, contact, privacy, and terms.
+                  Public landing, integrate, FAQ, changelog, contact, privacy,
+                  and terms.
                 </p>
                 <p>Launch controls, waitlist review, and referrals in admin.</p>
                 <p>

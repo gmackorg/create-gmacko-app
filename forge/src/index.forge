@@ -1,0 +1,3 @@
+/// The API a business partner integrates with.
+/// Customers are declared in customers/customer.forge.
+/// The partner notification is declared in partner/notify.forge.
