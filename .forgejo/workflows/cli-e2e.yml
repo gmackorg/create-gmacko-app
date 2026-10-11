@@ -1,4 +1,5 @@
 name: CLI E2E Tests
+# Revalidate all scaffold lanes after restoring runner disk capacity (CREA-3).
 
 on:
   # Run on release branches

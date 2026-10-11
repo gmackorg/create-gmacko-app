@@ -1,4 +1,5 @@
 name: SDK Generation
+# Revalidate SDK generation after restoring runner disk capacity (CREA-3).
 
 on:
   push:
