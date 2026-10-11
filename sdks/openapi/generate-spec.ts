@@ -13,7 +13,7 @@ import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { AppApi } from "@gmacko/domain";
-import { OpenApi } from "effect/unstable/httpapi";
+import { OpenApi } from "effect/http-api";
 
 const spec = OpenApi.fromApi(AppApi);
 const outputPath = resolve(import.meta.dirname, "openapi.json");

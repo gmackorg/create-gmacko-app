@@ -26,8 +26,8 @@ import {
   Result,
   SchemaAST,
 } from "effect";
-import { HttpServerRequest, HttpTraceContext } from "effect/unstable/http";
-import { HttpApiError } from "effect/unstable/httpapi";
+import { HttpServerRequest, HttpTraceContext } from "effect/http";
+import { HttpApiError } from "effect/http-api";
 
 // ---------------------------------------------------------------------------
 // Request trace holder

@@ -1,6 +1,6 @@
 import { AppApi } from "@gmacko/domain";
 import { Effect, Layer } from "effect";
-import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { HttpApiBuilder } from "effect/http-api";
 
 import { Health } from "./service";
 

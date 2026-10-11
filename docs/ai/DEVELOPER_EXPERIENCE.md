@@ -75,7 +75,7 @@ Use these labels literally when describing an integration on the web lane:
 | PostHog | stable | browser SDK via `@gmacko/analytics` (`VITE_POSTHOG_KEY`) |
 | Stripe | stable | `POST /api/webhooks/stripe` through `@gmacko/payments` (SubtleCrypto signature check, fetch HTTP client) |
 | Email | stable | Resend through `@gmacko/email` (`RESEND_BASE_URL` overridable for emulate) |
-| OTLP telemetry | stable | `@gmacko/telemetry` over `effect/unstable/observability`, flushed on `waitUntil` |
+| OTLP telemetry | stable | `@gmacko/telemetry` over `effect/observability`, flushed on `waitUntil` |
 | Storage | stable, off by default | Cloudflare R2 through an `r2_buckets` binding (`BUCKET`), mounted at `POST/GET /api/storage` (`apps/web/src/routes/api.storage.$.ts`). `@gmacko/storage` owns authorization, the content-type allow-list and the size ceiling, because a bucket enforces none of them; there is no virus scanning and no CDN URL per file — packages/storage/README.md |
 | Realtime | unsupported | `@gmacko/realtime` is ioredis + BullMQ, Node-only; use it only from a separately deployed Node service |
 

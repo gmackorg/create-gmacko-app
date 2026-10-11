@@ -12,9 +12,9 @@ import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient";
 import * as SqliteDrizzle from "drizzle-orm/effect-sqlite-node";
 import { drizzle as drizzleProxy } from "drizzle-orm/sqlite-proxy";
 import { Effect, Layer } from "effect";
-import * as Reactivity from "effect/unstable/reactivity/Reactivity";
-import type { SqlClient } from "effect/unstable/sql/SqlClient";
-import type { SqlError } from "effect/unstable/sql/SqlError";
+import * as Reactivity from "effect/reactivity/Reactivity";
+import type { SqlClient } from "effect/sql/SqlClient";
+import type { SqlError } from "effect/sql/SqlError";
 
 // This module is the composition root for the sqlite-node flavour of
 // `Database`: it *builds* the Layer that `makeDatabase` exists to be called
@@ -120,7 +120,9 @@ const makePlain = (client: SqliteClient.SqliteClient): PlainDatabase =>
 
 export const layerTest: Layer.Layer<Database> = Layer.effect(Database)(
   Effect.gen(function* () {
-    const client = yield* SqliteClient.make({ filename: ":memory:" });
+    const client = yield* SqliteClient.make({ filename: ":memory:" }).pipe(
+      Effect.orDie,
+    );
     // D1 enforces foreign keys unconditionally; sqlite-node leaves the pragma
     // off per connection, so set it here rather than rely on a migration
     // happening to end with `PRAGMA foreign_keys=ON`.

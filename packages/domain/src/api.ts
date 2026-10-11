@@ -1,4 +1,4 @@
-import { HttpApi, OpenApi } from "effect/unstable/httpapi";
+import { HttpApi, OpenApi } from "effect/http-api";
 
 import pkg from "../package.json" with { type: "json" };
 import { AdminApi } from "./admin/api";

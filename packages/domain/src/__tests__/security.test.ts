@@ -4,7 +4,7 @@
  * middlewares (the ones the credential-matrix and OpenAPI count).
  */
 import { Context } from "effect";
-import { HttpApiMiddleware } from "effect/unstable/httpapi";
+import { HttpApiMiddleware } from "effect/http-api";
 import { describe, expect, it } from "vitest";
 
 import { Forbidden, Unauthorized } from "../errors";

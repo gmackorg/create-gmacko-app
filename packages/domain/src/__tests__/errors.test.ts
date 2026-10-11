@@ -4,11 +4,7 @@
  * all agree on the code without a lookup table.
  */
 import { Schema } from "effect";
-import {
-  HttpApi,
-  HttpApiEndpoint,
-  HttpApiGroup,
-} from "effect/unstable/httpapi";
+import { HttpApi, HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 import { describe, expect, it } from "vitest";
 
 import {

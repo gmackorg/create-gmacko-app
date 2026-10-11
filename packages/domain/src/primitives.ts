@@ -5,8 +5,9 @@
 import { Schema } from "effect";
 
 /** A `text` primary key generated in the Worker; branded per table. */
-export const id = <B extends string>(brand: B) =>
-  Schema.String.pipe(Schema.brand(brand));
+export const id = <B extends string>(
+  brand: Parameters<typeof Schema.brand<B>>[0],
+) => Schema.String.pipe(Schema.brand<B>(brand));
 
 /** Same acceptance as zod's `z.string().email()`: one `@`, a dot in the domain, no whitespace. */
 export const Email = Schema.String.pipe(

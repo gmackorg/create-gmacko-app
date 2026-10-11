@@ -112,7 +112,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/PostEncoded"
+                    "$ref": "#/components/schemas/PostEncoded_1"
                   }
                 }
               }
@@ -150,7 +150,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PostEncoded"
+                  "$ref": "#/components/schemas/PostEncoded_1"
                 }
               }
             }
@@ -221,7 +221,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PostEncoded"
+                  "$ref": "#/components/schemas/PostEncoded_1"
                 }
               }
             }
@@ -602,7 +602,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/WorkspaceInviteEncoded"
+                    "$ref": "#/components/schemas/WorkspaceInviteEncoded_1"
                   }
                 }
               }
@@ -660,7 +660,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WorkspaceInviteEncoded"
+                  "$ref": "#/components/schemas/WorkspaceInviteEncoded_1"
                 }
               }
             }
@@ -1790,7 +1790,7 @@
               "type": "string",
               "pattern": "^[+-]?\\d*\\.?\\d+(?:[Ee][+-]?\\d+)?$"
             },
-            "required": true
+            "required": false
           },
           {
             "name": "offset",
@@ -1799,7 +1799,7 @@
               "type": "string",
               "pattern": "^[+-]?\\d*\\.?\\d+(?:[Ee][+-]?\\d+)?$"
             },
-            "required": true
+            "required": false
           }
         ],
         "security": [
@@ -2181,6 +2181,496 @@
   },
   "components": {
     "schemas": {
+      "ForgeUnhealthyEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ForgeUnhealthy"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "unhealthy"
+            ]
+          },
+          "version": {
+            "type": "string",
+            "enum": [
+              "1.0"
+            ]
+          },
+          "timestamp": {
+            "type": "string"
+          },
+          "checks": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "healthy",
+                    "degraded",
+                    "unhealthy"
+                  ]
+                },
+                "latencyMs": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string",
+                      "enum": [
+                        "Infinity",
+                        "-Infinity",
+                        "NaN"
+                      ]
+                    }
+                  ]
+                },
+                "checkedAt": {
+                  "type": "string"
+                },
+                "error": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "status",
+                "latencyMs",
+                "checkedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "_tag",
+          "status",
+          "version",
+          "timestamp",
+          "checks"
+        ],
+        "additionalProperties": false
+      },
+      "ForgeHealthEncoded": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "degraded"
+            ]
+          },
+          "version": {
+            "type": "string",
+            "enum": [
+              "1.0"
+            ]
+          },
+          "timestamp": {
+            "type": "string"
+          },
+          "checks": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "healthy",
+                    "degraded",
+                    "unhealthy"
+                  ]
+                },
+                "latencyMs": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string",
+                      "enum": [
+                        "Infinity",
+                        "-Infinity",
+                        "NaN"
+                      ]
+                    }
+                  ]
+                },
+                "checkedAt": {
+                  "type": "string"
+                },
+                "error": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "status",
+                "latencyMs",
+                "checkedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "status",
+          "version",
+          "timestamp",
+          "checks"
+        ],
+        "additionalProperties": false
+      },
+      "UnhealthyReportEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "UnhealthyReport"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "unhealthy"
+            ]
+          },
+          "timestamp": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "checks": {
+            "type": "object",
+            "properties": {
+              "database": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pass",
+                      "fail",
+                      "warn"
+                    ]
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "responseTime": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "Infinity",
+                          "-Infinity",
+                          "NaN"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "status"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "database"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "_tag",
+          "status",
+          "timestamp",
+          "version",
+          "checks"
+        ],
+        "additionalProperties": false
+      },
+      "HealthStatusEncoded": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "degraded"
+            ]
+          },
+          "timestamp": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "checks": {
+            "type": "object",
+            "properties": {
+              "database": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pass",
+                      "fail",
+                      "warn"
+                    ]
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "responseTime": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "Infinity",
+                          "-Infinity",
+                          "NaN"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "status"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "database"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "status",
+          "timestamp",
+          "version",
+          "checks"
+        ],
+        "additionalProperties": false
+      },
+      "UnhealthyEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "Unhealthy"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "unhealthy"
+            ]
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "_tag",
+          "status",
+          "detail"
+        ],
+        "additionalProperties": false
+      },
+      "ReadyStatusEncoded": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          },
+          "latencyMs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "Infinity",
+                  "-Infinity",
+                  "NaN"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "latencyMs"
+        ],
+        "additionalProperties": false
+      },
+      "LiveStatusEncoded": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "development",
+              "preview",
+              "staging",
+              "production"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "stage"
+        ],
+        "additionalProperties": false
+      },
+      "InternalErrorEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "InternalError"
+            ]
+          }
+        },
+        "required": [
+          "_tag"
+        ],
+        "additionalProperties": false
+      },
+      "RateLimitedEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "RateLimited"
+            ]
+          },
+          "retryAfterSeconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "Infinity",
+                  "-Infinity",
+                  "NaN"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "_tag",
+          "retryAfterSeconds"
+        ],
+        "additionalProperties": false
+      },
+      "UnauthorizedEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "Unauthorized"
+            ]
+          }
+        },
+        "required": [
+          "_tag"
+        ],
+        "additionalProperties": false
+      },
+      "ForbiddenEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "Forbidden"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "scope",
+              "origin",
+              "role"
+            ]
+          }
+        },
+        "required": [
+          "_tag",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "NotFoundEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "NotFound"
+            ]
+          },
+          "resource": {
+            "type": "string",
+            "enum": [
+              "post",
+              "user",
+              "invite",
+              "waitlistEntry",
+              "apiKey",
+              "workspace"
+            ]
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "_tag",
+          "resource",
+          "id"
+        ],
+        "additionalProperties": false
+      },
       "UserEncoded": {
         "type": "object",
         "properties": {
@@ -2232,85 +2722,25 @@
         ],
         "additionalProperties": false
       },
-      "SessionStateEncoded": {
-        "type": "object",
-        "properties": {
-          "user": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UserEncoded"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "credential": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "session",
-                  "key"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "user",
-          "credential"
-        ],
-        "additionalProperties": false
-      },
-      "InternalErrorEncoded": {
+      "ConflictEncoded": {
         "type": "object",
         "properties": {
           "_tag": {
             "type": "string",
             "enum": [
-              "InternalError"
-            ]
-          }
-        },
-        "required": [
-          "_tag"
-        ],
-        "additionalProperties": false
-      },
-      "UnauthorizedEncoded": {
-        "type": "object",
-        "properties": {
-          "_tag": {
-            "type": "string",
-            "enum": [
-              "Unauthorized"
-            ]
-          }
-        },
-        "required": [
-          "_tag"
-        ],
-        "additionalProperties": false
-      },
-      "ForbiddenEncoded": {
-        "type": "object",
-        "properties": {
-          "_tag": {
-            "type": "string",
-            "enum": [
-              "Forbidden"
+              "Conflict"
             ]
           },
           "reason": {
             "type": "string",
             "enum": [
-              "scope",
-              "origin",
-              "role"
+              "invite-exists",
+              "already-in-workspace",
+              "owner-invite-unsupported",
+              "bootstrap-already-completed",
+              "bootstrap-already-started",
+              "waitlist-status-changed",
+              "self-demotion"
             ]
           }
         },
@@ -2320,16 +2750,142 @@
         ],
         "additionalProperties": false
       },
-      "PostEncoded": {
+      "UpdateUserRoleEncoded": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "admin"
+            ]
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "additionalProperties": false
+      },
+      "UserListEncoded": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserEncoded"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "users",
+          "total",
+          "hasMore"
+        ],
+        "additionalProperties": false
+      },
+      "AdminWorkspaceEncoded": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string"
           },
-          "title": {
+          "name": {
             "type": "string"
           },
-          "content": {
+          "slug": {
+            "type": "string"
+          },
+          "ownerUserId": {
+            "type": "string"
+          },
+          "membershipCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "ownerUserId",
+          "membershipCount",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminStatsEncoded": {
+        "type": "object",
+        "properties": {
+          "totalUsers": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "totalWorkspaces": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "adminUsers": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "regularUsers": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "totalUsers",
+          "totalWorkspaces",
+          "adminUsers",
+          "regularUsers"
+        ],
+        "additionalProperties": false
+      },
+      "BootstrapCompletedEncoded": {
+        "type": "object",
+        "properties": {
+          "settings": {
+            "$ref": "#/components/schemas/ApplicationSettingsEncoded"
+          },
+          "workspace": {
+            "$ref": "#/components/schemas/WorkspaceEncoded"
+          }
+        },
+        "required": [
+          "settings",
+          "workspace"
+        ],
+        "additionalProperties": false
+      },
+      "WorkspaceEncoded": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "ownerUserId": {
             "type": "string"
           },
           "createdAt": {
@@ -2348,66 +2904,56 @@
         },
         "required": [
           "id",
-          "title",
-          "content",
+          "name",
+          "slug",
+          "ownerUserId",
           "createdAt",
           "updatedAt"
         ],
         "additionalProperties": false
       },
-      "NotFoundEncoded": {
+      "ApplicationSettingsEncoded": {
         "type": "object",
         "properties": {
-          "_tag": {
-            "type": "string",
-            "enum": [
-              "NotFound"
-            ]
-          },
-          "resource": {
-            "type": "string",
-            "enum": [
-              "post",
-              "user",
-              "invite",
-              "waitlistEntry",
-              "apiKey",
-              "workspace"
-            ]
-          },
           "id": {
             "type": "string"
-          }
-        },
-        "required": [
-          "_tag",
-          "resource",
-          "id"
-        ],
-        "additionalProperties": false
-      },
-      "CreatePostEncoded": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 256
           },
-          "content": {
-            "type": "string",
-            "maxLength": 256
-          }
-        },
-        "required": [
-          "title",
-          "content"
-        ],
-        "additionalProperties": false
-      },
-      "LaunchStateEncoded": {
-        "type": "object",
-        "properties": {
+          "setupCompletedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "setupCompletedByUserId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "initialWorkspaceId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maintenanceMode": {
+            "type": "boolean"
+          },
+          "signupEnabled": {
+            "type": "boolean"
+          },
           "announcementMessage": {
             "anyOf": [
               {
@@ -2432,75 +2978,92 @@
               "type": "string"
             }
           },
-          "canAutoCreateAccounts": {
-            "type": "boolean"
+          "createdAt": {
+            "type": "string"
           },
-          "inviteOnly": {
-            "type": "boolean"
-          },
-          "maintenanceMode": {
-            "type": "boolean"
-          },
-          "signupEnabled": {
-            "type": "boolean"
-          },
-          "stripeConfigured": {
-            "type": "boolean"
-          },
-          "publicAnnouncementVisible": {
-            "type": "boolean"
-          },
-          "canUseWaitlist": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "announcementMessage",
-          "announcementTone",
-          "allowedEmailDomains",
-          "canAutoCreateAccounts",
-          "inviteOnly",
-          "maintenanceMode",
-          "signupEnabled",
-          "stripeConfigured",
-          "publicAnnouncementVisible",
-          "canUseWaitlist"
-        ],
-        "additionalProperties": false
-      },
-      "WaitlistSubmitEncoded": {
-        "type": "object",
-        "properties": {
-          "email": {
-            "type": "string",
-            "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
-            "description": "an email address",
-            "maxLength": 254
-          },
-          "message": {
-            "type": "string",
-            "maxLength": 1000
-          },
-          "referralCode": {
-            "type": "string",
-            "maxLength": 120
-          },
-          "source": {
-            "type": "string",
-            "enum": [
-              "landing",
-              "contact",
-              "referral",
-              "blocked-signup"
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           }
         },
         "required": [
-          "email"
+          "id",
+          "setupCompletedAt",
+          "setupCompletedByUserId",
+          "initialWorkspaceId",
+          "maintenanceMode",
+          "signupEnabled",
+          "announcementMessage",
+          "announcementTone",
+          "allowedEmailDomains",
+          "createdAt",
+          "updatedAt"
         ],
         "additionalProperties": false
       },
-      "WaitlistSubmissionEncoded": {
+      "CompleteBootstrapEncoded": {
+        "type": "object",
+        "properties": {
+          "workspaceName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "workspaceName"
+        ],
+        "additionalProperties": false
+      },
+      "BootstrapStatusEncoded": {
+        "type": "object",
+        "properties": {
+          "isInitialized": {
+            "type": "boolean"
+          },
+          "requiresSetup": {
+            "type": "boolean"
+          },
+          "hasExistingWorkspace": {
+            "type": "boolean"
+          },
+          "setupCompletedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "initialWorkspaceId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "isInitialized",
+          "requiresSetup",
+          "hasExistingWorkspace",
+          "setupCompletedAt",
+          "initialWorkspaceId"
+        ],
+        "additionalProperties": false
+      },
+      "WaitlistEntryEncoded": {
         "type": "object",
         "properties": {
           "id": {
@@ -2526,116 +3089,181 @@
               "approved",
               "dismissed"
             ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "referralCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reviewedByUserId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reviewedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
           "id",
           "email",
           "source",
+          "status",
+          "message",
+          "referralCode",
+          "reviewedByUserId",
+          "reviewedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "ReviewWaitlistEntryEncoded": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "contacted",
+              "approved",
+              "dismissed"
+            ]
+          }
+        },
+        "required": [
           "status"
         ],
         "additionalProperties": false
       },
-      "RateLimitedEncoded": {
+      "UpdateLaunchControlsEncoded": {
         "type": "object",
         "properties": {
-          "_tag": {
-            "type": "string",
-            "enum": [
-              "RateLimited"
-            ]
+          "maintenanceMode": {
+            "type": "boolean"
           },
-          "retryAfterSeconds": {
+          "signupEnabled": {
+            "type": "boolean"
+          },
+          "announcementMessage": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "string",
+                "maxLength": 2000
               },
               {
-                "type": "string",
-                "enum": [
-                  "Infinity",
-                  "-Infinity",
-                  "NaN"
-                ]
+                "type": "null"
               }
             ]
+          },
+          "announcementTone": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ]
+          },
+          "allowedEmailDomains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         },
-        "required": [
-          "_tag",
-          "retryAfterSeconds"
-        ],
         "additionalProperties": false
       },
-      "WorkspaceContextEncoded": {
+      "LaunchControlsEncoded": {
         "type": "object",
         "properties": {
-          "workspace": {
+          "maintenanceMode": {
+            "type": "boolean"
+          },
+          "signupEnabled": {
+            "type": "boolean"
+          },
+          "announcementMessage": {
             "anyOf": [
               {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "name": {
-                    "type": "string"
-                  },
-                  "slug": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "id",
-                  "name",
-                  "slug"
-                ],
-                "additionalProperties": false
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ]
           },
-          "workspaceRole": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "owner",
-                  "admin",
-                  "member"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "platformRole": {
+          "announcementTone": {
             "type": "string",
             "enum": [
-              "user",
-              "admin"
+              "info",
+              "warning",
+              "critical"
             ]
           },
-          "canManageWorkspace": {
-            "type": "boolean"
+          "allowedEmailDomains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
-          "isPlatformAdmin": {
-            "type": "boolean"
+          "platformPrimitives": {
+            "$ref": "#/components/schemas/PlatformPrimitivesEncoded"
           },
-          "inviteAllowlistCount": {
-            "type": "integer"
+          "waitlistCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           }
         },
         "required": [
-          "workspace",
-          "workspaceRole",
-          "platformRole",
-          "canManageWorkspace",
-          "isPlatformAdmin",
-          "inviteAllowlistCount"
+          "maintenanceMode",
+          "signupEnabled",
+          "announcementMessage",
+          "announcementTone",
+          "allowedEmailDomains",
+          "platformPrimitives",
+          "waitlistCount"
         ],
         "additionalProperties": false
       },
@@ -2777,6 +3405,346 @@
         ],
         "additionalProperties": false
       },
+      "ApiKeyCreatedEncoded": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "keyPrefix": {
+            "type": "string"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "read",
+                "write",
+                "delete",
+                "admin"
+              ]
+            }
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "keyPrefix",
+          "permissions",
+          "expiresAt",
+          "key"
+        ],
+        "additionalProperties": false
+      },
+      "CreateApiKeyEncoded": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "permissions": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "string",
+                "enum": [
+                  "read",
+                  "write",
+                  "delete",
+                  "admin"
+                ]
+              }
+            ],
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "enum": [
+                "read",
+                "write",
+                "delete",
+                "admin"
+              ]
+            }
+          },
+          "expiresInDays": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "exclusiveMinimum": 0
+          }
+        },
+        "required": [
+          "name",
+          "permissions"
+        ],
+        "additionalProperties": false
+      },
+      "ApiKeyEncoded": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "keyPrefix": {
+            "type": "string"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "read",
+                "write",
+                "delete",
+                "admin"
+              ]
+            }
+          },
+          "lastUsedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "keyPrefix",
+          "permissions",
+          "lastUsedAt",
+          "expiresAt",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "UserPreferencesEncoded": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "userId": {
+            "type": "string"
+          },
+          "theme": {
+            "type": "string",
+            "enum": [
+              "light",
+              "dark",
+              "system"
+            ]
+          },
+          "language": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "emailNotifications": {
+            "type": "boolean"
+          },
+          "pushNotifications": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "theme",
+          "language",
+          "timezone",
+          "emailNotifications",
+          "pushNotifications",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "UpdatePreferencesEncoded": {
+        "type": "object",
+        "properties": {
+          "theme": {
+            "type": "string",
+            "enum": [
+              "light",
+              "dark",
+              "system"
+            ]
+          },
+          "language": {
+            "type": "string",
+            "maxLength": 10
+          },
+          "timezone": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "emailNotifications": {
+            "type": "boolean"
+          },
+          "pushNotifications": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "InviteAcceptedEncoded": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "member"
+            ]
+          }
+        },
+        "required": [
+          "workspaceId",
+          "role"
+        ],
+        "additionalProperties": false
+      },
+      "WorkspaceInviteEncoded_1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "member"
+            ]
+          },
+          "invitedByUserId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "workspaceId",
+          "email",
+          "role",
+          "invitedByUserId",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "CreateInviteEncoded": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "an email address",
+            "maxLength": 254
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "member"
+            ]
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "additionalProperties": false
+      },
       "BillingOverviewEncoded": {
         "type": "object",
         "properties": {
@@ -2792,7 +3760,9 @@
                     "type": "object",
                     "properties": {
                       "amountInCents": {
-                        "type": "integer"
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
                       },
                       "currency": {
                         "type": "string"
@@ -2846,7 +3816,9 @@
                   "type": "object",
                   "properties": {
                     "amountInCents": {
-                      "type": "integer"
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
                     },
                     "currency": {
                       "type": "string"
@@ -3136,558 +4108,81 @@
         ],
         "additionalProperties": false
       },
-      "WorkspaceInviteEncoded": {
+      "WorkspaceContextEncoded": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string"
-          },
-          "workspaceId": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "role": {
-            "type": "string",
-            "enum": [
-              "owner",
-              "admin",
-              "member"
-            ]
-          },
-          "invitedByUserId": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "updatedAt": {
+          "workspace": {
             "anyOf": [
               {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "id",
-          "workspaceId",
-          "email",
-          "role",
-          "invitedByUserId",
-          "createdAt",
-          "updatedAt"
-        ],
-        "additionalProperties": false
-      },
-      "CreateInviteEncoded": {
-        "type": "object",
-        "properties": {
-          "email": {
-            "type": "string",
-            "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
-            "description": "an email address",
-            "maxLength": 254
-          },
-          "role": {
-            "type": "string",
-            "enum": [
-              "admin",
-              "member"
-            ]
-          }
-        },
-        "required": [
-          "email"
-        ],
-        "additionalProperties": false
-      },
-      "ConflictEncoded": {
-        "type": "object",
-        "properties": {
-          "_tag": {
-            "type": "string",
-            "enum": [
-              "Conflict"
-            ]
-          },
-          "reason": {
-            "type": "string",
-            "enum": [
-              "invite-exists",
-              "already-in-workspace",
-              "owner-invite-unsupported",
-              "bootstrap-already-completed",
-              "bootstrap-already-started",
-              "waitlist-status-changed",
-              "self-demotion"
-            ]
-          }
-        },
-        "required": [
-          "_tag",
-          "reason"
-        ],
-        "additionalProperties": false
-      },
-      "InviteAcceptedEncoded": {
-        "type": "object",
-        "properties": {
-          "workspaceId": {
-            "type": "string"
-          },
-          "role": {
-            "type": "string",
-            "enum": [
-              "owner",
-              "admin",
-              "member"
-            ]
-          }
-        },
-        "required": [
-          "workspaceId",
-          "role"
-        ],
-        "additionalProperties": false
-      },
-      "UserPreferencesEncoded": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "anyOf": [
-              {
-                "type": "string"
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "slug": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "slug"
+                ],
+                "additionalProperties": false
               },
               {
                 "type": "null"
               }
             ]
           },
-          "userId": {
-            "type": "string"
-          },
-          "theme": {
-            "type": "string",
-            "enum": [
-              "light",
-              "dark",
-              "system"
-            ]
-          },
-          "language": {
-            "type": "string"
-          },
-          "timezone": {
-            "type": "string"
-          },
-          "emailNotifications": {
-            "type": "boolean"
-          },
-          "pushNotifications": {
-            "type": "boolean"
-          },
-          "createdAt": {
+          "workspaceRole": {
             "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "updatedAt": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "id",
-          "userId",
-          "theme",
-          "language",
-          "timezone",
-          "emailNotifications",
-          "pushNotifications",
-          "createdAt",
-          "updatedAt"
-        ],
-        "additionalProperties": false
-      },
-      "UpdatePreferencesEncoded": {
-        "type": "object",
-        "properties": {
-          "theme": {
-            "type": "string",
-            "enum": [
-              "light",
-              "dark",
-              "system"
-            ]
-          },
-          "language": {
-            "type": "string",
-            "maxLength": 10
-          },
-          "timezone": {
-            "type": "string",
-            "maxLength": 50
-          },
-          "emailNotifications": {
-            "type": "boolean"
-          },
-          "pushNotifications": {
-            "type": "boolean"
-          }
-        },
-        "additionalProperties": false
-      },
-      "ApiKeyEncoded": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "keyPrefix": {
-            "type": "string"
-          },
-          "permissions": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "read",
-                "write",
-                "delete",
-                "admin"
-              ]
-            }
-          },
-          "lastUsedAt": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "expiresAt": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "createdAt": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "keyPrefix",
-          "permissions",
-          "lastUsedAt",
-          "expiresAt",
-          "createdAt"
-        ],
-        "additionalProperties": false
-      },
-      "CreateApiKeyEncoded": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          },
-          "permissions": {
-            "type": "array",
-            "prefixItems": [
               {
                 "type": "string",
                 "enum": [
-                  "read",
-                  "write",
-                  "delete",
-                  "admin"
+                  "owner",
+                  "admin",
+                  "member"
                 ]
+              },
+              {
+                "type": "null"
               }
-            ],
-            "minItems": 1,
-            "items": {
-              "type": "string",
-              "enum": [
-                "read",
-                "write",
-                "delete",
-                "admin"
-              ]
-            }
+            ]
           },
-          "expiresInDays": {
+          "platformRole": {
+            "type": "string",
+            "enum": [
+              "user",
+              "admin"
+            ]
+          },
+          "canManageWorkspace": {
+            "type": "boolean"
+          },
+          "isPlatformAdmin": {
+            "type": "boolean"
+          },
+          "inviteAllowlistCount": {
             "type": "integer",
-            "exclusiveMinimum": 0
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           }
         },
         "required": [
-          "name",
-          "permissions"
+          "workspace",
+          "workspaceRole",
+          "platformRole",
+          "canManageWorkspace",
+          "isPlatformAdmin",
+          "inviteAllowlistCount"
         ],
         "additionalProperties": false
       },
-      "ApiKeyCreatedEncoded": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "keyPrefix": {
-            "type": "string"
-          },
-          "permissions": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "read",
-                "write",
-                "delete",
-                "admin"
-              ]
-            }
-          },
-          "expiresAt": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "key": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "keyPrefix",
-          "permissions",
-          "expiresAt",
-          "key"
-        ],
-        "additionalProperties": false
-      },
-      "LaunchControlsEncoded": {
-        "type": "object",
-        "properties": {
-          "maintenanceMode": {
-            "type": "boolean"
-          },
-          "signupEnabled": {
-            "type": "boolean"
-          },
-          "announcementMessage": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "announcementTone": {
-            "type": "string",
-            "enum": [
-              "info",
-              "warning",
-              "critical"
-            ]
-          },
-          "allowedEmailDomains": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "platformPrimitives": {
-            "$ref": "#/components/schemas/PlatformPrimitivesEncoded"
-          },
-          "waitlistCount": {
-            "type": "integer"
-          }
-        },
-        "required": [
-          "maintenanceMode",
-          "signupEnabled",
-          "announcementMessage",
-          "announcementTone",
-          "allowedEmailDomains",
-          "platformPrimitives",
-          "waitlistCount"
-        ],
-        "additionalProperties": false
-      },
-      "UpdateLaunchControlsEncoded": {
-        "type": "object",
-        "properties": {
-          "maintenanceMode": {
-            "type": "boolean"
-          },
-          "signupEnabled": {
-            "type": "boolean"
-          },
-          "announcementMessage": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2000
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "announcementTone": {
-            "type": "string",
-            "enum": [
-              "info",
-              "warning",
-              "critical"
-            ]
-          },
-          "allowedEmailDomains": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "minLength": 1
-            }
-          }
-        },
-        "additionalProperties": false
-      },
-      "ApplicationSettingsEncoded": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "setupCompletedAt": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "setupCompletedByUserId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "initialWorkspaceId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "maintenanceMode": {
-            "type": "boolean"
-          },
-          "signupEnabled": {
-            "type": "boolean"
-          },
-          "announcementMessage": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "announcementTone": {
-            "type": "string",
-            "enum": [
-              "info",
-              "warning",
-              "critical"
-            ]
-          },
-          "allowedEmailDomains": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "id",
-          "setupCompletedAt",
-          "setupCompletedByUserId",
-          "initialWorkspaceId",
-          "maintenanceMode",
-          "signupEnabled",
-          "announcementMessage",
-          "announcementTone",
-          "allowedEmailDomains",
-          "createdAt",
-          "updatedAt"
-        ],
-        "additionalProperties": false
-      },
-      "WaitlistEntryEncoded": {
+      "WaitlistSubmissionEncoded": {
         "type": "object",
         "properties": {
           "id": {
@@ -3713,162 +4208,120 @@
               "approved",
               "dismissed"
             ]
-          },
-          "message": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "referralCode": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "reviewedByUserId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "reviewedAt": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
           }
         },
         "required": [
           "id",
           "email",
           "source",
-          "status",
-          "message",
-          "referralCode",
-          "reviewedByUserId",
-          "reviewedAt",
-          "createdAt",
-          "updatedAt"
-        ],
-        "additionalProperties": false
-      },
-      "ReviewWaitlistEntryEncoded": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "pending",
-              "contacted",
-              "approved",
-              "dismissed"
-            ]
-          }
-        },
-        "required": [
           "status"
         ],
         "additionalProperties": false
       },
-      "BootstrapStatusEncoded": {
+      "WaitlistSubmitEncoded": {
         "type": "object",
         "properties": {
-          "isInitialized": {
-            "type": "boolean"
-          },
-          "requiresSetup": {
-            "type": "boolean"
-          },
-          "hasExistingWorkspace": {
-            "type": "boolean"
-          },
-          "setupCompletedAt": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "initialWorkspaceId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "isInitialized",
-          "requiresSetup",
-          "hasExistingWorkspace",
-          "setupCompletedAt",
-          "initialWorkspaceId"
-        ],
-        "additionalProperties": false
-      },
-      "CompleteBootstrapEncoded": {
-        "type": "object",
-        "properties": {
-          "workspaceName": {
+          "email": {
             "type": "string",
-            "minLength": 2,
+            "description": "an email address",
+            "maxLength": 254
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "referralCode": {
+            "type": "string",
             "maxLength": 120
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "landing",
+              "contact",
+              "referral",
+              "blocked-signup"
+            ]
           }
         },
         "required": [
-          "workspaceName"
+          "email"
         ],
         "additionalProperties": false
       },
-      "WorkspaceEncoded": {
+      "LaunchStateEncoded": {
+        "type": "object",
+        "properties": {
+          "announcementMessage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "announcementTone": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ]
+          },
+          "allowedEmailDomains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "canAutoCreateAccounts": {
+            "type": "boolean"
+          },
+          "inviteOnly": {
+            "type": "boolean"
+          },
+          "maintenanceMode": {
+            "type": "boolean"
+          },
+          "signupEnabled": {
+            "type": "boolean"
+          },
+          "stripeConfigured": {
+            "type": "boolean"
+          },
+          "publicAnnouncementVisible": {
+            "type": "boolean"
+          },
+          "canUseWaitlist": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "announcementMessage",
+          "announcementTone",
+          "allowedEmailDomains",
+          "canAutoCreateAccounts",
+          "inviteOnly",
+          "maintenanceMode",
+          "signupEnabled",
+          "stripeConfigured",
+          "publicAnnouncementVisible",
+          "canUseWaitlist"
+        ],
+        "additionalProperties": false
+      },
+      "PostEncoded_1": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string"
           },
-          "name": {
+          "title": {
             "type": "string"
           },
-          "slug": {
-            "type": "string"
-          },
-          "ownerUserId": {
+          "content": {
             "type": "string"
           },
           "createdAt": {
@@ -3887,496 +4340,63 @@
         },
         "required": [
           "id",
-          "name",
-          "slug",
-          "ownerUserId",
+          "title",
+          "content",
           "createdAt",
           "updatedAt"
         ],
         "additionalProperties": false
       },
-      "BootstrapCompletedEncoded": {
+      "CreatePostEncoded": {
         "type": "object",
         "properties": {
-          "settings": {
-            "$ref": "#/components/schemas/ApplicationSettingsEncoded"
-          },
-          "workspace": {
-            "$ref": "#/components/schemas/WorkspaceEncoded"
-          }
-        },
-        "required": [
-          "settings",
-          "workspace"
-        ],
-        "additionalProperties": false
-      },
-      "AdminStatsEncoded": {
-        "type": "object",
-        "properties": {
-          "totalUsers": {
-            "type": "integer"
-          },
-          "totalWorkspaces": {
-            "type": "integer"
-          },
-          "adminUsers": {
-            "type": "integer"
-          },
-          "regularUsers": {
-            "type": "integer"
-          }
-        },
-        "required": [
-          "totalUsers",
-          "totalWorkspaces",
-          "adminUsers",
-          "regularUsers"
-        ],
-        "additionalProperties": false
-      },
-      "AdminWorkspaceEncoded": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "slug": {
-            "type": "string"
-          },
-          "ownerUserId": {
-            "type": "string"
-          },
-          "membershipCount": {
-            "type": "integer"
-          },
-          "createdAt": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "slug",
-          "ownerUserId",
-          "membershipCount",
-          "createdAt"
-        ],
-        "additionalProperties": false
-      },
-      "UserListEncoded": {
-        "type": "object",
-        "properties": {
-          "users": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/UserEncoded"
-            }
-          },
-          "total": {
-            "type": "integer"
-          },
-          "hasMore": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "users",
-          "total",
-          "hasMore"
-        ],
-        "additionalProperties": false
-      },
-      "UpdateUserRoleEncoded": {
-        "type": "object",
-        "properties": {
-          "role": {
+          "title": {
             "type": "string",
-            "enum": [
-              "user",
-              "admin"
-            ]
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 256
           }
         },
         "required": [
-          "role"
+          "title",
+          "content"
         ],
         "additionalProperties": false
       },
-      "LiveStatusEncoded": {
+      "SessionStateEncoded": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "ok"
-            ]
-          },
-          "stage": {
-            "type": "string",
-            "enum": [
-              "development",
-              "preview",
-              "staging",
-              "production"
-            ]
-          }
-        },
-        "required": [
-          "status",
-          "stage"
-        ],
-        "additionalProperties": false
-      },
-      "ReadyStatusEncoded": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "ok"
-            ]
-          },
-          "latencyMs": {
+          "user": {
             "anyOf": [
               {
-                "type": "number"
+                "$ref": "#/components/schemas/UserEncoded"
               },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "credential": {
+            "anyOf": [
               {
                 "type": "string",
                 "enum": [
-                  "Infinity",
-                  "-Infinity",
-                  "NaN"
+                  "session",
+                  "key"
                 ]
-              }
-            ]
-          }
-        },
-        "required": [
-          "status",
-          "latencyMs"
-        ],
-        "additionalProperties": false
-      },
-      "UnhealthyEncoded": {
-        "type": "object",
-        "properties": {
-          "_tag": {
-            "type": "string",
-            "enum": [
-              "Unhealthy"
-            ]
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "unhealthy"
-            ]
-          },
-          "detail": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "_tag",
-          "status",
-          "detail"
-        ],
-        "additionalProperties": false
-      },
-      "HealthStatusEncoded": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "healthy",
-              "degraded"
-            ]
-          },
-          "timestamp": {
-            "type": "string"
-          },
-          "version": {
-            "type": "string"
-          },
-          "checks": {
-            "type": "object",
-            "properties": {
-              "database": {
-                "type": "object",
-                "properties": {
-                  "status": {
-                    "type": "string",
-                    "enum": [
-                      "pass",
-                      "fail",
-                      "warn"
-                    ]
-                  },
-                  "message": {
-                    "type": "string"
-                  },
-                  "responseTime": {
-                    "anyOf": [
-                      {
-                        "type": "number"
-                      },
-                      {
-                        "type": "string",
-                        "enum": [
-                          "Infinity",
-                          "-Infinity",
-                          "NaN"
-                        ]
-                      }
-                    ]
-                  }
-                },
-                "required": [
-                  "status"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "required": [
-              "database"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "required": [
-          "status",
-          "timestamp",
-          "version",
-          "checks"
-        ],
-        "additionalProperties": false
-      },
-      "UnhealthyReportEncoded": {
-        "type": "object",
-        "properties": {
-          "_tag": {
-            "type": "string",
-            "enum": [
-              "UnhealthyReport"
-            ]
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "unhealthy"
-            ]
-          },
-          "timestamp": {
-            "type": "string"
-          },
-          "version": {
-            "type": "string"
-          },
-          "checks": {
-            "type": "object",
-            "properties": {
-              "database": {
-                "type": "object",
-                "properties": {
-                  "status": {
-                    "type": "string",
-                    "enum": [
-                      "pass",
-                      "fail",
-                      "warn"
-                    ]
-                  },
-                  "message": {
-                    "type": "string"
-                  },
-                  "responseTime": {
-                    "anyOf": [
-                      {
-                        "type": "number"
-                      },
-                      {
-                        "type": "string",
-                        "enum": [
-                          "Infinity",
-                          "-Infinity",
-                          "NaN"
-                        ]
-                      }
-                    ]
-                  }
-                },
-                "required": [
-                  "status"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "required": [
-              "database"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "required": [
-          "_tag",
-          "status",
-          "timestamp",
-          "version",
-          "checks"
-        ],
-        "additionalProperties": false
-      },
-      "ForgeHealthEncoded": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "healthy",
-              "degraded"
-            ]
-          },
-          "version": {
-            "type": "string",
-            "enum": [
-              "1.0"
-            ]
-          },
-          "timestamp": {
-            "type": "string"
-          },
-          "checks": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "object",
-              "properties": {
-                "status": {
-                  "type": "string",
-                  "enum": [
-                    "healthy",
-                    "degraded",
-                    "unhealthy"
-                  ]
-                },
-                "latencyMs": {
-                  "anyOf": [
-                    {
-                      "type": "number"
-                    },
-                    {
-                      "type": "string",
-                      "enum": [
-                        "Infinity",
-                        "-Infinity",
-                        "NaN"
-                      ]
-                    }
-                  ]
-                },
-                "checkedAt": {
-                  "type": "string"
-                },
-                "error": {
-                  "type": "string"
-                }
               },
-              "required": [
-                "status",
-                "latencyMs",
-                "checkedAt"
-              ],
-              "additionalProperties": false
-            }
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
-          "status",
-          "version",
-          "timestamp",
-          "checks"
-        ],
-        "additionalProperties": false
-      },
-      "ForgeUnhealthyEncoded": {
-        "type": "object",
-        "properties": {
-          "_tag": {
-            "type": "string",
-            "enum": [
-              "ForgeUnhealthy"
-            ]
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "unhealthy"
-            ]
-          },
-          "version": {
-            "type": "string",
-            "enum": [
-              "1.0"
-            ]
-          },
-          "timestamp": {
-            "type": "string"
-          },
-          "checks": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "object",
-              "properties": {
-                "status": {
-                  "type": "string",
-                  "enum": [
-                    "healthy",
-                    "degraded",
-                    "unhealthy"
-                  ]
-                },
-                "latencyMs": {
-                  "anyOf": [
-                    {
-                      "type": "number"
-                    },
-                    {
-                      "type": "string",
-                      "enum": [
-                        "Infinity",
-                        "-Infinity",
-                        "NaN"
-                      ]
-                    }
-                  ]
-                },
-                "checkedAt": {
-                  "type": "string"
-                },
-                "error": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "status",
-                "latencyMs",
-                "checkedAt"
-              ],
-              "additionalProperties": false
-            }
-          }
-        },
-        "required": [
-          "_tag",
-          "status",
-          "version",
-          "timestamp",
-          "checks"
+          "user",
+          "credential"
         ],
         "additionalProperties": false
       }

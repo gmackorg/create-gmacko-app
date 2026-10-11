@@ -7,8 +7,8 @@
  */
 import { AppApi } from "@gmacko/domain";
 import { Cause, Effect, type Exit, Schema } from "effect";
-import { HttpClient, HttpClientError } from "effect/unstable/http";
-import { HttpApiClient } from "effect/unstable/httpapi";
+import { HttpClient, HttpClientError } from "effect/http";
+import { HttpApiClient } from "effect/http-api";
 
 import { ApiClientError, type RequestTrace, recordTrace } from "./errors";
 import {

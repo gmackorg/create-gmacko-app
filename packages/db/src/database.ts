@@ -35,10 +35,10 @@ import {
   Predicate,
   Schema,
 } from "effect";
-import * as Reactivity from "effect/unstable/reactivity/Reactivity";
-import type { SqlClient } from "effect/unstable/sql/SqlClient";
-import { isSqlError, type SqlError } from "effect/unstable/sql/SqlError";
-import type * as Statement from "effect/unstable/sql/Statement";
+import * as Reactivity from "effect/reactivity/Reactivity";
+import type { SqlClient } from "effect/sql/SqlClient";
+import { isSqlError, type SqlError } from "effect/sql/SqlError";
+import type * as Statement from "effect/sql/Statement";
 
 import { type Relations, relations } from "./relations";
 

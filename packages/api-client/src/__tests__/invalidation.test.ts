@@ -6,7 +6,7 @@
  */
 import { AppApi } from "@gmacko/domain";
 import type { MutationMeta, QueryKey } from "@tanstack/react-query";
-import { HttpApi } from "effect/unstable/httpapi";
+import { HttpApi } from "effect/http-api";
 import { describe, expect, it } from "vitest";
 
 import { makeApiClient } from "../index";

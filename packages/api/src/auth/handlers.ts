@@ -1,8 +1,8 @@
 import { bearerOf } from "@gmacko/auth/middleware";
 import { AppApi } from "@gmacko/domain";
 import { Effect, Layer } from "effect";
-import { HttpServerRequest } from "effect/unstable/http";
-import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { HttpServerRequest } from "effect/http";
+import { HttpApiBuilder } from "effect/http-api";
 
 import { internal, requestContext } from "../boundary";
 import { Sessions } from "./service";

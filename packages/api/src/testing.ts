@@ -43,8 +43,8 @@ import {
   HttpClientError,
   HttpClientRequest,
   HttpClientResponse,
-} from "effect/unstable/http";
-import { HttpApiClient } from "effect/unstable/httpapi";
+} from "effect/http";
+import { HttpApiClient } from "effect/http-api";
 
 import { Background } from "./background";
 import {

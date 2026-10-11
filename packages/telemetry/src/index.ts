@@ -3,7 +3,7 @@
  *
  * `Observability.layer(options)` installs the JSON console logger
  * (@gmacko/logging) and, when an OTLP endpoint is configured, Effect's
- * OTLP/HTTP exporters for all three signals (`effect/unstable/observability`,
+ * OTLP/HTTP exporters for all three signals (`effect/observability`,
  * fetch-based, so they run on workerd). Either way the layer provides
  * `OtlpExporter.Flusher`, so `flushTelemetry` is always safe to run: with
  * nothing registered, `flush` is a no-op.
@@ -16,8 +16,8 @@
  */
 import { Logging, type LoggingOptions } from "@gmacko/logging";
 import { Duration, Effect, Layer, Metric } from "effect";
-import { FetchHttpClient } from "effect/unstable/http";
-import { Otlp, OtlpExporter } from "effect/unstable/observability";
+import { FetchHttpClient } from "effect/http";
+import { Otlp, OtlpExporter } from "effect/observability";
 
 export interface ObservabilityOptions {
   /** OTLP/HTTP base URL (`…/v1/{traces,logs,metrics}` are appended); unset → export off. */

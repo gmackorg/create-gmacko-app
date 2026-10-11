@@ -8,8 +8,8 @@ import {
   HttpEffect,
   HttpServerRequest,
   HttpServerResponse,
-} from "effect/unstable/http";
-import { HttpApiBuilder } from "effect/unstable/httpapi";
+} from "effect/http";
+import { HttpApiBuilder } from "effect/http-api";
 
 import { internal, requestContext, withUser } from "../boundary";
 import { Billing } from "./billing";

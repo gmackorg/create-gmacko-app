@@ -9,7 +9,7 @@
  * `CurrentUser` a security middleware provided.
  */
 import { Context } from "effect";
-import { HttpApiMiddleware, HttpApiSecurity } from "effect/unstable/httpapi";
+import { HttpApiMiddleware, HttpApiSecurity } from "effect/http-api";
 
 import type { User } from "./auth/models";
 import { Forbidden, Unauthorized } from "./errors";

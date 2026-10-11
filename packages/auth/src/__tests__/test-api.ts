@@ -13,13 +13,13 @@ import {
   WorkspaceRole,
 } from "@gmacko/domain";
 import { Effect, FileSystem, Layer, Path, Schema } from "effect";
-import { Etag, HttpPlatform, HttpRouter } from "effect/unstable/http";
+import { Etag, HttpPlatform, HttpRouter } from "effect/http";
 import {
   HttpApi,
   HttpApiBuilder,
   HttpApiEndpoint,
   HttpApiGroup,
-} from "effect/unstable/httpapi";
+} from "effect/http-api";
 import { SecurityLive } from "../middleware";
 import type { AuthSecurityConfig } from "../security-config";
 import type { Auth } from "../service";

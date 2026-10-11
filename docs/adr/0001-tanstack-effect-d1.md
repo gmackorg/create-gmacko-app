@@ -17,6 +17,11 @@ plan's Overview. Every Phase 0 kill criterion passed, so no fallback is in use.
 
 ## Pinned versions (pnpm catalog)
 
+> **Amended 2026-10-11 (CREA-4):** `effect`, `@effect/sql-d1` and `@effect/sql-sqlite-node` moved to the
+> stable 4.0.3 release. HTTP, HttpApi, SQL and observability left `effect/unstable/*` for
+> `effect/{http,http-api,sql,observability}`. drizzle-orm rc5 still imports the old SQL paths, so it carries
+> `patches/drizzle-orm@1.0.0-rc.5-169397b.patch` until upstream catches up. The table below is the Phase 0 record.
+
 | Package | Version | Note |
 | --- | --- | --- |
 | `effect` | 4.0.0-rc.112 | `Context.Service`, `effect/unstable/{httpapi,http,sql,schema,observability}` |
