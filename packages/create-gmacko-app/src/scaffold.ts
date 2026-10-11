@@ -100,9 +100,10 @@ export async function scaffold(options: CliOptions): Promise<void> {
     }
 
     spinner.stop("Template cloned");
-  } catch {
+  } catch (cause) {
     spinner.stop("Failed to clone template");
     p.log.error("Failed to clone template repository");
+    p.log.error(cause instanceof Error ? cause.message : String(cause));
     process.exit(1);
   }
 
@@ -341,6 +342,8 @@ const storage: StorageIntegration = {
 
 export const integrations = {
   sentry: ${integrations.sentry},
+  // No-ops unless the app id and ingest key are configured.
+  preflight: true,
   posthog: ${integrations.posthog},
   forgegraph: ${integrations.forgegraph},
   stripe: ${integrations.stripe},
@@ -368,6 +371,7 @@ export const saasFeatures = {
 export type SaasFeatures = typeof saasFeatures;
 
 export const isSentryEnabled = () => integrations.sentry;
+export const isPreflightEnabled = () => integrations.preflight;
 export const isPostHogEnabled = () => integrations.posthog;
 export const isStripeEnabled = () => integrations.stripe;
 export const isRevenueCatEnabled = () => integrations.revenuecat;
@@ -1031,7 +1035,7 @@ After \`pnpm bootstrap:local\`:
  */
 function removeWebApp(targetDir: string): void {
   fs.removeSync(path.join(targetDir, WEB_APP_DIR));
-  fs.removeSync(path.join(targetDir, ".github/workflows/preview.yml"));
+  fs.removeSync(path.join(targetDir, ".forgejo/workflows/preview.yml"));
 
   const rootPackagePath = path.join(targetDir, "package.json");
   const rootPackage = readRootPackage(rootPackagePath);
@@ -1460,7 +1464,7 @@ function removeSnippet(filePath: string, snippet: string): void {
 /**
  * Sentry off + prune: `apps/expo/src/components/error-boundary.tsx` reports
  * caught errors through `@gmacko/monitoring/native`. Strip that import and
- * the two guarded `captureExceptionNative` calls; the boundary itself (and
+ * the guarded Sentry and Preflight calls; the boundary itself (and
  * its `integrations.sentry` status line, now always false) stays.
  */
 function pruneExpoErrorBoundary(targetDir: string): void {
@@ -1472,7 +1476,7 @@ function pruneExpoErrorBoundary(targetDir: string): void {
 
   let content = fs.readFileSync(boundaryPath, "utf-8");
   content = content.replace(
-    'import { captureExceptionNative } from "@gmacko/monitoring/native";\n',
+    /import \{[^}]*\} from "@gmacko\/monitoring\/native";\n/,
     "",
   );
   content = content.replace(
@@ -1480,10 +1484,17 @@ function pruneExpoErrorBoundary(targetDir: string): void {
     "\n",
   );
   content = content.replace(
+    /\n *\/\/ Dual-report to Preflight[^\n]*\n *if \(integrations\.preflight\) \{\n *capturePreflightException\(error, \{ isFatal: false \}\);\n *\}\n/,
+    "\n",
+  );
+  content = content.replace(
     /const handleReport = \(\) => \{\n *if \(onReport\) \{\n *onReport\(\);\n *\} else if \(integrations\.sentry && error\) \{\n[^}]*\}\n *\};/,
     "const handleReport = () => {\n    onReport?.();\n  };",
   );
-  if (content.includes("captureExceptionNative")) {
+  if (
+    content.includes("captureExceptionNative") ||
+    content.includes("capturePreflightException")
+  ) {
     throw new Error(
       "pruneExpoErrorBoundary: apps/expo/src/components/error-boundary.tsx no longer matches the template; update the scaffolder",
     );

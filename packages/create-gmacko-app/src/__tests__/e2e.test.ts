@@ -556,9 +556,9 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
       // The generators that write shell commands: workflows, ForgeGraph
       // contract, provisioning script.
       for (const file of [
-        ".github/workflows/preview.yml",
-        ".github/workflows/e2e.yml",
-        ".github/workflows/sdk.yml",
+        ".forgejo/workflows/preview.yml",
+        ".forgejo/workflows/e2e.yml",
+        ".forgejo/workflows/sdk.yml",
         ".forgegraph.yaml",
       ]) {
         const content = readFile(appPath, file);
@@ -633,7 +633,7 @@ describe.skipIf(SKIP_E2E)("create-gmacko-app E2E", () => {
     it("should have no web app and no Worker wiring", () => {
       expect(fileExists(appPath, "apps/web")).toBe(false);
       expect(fileExists(appPath, "apps/expo")).toBe(true);
-      expect(fileExists(appPath, ".github/workflows/preview.yml")).toBe(false);
+      expect(fileExists(appPath, ".forgejo/workflows/preview.yml")).toBe(false);
     });
 
     it("should pass typecheck and the doctor without a Worker", () => {

@@ -26,13 +26,13 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-pnpm@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-node@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -65,13 +65,13 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-pnpm@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-node@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -94,19 +94,22 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-pnpm@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-node@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Test Forgejo CI API operations
+        run: node --test scripts/ci/forgejo.test.mjs
 
       - name: Run tests
         run: pnpm test
@@ -115,12 +118,12 @@ jobs:
       # @cloudflare/vitest-pool-workers); catches D1-only divergence that the
       # sqlite-node suite cannot.
       - name: Run Workers tests
-        run: pnpm test:workers
+        run: pnpm test:workers --concurrency=1
 
       - name: Upload coverage
         if: always()
         # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
-        uses: actions/upload-artifact@v3
+        uses: https://git.forgegraf.com/gmackie/ci-actions/upload-artifact@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           name: coverage
           path: |
@@ -145,13 +148,13 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-pnpm@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-node@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -168,7 +171,7 @@ jobs:
     # A bounded depth-1 pass: every declared perturbation on its own, against
     # the real Worker code on workerd with a real Miniflare D1. Pairs and
     # deeper combinations are the scheduled job's business
-    # (.github/workflows/fault.yml), because the scenario count grows
+    # (.forgejo/workflows/fault.yml), because the scenario count grows
     # combinatorially and a PR gate has to stay under a couple of minutes.
     #
     # Budget: 10 minutes. Today the search itself is ~150ms and the job is
@@ -178,13 +181,13 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-pnpm@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-node@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -210,13 +213,13 @@ jobs:
     needs: [lint, typecheck]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-pnpm@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-node@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"

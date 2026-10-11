@@ -37,7 +37,7 @@
 - Generated repos ship no dead deployment directories, no `DATABASE_URL`, and no provider-specific env presets.
 - Provisioning offers ForgeGraph deployment guidance and the `wrangler d1 create` steps.
 - Scaffold tests assert the presence of the current Workers/D1/ForgeGraph expectations and the absence of stale runtime hooks.
-- `pnpm check:fast` (lint, typecheck, standards) passes on every scaffold profile in `.github/workflows/cli-e2e.yml`.
+- `pnpm check:fast` (lint, typecheck, standards) passes on every scaffold profile in `.forgejo/workflows/cli-e2e.yml`.
 
 ### 4. SaaS Scaffold Expansion
 

@@ -15,7 +15,7 @@ copy, size) are in [`RUNBOOK.md`](./RUNBOOK.md) and the migration rules in
 | Stage | Worker | wrangler env | D1 | Who deploys |
 | --- | --- | --- | --- | --- |
 | development | `vite dev` on workerd | (none) | local, `apps/web/.wrangler/state` | you: `pnpm dev` |
-| preview | `gmacko-web-preview` (a version per PR) | `preview` | shared `gmacko-web-preview` | `.github/workflows/preview.yml`, per PR |
+| preview | `gmacko-web-preview` (a version per PR) | `preview` | shared `gmacko-web-preview` | `.forgejo/workflows/preview.yml`, per PR |
 | staging | `gmacko-web-staging` | `staging` | `gmacko-web-staging` | ForgeGraph (`pnpm forge:deploy:staging`) or `pnpm deploy:staging` |
 | production | `gmacko-web` | `production` | `gmacko-web` | ForgeGraph (`pnpm forge:deploy:production`) or `pnpm deploy:production` |
 
@@ -189,7 +189,7 @@ CI's `pnpm check:cf-types` fails when it drifts, so a binding added to
 
 ## Previews
 
-`.github/workflows/preview.yml` uploads a *version* of the single
+`.forgejo/workflows/preview.yml` uploads a *version* of the single
 `gmacko-web-preview` Worker on every PR update (`pnpm -F @gmacko/web
 preview:upload` = `CLOUDFLARE_ENV=preview vite build && wrangler versions
 upload`), after applying pending migrations to the shared

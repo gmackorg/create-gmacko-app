@@ -8,7 +8,12 @@ on:
       - release/*
     paths:
       - "packages/create-gmacko-app/**"
-      - ".github/workflows/cli-e2e.yml"
+      - ".forgejo/workflows/cli-e2e.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "packages/create-gmacko-app/**"
+      - ".forgejo/workflows/cli-e2e.yml"
   # Allow manual trigger
   workflow_dispatch:
     inputs:
@@ -25,10 +30,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Scaffold from this checkout instead of cloning main, so template changes in
-  # the branch under test are actually exercised (the CLI defaults to cloning
-  # https://github.com/gmackorg/create-gmacko-app.git otherwise).
-  CREATE_GMACKO_APP_TEMPLATE_REPO: ${{ github.workspace }}
   # The mock .env every scaffold gets. It mirrors .env.example: the web lane
   # reads these as Worker bindings (no database URL, the database is a local
   # D1), Expo reads EXPO_PUBLIC_*, the operator lane reads GMACKO_API_*.
@@ -61,13 +62,13 @@ jobs:
     timeout-minutes: 40
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-pnpm@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-node@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -80,7 +81,7 @@ jobs:
 
       - name: Upload CLI dist
         # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
-        uses: actions/upload-artifact@v3
+        uses: https://git.forgegraf.com/gmackie/ci-actions/upload-artifact@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           name: cli-dist
           path: packages/create-gmacko-app/dist
@@ -93,20 +94,20 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Download CLI dist
         # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
-        uses: actions/download-artifact@v3
+        uses: https://git.forgegraf.com/gmackie/ci-actions/download-artifact@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           name: cli-dist
           path: packages/create-gmacko-app/dist
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-pnpm@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-node@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -116,6 +117,8 @@ jobs:
 
       - name: Scaffold app
         run: |
+          # Resolve the checkout after runner preparation, before changing cwd.
+          export CREATE_GMACKO_APP_TEMPLATE_REPO="$PWD"
           mkdir -p /tmp/e2e-test
           cd /tmp/e2e-test
           node ${{ github.workspace }}/packages/create-gmacko-app/dist/index.js test-app-default \
@@ -211,20 +214,20 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Download CLI dist
         # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
-        uses: actions/download-artifact@v3
+        uses: https://git.forgegraf.com/gmackie/ci-actions/download-artifact@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           name: cli-dist
           path: packages/create-gmacko-app/dist
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-pnpm@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-node@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -234,6 +237,8 @@ jobs:
 
       - name: Scaffold operator app
         run: |
+          # Resolve the checkout after runner preparation, before changing cwd.
+          export CREATE_GMACKO_APP_TEMPLATE_REPO="$PWD"
           mkdir -p /tmp/e2e-test
           cd /tmp/e2e-test
           node ${{ github.workspace }}/packages/create-gmacko-app/dist/index.js test-app-operators \
@@ -284,20 +289,20 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Download CLI dist
         # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
-        uses: actions/download-artifact@v3
+        uses: https://git.forgegraf.com/gmackie/ci-actions/download-artifact@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           name: cli-dist
           path: packages/create-gmacko-app/dist
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-pnpm@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-node@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -307,6 +312,8 @@ jobs:
 
       - name: Scaffold minimal app
         run: |
+          # Resolve the checkout after runner preparation, before changing cwd.
+          export CREATE_GMACKO_APP_TEMPLATE_REPO="$PWD"
           mkdir -p /tmp/e2e-test
           cd /tmp/e2e-test
           node ${{ github.workspace }}/packages/create-gmacko-app/dist/index.js test-app-minimal \
@@ -348,20 +355,20 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Download CLI dist
         # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
-        uses: actions/download-artifact@v3
+        uses: https://git.forgegraf.com/gmackie/ci-actions/download-artifact@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           name: cli-dist
           path: packages/create-gmacko-app/dist
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-pnpm@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-node@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -371,6 +378,8 @@ jobs:
 
       - name: Scaffold with custom scope
         run: |
+          # Resolve the checkout after runner preparation, before changing cwd.
+          export CREATE_GMACKO_APP_TEMPLATE_REPO="$PWD"
           mkdir -p /tmp/e2e-test
           cd /tmp/e2e-test
           node ${{ github.workspace }}/packages/create-gmacko-app/dist/index.js test-app-scope \
@@ -398,7 +407,7 @@ jobs:
           grep '@mycompany/api-cli' package.json || (echo "api:ops kept the template scope" && exit 1)
           grep '@mycompany/mcp-server' package.json || (echo "mcp:app kept the template scope" && exit 1)
           grep '@mycompany/mcp-server' .mcp.json || (echo ".mcp.json kept the template scope" && exit 1)
-          for f in .github/workflows/preview.yml .github/workflows/e2e.yml .github/workflows/sdk.yml .forgegraph.yaml; do
+          for f in .forgejo/workflows/preview.yml .forgejo/workflows/e2e.yml .forgejo/workflows/sdk.yml .forgegraph.yaml; do
             grep -q '@mycompany/' "$f" || (echo "$f kept the template scope" && exit 1)
             if grep -q '@gmacko/' "$f"; then echo "$f still names @gmacko/" && exit 1; fi
           done
@@ -424,20 +433,20 @@ jobs:
     timeout-minutes: 75
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Download CLI dist
         # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
-        uses: actions/download-artifact@v3
+        uses: https://git.forgegraf.com/gmackie/ci-actions/download-artifact@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           name: cli-dist
           path: packages/create-gmacko-app/dist
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-pnpm@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-node@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -447,6 +456,8 @@ jobs:
 
       - name: Scaffold full app
         run: |
+          # Resolve the checkout after runner preparation, before changing cwd.
+          export CREATE_GMACKO_APP_TEMPLATE_REPO="$PWD"
           mkdir -p /tmp/e2e-test
           cd /tmp/e2e-test
           node ${{ github.workspace }}/packages/create-gmacko-app/dist/index.js test-app-full \
@@ -510,20 +521,20 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Download CLI dist
         # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
-        uses: actions/download-artifact@v3
+        uses: https://git.forgegraf.com/gmackie/ci-actions/download-artifact@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           name: cli-dist
           path: packages/create-gmacko-app/dist
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-pnpm@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-node@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -533,6 +544,8 @@ jobs:
 
       - name: Scaffold mobile-only app
         run: |
+          # Resolve the checkout after runner preparation, before changing cwd.
+          export CREATE_GMACKO_APP_TEMPLATE_REPO="$PWD"
           mkdir -p /tmp/e2e-test
           cd /tmp/e2e-test
           node ${{ github.workspace }}/packages/create-gmacko-app/dist/index.js test-app-mobile \
@@ -548,7 +561,7 @@ jobs:
         run: |
           test ! -d apps/web || (echo "apps/web should not exist" && exit 1)
           test -d apps/expo || (echo "Missing apps/expo" && exit 1)
-          test ! -f .github/workflows/preview.yml || (echo "preview.yml should not exist without a web app" && exit 1)
+          test ! -f .forgejo/workflows/preview.yml || (echo "preview.yml should not exist without a web app" && exit 1)
           grep -q '"dev": "pnpm dev:emulate"' package.json || (echo "dev script should only start emulate" && exit 1)
           echo "Structure verified!"
         working-directory: /tmp/e2e-test/test-app-mobile
@@ -576,20 +589,20 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Download CLI dist
         # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
-        uses: actions/download-artifact@v3
+        uses: https://git.forgegraf.com/gmackie/ci-actions/download-artifact@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           name: cli-dist
           path: packages/create-gmacko-app/dist
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-pnpm@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-node@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -599,6 +612,8 @@ jobs:
 
       - name: Scaffold pruned mobile-only app
         run: |
+          # Resolve the checkout after runner preparation, before changing cwd.
+          export CREATE_GMACKO_APP_TEMPLATE_REPO="$PWD"
           mkdir -p /tmp/e2e-test
           cd /tmp/e2e-test
           node ${{ github.workspace }}/packages/create-gmacko-app/dist/index.js test-app-mobile-pruned \
@@ -708,13 +723,13 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-pnpm@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-node@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"

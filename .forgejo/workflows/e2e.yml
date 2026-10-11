@@ -14,10 +14,10 @@ on:
       - "packages/db/**"
       - "packages/domain/**"
       - "packages/ui/**"
-      - ".github/workflows/e2e.yml"
+      - ".forgejo/workflows/e2e.yml"
   workflow_dispatch:
 
-# Shares a group with CI. See .github/workflows/ci.yml.
+# Shares a group with CI. See .forgejo/workflows/ci.yml.
 concurrency:
   group: workerd-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
@@ -36,13 +36,13 @@ jobs:
     # emulated GitHub for the OAuth journey (apps/web/e2e/global-setup.ts).
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-pnpm@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-node@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -64,7 +64,7 @@ jobs:
       - name: Upload test results
         if: always()
         # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
-        uses: actions/upload-artifact@v3
+        uses: https://git.forgegraf.com/gmackie/ci-actions/upload-artifact@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           name: playwright-report
           path: apps/web/playwright-report
@@ -73,7 +73,7 @@ jobs:
       - name: Upload test artifacts
         if: failure()
         # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
-        uses: actions/upload-artifact@v3
+        uses: https://git.forgegraf.com/gmackie/ci-actions/upload-artifact@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           name: test-results
           path: |
@@ -91,13 +91,13 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'run-mobile-e2e')
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-pnpm@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-node@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -106,7 +106,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Xcode
-        uses: maxim-lobanov/setup-xcode@v1
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-xcode@9681ef93e12f50014fd38c9b3eba320a87c8b80e # v1.6.0, Node 20 for the Mac runner
         with:
           xcode-version: latest-stable
 
@@ -192,7 +192,7 @@ jobs:
       - name: Upload Maestro screenshots
         if: always()
         # v4's artifact client is rejected by Forgejo (GHESNotSupportedError).
-        uses: actions/upload-artifact@v3
+        uses: https://git.forgegraf.com/gmackie/ci-actions/upload-artifact@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           name: maestro-screenshots
           path: ~/.maestro/screenshots/

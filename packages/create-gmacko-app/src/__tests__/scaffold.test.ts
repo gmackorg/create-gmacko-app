@@ -72,6 +72,21 @@ describe("create-gmacko-app scaffold", () => {
     }
   }, 900000);
 
+  it("ships only Forgejo-hosted CI actions", () => {
+    const root = path.resolve(process.cwd(), "../..");
+    expect(fs.existsSync(path.join(root, ".github/workflows"))).toBe(false);
+    const workflows = path.join(root, ".forgejo/workflows");
+    for (const name of fs.readdirSync(workflows)) {
+      const content = fs.readFileSync(path.join(workflows, name), "utf8");
+      expect(content, name).not.toContain("github.com");
+      for (const action of content.matchAll(/uses: (\S+)/g)) {
+        expect(action[1], name).toMatch(
+          /^https:\/\/git\.forgegraf\.com\/gmackie\/ci-actions\/[a-z-]+@[a-f0-9]{40}$/,
+        );
+      }
+    }
+  });
+
   it("does not copy the pnpm store that CI keeps inside the checkout", () => {
     expect(shouldCopyTemplatePath("/workspace/app/.pnpm-store")).toBe(false);
     expect(
@@ -103,6 +118,16 @@ describe("create-gmacko-app scaffold", () => {
         "package.json",
       );
       expect(pkg.name).toBe(appName);
+
+      // Native monitoring reads this field even in a web-only scaffold.
+      const integrationsConfig = readFile(
+        result.appPath,
+        "packages/config/src/integrations.ts",
+      );
+      expect(integrationsConfig).toContain("preflight: true");
+      expect(integrationsConfig).toContain(
+        "export const isPreflightEnabled = () => integrations.preflight",
+      );
 
       // Check core files exist
       for (const file of EXPECTED_FILES.core) {
@@ -755,7 +780,7 @@ describe("create-gmacko-app scaffold", () => {
 
       const previewWorkflow = readFile(
         result.appPath,
-        ".github/workflows/preview.yml",
+        ".forgejo/workflows/preview.yml",
       );
 
       // Workers Versions, not a Worker per PR: `preview:upload` is
@@ -1670,7 +1695,7 @@ describe("create-gmacko-app scaffold", () => {
 
   it("keeps the template release workflow scoped to the CLI package", () => {
     const releaseWorkflow = fs.readFileSync(
-      path.resolve(process.cwd(), "../../.github/workflows/release.yml"),
+      path.resolve(process.cwd(), "../../.forgejo/workflows/release.yml"),
       "utf8",
     );
 
@@ -1689,7 +1714,7 @@ describe("create-gmacko-app scaffold", () => {
 
   it("keeps the CLI E2E workflow aligned with the current template baseline", () => {
     const e2eWorkflow = fs.readFileSync(
-      path.resolve(process.cwd(), "../../.github/workflows/cli-e2e.yml"),
+      path.resolve(process.cwd(), "../../.forgejo/workflows/cli-e2e.yml"),
       "utf8",
     );
 
@@ -1877,7 +1902,7 @@ describe("create-gmacko-app scaffold", () => {
       ).toBe(0);
       expect(fileExists(result.appPath, "apps/web")).toBe(false);
       expect(fileExists(result.appPath, "apps/expo")).toBe(true);
-      expect(fileExists(result.appPath, ".github/workflows/preview.yml")).toBe(
+      expect(fileExists(result.appPath, ".forgejo/workflows/preview.yml")).toBe(
         false,
       );
 
@@ -2172,7 +2197,7 @@ describe("create-gmacko-app scaffold", () => {
         "apps/web/fault/signup-rate-limit.fault.ts",
         "apps/web/vitest.fault.config.ts",
         "docs/FAULT_TESTING.md",
-        ".github/workflows/fault.yml",
+        ".forgejo/workflows/fault.yml",
       ]) {
         expect(fileExists(result.appPath, kept), kept).toBe(true);
       }
@@ -2277,6 +2302,35 @@ describe("create-gmacko-app scaffold", () => {
       expect(integrationsContent).not.toContain("uploadthing");
     }, 120000);
   });
+
+  it("scaffolds mobile-only with monitoring pruned", async () => {
+    const result = await runCli({
+      appName: generateAppName("mobile-pruned"),
+      flags: [
+        "--yes",
+        "--no-install",
+        "--no-git",
+        "--no-web",
+        "--no-ai",
+        "--prune",
+        "--integrations",
+        "",
+      ],
+      cwd: tempDir,
+    });
+    appsToClean.push(result.appPath);
+    expect(result.exitCode, `${result.stderr}\n${result.stdout}`).toBe(0);
+    expect(fileExists(result.appPath, "apps/web")).toBe(false);
+    expect(fileExists(result.appPath, "packages/monitoring")).toBe(false);
+    const boundary = readFile(
+      result.appPath,
+      "apps/expo/src/components/error-boundary.tsx",
+    );
+    expect(boundary).not.toContain("@gmacko/monitoring");
+    expect(boundary).not.toContain("captureExceptionNative");
+    expect(boundary).not.toContain("capturePreflightException");
+    expect(boundary).toContain("this.props.onError?.(error, errorInfo)");
+  }, 120000);
 
   describe("package scope", () => {
     it("should replace package scope when --package-scope is passed", async () => {
@@ -2387,8 +2441,8 @@ describe("create-gmacko-app scaffold", () => {
 
       // A lane that cannot start is a red build in both workflows.
       for (const workflow of [
-        ".github/workflows/ci.yml",
-        ".github/workflows/fault.yml",
+        ".forgejo/workflows/ci.yml",
+        ".forgejo/workflows/fault.yml",
       ]) {
         expect(readFile(result.appPath, workflow), workflow).toContain(
           "CLOUDFAULT_REQUIRED: 1",

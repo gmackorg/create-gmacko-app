@@ -81,13 +81,13 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-pnpm@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-node@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -130,51 +130,15 @@ jobs:
 
       - name: Comment the preview URL
         if: steps.creds.outputs.ok == 'true'
-        uses: actions/github-script@v7
+        run: node scripts/ci/forgejo.mjs preview
         env:
           PREVIEW_URL: ${{ steps.upload.outputs.url }}
           VERSION_ID: ${{ steps.upload.outputs.version }}
-        with:
-          script: |
-            const url = process.env.PREVIEW_URL;
-            const version = process.env.VERSION_ID || '(unknown)';
-            const link = url || '(preview URLs are not enabled for `gmacko-web-preview`)';
-            const sha = '${{ github.event.pull_request.head.sha }}'.slice(0, 7);
-            const body = `## Preview deploy
-
-            | Field | Value |
-            |------|-------|
-            | Worker | \`gmacko-web-preview\` (version, not deployed) |
-            | Version | \`${version}\` |
-            | URL | ${link} |
-            | Commit | \`${sha}\` |
-            | Database | shared \`gmacko-web-preview\` D1 ([why](../blob/main/.github/workflows/preview.yml)) |
-
-            Health: ${url ? `${url}/.well-known/forge-health` : "n/a"}
-            `;
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-            const existing = comments.find(
-              (c) => c.user.type === 'Bot' && c.body.includes('## Preview deploy'),
-            );
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body,
-              });
-            }
+          FORGEJO_SERVER_URL: ${{ github.server_url }}
+          FORGEJO_REPOSITORY: ${{ github.repository }}
+          FORGEJO_TOKEN: ${{ github.token }}
+          FORGEJO_PR_NUMBER: ${{ github.event.pull_request.number }}
+          FORGEJO_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
   reset:
     name: Reset the shared preview database
@@ -187,13 +151,13 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-pnpm@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/setup-node@9681ef93e12f50014fd38c9b3eba320a87c8b80e
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"

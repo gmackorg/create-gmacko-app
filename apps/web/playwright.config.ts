@@ -14,6 +14,11 @@ export default defineConfig({
   globalTeardown: "./e2e/global-teardown.ts",
   fullyParallel: false,
   workers: 1,
+  // Shared CI runners compile Vite routes on demand and start workerd for
+  // each D1 helper call. Run 441's successful bootstrap and settings reads
+  // rendered just after the default five-second assertion budget expired.
+  timeout: process.env.CI ? 60_000 : 30_000,
+  expect: { timeout: process.env.CI ? 15_000 : 5_000 },
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: [

@@ -17,11 +17,11 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: https://git.forgegraf.com/gmackie/ci-actions/checkout@9681ef93e12f50014fd38c9b3eba320a87c8b80e
 
       - name: Install forgec 0.5.0
         run: |
-          curl -fsSL -o forgec.tar.gz https://github.com/gmackie/forgec/releases/download/v0.5.0/forgec-0.5.0-x86_64-unknown-linux-gnu.tar.gz
+          curl -fsSL -o forgec.tar.gz https://git.forgegraf.com/gmackie/ci-actions/releases/download/forgec-v0.5.0/forgec-0.5.0-x86_64-unknown-linux-gnu.tar.gz
           echo "683854945966686d7f6080e518a292b5dbc5eca3915a4b0e3e148a4a3a27601f  forgec.tar.gz" | sha256sum -c -
           tar xzf forgec.tar.gz
           install -m 755 "$(find . -name forgec -type f | head -1)" /usr/local/bin/forgec
