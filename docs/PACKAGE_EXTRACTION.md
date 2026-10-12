@@ -32,7 +32,7 @@ be replaced with a constructor argument.
 | Package | Standalone Name | Current Deps | Decoupling Work |
 |---------|----------------|--------------|-----------------|
 | `@gmacko/logging` | `@gmacko/saas-logger` | none | Already standalone (Effect logger, JSON console output). Publish. |
-| `@gmacko/telemetry` | `@gmacko/saas-telemetry` | `@gmacko/logging` | Depends on the published logger; OTLP layers over `effect/unstable/observability`. |
+| `@gmacko/telemetry` | `@gmacko/saas-telemetry` | `@gmacko/logging` | Depends on the published logger; OTLP layers over `effect/observability`. |
 | `@gmacko/monitoring` | `@gmacko/saas-monitoring` | `@gmacko/config` (for `integrations.sentry`) | Replace with `initSentry({ enabled: boolean, ...config })` factory. |
 | `@gmacko/analytics` | `@gmacko/saas-analytics` | `@gmacko/config` (for `integrations.posthog`) | Replace with `initAnalytics({ enabled: boolean, ...config })` factory. |
 | `@gmacko/flags` | `@gmacko/feature-flags` | None (only React as peer dep) | Already standalone. Just publish. |

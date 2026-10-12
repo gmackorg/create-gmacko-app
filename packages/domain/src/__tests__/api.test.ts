@@ -4,7 +4,7 @@
  * document pinned as a snapshot so a change to the contract is a visible
  * diff.
  */
-import { OpenApi } from "effect/unstable/httpapi";
+import { OpenApi } from "effect/http-api";
 import { describe, expect, it } from "vitest";
 
 import { AppApi } from "../api";

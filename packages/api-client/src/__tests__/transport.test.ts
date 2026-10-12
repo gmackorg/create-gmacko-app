@@ -160,9 +160,8 @@ describe("transport", () => {
     await traced.run((c) => Effect.withSpan("page.render")(c.posts.list()));
 
     const render = clientSpans.find((span) => span.name === "page.render");
-    const outbound = clientSpans.find((span) =>
-      span.name.startsWith("http.client"),
-    );
+    // Matched on kind, not name: Effect names client spans by method alone.
+    const outbound = clientSpans.find((span) => span.kind === "client");
     expect(render).toBeDefined();
     expect(outbound).toBeDefined();
     // The client span is a child of the render span...

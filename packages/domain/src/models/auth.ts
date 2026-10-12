@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { Model } from "effect/unstable/schema";
+import { Model } from "effect/schema";
 
 import { UserRole } from "../roles";
 import { UserId } from "./ids";

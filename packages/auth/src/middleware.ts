@@ -44,11 +44,8 @@ import {
   WorkspaceRole,
 } from "@gmacko/domain";
 import { type Context, Effect, Layer } from "effect";
+import { HttpServerRequest, type HttpServerResponse } from "effect/http";
 import type { unhandled } from "effect/Types";
-import {
-  HttpServerRequest,
-  type HttpServerResponse,
-} from "effect/unstable/http";
 
 import { ApiKeys, type ApiKeysShape } from "./api-keys";
 import { RequestContext, type RequestContextShape } from "./request-context";

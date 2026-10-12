@@ -1,6 +1,6 @@
 /**
  * `@gmacko/api`: the services and handler groups behind `AppApi`
- * (@gmacko/domain). Framework-free: only `effect/unstable/httpapi` knows
+ * (@gmacko/domain). Framework-free: only `effect/http-api` knows
  * HTTP, and only the app knows the platform.
  */
 

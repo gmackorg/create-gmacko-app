@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { HttpApi, type HttpApiGroup } from "effect/unstable/httpapi";
+import { HttpApi, type HttpApiGroup } from "effect/http-api";
 
 import { type EndpointInfo, inspectApi } from "../inspect";
 

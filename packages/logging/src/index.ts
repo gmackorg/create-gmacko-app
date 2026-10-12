@@ -19,12 +19,14 @@
  */
 import {
   Cause,
+  Context,
   Effect,
   type LogLevel as EffectLogLevel,
   Layer,
   Logger,
   ManagedRuntime,
   References,
+  Tracer,
 } from "effect";
 
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
@@ -422,7 +424,7 @@ export const makeLogger = (
     const annotations = fiber.getRef(
       References.CurrentLogAnnotations,
     ) as LogFields;
-    const span = fiber.currentSpan;
+    const span = Context.getOrUndefined(fiber.context, Tracer.ParentSpan);
     const record: LogRecord = {
       level: fromEffectLevel(logLevel),
       time: date.toISOString(),

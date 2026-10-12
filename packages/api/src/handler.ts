@@ -16,7 +16,7 @@ import {
   HttpRouter,
   HttpServerRequest,
   HttpServerResponse,
-} from "effect/unstable/http";
+} from "effect/http";
 
 import { RequestTrace, type RequestTraceShape } from "./boundary";
 import { AppConfig, type AppConfigShape } from "./config";

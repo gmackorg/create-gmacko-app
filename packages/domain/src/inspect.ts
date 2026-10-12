@@ -5,11 +5,7 @@
  * derived from this, so neither can drift from the declarations.
  */
 import { Context, Predicate, type Schema } from "effect";
-import {
-  HttpApi,
-  type HttpApiGroup,
-  HttpApiMiddleware,
-} from "effect/unstable/httpapi";
+import { HttpApi, type HttpApiGroup, HttpApiMiddleware } from "effect/http-api";
 
 import { type RateLimitScope, RateLimitScopeAnnotation } from "./middleware";
 import { ApiKeyScope } from "./roles";

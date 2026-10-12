@@ -11,8 +11,8 @@ import type { Auth } from "@gmacko/auth/service";
 import type { Database } from "@gmacko/db";
 import { AppApi } from "@gmacko/domain";
 import { Effect, FileSystem, Layer, Path } from "effect";
-import { Etag, HttpPlatform } from "effect/unstable/http";
-import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { Etag, HttpPlatform } from "effect/http";
+import { HttpApiBuilder } from "effect/http-api";
 
 import { AdminHandlers } from "./admin/handlers";
 import { AuthHandlers } from "./auth/handlers";

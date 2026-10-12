@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { Model } from "effect/unstable/schema";
+import { Model } from "effect/schema";
 
 import { AnnouncementTone } from "./enums";
 import { ApplicationSettingsId, UserId, WorkspaceId } from "./ids";

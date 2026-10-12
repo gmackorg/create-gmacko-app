@@ -50,7 +50,7 @@ const IMPLEMENTATION_RULES = [
   "## Implementation rules (Phase 3)",
   "",
   "The contract declares the credentials; packages/auth implements them. These rules follow from how",
-  "effect 4.0.0-rc.112's `HttpApiBuilder` runs security middlewares and from better-auth's cookie handling.",
+  "Effect 4's `HttpApiBuilder` (verified on rc.112, unchanged on 4.0.3) runs security middlewares and from better-auth's cookie handling.",
   "",
   "1. **Schemes run in declaration order and a missing cookie is not a failure.** `HttpApiBuilder` tries a",
   "   middleware's `security` entries in the order they were declared (`session` first, then `apiKey`) and",
