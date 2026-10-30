@@ -151,7 +151,7 @@ describe("GitHub OAuth callback (generic provider, sqlite-node)", () => {
     );
   });
 
-  it("exchanges the code, creates user + account (with issuer) and sets the session cookie", async () => {
+  it("exchanges the code, creates user + account and sets the session cookie", async () => {
     const result = await runtime.runPromise(
       Effect.gen(function* () {
         const auth = yield* Auth;
@@ -224,12 +224,12 @@ describe("GitHub OAuth callback (generic provider, sqlite-node)", () => {
     expect(result.users[0]?.emailVerified).toBe(true);
     expect(result.users[0]?.image).toBe(profile.avatar_url);
 
-    // better-auth 1.7 keys the account on (issuer, accountId); a generic
-    // provider without a discovery document gets the local namespace.
+    // better-auth (1.7.3+, as in 1.6) keys the account on
+    // (providerId, accountId).
     expect(result.accounts).toHaveLength(1);
     const linked = result.accounts[0];
     expect(linked?.userId).toBe(result.users[0]?.id);
-    expect(linked?.issuer).toBe("local:oauth:github");
+    expect(linked?.providerId).toBe("github");
     expect(linked?.accountId).toBe(String(profile.id));
     expect(linked?.accessToken).toBe(accessToken);
     expect(linked?.scope).toContain("read:user");

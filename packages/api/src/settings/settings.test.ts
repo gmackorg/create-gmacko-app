@@ -1015,7 +1015,6 @@ describe("settings deleteAccount", () => {
     await db(({ db }) =>
       db.insert(account).values({
         id: crypto.randomUUID(),
-        issuer: "test",
         accountId: person.id,
         providerId: "magic-link",
         userId: person.id,

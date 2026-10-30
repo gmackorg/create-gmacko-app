@@ -1,5 +1,5 @@
 /**
- * better-auth's tables (1.7.2), hand-maintained on top of `auth generate`:
+ * better-auth's tables (1.7.14), hand-maintained on top of `auth generate`:
  * `pnpm -F @gmacko/auth generate` writes the CLI's version to
  * `packages/db/.cache/auth-schema.generated.ts` (never here); reconcile it
  * against this file rather than copying it verbatim. Deliberate
@@ -70,8 +70,6 @@ export const account = sqliteTable(
   "account",
   {
     id: text().primaryKey(),
-    /** OAuth issuer (1.7+): with `accountId` it is the provider-side identity key. */
-    issuer: text().notNull(),
     accountId: text("account_id").notNull(),
     providerId: text("provider_id").notNull(),
     userId: text("user_id")
@@ -87,13 +85,7 @@ export const account = sqliteTable(
     createdAt: timestampMs("created_at").notNull(),
     updatedAt: timestampMs("updated_at").notNull(),
   },
-  (table) => [
-    uniqueIndex("account_issuer_accountId_uidx").on(
-      table.issuer,
-      table.accountId,
-    ),
-    index("account_userId_idx").on(table.userId),
-  ],
+  (table) => [index("account_userId_idx").on(table.userId)],
 );
 
 export const verification = sqliteTable(

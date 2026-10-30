@@ -5,7 +5,7 @@ packages:
   - sdks/openapi
 
 catalog:
-  '@better-auth/expo': 1.7.2
+  '@better-auth/expo': 1.7.14
   '@biomejs/biome': ^2.4.8
   '@cloudflare/vite-plugin': 1.54.3
   '@cloudflare/vitest-pool-workers': 0.22.0
@@ -40,10 +40,10 @@ catalog:
   '@tanstack/react-start': 1.168.49
   '@types/node': ^25.5.0
   '@vitejs/plugin-react': 6.0.1
-  # better-auth 1.7.2 is the first published release with the generic OAuth
+  # better-auth 1.7.2 was the first published release with the generic OAuth
   # rewrite (providers as first-class social providers); replaces the expired
   # pkg.pr.new pin of the unmerged endpoint-override PR #8814.
-  better-auth: 1.7.2
+  better-auth: 1.7.14
   # drizzle 1.0 rc5 is the first line that compiles against effect rc.108+
   # (rc.4 still calls the removed Schema.TaggedErrorClass). Pin exact builds.
   drizzle-kit: 1.0.0-rc.5-ab785fc

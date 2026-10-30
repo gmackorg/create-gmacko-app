@@ -185,14 +185,22 @@ export const reset = (): void => {
 
 const literal = (value: string): string => `'${value.replaceAll("'", "''")}'`;
 
-/** The token of the latest magic link sent to `email` (better-auth stores it as the verification identifier). */
+/** better-auth (1.7.3+) prefixes a magic link's verification identifier. */
+const MAGIC_LINK_IDENTIFIER_PREFIX = "magic-link:";
+
+/**
+ * The token of the latest magic link sent to `email`: better-auth stores it
+ * (plain, its default) as the verification identifier, `magic-link:<token>`.
+ */
 export const magicLinkToken = (email: string): string => {
   const rows = query<{ identifier: string }>(
     `select identifier from verification where value like ${literal(`%"email":"${email.toLowerCase()}"%`)} order by created_at desc limit 1`,
   );
-  const token = rows[0]?.identifier;
-  if (!token) throw new Error(`no magic link was recorded for ${email}`);
-  return token;
+  const identifier = rows[0]?.identifier;
+  if (!identifier?.startsWith(MAGIC_LINK_IDENTIFIER_PREFIX)) {
+    throw new Error(`no magic link was recorded for ${email}`);
+  }
+  return identifier.slice(MAGIC_LINK_IDENTIFIER_PREFIX.length);
 };
 
 export const countRows = (table: string, where?: string): number => {

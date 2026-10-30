@@ -203,6 +203,6 @@ In short:
   the Worker, 30-day Time Travel; the cost is no interactive transactions and
   expand/contract-only migrations, both enforced by standards rules.
 - **better-auth** — framework-agnostic auth shared by the web app, Expo, and
-  the API-key path, from a published release (1.7.2).
+  the API-key path, from a published release (1.7.14).
 - **Turborepo with pnpm workspaces** — incremental builds, shared tooling, one
   contract package consumed by every app.

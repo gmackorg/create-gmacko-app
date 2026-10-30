@@ -40,16 +40,8 @@ const seedUserWithSession = async (suffix: string) => {
       "INSERT INTO `session` (`id`, `expires_at`, `token`, `created_at`, `updated_at`, `user_id`) VALUES (?, ?, ?, ?, ?, ?)",
     ).bind(sessionId, now() + 60_000, `token-${suffix}`, now(), now(), userId),
     env.DB.prepare(
-      "INSERT INTO `account` (`id`, `issuer`, `account_id`, `provider_id`, `user_id`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    ).bind(
-      accountId,
-      "local:oauth:github",
-      `gh-${suffix}`,
-      "github",
-      userId,
-      now(),
-      now(),
-    ),
+      "INSERT INTO `account` (`id`, `account_id`, `provider_id`, `user_id`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?, ?, ?)",
+    ).bind(accountId, `gh-${suffix}`, "github", userId, now(), now()),
   ]);
   return { userId, sessionId, accountId };
 };
@@ -121,13 +113,14 @@ describe("migrations on D1 (vitest-pool-workers)", () => {
     }
     expect(names.filter((name) => name.startsWith("__new_"))).toEqual([]);
 
-    // The issuer migration landed: NOT NULL, no default, unique with account_id.
+    // better-auth 1.7.3 dropped the 1.7.0–1.7.2 issuer key again:
+    // `auth_1_7_14_drop_issuer` removes the column and its unique index.
     const issuer = (await columns("account")).find((c) => c.name === "issuer");
-    expect(issuer).toMatchObject({ notnull: 1, dflt_value: null });
+    expect(issuer).toBeUndefined();
     const indexes = await env.DB.prepare(
       "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'account'",
     ).all<{ name: string }>();
-    expect(indexes.results.map((row) => row.name)).toContain(
+    expect(indexes.results.map((row) => row.name)).not.toContain(
       "account_issuer_accountId_uidx",
     );
   });

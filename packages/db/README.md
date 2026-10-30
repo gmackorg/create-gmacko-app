@@ -51,6 +51,11 @@ The `Database` Effect service over Cloudflare D1 (drizzle's Effect API,
   `ON DELETE CASCADE` to `user` (the rows are gone after the rename).
   `src/__tests__/migrations.workers.test.ts` proves both facts on a Miniflare
   D1. Do not reuse or copy that recipe once a stage database exists.
+- `20261030055827_auth_1_7_14_drop_issuer.sql` undoes the issuer column for
+  better-auth 1.7.3+, which keys accounts on `(provider_id, account_id)`
+  again. It is `DROP INDEX` then `ALTER TABLE account DROP COLUMN issuer`:
+  no table rebuild, so it is safe on a populated database (see the
+  1.7 upgrade guide, "The `account.issuer` column").
 - From the first stage database on, every change is **expand/contract**: add
   a nullable or defaulted column, backfill in the app or a follow-up
   migration, then tighten; add a new table and copy, never drop-and-recreate
