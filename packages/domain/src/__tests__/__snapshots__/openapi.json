@@ -4612,7 +4612,8 @@
                 "type": "string",
                 "enum": [
                   "session",
-                  "key"
+                  "key",
+                  "oauth"
                 ]
               },
               {

@@ -9,6 +9,7 @@
     "./api-keys": "./src/api-keys.ts",
     "./middleware": "./src/middleware.ts",
     "./oauth-provider": "./src/oauth-provider.ts",
+    "./oauth-tokens": "./src/oauth-tokens.ts",
     "./request-context": "./src/request-context.ts",
     "./security-config": "./src/security-config.ts",
     "./testing": "./src/testing.ts"

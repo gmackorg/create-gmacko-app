@@ -26,6 +26,13 @@
  * 6. The credential middleware is declared last in the contract and so runs
  *    outermost; it provides `CurrentUser` (and the `RequestContext`) to the
  *    role middlewares and the handler inside it.
+ * 7. A `gmo_` bearer is an OAuth access token (`OAuthTokens`). It is
+ *    accepted only on a request the `/mcp` endpoint dispatched, which
+ *    carries `OAuthResource` in its per-request context (a caller cannot
+ *    set it); the token must be for that resource, hold the endpoint's
+ *    scope, and its user still belong to the workspace the grant is pinned
+ *    to. That workspace replaces `resolveWorkspace` for the request: the
+ *    `RequestContext` provided downstream answers it for `workspace(...)`.
  *
  * A database failure inside a middleware is a defect (500), never a 401/403:
  * an outage must not read as "not signed in".
@@ -43,11 +50,17 @@ import {
   type WorkspaceMemberRole,
   WorkspaceRole,
 } from "@gmacko/domain";
-import { type Context, Effect, Layer } from "effect";
+import { type Context, Effect, Layer, Option } from "effect";
 import { HttpServerRequest, type HttpServerResponse } from "effect/http";
 import type { unhandled } from "effect/Types";
 
 import { ApiKeys, type ApiKeysShape } from "./api-keys";
+import {
+  isOAuthAccessToken,
+  OAuthResource,
+  OAuthTokens,
+  type OAuthTokensShape,
+} from "./oauth-tokens";
 import { RequestContext, type RequestContextShape } from "./request-context";
 import { AuthSecurityConfig } from "./security-config";
 import { Auth } from "./service";
@@ -245,6 +258,40 @@ const keyPath = (
     return yield* provide(wrapped, toCurrentUser(key.user, "key"), context);
   });
 
+/**
+ * `gmo_` bearer → `CurrentUser(credential: "oauth")`, on a request `/mcp`
+ * dispatched (rule 7), when the token holds `scope`. Downstream, the
+ * request's workspace is the one the grant is pinned to.
+ */
+const oauthPath = (
+  deps: Deps,
+  tokens: OAuthTokensShape,
+  scope: Scope,
+  wrapped: Wrapped,
+  request: Request,
+  bearer: string,
+): Effect.Effect<
+  HttpServerResponse.HttpServerResponse,
+  unhandled | Unauthorized | Forbidden
+> =>
+  Effect.gen(function* () {
+    const audience = yield* Effect.serviceOption(OAuthResource);
+    if (Option.isNone(audience)) return yield* new Unauthorized();
+    const context = yield* deps.forRequest(request);
+    const token = yield* tokens
+      .authenticate(bearer, audience.value.resource)
+      .pipe(orDie("oauth token lookup"));
+    if (!token.scopes.includes(scope)) {
+      return yield* new Forbidden({ reason: "scope" });
+    }
+    const pinned: RequestContextShape = {
+      ...context,
+      workspace: () =>
+        Effect.succeed({ workspaceId: token.workspaceId, role: token.role }),
+    };
+    return yield* provide(wrapped, toCurrentUser(token.user, "oauth"), pinned);
+  });
+
 // ---------------------------------------------------------------------------
 // Credential middlewares
 // ---------------------------------------------------------------------------
@@ -280,11 +327,16 @@ type WorkspaceRoleShape = ShapeOf<ReturnType<typeof WorkspaceRole<"owner">>>;
 const requireScopeLive = <Self>(
   tag: Context.Service<Self, RequireScopeShape>,
   scope: Scope,
-): Layer.Layer<Self, never, Auth | Database | AuthSecurityConfig | ApiKeys> =>
+): Layer.Layer<
+  Self,
+  never,
+  Auth | Database | AuthSecurityConfig | ApiKeys | OAuthTokens
+> =>
   Layer.effect(tag)(
     Effect.gen(function* () {
       const deps = yield* makeDeps;
       const keys = yield* ApiKeys;
+      const tokens = yield* OAuthTokens;
       return tag.of({
         // Rule 2: `session` is declared so OpenAPI shows the cookie scheme and
         // always refuses; the builder falls through to `apiKey`, the single
@@ -296,8 +348,11 @@ const requireScopeLive = <Self>(
           Effect.gen(function* () {
             const request = yield* HttpServerRequest.HttpServerRequest;
             const bearer = bearerOf(request);
-            return bearer === undefined
-              ? yield* cookiePath(deps, wrapped, request)
+            if (bearer === undefined) {
+              return yield* cookiePath(deps, wrapped, request);
+            }
+            return isOAuthAccessToken(bearer)
+              ? yield* oauthPath(deps, tokens, scope, wrapped, request, bearer)
               : yield* keyPath(deps, keys, scope, wrapped, request, bearer);
           }),
       });
@@ -459,9 +514,9 @@ export const WorkspaceRoleLive = <R extends WorkspaceMemberRole>(
 // ---------------------------------------------------------------------------
 
 /**
- * Every middleware the contract declares, plus the `ApiKeys` service they
- * (and Phase 4's key-management handlers) use. Needs `Auth`, `Database` and
- * `AuthSecurityConfig` from the app.
+ * Every middleware the contract declares, plus the `ApiKeys` and
+ * `OAuthTokens` services they (and the key-management handlers) use. Needs
+ * `Auth`, `Database` and `AuthSecurityConfig` from the app.
  */
 export const SecurityLive = Layer.mergeAll(
   SessionLive,
@@ -470,4 +525,4 @@ export const SecurityLive = Layer.mergeAll(
   WorkspaceRoleLive("owner"),
   WorkspaceRoleLive("admin"),
   WorkspaceRoleLive("member"),
-).pipe(Layer.provideMerge(ApiKeys.layer));
+).pipe(Layer.provideMerge(Layer.mergeAll(ApiKeys.layer, OAuthTokens.layer)));

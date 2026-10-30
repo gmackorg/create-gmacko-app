@@ -28,7 +28,7 @@ export const Who = Schema.Struct({
   id: Schema.String,
   email: Schema.String,
   role: Schema.Literals(["user", "admin"]),
-  credential: Schema.Literals(["session", "key"]),
+  credential: Schema.Literals(["session", "key", "oauth"]),
 });
 export type Who = typeof Who.Type;
 

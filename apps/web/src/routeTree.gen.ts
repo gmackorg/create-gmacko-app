@@ -16,12 +16,14 @@ import { Route as ContactRouteImport } from "./routes/contact";
 import { Route as DeviceRouteImport } from "./routes/device";
 import { Route as FaqRouteImport } from "./routes/faq";
 import { Route as IntegrateRouteImport } from "./routes/integrate";
+import { Route as McpRouteImport } from "./routes/mcp";
 import { Route as PricingRouteImport } from "./routes/pricing";
 import { Route as PrivacyRouteImport } from "./routes/privacy";
 import { Route as SettingsRouteImport } from "./routes/settings";
 import { Route as TermsRouteImport } from "./routes/terms";
 import { Route as DotwellKnownForgeHealthRouteImport } from "./routes/[.]well-known.forge-health";
 import { Route as DotwellKnownOauthAuthorizationServerRouteImport } from "./routes/[.]well-known.oauth-authorization-server";
+import { Route as DotwellKnownOauthProtectedResourceRouteImport } from "./routes/[.]well-known.oauth-protected-resource";
 import { Route as AdminIndexRouteImport } from "./routes/admin.index";
 import { Route as AdminUsersRouteImport } from "./routes/admin.users";
 import { Route as ApiSplatRouteImport } from "./routes/api.$";
@@ -29,6 +31,7 @@ import { Route as OauthConsentRouteImport } from "./routes/oauth.consent";
 import { Route as OauthSignInRouteImport } from "./routes/oauth.sign-in";
 import { Route as OauthWorkspaceRouteImport } from "./routes/oauth.workspace";
 import { Route as DotwellKnownOauthAuthorizationServerSplatRouteImport } from "./routes/[.]well-known.oauth-authorization-server.$";
+import { Route as DotwellKnownOauthProtectedResourceSplatRouteImport } from "./routes/[.]well-known.oauth-protected-resource.$";
 import { Route as ApiAuthSplatRouteImport } from "./routes/api/auth.$";
 import { Route as ApiStorageSplatRouteImport } from "./routes/api.storage.$";
 import { Route as ApiWebhooksStripeRouteImport } from "./routes/api.webhooks.stripe";
@@ -68,6 +71,11 @@ const IntegrateRoute = IntegrateRouteImport.update({
   path: "/integrate",
   getParentRoute: () => rootRouteImport,
 } as any);
+const McpRoute = McpRouteImport.update({
+  id: "/mcp",
+  path: "/mcp",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const PricingRoute = PricingRouteImport.update({
   id: "/pricing",
   path: "/pricing",
@@ -97,6 +105,12 @@ const DotwellKnownOauthAuthorizationServerRoute =
   DotwellKnownOauthAuthorizationServerRouteImport.update({
     id: "/.well-known/oauth-authorization-server",
     path: "/.well-known/oauth-authorization-server",
+    getParentRoute: () => rootRouteImport,
+  } as any);
+const DotwellKnownOauthProtectedResourceRoute =
+  DotwellKnownOauthProtectedResourceRouteImport.update({
+    id: "/.well-known/oauth-protected-resource",
+    path: "/.well-known/oauth-protected-resource",
     getParentRoute: () => rootRouteImport,
   } as any);
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -135,6 +149,12 @@ const DotwellKnownOauthAuthorizationServerSplatRoute =
     path: "/$",
     getParentRoute: () => DotwellKnownOauthAuthorizationServerRoute,
   } as any);
+const DotwellKnownOauthProtectedResourceSplatRoute =
+  DotwellKnownOauthProtectedResourceSplatRouteImport.update({
+    id: "/$",
+    path: "/$",
+    getParentRoute: () => DotwellKnownOauthProtectedResourceRoute,
+  } as any);
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: "/api/auth/$",
   path: "/api/auth/$",
@@ -159,12 +179,14 @@ export interface FileRoutesByFullPath {
   "/device": typeof DeviceRoute;
   "/faq": typeof FaqRoute;
   "/integrate": typeof IntegrateRoute;
+  "/mcp": typeof McpRoute;
   "/pricing": typeof PricingRoute;
   "/privacy": typeof PrivacyRoute;
   "/settings": typeof SettingsRoute;
   "/terms": typeof TermsRoute;
   "/.well-known/forge-health": typeof DotwellKnownForgeHealthRoute;
   "/.well-known/oauth-authorization-server": typeof DotwellKnownOauthAuthorizationServerRouteWithChildren;
+  "/.well-known/oauth-protected-resource": typeof DotwellKnownOauthProtectedResourceRouteWithChildren;
   "/admin/users": typeof AdminUsersRoute;
   "/api/$": typeof ApiSplatRoute;
   "/oauth/consent": typeof OauthConsentRoute;
@@ -172,6 +194,7 @@ export interface FileRoutesByFullPath {
   "/oauth/workspace": typeof OauthWorkspaceRoute;
   "/admin/": typeof AdminIndexRoute;
   "/.well-known/oauth-authorization-server/$": typeof DotwellKnownOauthAuthorizationServerSplatRoute;
+  "/.well-known/oauth-protected-resource/$": typeof DotwellKnownOauthProtectedResourceSplatRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
   "/api/storage/$": typeof ApiStorageSplatRoute;
   "/api/webhooks/stripe": typeof ApiWebhooksStripeRoute;
@@ -183,12 +206,14 @@ export interface FileRoutesByTo {
   "/device": typeof DeviceRoute;
   "/faq": typeof FaqRoute;
   "/integrate": typeof IntegrateRoute;
+  "/mcp": typeof McpRoute;
   "/pricing": typeof PricingRoute;
   "/privacy": typeof PrivacyRoute;
   "/settings": typeof SettingsRoute;
   "/terms": typeof TermsRoute;
   "/.well-known/forge-health": typeof DotwellKnownForgeHealthRoute;
   "/.well-known/oauth-authorization-server": typeof DotwellKnownOauthAuthorizationServerRouteWithChildren;
+  "/.well-known/oauth-protected-resource": typeof DotwellKnownOauthProtectedResourceRouteWithChildren;
   "/admin/users": typeof AdminUsersRoute;
   "/api/$": typeof ApiSplatRoute;
   "/oauth/consent": typeof OauthConsentRoute;
@@ -196,6 +221,7 @@ export interface FileRoutesByTo {
   "/oauth/workspace": typeof OauthWorkspaceRoute;
   "/admin": typeof AdminIndexRoute;
   "/.well-known/oauth-authorization-server/$": typeof DotwellKnownOauthAuthorizationServerSplatRoute;
+  "/.well-known/oauth-protected-resource/$": typeof DotwellKnownOauthProtectedResourceSplatRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
   "/api/storage/$": typeof ApiStorageSplatRoute;
   "/api/webhooks/stripe": typeof ApiWebhooksStripeRoute;
@@ -209,12 +235,14 @@ export interface FileRoutesById {
   "/device": typeof DeviceRoute;
   "/faq": typeof FaqRoute;
   "/integrate": typeof IntegrateRoute;
+  "/mcp": typeof McpRoute;
   "/pricing": typeof PricingRoute;
   "/privacy": typeof PrivacyRoute;
   "/settings": typeof SettingsRoute;
   "/terms": typeof TermsRoute;
   "/.well-known/forge-health": typeof DotwellKnownForgeHealthRoute;
   "/.well-known/oauth-authorization-server": typeof DotwellKnownOauthAuthorizationServerRouteWithChildren;
+  "/.well-known/oauth-protected-resource": typeof DotwellKnownOauthProtectedResourceRouteWithChildren;
   "/admin/users": typeof AdminUsersRoute;
   "/api/$": typeof ApiSplatRoute;
   "/oauth/consent": typeof OauthConsentRoute;
@@ -222,6 +250,7 @@ export interface FileRoutesById {
   "/oauth/workspace": typeof OauthWorkspaceRoute;
   "/admin/": typeof AdminIndexRoute;
   "/.well-known/oauth-authorization-server/$": typeof DotwellKnownOauthAuthorizationServerSplatRoute;
+  "/.well-known/oauth-protected-resource/$": typeof DotwellKnownOauthProtectedResourceSplatRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
   "/api/storage/$": typeof ApiStorageSplatRoute;
   "/api/webhooks/stripe": typeof ApiWebhooksStripeRoute;
@@ -236,12 +265,14 @@ export interface FileRouteTypes {
     | "/device"
     | "/faq"
     | "/integrate"
+    | "/mcp"
     | "/pricing"
     | "/privacy"
     | "/settings"
     | "/terms"
     | "/.well-known/forge-health"
     | "/.well-known/oauth-authorization-server"
+    | "/.well-known/oauth-protected-resource"
     | "/admin/users"
     | "/api/$"
     | "/oauth/consent"
@@ -249,6 +280,7 @@ export interface FileRouteTypes {
     | "/oauth/workspace"
     | "/admin/"
     | "/.well-known/oauth-authorization-server/$"
+    | "/.well-known/oauth-protected-resource/$"
     | "/api/auth/$"
     | "/api/storage/$"
     | "/api/webhooks/stripe";
@@ -260,12 +292,14 @@ export interface FileRouteTypes {
     | "/device"
     | "/faq"
     | "/integrate"
+    | "/mcp"
     | "/pricing"
     | "/privacy"
     | "/settings"
     | "/terms"
     | "/.well-known/forge-health"
     | "/.well-known/oauth-authorization-server"
+    | "/.well-known/oauth-protected-resource"
     | "/admin/users"
     | "/api/$"
     | "/oauth/consent"
@@ -273,6 +307,7 @@ export interface FileRouteTypes {
     | "/oauth/workspace"
     | "/admin"
     | "/.well-known/oauth-authorization-server/$"
+    | "/.well-known/oauth-protected-resource/$"
     | "/api/auth/$"
     | "/api/storage/$"
     | "/api/webhooks/stripe";
@@ -285,12 +320,14 @@ export interface FileRouteTypes {
     | "/device"
     | "/faq"
     | "/integrate"
+    | "/mcp"
     | "/pricing"
     | "/privacy"
     | "/settings"
     | "/terms"
     | "/.well-known/forge-health"
     | "/.well-known/oauth-authorization-server"
+    | "/.well-known/oauth-protected-resource"
     | "/admin/users"
     | "/api/$"
     | "/oauth/consent"
@@ -298,6 +335,7 @@ export interface FileRouteTypes {
     | "/oauth/workspace"
     | "/admin/"
     | "/.well-known/oauth-authorization-server/$"
+    | "/.well-known/oauth-protected-resource/$"
     | "/api/auth/$"
     | "/api/storage/$"
     | "/api/webhooks/stripe";
@@ -311,12 +349,14 @@ export interface RootRouteChildren {
   DeviceRoute: typeof DeviceRoute;
   FaqRoute: typeof FaqRoute;
   IntegrateRoute: typeof IntegrateRoute;
+  McpRoute: typeof McpRoute;
   PricingRoute: typeof PricingRoute;
   PrivacyRoute: typeof PrivacyRoute;
   SettingsRoute: typeof SettingsRoute;
   TermsRoute: typeof TermsRoute;
   DotwellKnownForgeHealthRoute: typeof DotwellKnownForgeHealthRoute;
   DotwellKnownOauthAuthorizationServerRoute: typeof DotwellKnownOauthAuthorizationServerRouteWithChildren;
+  DotwellKnownOauthProtectedResourceRoute: typeof DotwellKnownOauthProtectedResourceRouteWithChildren;
   ApiSplatRoute: typeof ApiSplatRoute;
   OauthConsentRoute: typeof OauthConsentRoute;
   OauthSignInRoute: typeof OauthSignInRoute;
@@ -377,6 +417,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof IntegrateRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/mcp": {
+      id: "/mcp";
+      path: "/mcp";
+      fullPath: "/mcp";
+      preLoaderRoute: typeof McpRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/pricing": {
       id: "/pricing";
       path: "/pricing";
@@ -417,6 +464,13 @@ declare module "@tanstack/react-router" {
       path: "/.well-known/oauth-authorization-server";
       fullPath: "/.well-known/oauth-authorization-server";
       preLoaderRoute: typeof DotwellKnownOauthAuthorizationServerRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/.well-known/oauth-protected-resource": {
+      id: "/.well-known/oauth-protected-resource";
+      path: "/.well-known/oauth-protected-resource";
+      fullPath: "/.well-known/oauth-protected-resource";
+      preLoaderRoute: typeof DotwellKnownOauthProtectedResourceRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/admin/": {
@@ -467,6 +521,13 @@ declare module "@tanstack/react-router" {
       fullPath: "/.well-known/oauth-authorization-server/$";
       preLoaderRoute: typeof DotwellKnownOauthAuthorizationServerSplatRouteImport;
       parentRoute: typeof DotwellKnownOauthAuthorizationServerRoute;
+    };
+    "/.well-known/oauth-protected-resource/$": {
+      id: "/.well-known/oauth-protected-resource/$";
+      path: "/$";
+      fullPath: "/.well-known/oauth-protected-resource/$";
+      preLoaderRoute: typeof DotwellKnownOauthProtectedResourceSplatRouteImport;
+      parentRoute: typeof DotwellKnownOauthProtectedResourceRoute;
     };
     "/api/auth/$": {
       id: "/api/auth/$";
@@ -519,6 +580,21 @@ const DotwellKnownOauthAuthorizationServerRouteWithChildren =
     DotwellKnownOauthAuthorizationServerRouteChildren,
   );
 
+interface DotwellKnownOauthProtectedResourceRouteChildren {
+  DotwellKnownOauthProtectedResourceSplatRoute: typeof DotwellKnownOauthProtectedResourceSplatRoute;
+}
+
+const DotwellKnownOauthProtectedResourceRouteChildren: DotwellKnownOauthProtectedResourceRouteChildren =
+  {
+    DotwellKnownOauthProtectedResourceSplatRoute:
+      DotwellKnownOauthProtectedResourceSplatRoute,
+  };
+
+const DotwellKnownOauthProtectedResourceRouteWithChildren =
+  DotwellKnownOauthProtectedResourceRoute._addFileChildren(
+    DotwellKnownOauthProtectedResourceRouteChildren,
+  );
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
@@ -527,6 +603,7 @@ const rootRouteChildren: RootRouteChildren = {
   DeviceRoute: DeviceRoute,
   FaqRoute: FaqRoute,
   IntegrateRoute: IntegrateRoute,
+  McpRoute: McpRoute,
   PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
   SettingsRoute: SettingsRoute,
@@ -534,6 +611,8 @@ const rootRouteChildren: RootRouteChildren = {
   DotwellKnownForgeHealthRoute: DotwellKnownForgeHealthRoute,
   DotwellKnownOauthAuthorizationServerRoute:
     DotwellKnownOauthAuthorizationServerRouteWithChildren,
+  DotwellKnownOauthProtectedResourceRoute:
+    DotwellKnownOauthProtectedResourceRouteWithChildren,
   ApiSplatRoute: ApiSplatRoute,
   OauthConsentRoute: OauthConsentRoute,
   OauthSignInRoute: OauthSignInRoute,

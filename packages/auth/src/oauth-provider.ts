@@ -27,7 +27,10 @@ import {
   oauthProviderAuthServerMetadata,
 } from "@better-auth/oauth-provider";
 import type { PlainDatabase } from "@gmacko/db";
-import { oauthWorkspaceSelection, workspaceMembership } from "@gmacko/db/schema";
+import {
+  oauthWorkspaceSelection,
+  workspaceMembership,
+} from "@gmacko/db/schema";
 import { OAUTH_SCOPES } from "@gmacko/domain/scopes";
 import { and, eq } from "drizzle-orm";
 
@@ -74,7 +77,10 @@ export const selectedWorkspace = async (
     .innerJoin(
       workspaceMembership,
       and(
-        eq(workspaceMembership.workspaceId, oauthWorkspaceSelection.workspaceId),
+        eq(
+          workspaceMembership.workspaceId,
+          oauthWorkspaceSelection.workspaceId,
+        ),
         eq(workspaceMembership.userId, oauthWorkspaceSelection.userId),
       ),
     )

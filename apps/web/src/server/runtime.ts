@@ -20,7 +20,11 @@ import {
   rateLimitsFor,
   WebhookEvents,
 } from "@gmacko/api";
-import { authorizationServerMetadata } from "@gmacko/auth/oauth-provider";
+import {
+  authorizationServerMetadata,
+  mcpResource,
+} from "@gmacko/auth/oauth-provider";
+import { OAuthResource, OAuthTokens } from "@gmacko/auth/oauth-tokens";
 import { RequestContext } from "@gmacko/auth/request-context";
 import { Auth } from "@gmacko/auth/service";
 import { Database } from "@gmacko/db";
@@ -32,6 +36,7 @@ import { env as clientEnv } from "~/env";
 import { AuthLive } from "./auth";
 import { oauthClientRateKey } from "./auth-dispatch";
 import { fromBindings, webFromBindings } from "./config";
+import { mcpRequestHandler, protectedResourceMetadata } from "./mcp";
 import { createStorageHandlers } from "./storage";
 import type { StripeWebhookLedger } from "./stripe-webhook";
 
@@ -261,6 +266,41 @@ export const stripeWebhookEvents: StripeWebhookLedger = {
       Effect.flatMap(WebhookEvents, (events) => events.complete(id)),
     ),
 };
+
+/**
+ * The remote MCP endpoint (src/routes/mcp.ts). A tool call is dispatched to
+ * the API handler with `OAuthResource` in its per-request context, which is
+ * the only way a `gmo_` token authenticates there (packages/auth
+ * middleware.ts, rule 7).
+ */
+const mcp = {
+  resource: mcpResource(config.auth.baseUrl),
+  issuer: new URL("/api/auth", config.auth.baseUrl).toString(),
+  baseUrl: config.auth.baseUrl,
+};
+const mcpDispatchContext = Context.make(OAuthResource, {
+  resource: mcp.resource,
+});
+
+export const mcpHandler: (request: Request) => Promise<Response> = flushed(
+  mcpRequestHandler({
+    ...mcp,
+    verify: (bearer) =>
+      runtime.runPromise(
+        Effect.flatMap(OAuthTokens, (tokens) =>
+          tokens.authenticate(bearer, mcp.resource),
+        ).pipe(
+          Effect.provide(OAuthTokens.layer),
+          Effect.catchTag("Unauthorized", () => Effect.succeed(null)),
+        ),
+      ),
+    dispatch: (request) => apiHandler(request, mcpDispatchContext),
+  }),
+);
+
+/** `/.well-known/oauth-protected-resource[/mcp]`: RFC 9728 metadata for `/mcp`. */
+export const protectedResourceMetadataResponse = (): Response =>
+  Response.json(protectedResourceMetadata(mcp));
 
 /** better-auth's server API, for the sign-out server function (src/server/actions.ts). */
 export const authApi = () =>
