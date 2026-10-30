@@ -79,3 +79,6 @@ sdks/generated/*
 !sdks/generated/.gitkeep
 # Written by openapi-generator-cli on every run.
 openapitools.json
+
+# pnpm store inside the checkout (CI); never source, never committed
+.pnpm-store/

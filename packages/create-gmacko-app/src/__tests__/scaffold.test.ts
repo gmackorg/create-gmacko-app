@@ -138,9 +138,9 @@ describe("create-gmacko-app scaffold", () => {
       expect(
         fileExists(result.appPath, "packages/operator-core/package.json"),
       ).toBe(true);
-      expect(
-        fileExists(result.appPath, "apps/web/src/server/mcp.ts"),
-      ).toBe(true);
+      expect(fileExists(result.appPath, "apps/web/src/server/mcp.ts")).toBe(
+        true,
+      );
       expect(fileExists(result.appPath, "packages/api-cli/package.json")).toBe(
         false,
       );

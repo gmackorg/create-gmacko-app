@@ -2,9 +2,7 @@
   "version": "7",
   "dialect": "sqlite",
   "id": "9428752d-ed46-410f-9b22-c35aff07e779",
-  "prevIds": [
-    "07a1dd80-7acf-4c26-af0b-1fcc7f5f3107"
-  ],
+  "prevIds": ["07a1dd80-7acf-4c26-af0b-1fcc7f5f3107"],
   "ddl": [
     {
       "name": "post",
@@ -2799,13 +2797,9 @@
       "table": "verification"
     },
     {
-      "columns": [
-        "user_id"
-      ],
+      "columns": ["user_id"],
       "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -2814,13 +2808,9 @@
       "table": "api_keys"
     },
     {
-      "columns": [
-        "setup_completed_by_user_id"
-      ],
+      "columns": ["setup_completed_by_user_id"],
       "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "SET NULL",
       "nameExplicit": false,
@@ -2829,13 +2819,9 @@
       "table": "application_settings"
     },
     {
-      "columns": [
-        "initial_workspace_id"
-      ],
+      "columns": ["initial_workspace_id"],
       "tableTo": "workspace",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "SET NULL",
       "nameExplicit": false,
@@ -2844,13 +2830,9 @@
       "table": "application_settings"
     },
     {
-      "columns": [
-        "plan_id"
-      ],
+      "columns": ["plan_id"],
       "tableTo": "billing_plan",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -2859,13 +2841,9 @@
       "table": "billing_plan_limit"
     },
     {
-      "columns": [
-        "session_id"
-      ],
+      "columns": ["session_id"],
       "tableTo": "session",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -2874,13 +2852,9 @@
       "table": "oauth_workspace_selection"
     },
     {
-      "columns": [
-        "user_id"
-      ],
+      "columns": ["user_id"],
       "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -2889,13 +2863,9 @@
       "table": "oauth_workspace_selection"
     },
     {
-      "columns": [
-        "workspace_id"
-      ],
+      "columns": ["workspace_id"],
       "tableTo": "workspace",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -2904,13 +2874,9 @@
       "table": "oauth_workspace_selection"
     },
     {
-      "columns": [
-        "user_id"
-      ],
+      "columns": ["user_id"],
       "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -2919,13 +2885,9 @@
       "table": "user_preferences"
     },
     {
-      "columns": [
-        "reviewed_by_user_id"
-      ],
+      "columns": ["reviewed_by_user_id"],
       "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "SET NULL",
       "nameExplicit": false,
@@ -2934,13 +2896,9 @@
       "table": "waitlist_entry"
     },
     {
-      "columns": [
-        "owner_user_id"
-      ],
+      "columns": ["owner_user_id"],
       "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -2949,13 +2907,9 @@
       "table": "workspace"
     },
     {
-      "columns": [
-        "workspace_id"
-      ],
+      "columns": ["workspace_id"],
       "tableTo": "workspace",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -2964,13 +2918,9 @@
       "table": "workspace_invite_allowlist"
     },
     {
-      "columns": [
-        "invited_by_user_id"
-      ],
+      "columns": ["invited_by_user_id"],
       "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -2979,13 +2929,9 @@
       "table": "workspace_invite_allowlist"
     },
     {
-      "columns": [
-        "workspace_id"
-      ],
+      "columns": ["workspace_id"],
       "tableTo": "workspace",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -2994,13 +2940,9 @@
       "table": "workspace_membership"
     },
     {
-      "columns": [
-        "user_id"
-      ],
+      "columns": ["user_id"],
       "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -3009,13 +2951,9 @@
       "table": "workspace_membership"
     },
     {
-      "columns": [
-        "workspace_id"
-      ],
+      "columns": ["workspace_id"],
       "tableTo": "workspace",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -3024,13 +2962,9 @@
       "table": "workspace_subscription"
     },
     {
-      "columns": [
-        "plan_id"
-      ],
+      "columns": ["plan_id"],
       "tableTo": "billing_plan",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "SET NULL",
       "nameExplicit": false,
@@ -3039,13 +2973,9 @@
       "table": "workspace_subscription"
     },
     {
-      "columns": [
-        "workspace_id"
-      ],
+      "columns": ["workspace_id"],
       "tableTo": "workspace",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -3054,13 +2984,9 @@
       "table": "workspace_usage_rollup"
     },
     {
-      "columns": [
-        "meter_id"
-      ],
+      "columns": ["meter_id"],
       "tableTo": "usage_meter",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -3069,13 +2995,9 @@
       "table": "workspace_usage_rollup"
     },
     {
-      "columns": [
-        "user_id"
-      ],
+      "columns": ["user_id"],
       "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -3084,13 +3006,9 @@
       "table": "account"
     },
     {
-      "columns": [
-        "user_id"
-      ],
+      "columns": ["user_id"],
       "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -3099,13 +3017,9 @@
       "table": "device_code"
     },
     {
-      "columns": [
-        "client_id"
-      ],
+      "columns": ["client_id"],
       "tableTo": "oauth_client",
-      "columnsTo": [
-        "client_id"
-      ],
+      "columnsTo": ["client_id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -3114,13 +3028,9 @@
       "table": "oauth_access_token"
     },
     {
-      "columns": [
-        "session_id"
-      ],
+      "columns": ["session_id"],
       "tableTo": "session",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "SET NULL",
       "nameExplicit": false,
@@ -3129,13 +3039,9 @@
       "table": "oauth_access_token"
     },
     {
-      "columns": [
-        "user_id"
-      ],
+      "columns": ["user_id"],
       "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -3144,13 +3050,9 @@
       "table": "oauth_access_token"
     },
     {
-      "columns": [
-        "refresh_id"
-      ],
+      "columns": ["refresh_id"],
       "tableTo": "oauth_refresh_token",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -3159,13 +3061,9 @@
       "table": "oauth_access_token"
     },
     {
-      "columns": [
-        "user_id"
-      ],
+      "columns": ["user_id"],
       "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -3174,13 +3072,9 @@
       "table": "oauth_client"
     },
     {
-      "columns": [
-        "client_id"
-      ],
+      "columns": ["client_id"],
       "tableTo": "oauth_client",
-      "columnsTo": [
-        "client_id"
-      ],
+      "columnsTo": ["client_id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -3189,13 +3083,9 @@
       "table": "oauth_client_resource"
     },
     {
-      "columns": [
-        "resource_id"
-      ],
+      "columns": ["resource_id"],
       "tableTo": "oauth_resource",
-      "columnsTo": [
-        "identifier"
-      ],
+      "columnsTo": ["identifier"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -3204,13 +3094,9 @@
       "table": "oauth_client_resource"
     },
     {
-      "columns": [
-        "client_id"
-      ],
+      "columns": ["client_id"],
       "tableTo": "oauth_client",
-      "columnsTo": [
-        "client_id"
-      ],
+      "columnsTo": ["client_id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -3219,13 +3105,9 @@
       "table": "oauth_consent"
     },
     {
-      "columns": [
-        "user_id"
-      ],
+      "columns": ["user_id"],
       "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -3234,13 +3116,9 @@
       "table": "oauth_consent"
     },
     {
-      "columns": [
-        "client_id"
-      ],
+      "columns": ["client_id"],
       "tableTo": "oauth_client",
-      "columnsTo": [
-        "client_id"
-      ],
+      "columnsTo": ["client_id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -3249,13 +3127,9 @@
       "table": "oauth_refresh_token"
     },
     {
-      "columns": [
-        "session_id"
-      ],
+      "columns": ["session_id"],
       "tableTo": "session",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "SET NULL",
       "nameExplicit": false,
@@ -3264,13 +3138,9 @@
       "table": "oauth_refresh_token"
     },
     {
-      "columns": [
-        "user_id"
-      ],
+      "columns": ["user_id"],
       "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -3279,13 +3149,9 @@
       "table": "oauth_refresh_token"
     },
     {
-      "columns": [
-        "user_id"
-      ],
+      "columns": ["user_id"],
       "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
@@ -3294,252 +3160,196 @@
       "table": "session"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "post_pk",
       "table": "post",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "api_keys_pk",
       "table": "api_keys",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "application_settings_pk",
       "table": "application_settings",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "billing_plan_pk",
       "table": "billing_plan",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "billing_plan_limit_pk",
       "table": "billing_plan_limit",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "session_id"
-      ],
+      "columns": ["session_id"],
       "nameExplicit": false,
       "name": "oauth_workspace_selection_pk",
       "table": "oauth_workspace_selection",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "key"
-      ],
+      "columns": ["key"],
       "nameExplicit": false,
       "name": "rate_limit_window_pk",
       "table": "rate_limit_window",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "event_id"
-      ],
+      "columns": ["event_id"],
       "nameExplicit": false,
       "name": "stripe_webhook_event_pk",
       "table": "stripe_webhook_event",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "usage_meter_pk",
       "table": "usage_meter",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "user_preferences_pk",
       "table": "user_preferences",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "waitlist_entry_pk",
       "table": "waitlist_entry",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "workspace_pk",
       "table": "workspace",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "workspace_invite_allowlist_pk",
       "table": "workspace_invite_allowlist",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "workspace_membership_pk",
       "table": "workspace_membership",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "workspace_subscription_pk",
       "table": "workspace_subscription",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "workspace_usage_rollup_pk",
       "table": "workspace_usage_rollup",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "account_pk",
       "table": "account",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "device_code_pk",
       "table": "device_code",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "oauth_access_token_pk",
       "table": "oauth_access_token",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "oauth_client_pk",
       "table": "oauth_client",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "oauth_client_assertion_pk",
       "table": "oauth_client_assertion",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "oauth_client_resource_pk",
       "table": "oauth_client_resource",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "oauth_consent_pk",
       "table": "oauth_consent",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "oauth_refresh_token_pk",
       "table": "oauth_refresh_token",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "oauth_resource_pk",
       "table": "oauth_resource",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "session_pk",
       "table": "session",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "user_pk",
       "table": "user",
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "verification_pk",
       "table": "verification",
@@ -3830,169 +3640,126 @@
       "table": "verification"
     },
     {
-      "columns": [
-        "plan_id",
-        "key"
-      ],
+      "columns": ["plan_id", "key"],
       "nameExplicit": true,
       "name": "billing_plan_limit_plan_key_unique",
       "entityType": "uniques",
       "table": "billing_plan_limit"
     },
     {
-      "columns": [
-        "email",
-        "source"
-      ],
+      "columns": ["email", "source"],
       "nameExplicit": true,
       "name": "waitlist_entry_email_source_unique",
       "entityType": "uniques",
       "table": "waitlist_entry"
     },
     {
-      "columns": [
-        "workspace_id",
-        "email"
-      ],
+      "columns": ["workspace_id", "email"],
       "nameExplicit": true,
       "name": "workspace_invite_allowlist_workspace_email_unique",
       "entityType": "uniques",
       "table": "workspace_invite_allowlist"
     },
     {
-      "columns": [
-        "workspace_id",
-        "user_id"
-      ],
+      "columns": ["workspace_id", "user_id"],
       "nameExplicit": true,
       "name": "workspace_membership_workspace_user_unique",
       "entityType": "uniques",
       "table": "workspace_membership"
     },
     {
-      "columns": [
-        "workspace_id"
-      ],
+      "columns": ["workspace_id"],
       "nameExplicit": true,
       "name": "workspace_subscription_workspace_unique",
       "entityType": "uniques",
       "table": "workspace_subscription"
     },
     {
-      "columns": [
-        "workspace_id",
-        "meter_id",
-        "period_start",
-        "period_end"
-      ],
+      "columns": ["workspace_id", "meter_id", "period_start", "period_end"],
       "nameExplicit": true,
       "name": "workspace_usage_rollup_workspace_meter_period_unique",
       "entityType": "uniques",
       "table": "workspace_usage_rollup"
     },
     {
-      "columns": [
-        "key"
-      ],
+      "columns": ["key"],
       "nameExplicit": false,
       "name": "billing_plan_key_unique",
       "entityType": "uniques",
       "table": "billing_plan"
     },
     {
-      "columns": [
-        "key"
-      ],
+      "columns": ["key"],
       "nameExplicit": false,
       "name": "usage_meter_key_unique",
       "entityType": "uniques",
       "table": "usage_meter"
     },
     {
-      "columns": [
-        "user_id"
-      ],
+      "columns": ["user_id"],
       "nameExplicit": false,
       "name": "user_preferences_user_id_unique",
       "entityType": "uniques",
       "table": "user_preferences"
     },
     {
-      "columns": [
-        "slug"
-      ],
+      "columns": ["slug"],
       "nameExplicit": false,
       "name": "workspace_slug_unique",
       "entityType": "uniques",
       "table": "workspace"
     },
     {
-      "columns": [
-        "device_code"
-      ],
+      "columns": ["device_code"],
       "nameExplicit": false,
       "name": "device_code_device_code_unique",
       "entityType": "uniques",
       "table": "device_code"
     },
     {
-      "columns": [
-        "user_code"
-      ],
+      "columns": ["user_code"],
       "nameExplicit": false,
       "name": "device_code_user_code_unique",
       "entityType": "uniques",
       "table": "device_code"
     },
     {
-      "columns": [
-        "token"
-      ],
+      "columns": ["token"],
       "nameExplicit": false,
       "name": "oauth_access_token_token_unique",
       "entityType": "uniques",
       "table": "oauth_access_token"
     },
     {
-      "columns": [
-        "client_id"
-      ],
+      "columns": ["client_id"],
       "nameExplicit": false,
       "name": "oauth_client_client_id_unique",
       "entityType": "uniques",
       "table": "oauth_client"
     },
     {
-      "columns": [
-        "token"
-      ],
+      "columns": ["token"],
       "nameExplicit": false,
       "name": "oauth_refresh_token_token_unique",
       "entityType": "uniques",
       "table": "oauth_refresh_token"
     },
     {
-      "columns": [
-        "identifier"
-      ],
+      "columns": ["identifier"],
       "nameExplicit": false,
       "name": "oauth_resource_identifier_unique",
       "entityType": "uniques",
       "table": "oauth_resource"
     },
     {
-      "columns": [
-        "token"
-      ],
+      "columns": ["token"],
       "nameExplicit": false,
       "name": "session_token_unique",
       "entityType": "uniques",
       "table": "session"
     },
     {
-      "columns": [
-        "email"
-      ],
+      "columns": ["email"],
       "nameExplicit": false,
       "name": "user_email_unique",
       "entityType": "uniques",

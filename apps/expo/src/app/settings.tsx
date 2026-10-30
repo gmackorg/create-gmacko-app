@@ -2,8 +2,8 @@ import {
   ALL_SCOPES,
   DEFAULT_SCOPES,
   type InviteRole,
-  type Scope,
   SCOPES,
+  type Scope,
   type Theme,
 } from "@gmacko/domain";
 import {
