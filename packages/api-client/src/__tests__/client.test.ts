@@ -102,11 +102,14 @@ describe("run", () => {
     );
     expect(anonymous).toBeInstanceOf(Unauthorized);
 
-    const readKey = await api.createApiKey(person, ["read"]);
+    const readKey = await api.createApiKey(person, ["api_keys:read"]);
     const scoped = await rejection(
       client(() => ({ authorization: `Bearer ${readKey.key}` })).run((c) =>
         c.settings.createApiKey({
-          payload: new CreateApiKey({ name: "nope", permissions: ["read"] }),
+          payload: new CreateApiKey({
+            name: "nope",
+            permissions: ["profile:read"],
+          }),
         }),
       ),
     );

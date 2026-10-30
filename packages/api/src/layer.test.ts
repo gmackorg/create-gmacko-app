@@ -347,7 +347,7 @@ describe("rate limit", () => {
           cookie,
           origin: api.baseUrl,
         },
-        body: JSON.stringify({ name, permissions: ["read"] }),
+        body: JSON.stringify({ name, permissions: ["profile:read"] }),
       });
     expect((await create(person.cookie, "one")).status).toBe(201);
     // Refused before the credential is read.
@@ -375,14 +375,14 @@ describe("rate limit", () => {
           "content-type": "application/json",
           authorization: `Bearer ${key}`,
         },
-        body: JSON.stringify({ name: "x", permissions: ["read"] }),
+        body: JSON.stringify({ name: "x", permissions: ["profile:read"] }),
       });
     expect((await withKey("gmk_bad")).status).toBe(401);
     expect((await withKey("gmk_bad")).status).toBe(429);
     expect((await withKey("gmk_other")).status).toBe(401);
     // A real key is its own caller too.
     const person = await api.createUser();
-    const key = await api.createApiKey(person, ["admin"]);
+    const key = await api.createApiKey(person, ["api_keys:manage"]);
     expect((await withKey(key.key)).status).toBe(201);
     expect((await withKey(key.key)).status).toBe(429);
   });

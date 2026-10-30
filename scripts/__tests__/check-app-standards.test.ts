@@ -264,16 +264,16 @@ describe("endpoint-declares-credential", () => {
         'export class ThingsApi extends HttpApiGroup.make("things")',
         endpoint(
           "twoCredentials",
-          '.middleware(Session).middleware(SessionOrKey("read"))',
+          '.middleware(Session).middleware(RequireScope("profile:read"))',
         ),
         endpoint("roleOnly", ".middleware(AdminOnly)"),
         endpoint(
           "inverted",
-          '.middleware(SessionOrKey("admin")).middleware(AdminOnly)',
+          '.middleware(RequireScope("platform:admin")).middleware(AdminOnly)',
         ),
         endpoint(
           "nestedInverted",
-          '\n      .middleware(SessionOrKey("write"))\n      .middleware(WorkspaceRole("admin"))',
+          '\n      .middleware(RequireScope("posts:write"))\n      .middleware(WorkspaceRole("admin"))',
         ),
         "  {}",
       ].join("\n"),
@@ -285,7 +285,7 @@ describe("endpoint-declares-credential", () => {
       "endpoint-declares-credential packages/domain/src/things/api.ts:7",
     ]);
     expect(violations.map((v) => v.message)).toEqual([
-      "Endpoint `twoCredentials` declares 2 security middlewares (Session, SessionOrKey).",
+      "Endpoint `twoCredentials` declares 2 security middlewares (Session, RequireScope).",
       "Endpoint `roleOnly` has a role check (AdminOnly) but no credential.",
       "Endpoint `inverted` declares its credential before a role check.",
       "Endpoint `nestedInverted` declares its credential before a role check.",
@@ -297,15 +297,15 @@ describe("endpoint-declares-credential", () => {
       "packages/domain/src/things/api.ts": [
         'export class ThingsApi extends HttpApiGroup.make("things")',
         endpoint("list", ""),
-        endpoint("byId", '.middleware(SessionOrKey("read"))'),
+        endpoint("byId", '.middleware(RequireScope("profile:read"))'),
         endpoint("remove", ".middleware(Session)"),
         endpoint(
           "admin",
-          '\n      .middleware(AdminOnly)\n      .middleware(SessionOrKey("admin"))\n      .annotate(RateLimitScopeAnnotation, "operator-api")\n      .middleware(RateLimit)',
+          '\n      .middleware(AdminOnly)\n      .middleware(RequireScope("platform:admin"))\n      .annotate(RateLimitScopeAnnotation, "operator-api")\n      .middleware(RateLimit)',
         ),
         endpoint(
           "invites",
-          '\n      .middleware(WorkspaceRole("admin"))\n      .middleware(SessionOrKey("write"))',
+          '\n      .middleware(WorkspaceRole("admin"))\n      .middleware(RequireScope("posts:write"))',
         ),
         "  // .middleware(Session).middleware(Session) in a comment does not count",
         "  {}",

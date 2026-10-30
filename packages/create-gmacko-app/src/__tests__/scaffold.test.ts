@@ -1214,7 +1214,7 @@ describe("create-gmacko-app scaffold", () => {
       expect(rootReadme).toContain("pnpm api:ops -- get_workspace_context");
       expect(rootReadme).toContain("pnpm api:ops -- list_api_keys");
       expect(rootReadme).toContain("pnpm mcp:app");
-      expect(rootReadme).toContain("`admin` scope");
+      expect(rootReadme).toContain("`api_keys:manage`");
       expect(integrationsConfig).toContain("operatorApis: false");
 
       const doctorScript = readFile(result.appPath, "scripts/doctor.sh");

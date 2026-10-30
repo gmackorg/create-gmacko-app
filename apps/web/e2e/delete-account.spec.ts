@@ -15,7 +15,7 @@ test.describe("Delete account", () => {
     await signInAsAdmin(page, alice);
     const key = await api(page).post("/api/api-keys", {
       name: "doomed",
-      permissions: ["read"],
+      permissions: ["profile:read"],
     });
     expect(key.status()).toBe(201);
     const user = userByEmail(alice.email);

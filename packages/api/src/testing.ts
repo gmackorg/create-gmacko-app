@@ -18,8 +18,8 @@ import { user, workspace, workspaceMembership } from "@gmacko/db/schema";
 import { layerTest } from "@gmacko/db/testing";
 import {
   type ApiKeyCreated,
-  type ApiKeyScope,
   AppApi,
+  type Scope,
   type UserRole,
   type WorkspaceMemberRole,
 } from "@gmacko/domain";
@@ -248,7 +248,7 @@ export interface TestApi {
   }) => Promise<TestWorkspace>;
   readonly createApiKey: (
     owner: TestUser,
-    scopes: ReadonlyArray<ApiKeyScope>,
+    scopes: ReadonlyArray<Scope>,
     options?: { readonly expiresAt?: Date },
   ) => Promise<ApiKeyCreated>;
   /** Every span the tracer started, in start order. */

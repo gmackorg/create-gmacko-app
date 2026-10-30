@@ -10,10 +10,10 @@ import { describe, expect, it } from "vitest";
 import { Forbidden, Unauthorized } from "../errors";
 import {
   AdminOnly,
-  ApiKeyScope,
   CurrentUser,
+  RequireScope,
+  Scope,
   Session,
-  SessionOrKey,
   sessionCookieName,
   WorkspaceRole,
 } from "../security";
@@ -60,10 +60,10 @@ describe("Session", () => {
   });
 });
 
-describe("SessionOrKey", () => {
-  it("accepts the session cookie or a bearer key, per scope", () => {
-    for (const scope of ApiKeyScope.literals) {
-      const middleware = SessionOrKey(scope);
+describe("RequireScope", () => {
+  it("accepts the session cookie or a bearer credential, per scope", () => {
+    for (const scope of Scope.literals) {
+      const middleware = RequireScope(scope);
       expect(isSecurity(middleware)).toBe(true);
       expect(Object.keys(middleware.security)).toEqual(["session", "apiKey"]);
       expect(middleware.security.session).toBe(Session.security.session);
@@ -72,16 +72,17 @@ describe("SessionOrKey", () => {
       });
       expect(middleware.security.apiKey.scheme.toLowerCase()).toBe("bearer");
       expect(middleware.scope).toBe(scope);
-      expect(middleware.key).toBe(`@gmacko/domain/SessionOrKey/${scope}`);
+      expect(middleware.key).toBe(`@gmacko/domain/RequireScope/${scope}`);
       expect([...middleware.error]).toEqual([Unauthorized, Forbidden]);
     }
   });
 
   it("has exactly one tag identity per scope", () => {
-    expect(SessionOrKey("read")).toBe(SessionOrKey("read"));
-    expect(SessionOrKey("write")).toBe(SessionOrKey("write"));
-    expect(SessionOrKey("read")).not.toBe(SessionOrKey("write"));
-    expect(new Set(ApiKeyScope.literals.map(SessionOrKey)).size).toBe(4);
+    expect(RequireScope("posts:write")).toBe(RequireScope("posts:write"));
+    expect(RequireScope("posts:write")).not.toBe(RequireScope("posts:delete"));
+    expect(new Set(Scope.literals.map(RequireScope)).size).toBe(
+      Scope.literals.length,
+    );
   });
 });
 

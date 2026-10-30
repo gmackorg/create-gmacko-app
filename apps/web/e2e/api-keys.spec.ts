@@ -20,7 +20,8 @@ test.describe("API keys", () => {
     await section.getByRole("button", { name: "Create New Key" }).click();
     const form = page.getByTestId("create-api-key-form");
     await form.getByLabel("Key Name").fill("CI deploy key");
-    await form.getByRole("checkbox", { name: "write" }).check();
+    // The read scopes start selected; add one write.
+    await form.getByRole("checkbox", { name: "Create posts" }).check();
     await form.getByRole("button", { name: "Create Key" }).click();
 
     const reveal = page.getByTestId("api-key-secret");
@@ -36,7 +37,8 @@ test.describe("API keys", () => {
     const row = page.getByTestId("api-key-row");
     await expect(row).toHaveCount(1);
     await expect(row).toContainText("CI deploy key");
-    await expect(row).toContainText("Permissions: read, write");
+    await expect(row).toContainText("posts:write");
+    await expect(row).toContainText("profile:read");
 
     // The key works as a bearer credential, without the browser's cookies.
     const authed = await page.request.get("/api/auth/secret", {
@@ -71,7 +73,9 @@ test.describe("API keys", () => {
       .getByRole("button", { name: "Create New Key" })
       .click();
     const form = page.getByTestId("create-api-key-form");
-    await form.getByRole("checkbox", { name: "read" }).uncheck();
+    for (const checkbox of await form.getByRole("checkbox").all()) {
+      await checkbox.uncheck();
+    }
     await form.getByRole("button", { name: "Create Key" }).click();
     await expect(form.getByRole("alert").first()).toBeVisible();
     await expect(page.getByTestId("api-key-secret")).toHaveCount(0);

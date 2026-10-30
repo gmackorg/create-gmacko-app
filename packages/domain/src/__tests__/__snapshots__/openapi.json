@@ -3422,10 +3422,18 @@
             "items": {
               "type": "string",
               "enum": [
-                "read",
-                "write",
-                "delete",
-                "admin"
+                "posts:write",
+                "posts:delete",
+                "workspace:read",
+                "workspace:invite",
+                "workspace:join",
+                "billing:read",
+                "preferences:read",
+                "preferences:write",
+                "profile:read",
+                "api_keys:read",
+                "api_keys:manage",
+                "platform:admin"
               ]
             }
           },
@@ -3467,10 +3475,18 @@
               {
                 "type": "string",
                 "enum": [
-                  "read",
-                  "write",
-                  "delete",
-                  "admin"
+                  "posts:write",
+                  "posts:delete",
+                  "workspace:read",
+                  "workspace:invite",
+                  "workspace:join",
+                  "billing:read",
+                  "preferences:read",
+                  "preferences:write",
+                  "profile:read",
+                  "api_keys:read",
+                  "api_keys:manage",
+                  "platform:admin"
                 ]
               }
             ],
@@ -3478,10 +3494,18 @@
             "items": {
               "type": "string",
               "enum": [
-                "read",
-                "write",
-                "delete",
-                "admin"
+                "posts:write",
+                "posts:delete",
+                "workspace:read",
+                "workspace:invite",
+                "workspace:join",
+                "billing:read",
+                "preferences:read",
+                "preferences:write",
+                "profile:read",
+                "api_keys:read",
+                "api_keys:manage",
+                "platform:admin"
               ]
             }
           },
@@ -3515,10 +3539,18 @@
             "items": {
               "type": "string",
               "enum": [
-                "read",
-                "write",
-                "delete",
-                "admin"
+                "posts:write",
+                "posts:delete",
+                "workspace:read",
+                "workspace:invite",
+                "workspace:join",
+                "billing:read",
+                "preferences:read",
+                "preferences:write",
+                "profile:read",
+                "api_keys:read",
+                "api_keys:manage",
+                "platform:admin"
               ]
             }
           },

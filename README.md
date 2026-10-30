@@ -190,7 +190,7 @@ pnpm api:ops -- --help
 pnpm mcp:app
 ```
 
-Both are wrappers over the same HTTP API and authenticate with an API key that holds the `admin` scope.
+Both are wrappers over the same HTTP API and authenticate with an API key. Each tool needs its endpoint's scope (`posts:write`, `workspace:read`, ...); managing keys needs `api_keys:manage`.
 
 ### 2. Generate Better Auth Schema
 

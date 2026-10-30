@@ -63,7 +63,7 @@ describe("AppApi", () => {
       } else {
         expect(row.securityMiddlewares, route(row)).toHaveLength(1);
         expect(row.credential, route(row)).toMatch(
-          /^(Session|SessionOrKey\((read|write|delete|admin)\))$/,
+          /^(Session|RequireScope\([a-z_]+:[a-z]+\))$/,
         );
       }
     }
@@ -86,7 +86,7 @@ describe("AppApi", () => {
 
   /**
    * rc.112 wraps middlewares in insertion order (last declared runs
-   * outermost), so `.middleware(AdminOnly).middleware(SessionOrKey(...))` is
+   * outermost), so `.middleware(AdminOnly).middleware(RequireScope(...))` is
    * the only order in which the role check sees a `CurrentUser`.
    */
   it("declares the security middleware last, so it wraps the role checks", () => {

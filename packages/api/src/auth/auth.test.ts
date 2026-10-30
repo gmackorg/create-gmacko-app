@@ -54,7 +54,7 @@ describe("auth.session", () => {
 
   it("resolves a bearer key to its owner with credential 'key'", async () => {
     const owner = await api.createUser();
-    const key = await api.createApiKey(owner, ["read"]);
+    const key = await api.createApiKey(owner, ["profile:read"]);
     const state = await api.call((client) => client.auth.session(), {
       bearer: key.key,
     });
@@ -86,7 +86,7 @@ describe("auth.secret", () => {
       }),
     ).toBe("you can see this secret message!");
 
-    const key = await api.createApiKey(person, ["read"]);
+    const key = await api.createApiKey(person, ["profile:read"]);
     expect(
       await api.call((client) => client.auth.secret(), { bearer: key.key }),
     ).toBe("you can see this secret message!");

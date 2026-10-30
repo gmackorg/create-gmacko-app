@@ -51,7 +51,7 @@ This template includes the following security measures out of the box:
 - `pnpm check:standards` fails a PR that commits credentials, reads raw `process.env` in the Worker bundle, or creates `.dev.vars`
 
 ### API Security
-- Every endpoint declares its credential in the contract: public, `Session`, or `SessionOrKey(scope)`; role checks (`AdminOnly`, `WorkspaceRole(min)`) read the database on every request, never the cookie cache. The generated matrix is `docs/API_AUTH.md`.
+- Every endpoint declares its credential in the contract: public, `Session`, or `RequireScope(scope)` (one `resource:action` scope from `packages/domain/src/scopes.ts`); role checks (`AdminOnly`, `WorkspaceRole(min)`) read the database on every request, never the cookie cache. The generated matrix is `docs/API_AUTH.md`.
 - Account deletion and bootstrap completion accept a session only; a leaked API key cannot reach them
 - CORS trusted origins configured per stage (`ALLOWED_ORIGINS`)
 - `x-request-id` and `x-trace-id` on every API response for audit trails

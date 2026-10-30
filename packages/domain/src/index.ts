@@ -12,5 +12,6 @@ export * from "./middleware";
 export * from "./posts";
 export * from "./primitives";
 export * from "./roles";
+export * from "./scopes";
 export * from "./security";
 export * from "./settings";

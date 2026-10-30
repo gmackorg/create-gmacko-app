@@ -16,15 +16,6 @@ export const WorkspaceMemberRole = Schema.Literals([
 ]);
 export type WorkspaceMemberRole = typeof WorkspaceMemberRole.Type;
 
-/** What an API key may do; `admin` implies every other scope. */
-export const ApiKeyScope = Schema.Literals([
-  "read",
-  "write",
-  "delete",
-  "admin",
-]);
-export type ApiKeyScope = typeof ApiKeyScope.Type;
-
 /** How the current request was authenticated. */
 export const Credential = Schema.Literals(["session", "key"]);
 export type Credential = typeof Credential.Type;

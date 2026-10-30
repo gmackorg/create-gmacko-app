@@ -1,4 +1,11 @@
-import type { ApiKeyScope, InviteRole, Theme } from "@gmacko/domain";
+import {
+  ALL_SCOPES,
+  DEFAULT_SCOPES,
+  type InviteRole,
+  type Scope,
+  SCOPES,
+  type Theme,
+} from "@gmacko/domain";
 import {
   supportedLocales,
   useLocaleNative,
@@ -22,12 +29,6 @@ import { mutations, queries } from "~/utils/api";
 import { authClient } from "~/utils/auth";
 import { setLocale } from "~/utils/i18n";
 
-const PERMISSIONS: ReadonlyArray<ApiKeyScope> = [
-  "read",
-  "write",
-  "delete",
-  "admin",
-];
 const COLLABORATION_ROLES: ReadonlyArray<InviteRole> = ["member", "admin"];
 
 // Every mutation below invalidates what it makes stale through the query
@@ -189,21 +190,20 @@ function PreferencesSection() {
 function ApiKeysSection() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
-  const [selectedPermissions, setSelectedPermissions] = useState<
-    Array<ApiKeyScope>
-  >(["read"]);
+  const [selectedPermissions, setSelectedPermissions] =
+    useState<ReadonlyArray<Scope>>(DEFAULT_SCOPES);
   const [newKey, setNewKey] = useState<string | null>(null);
 
   const { data: apiKeys, isLoading } = useQuery(queries.settings.listApiKeys());
 
-  // Minting and revoking keys takes the `admin` scope on a key; a session
+  // Minting and revoking keys takes `api_keys:manage` on a key; a session
   // (this app) always may. The plaintext key is in the response once.
   const { mutate: createKey, isPending: isCreating } = useMutation({
     ...mutations.settings.createApiKey(),
     onSuccess: (data) => {
       setNewKey(data.key);
       setNewKeyName("");
-      setSelectedPermissions(["read"]);
+      setSelectedPermissions(DEFAULT_SCOPES);
       setShowCreateForm(false);
     },
     onError: (error) => {
@@ -239,11 +239,11 @@ function ApiKeysSection() {
     );
   };
 
-  const togglePermission = (permission: ApiKeyScope) => {
+  const togglePermission = (permission: Scope) => {
     setSelectedPermissions((prev) =>
-      prev.includes(permission)
-        ? prev.filter((p) => p !== permission)
-        : [...prev, permission],
+      ALL_SCOPES.filter((scope) =>
+        scope === permission ? !prev.includes(scope) : prev.includes(scope),
+      ),
     );
   };
 
@@ -304,7 +304,7 @@ function ApiKeysSection() {
 
           <Text className="text-foreground mb-2 text-sm">Permissions</Text>
           <View className="mb-3 flex-row flex-wrap gap-2">
-            {PERMISSIONS.map((permission) => (
+            {ALL_SCOPES.map((permission) => (
               <Pressable
                 key={permission}
                 onPress={() => togglePermission(permission)}
@@ -317,7 +317,9 @@ function ApiKeysSection() {
                       : "border-border bg-background"
                   }`}
                 />
-                <Text className="text-foreground capitalize">{permission}</Text>
+                <Text className="text-foreground">
+                  {SCOPES[permission].description}
+                </Text>
               </Pressable>
             ))}
           </View>
@@ -338,7 +340,7 @@ function ApiKeysSection() {
               onPress={() => {
                 setShowCreateForm(false);
                 setNewKeyName("");
-                setSelectedPermissions(["read"]);
+                setSelectedPermissions(DEFAULT_SCOPES);
               }}
               className="border-border rounded-md border px-4 py-2"
             >

@@ -151,7 +151,7 @@ Add or update stories in `packages/ui/src/**/*.stories.tsx`; run `pnpm --filter 
 
 ## Adding an API Endpoint
 
-1. Declare it in the contract: `packages/domain/src/<group>/api.ts` (`HttpApiEndpoint`, Schema models in `models.ts`, and exactly one credential: nothing, `Session`, or `SessionOrKey(scope)`).
+1. Declare it in the contract: `packages/domain/src/<group>/api.ts` (`HttpApiEndpoint`, Schema models in `models.ts`, and exactly one credential: nothing, `Session`, or `RequireScope(scope)`).
 2. Implement it in `packages/api/src/<group>/` (service + `HttpApiBuilder.group` handler).
 3. Add the `queryOptions`/`mutationOptions` and invalidation entry in `packages/api-client/src/queries/`.
 4. Regenerate `docs/API_AUTH.md`: `pnpm -F @gmacko/domain docs:api-auth` (its test fails when stale).

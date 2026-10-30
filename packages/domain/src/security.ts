@@ -4,7 +4,8 @@
  * in packages/auth (Phase 3); handlers only ever see `CurrentUser`.
  *
  * Every endpoint names the credential it accepts (plan principle 07):
- * `Session` (cookie only), `SessionOrKey(scope)`, or nothing (public).
+ * `Session` (cookie only), `RequireScope(scope)`, or nothing (public).
+ * Scopes come from the catalog in ./scopes.ts.
  * `AdminOnly` and `WorkspaceRole(min)` layer a role check on top of the
  * `CurrentUser` a security middleware provided.
  */
@@ -13,13 +14,11 @@ import { HttpApiMiddleware, HttpApiSecurity } from "effect/http-api";
 
 import type { User } from "./auth/models";
 import { Forbidden, Unauthorized } from "./errors";
-import {
-  ApiKeyScope,
-  type Credential,
-  type WorkspaceMemberRole,
-} from "./roles";
+import type { Credential, WorkspaceMemberRole } from "./roles";
+import type { Scope } from "./scopes";
 
-export { ApiKeyScope, Credential, WorkspaceMemberRole } from "./roles";
+export { Credential, WorkspaceMemberRole } from "./roles";
+export { Scope } from "./scopes";
 
 /** The authenticated user for the request, plus how they authenticated. */
 export type CurrentUserShape = User & { readonly credential: Credential };
@@ -62,39 +61,51 @@ export class Session extends HttpApiMiddleware.Service<
   security: { session: sessionCookie },
 }) {}
 
-const makeSessionOrKey = <S extends ApiKeyScope>(scope: S) => {
+const makeRequireScope = <S extends Scope>(scope: S) => {
   /**
-   * Cookie session, or a `gmk_` key whose permissions include `scope` (or
-   * `admin`). A key with a lower scope fails with `Forbidden("scope")`.
+   * Cookie session (which holds every scope), or a bearer credential that
+   * holds `scope`: a `gmk_` key with it in its permissions. A bearer without
+   * the scope fails with `Forbidden("scope")`.
    */
-  class SessionOrKey extends HttpApiMiddleware.Service<
-    SessionOrKey,
+  class RequireScope extends HttpApiMiddleware.Service<
+    RequireScope,
     { provides: CurrentUser }
-  >()(`@gmacko/domain/SessionOrKey/${scope}`, {
+  >()(`@gmacko/domain/RequireScope/${scope}`, {
     error: credentialErrors,
     security: { session: sessionCookie, apiKey: apiKeyBearer },
   }) {
     static readonly scope: S = scope;
   }
-  return SessionOrKey;
+  return RequireScope;
 };
 
-/** Built once per scope, so each scope has exactly one tag identity. */
-const sessionOrKey = {
-  read: makeSessionOrKey("read"),
-  write: makeSessionOrKey("write"),
-  delete: makeSessionOrKey("delete"),
-  admin: makeSessionOrKey("admin"),
+/**
+ * Built once per scope, so each scope has exactly one tag identity. A scope
+ * missing here fails to compile at `RequireScope`'s indexed return type.
+ */
+const requireScope = {
+  "posts:write": makeRequireScope("posts:write"),
+  "posts:delete": makeRequireScope("posts:delete"),
+  "workspace:read": makeRequireScope("workspace:read"),
+  "workspace:invite": makeRequireScope("workspace:invite"),
+  "workspace:join": makeRequireScope("workspace:join"),
+  "billing:read": makeRequireScope("billing:read"),
+  "preferences:read": makeRequireScope("preferences:read"),
+  "preferences:write": makeRequireScope("preferences:write"),
+  "profile:read": makeRequireScope("profile:read"),
+  "api_keys:read": makeRequireScope("api_keys:read"),
+  "api_keys:manage": makeRequireScope("api_keys:manage"),
+  "platform:admin": makeRequireScope("platform:admin"),
 } as const;
 
-/** The middleware tag for "session, or a key holding `scope`". */
-export const SessionOrKey = <S extends ApiKeyScope>(
+/** The middleware tag for "a session, or a bearer credential holding `scope`". */
+export const RequireScope = <S extends Scope>(
   scope: S,
-): (typeof sessionOrKey)[S] => sessionOrKey[scope];
+): (typeof requireScope)[S] => requireScope[scope];
 
 /**
  * Requires `CurrentUser.role === "admin"`, read fresh (bypassing the cookie
- * cache) once per request. Declared after a `SessionOrKey`, which provides
+ * cache) once per request. Declared after a `RequireScope`, which provides
  * the user; never on its own.
  */
 export class AdminOnly extends HttpApiMiddleware.Service<

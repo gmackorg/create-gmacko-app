@@ -167,7 +167,7 @@ pnpm api:ops -- get_billing_overview
 pnpm mcp:app
 ```
 
-Both surfaces call the same HTTP API through `@gmacko/api-client`; protected tools need `GMACKO_API_KEY` set to a key holding the `admin` scope. With AI files kept, `.mcp.json` also registers the app's MCP server as `gmacko-app`.
+Both surfaces call the same HTTP API through `@gmacko/api-client`; protected tools need `GMACKO_API_KEY` set to a key holding each tool's scope (`api_keys:manage` for key management). With AI files kept, `.mcp.json` also registers the app's MCP server as `gmacko-app`.
 
 ## SaaS Scaffold Maturity
 

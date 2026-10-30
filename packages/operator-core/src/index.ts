@@ -17,6 +17,7 @@ import {
   CreatePost,
   NotFound,
   PostId,
+  type Scope,
   UpdatePreferences,
 } from "@gmacko/domain";
 import { Option, Schema } from "effect";
@@ -59,8 +60,8 @@ export interface OperatorToolDefinition {
 const OPERATOR_LOGIN_GUIDANCE = [
   "Primary auth path: browser-based OAuth or magic-link sign-in from the web app.",
   "Automation path: create an API key in Settings and export GMACKO_API_KEY.",
-  "Reads need a key with the read scope, writes the write scope, deletes the delete scope.",
-  "Creating and revoking API keys (create_api_key, revoke_api_key) needs a key with the admin scope.",
+  "Each tool names the scope its key needs (posts:write, workspace:read, ...); a key holds only the scopes it was created with.",
+  "Creating and revoking API keys (create_api_key, revoke_api_key) needs a key with the api_keys:manage scope, which OAuth clients can never hold.",
   "The operator lane is a wrapper around the app's HTTP API (@gmacko/api-client), not a standalone auth server.",
 ].join(" ");
 
@@ -203,6 +204,8 @@ type ToolInput = Schema.Top & Schema.ConstraintDecoder<unknown>;
 interface Tool<S extends ToolInput> {
   readonly name: string;
   readonly description: string;
+  /** The scope the tool's endpoint requires; `null` for public tools. */
+  readonly scope: Scope | null;
   readonly input: S;
   readonly execute: (
     client: OperatorClient,
@@ -215,6 +218,7 @@ interface Tool<S extends ToolInput> {
  * the payload type never has to be recovered from the list at call time.
  */
 interface OperatorTool extends OperatorToolDefinition {
+  readonly scope: Scope | null;
   readonly run: (
     client: OperatorClient,
     args: OperatorToolArguments,
@@ -228,7 +232,10 @@ const tool = <S extends ToolInput>(definition: Tool<S>): OperatorTool => {
   });
   return {
     name: definition.name,
-    description: definition.description,
+    description: `${definition.description} (${
+      definition.scope === null ? "public" : `scope: ${definition.scope}`
+    })`,
+    scope: definition.scope,
     inputSchema,
     run: (client, args) => {
       let input: S["Type"];
@@ -258,27 +265,30 @@ const operatorTools = [
   tool({
     name: "auth_help",
     description: "Explain how to authenticate for CLI and MCP usage",
+    scope: null,
     input: NoInput,
     execute: async () => OPERATOR_LOGIN_GUIDANCE,
   }),
   tool({
     name: "get_workspace_context",
-    description: "Get the current workspace and role context (key scope: read)",
+    description: "Get the current workspace and role context",
+    scope: "workspace:read",
     input: NoInput,
     execute: (client) =>
       client.run((c) => c.settings.workspaceContext()).then(pretty),
   }),
   tool({
     name: "get_billing_overview",
-    description:
-      "Get workspace billing, usage, and limits overview (key scope: read)",
+    description: "Get workspace billing, usage, and limits overview",
+    scope: "billing:read",
     input: NoInput,
     execute: (client) =>
       client.run((c) => c.settings.billingOverview()).then(pretty),
   }),
   tool({
     name: "list_api_keys",
-    description: "List active API keys for the current user (key scope: read)",
+    description: "List active API keys for the current user",
+    scope: "api_keys:read",
     input: NoInput,
     execute: (client) =>
       client.run((c) => c.settings.listApiKeys()).then(pretty),
@@ -286,14 +296,16 @@ const operatorTools = [
   tool({
     name: "create_api_key",
     description:
-      "Create a new API key for automation; the plaintext key is returned once (key scope: admin)",
+      "Create a new API key for automation; the plaintext key is returned once",
+    scope: "api_keys:manage",
     input: CreateApiKey,
     execute: (client, payload) =>
       client.run((c) => c.settings.createApiKey({ payload })).then(pretty),
   }),
   tool({
     name: "revoke_api_key",
-    description: "Revoke an API key by ID (key scope: admin)",
+    description: "Revoke an API key by ID",
+    scope: "api_keys:manage",
     input: ApiKeyIdInput,
     execute: (client, { id }) =>
       client
@@ -305,13 +317,15 @@ const operatorTools = [
   }),
   tool({
     name: "list_posts",
-    description: "List all posts from the application (public)",
+    description: "List all posts from the application",
+    scope: null,
     input: NoInput,
     execute: (client) => client.run((c) => c.posts.list()).then(pretty),
   }),
   tool({
     name: "get_post",
-    description: "Get a specific post by ID (public)",
+    description: "Get a specific post by ID",
+    scope: null,
     input: PostIdInput,
     execute: (client, { id }) =>
       client
@@ -320,7 +334,8 @@ const operatorTools = [
   }),
   tool({
     name: "create_post",
-    description: "Create a new post (key scope: write)",
+    description: "Create a new post",
+    scope: "posts:write",
     input: CreatePost,
     execute: (client, payload) =>
       client
@@ -329,7 +344,8 @@ const operatorTools = [
   }),
   tool({
     name: "delete_post",
-    description: "Delete a post by ID (key scope: delete)",
+    description: "Delete a post by ID",
+    scope: "posts:delete",
     input: PostIdInput,
     execute: (client, { id }) =>
       client
@@ -341,15 +357,16 @@ const operatorTools = [
   }),
   tool({
     name: "get_preferences",
-    description: "Get user preferences/settings (key scope: read)",
+    description: "Get user preferences/settings",
+    scope: "preferences:read",
     input: NoInput,
     execute: (client) =>
       client.run((c) => c.settings.getPreferences()).then(pretty),
   }),
   tool({
     name: "update_preferences",
-    description:
-      "Update user preferences; only the keys given change (key scope: write)",
+    description: "Update user preferences; only the keys given change",
+    scope: "preferences:write",
     input: UpdatePreferences,
     execute: (client, payload) =>
       client
@@ -375,12 +392,30 @@ export const createOperatorClient = (
         : { authorization: `Bearer ${options.apiKey}` },
   });
 
-export const listOperatorTools = (): Array<OperatorToolDefinition> =>
-  operatorTools.map(({ name, description, inputSchema }) => ({
-    name,
-    description,
-    inputSchema,
-  }));
+/**
+ * The tool list. With `scopes`, only the tools a credential holding those
+ * scopes can call (public tools always), so an OAuth client is never shown
+ * a tool its grant cannot reach.
+ */
+export const listOperatorTools = (options?: {
+  readonly scopes?: ReadonlyArray<Scope> | undefined;
+}): Array<OperatorToolDefinition> =>
+  operatorTools
+    .filter(
+      ({ scope }) =>
+        options?.scopes === undefined ||
+        scope === null ||
+        options.scopes.includes(scope),
+    )
+    .map(({ name, description, inputSchema }) => ({
+      name,
+      description,
+      inputSchema,
+    }));
+
+/** The scope a tool needs (`null`: public), or `undefined` for an unknown tool. */
+export const operatorToolScope = (name: string): Scope | null | undefined =>
+  operatorTools.find((candidate) => candidate.name === name)?.scope;
 
 /**
  * Runs one tool. Arguments are coerced (CLI strings) and validated against

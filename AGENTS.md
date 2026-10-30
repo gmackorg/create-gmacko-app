@@ -107,7 +107,7 @@ observability) and by the health tests (`packages/api/src/health/health.test.ts`
   `apps/web/src/server/actions.ts`.
 - **Every endpoint names its credential** (`endpoint-declares-credential`). In
   `packages/domain/src/**/api.ts` a non-public endpoint declares exactly one of
-  `Session` or `SessionOrKey(scope)`, after any role check (`AdminOnly`,
+  `Session` or `RequireScope(scope)`, after any role check (`AdminOnly`,
   `WorkspaceRole`) so the credential runs outermost (`docs/API_AUTH.md`, rule 6).
 - **`Database.plain` is for better-auth only** (`no-plain-drizzle-in-api`). The
   promise-based drizzle bypasses the `DatabaseError` mapping and tracing; only
@@ -164,7 +164,7 @@ Derived from the code and *not* yet checked here, with the reason:
   version needs a mid-batch fault, which CloudFault cannot inject (see below).
 - `acceptInvite` and `deleteAccount` — no partial membership/allowlist rows,
   and the cascade leaves no orphans. Same reason: both are `Database.batch`.
-- API-key scopes (a `read` key cannot mutate) and the deleted-user session
+- Scopes (a key holding only `profile:read` cannot write a post) and the deleted-user session
   invariant — enforced before any write, so no infrastructure fault changes
   the answer; `packages/auth/src/__tests__/middleware.test.ts` covers them.
 **The gap that bounds all of this**: `Database.batch([...])` is unperturbed.

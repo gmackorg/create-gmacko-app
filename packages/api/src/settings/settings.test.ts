@@ -24,6 +24,7 @@ import {
   workspaceUsageRollup,
 } from "@gmacko/db/schema";
 import {
+  ALL_SCOPES,
   ApiKeyId,
   CreateApiKey,
   CreateInvite,
@@ -903,19 +904,19 @@ describe("settings api keys", () => {
       toApiKeyCreate(
         new CreateApiKey({
           name: "ci",
-          permissions: ["read"],
+          permissions: ["profile:read"],
           expiresInDays: 30,
         }),
         now,
       ),
     ).toEqual({
       name: "ci",
-      permissions: ["read"],
+      permissions: ["profile:read"],
       expiresAt: new Date(now + 30 * 24 * 60 * 60 * 1000),
     });
     expect(
       toApiKeyCreate(
-        new CreateApiKey({ name: "ci", permissions: ["read"] }),
+        new CreateApiKey({ name: "ci", permissions: ["profile:read"] }),
         now,
       ).expiresAt,
     ).toBeUndefined();
@@ -928,7 +929,7 @@ describe("settings api keys", () => {
         client.settings.createApiKey({
           payload: new CreateApiKey({
             name: "CI",
-            permissions: ["read", "write"],
+            permissions: ["profile:read", "posts:write"],
             expiresInDays: 30,
           }),
         }),
@@ -936,7 +937,7 @@ describe("settings api keys", () => {
     );
     expect(created.key.startsWith("gmk_")).toBe(true);
     expect(created.keyPrefix).toBe(created.key.slice(0, 12));
-    expect(created.permissions).toEqual(["read", "write"]);
+    expect(created.permissions).toEqual(["profile:read", "posts:write"]);
     expect(created.expiresAt?.getTime()).toBeGreaterThan(Date.now());
 
     const listed = await api.call((client) => client.settings.listApiKeys(), {
@@ -964,17 +965,20 @@ describe("settings api keys", () => {
     ).toMatchObject({ _tag: "NotFound", resource: "apiKey" });
   });
 
-  it("key management takes the admin scope; someone else's key is NotFound", async () => {
+  it("key management takes the api_keys:manage scope; someone else's key is NotFound", async () => {
     const person = await api.createUser();
     const other = await api.createUser();
-    const theirs = await api.createApiKey(other, ["read"]);
-    const readKey = await api.createApiKey(person, ["read"]);
-    const adminKey = await api.createApiKey(person, ["admin"]);
+    const theirs = await api.createApiKey(other, ["api_keys:read"]);
+    const readKey = await api.createApiKey(person, ["api_keys:read"]);
+    const adminKey = await api.createApiKey(person, ["api_keys:manage"]);
 
     const scoped = await api.failure(
       (client) =>
         client.settings.createApiKey({
-          payload: new CreateApiKey({ name: "nope", permissions: ["read"] }),
+          payload: new CreateApiKey({
+            name: "nope",
+            permissions: ["profile:read"],
+          }),
         }),
       { bearer: readKey.key },
     );
@@ -983,7 +987,10 @@ describe("settings api keys", () => {
     const minted = await api.call(
       (client) =>
         client.settings.createApiKey({
-          payload: new CreateApiKey({ name: "via-key", permissions: ["read"] }),
+          payload: new CreateApiKey({
+            name: "via-key",
+            permissions: ["profile:read"],
+          }),
         }),
       { bearer: adminKey.key },
     );
@@ -1003,7 +1010,7 @@ describe("settings api keys", () => {
 describe("settings deleteAccount", () => {
   it("deletes the user row and cascades sessions, accounts, keys, preferences and memberships", async () => {
     const person = await api.createUser();
-    await api.createApiKey(person, ["read"]);
+    await api.createApiKey(person, ["profile:read"]);
     const acme = await api.createWorkspace({ owner: person, name: "Mine" });
     await api.call(
       (client) =>
@@ -1096,9 +1103,9 @@ describe("settings deleteAccount", () => {
     expect(failure).toMatchObject({ _tag: "Unauthorized" });
   });
 
-  it("is session only: a bearer key, even admin, is Forbidden(scope)", async () => {
+  it("is session only: a bearer key, even one holding every scope, is Forbidden(scope)", async () => {
     const person = await api.createUser();
-    const adminKey = await api.createApiKey(person, ["admin"]);
+    const adminKey = await api.createApiKey(person, ALL_SCOPES);
     const response = await api.fetch("/api/account", {
       method: "DELETE",
       headers: { authorization: `Bearer ${adminKey.key}` },

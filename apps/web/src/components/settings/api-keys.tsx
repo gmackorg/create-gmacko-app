@@ -1,10 +1,18 @@
-import { type ApiKeyScope, CreateApiKeyForm } from "@gmacko/domain";
+import {
+  ALL_SCOPES,
+  CreateApiKeyForm,
+  DEFAULT_SCOPES,
+  isScope,
+  SCOPES,
+  type Scope,
+} from "@gmacko/domain";
 import { ApiKeyRow } from "@gmacko/ui/api-key-row";
 import { ApiKeySecret } from "@gmacko/ui/api-key-secret";
 import { Button } from "@gmacko/ui/button";
 import { Field, FieldContent, FieldError, FieldLabel } from "@gmacko/ui/field";
 import { Input } from "@gmacko/ui/input";
 import { Label } from "@gmacko/ui/label";
+import { ScopePicker } from "@gmacko/ui/scope-picker";
 import { SettingsCard, SettingsPanel } from "@gmacko/ui/settings-card";
 import { toast } from "@gmacko/ui/toast";
 import { useForm } from "@tanstack/react-form";
@@ -14,7 +22,11 @@ import { useState } from "react";
 import { useApiErrorHandler } from "~/components/use-api-error";
 import { mutations, queries } from "~/lib/api";
 
-const SCOPES: ReadonlyArray<ApiKeyScope> = ["read", "write", "delete", "admin"];
+/** Every scope may go on a key, the key-only ones included. */
+const SCOPE_OPTIONS = ALL_SCOPES.map((scope) => ({
+  value: scope,
+  description: SCOPES[scope].description,
+}));
 
 export function ApiKeysSection() {
   const { data: apiKeys } = useSuspenseQuery(queries.settings.listApiKeys());
@@ -37,9 +49,8 @@ export function ApiKeysSection() {
     onError: (error) => onError(error, "Could not revoke the API key."),
   });
 
-  // Annotated, not asserted, so the form's field type is the contract's
-  // scope list rather than the literal `["read"]` this starts on.
-  const defaultPermissions: ReadonlyArray<ApiKeyScope> = ["read"];
+  // Annotated, so the form's field type is the contract's scope list.
+  const defaultPermissions: ReadonlyArray<Scope> = DEFAULT_SCOPES;
 
   const form = useForm({
     defaultValues: {
@@ -124,28 +135,14 @@ export function ApiKeysSection() {
                 return (
                   <Field data-invalid={isInvalid}>
                     <Label className="mb-2 block">Permissions</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {SCOPES.map((scope) => (
-                        <label key={scope} className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            name={`permission-${scope}`}
-                            checked={field.state.value.includes(scope)}
-                            onChange={(event) =>
-                              field.handleChange(
-                                event.target.checked
-                                  ? [...field.state.value, scope]
-                                  : field.state.value.filter(
-                                      (p) => p !== scope,
-                                    ),
-                              )
-                            }
-                            className="h-4 w-4 rounded border-gray-300"
-                          />
-                          <span className="capitalize">{scope}</span>
-                        </label>
-                      ))}
-                    </div>
+                    <ScopePicker
+                      name="permission"
+                      options={SCOPE_OPTIONS}
+                      value={field.state.value}
+                      onChange={(next) =>
+                        field.handleChange(next.filter(isScope))
+                      }
+                    />
                     {isInvalid && (
                       <FieldError errors={field.state.meta.errors} />
                     )}

@@ -20,8 +20,8 @@ const PROTECTED_TOOL_ERROR =
 /**
  * The MCP server's view of the operator lane: the tool list (input schemas
  * derived from the API contract) and one call. Every tool but `auth_help`
- * needs `GMACKO_API_KEY`; creating or revoking keys needs one with the
- * `admin` scope.
+ * needs `GMACKO_API_KEY` holding the tool's scope; creating or revoking
+ * keys needs `api_keys:manage`.
  */
 export function createOperatorExecutor(options: {
   apiKey?: string | undefined;

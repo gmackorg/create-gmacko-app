@@ -41,7 +41,7 @@ Read `AGENTS.md` first: its "Local Development" section explains how the Worker 
 
 - `packages/domain/src/api.ts` - `AppApi`: every `HttpApiGroup` (health, auth, posts, settings, admin)
 - `packages/domain/src/<group>/{api,models}.ts` - Endpoints and `Schema` models per group
-- `packages/domain/src/security.ts` - `Session`, `SessionOrKey(scope)`; `roles.ts` - `AdminOnly`, `WorkspaceRole`; `middleware.ts` - `RateLimit`, `EndpointBoundary`
+- `packages/domain/src/security.ts` - `Session`, `RequireScope(scope)`; `roles.ts` - `AdminOnly`, `WorkspaceRole`; `middleware.ts` - `RateLimit`, `EndpointBoundary`
 - `packages/api/src/layer.ts` - `ApiLive`: services + handler groups
 - `packages/api/src/handler.ts` - `makeWebHandler` (`HttpRouter.toWebHandler`)
 - `packages/api/src/<group>/{service,handlers}.ts` - Effect service and `HttpApiBuilder.group` per group
@@ -111,7 +111,7 @@ if (integrations.posthog) {
 
 ### Adding a new API endpoint
 
-1. Declare it in `packages/domain/src/<group>/api.ts` with exactly one credential (`Session`, `SessionOrKey(scope)`, or public)
+1. Declare it in `packages/domain/src/<group>/api.ts` with exactly one credential (`Session`, `RequireScope(scope)`, or public)
 2. Implement it in `packages/api/src/<group>/` (service + handler) and register in `layer.ts`
 3. Add `queryOptions`/`mutationOptions` and invalidation in `packages/api-client/src/queries/`
 4. Regenerate `docs/API_AUTH.md`; use it in the apps via `queries`/`mutations`

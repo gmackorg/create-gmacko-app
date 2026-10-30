@@ -54,7 +54,7 @@ describe("posts", () => {
     );
     expect(anonymous).toMatchObject({ _tag: "Unauthorized" });
 
-    const readKey = await api.createApiKey(author, ["read"]);
+    const readKey = await api.createApiKey(author, ["profile:read"]);
     const scoped = await api.failure(
       (client) =>
         client.posts.create({
@@ -80,7 +80,7 @@ describe("posts", () => {
 
   it("list is public, newest first, at most ten", async () => {
     await clearPosts();
-    const key = await api.createApiKey(author, ["write"]);
+    const key = await api.createApiKey(author, ["posts:write"]);
     for (let i = 0; i < 12; i += 1) {
       await api.run(
         Effect.flatMap(Database, ({ db }) =>
@@ -134,14 +134,14 @@ describe("posts", () => {
         }),
       { cookie: author.cookie },
     );
-    const writeOnly = await api.createApiKey(author, ["write"]);
+    const writeOnly = await api.createApiKey(author, ["posts:write"]);
     const scoped = await api.failure(
       (client) => client.posts.remove({ params: { id: created.id } }),
       { bearer: writeOnly.key },
     );
     expect(scoped).toMatchObject({ _tag: "Forbidden", reason: "scope" });
 
-    const deleteKey = await api.createApiKey(author, ["delete"]);
+    const deleteKey = await api.createApiKey(author, ["posts:delete"]);
     const response = await api.fetch(`/api/posts/${created.id}`, {
       method: "DELETE",
       headers: { authorization: `Bearer ${deleteKey.key}` },

@@ -94,7 +94,7 @@ describe("ApiKeys", () => {
 
           const created = yield* api.create(owner.id, {
             name: "ci",
-            permissions: ["read", "write"],
+            permissions: ["profile:read", "posts:write"],
           });
           const listed = yield* api.list(owner.id);
           const stored = yield* db
@@ -126,7 +126,10 @@ describe("ApiKeys", () => {
 
       expect(result.created.key).toMatch(/^gmk_/);
       expect(result.created.keyPrefix).toBe(result.created.key.slice(0, 12));
-      expect(result.created.permissions).toEqual(["read", "write"]);
+      expect(result.created.permissions).toEqual([
+        "profile:read",
+        "posts:write",
+      ]);
       expect(result.created.expiresAt).toBeNull();
 
       expect(result.listed).toHaveLength(1);
@@ -134,7 +137,7 @@ describe("ApiKeys", () => {
         id: result.created.id,
         name: "ci",
         keyPrefix: result.created.keyPrefix,
-        permissions: ["read", "write"],
+        permissions: ["profile:read", "posts:write"],
         lastUsedAt: null,
         expiresAt: null,
       });
@@ -166,7 +169,7 @@ describe("ApiKeys", () => {
           );
           return yield* api.create(owner.id, {
             name: "expiring",
-            permissions: ["read"],
+            permissions: ["profile:read"],
             expiresAt,
           });
         }),
@@ -185,7 +188,7 @@ describe("ApiKeys", () => {
           );
           const created = yield* api.create(owner.id, {
             name: "live",
-            permissions: ["read"],
+            permissions: ["profile:read"],
           });
           const before = yield* api.list(owner.id);
           const authenticated = yield* api.authenticate(created.key);
@@ -194,12 +197,37 @@ describe("ApiKeys", () => {
         }),
       );
       expect(result.authenticated.keyId).toBe(result.created.id);
-      expect(result.authenticated.permissions).toEqual(["read"]);
+      expect(result.authenticated.permissions).toEqual(["profile:read"]);
       expect(result.authenticated.user.id).toBe(result.owner.id);
       expect(result.authenticated.user.email).toBe(result.owner.email);
       expect(result.authenticated.user.role).toBe("user");
       expect(result.before[0]?.lastUsedAt).toBeNull();
       expect(result.after[0]?.lastUsedAt).toBeInstanceOf(Date);
+    });
+
+    it("grants nothing for a stored permission outside the catalog (a pre-catalog `read`, a typo)", async () => {
+      const result = await run(
+        Effect.gen(function* () {
+          const api = yield* ApiKeys;
+          const { db } = yield* Database;
+          const owner = yield* insertUser(
+            `legacy-${crypto.randomUUID()}@example.com`,
+          );
+          const created = yield* api.create(owner.id, {
+            name: "legacy",
+            permissions: ["posts:write"],
+          });
+          yield* db
+            .update(apiKeys)
+            .set({ permissions: ["read", "posts:write", "posts:wrte"] })
+            .where(eq(apiKeys.id, created.id));
+          const authenticated = yield* api.authenticate(created.key);
+          const listed = yield* api.list(owner.id);
+          return { authenticated, listed };
+        }),
+      );
+      expect(result.authenticated.permissions).toEqual(["posts:write"]);
+      expect(result.listed[0]?.permissions).toEqual(["posts:write"]);
     });
 
     it("refuses unknown, malformed, expired and revoked keys with Unauthorized, without touching lastUsedAt", async () => {
@@ -212,12 +240,12 @@ describe("ApiKeys", () => {
           );
           const expired = yield* api.create(owner.id, {
             name: "expired",
-            permissions: ["admin"],
+            permissions: ["api_keys:manage"],
             expiresAt: new Date(Date.now() - 1000),
           });
           const revoked = yield* api.create(owner.id, {
             name: "revoked",
-            permissions: ["admin"],
+            permissions: ["api_keys:manage"],
           });
           yield* api.revoke(owner.id, revoked.id);
 
@@ -278,7 +306,7 @@ describe("ApiKeys", () => {
             );
             const created = yield* api.create(owner.id, {
               name: "flaky",
-              permissions: ["read"],
+              permissions: ["profile:read"],
             });
             const authenticated = yield* api.authenticate(created.key);
             const listed = yield* api.list(owner.id);
@@ -286,7 +314,7 @@ describe("ApiKeys", () => {
           }),
         );
         expect(result.authenticated.keyId).toBe(result.created.id);
-        expect(result.authenticated.permissions).toEqual(["read"]);
+        expect(result.authenticated.permissions).toEqual(["profile:read"]);
         expect(result.listed[0]?.lastUsedAt).toBeNull();
       } finally {
         await flaky.dispose();

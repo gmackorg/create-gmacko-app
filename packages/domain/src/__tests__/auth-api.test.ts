@@ -19,7 +19,7 @@ describe("AuthApi", () => {
         id: "secret",
         method: "GET",
         path: "/auth/secret",
-        credential: "SessionOrKey(read)",
+        credential: "RequireScope(profile:read)",
         roles: [],
         success: 200,
         errors: ["401 Unauthorized", "403 Forbidden"],

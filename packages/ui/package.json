@@ -15,6 +15,7 @@
     "./launch-banner": "./src/launch-banner.tsx",
     "./launch-controls-form": "./src/launch-controls-form.tsx",
     "./marketing-page": "./src/marketing-page.tsx",
+    "./scope-picker": "./src/scope-picker.tsx",
     "./select": "./src/select.tsx",
     "./separator": "./src/separator.tsx",
     "./settings-card": "./src/settings-card.tsx",

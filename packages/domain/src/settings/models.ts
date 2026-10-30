@@ -48,7 +48,8 @@ import {
   WorkspaceModel,
 } from "../models/settings";
 import { boundedString, Email, stringBetween } from "../primitives";
-import { ApiKeyScope, UserRole, WorkspaceMemberRole } from "../roles";
+import { UserRole, WorkspaceMemberRole } from "../roles";
+import { Scope } from "../scopes";
 
 // ---------------------------------------------------------------------------
 // Enums and ids (declared in ../models so the row models can import them)
@@ -120,7 +121,7 @@ export class ApiKeyCreated extends Schema.Class<ApiKeyCreated>("ApiKeyCreated")(
     id: ApiKeyId,
     name: Schema.String,
     keyPrefix: Schema.String,
-    permissions: Schema.Array(ApiKeyScope),
+    permissions: Schema.Array(Scope),
     expiresAt: Schema.NullOr(Schema.Date),
     key: Schema.String,
   },
@@ -379,7 +380,7 @@ export const UpdatePreferencesForm =
 
 export class CreateApiKey extends Schema.Class<CreateApiKey>("CreateApiKey")({
   name: stringBetween(1, 100),
-  permissions: Schema.NonEmptyArray(ApiKeyScope),
+  permissions: Schema.NonEmptyArray(Scope),
   expiresInDays: Schema.optionalKey(
     Schema.Int.pipe(Schema.check(Schema.isGreaterThan(0))),
   ),

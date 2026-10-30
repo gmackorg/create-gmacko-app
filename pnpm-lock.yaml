@@ -1107,6 +1107,9 @@ importers:
       '@gmacko/api':
         specifier: workspace:*
         version: link:../api
+      '@gmacko/domain':
+        specifier: workspace:*
+        version: link:../domain
       '@gmacko/tsconfig':
         specifier: workspace:*
         version: link:../../tooling/typescript

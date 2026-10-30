@@ -702,7 +702,7 @@ function getBootstrapRecommendations(
 
   if (options.saasOperatorApis || options.operatorLane) {
     selectedLayerLines.push(
-      "- Operator APIs: use `pnpm api:ops -- --help` and `pnpm mcp:app` for the shared CLI and MCP wrapper lane (an API key with the `admin` scope).",
+      "- Operator APIs: use `pnpm api:ops -- --help` and `pnpm mcp:app` for the shared CLI and MCP wrapper lane (an API key holding each tool's scope; `api_keys:manage` for key management).",
     );
     codexLines.push(
       "- Operator APIs: use `packages/operator-core`, `packages/api-cli`, and `packages/mcp-server` for the shared CLI and MCP wrapper lane.",

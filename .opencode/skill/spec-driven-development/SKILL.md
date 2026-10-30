@@ -28,7 +28,7 @@ When a user describes a feature, immediately check for these gaps:
 | **Data** | What data does this feature create/read/update/delete? |
 | **Behavior** | What happens when the user performs the action? |
 | **Validation** | What are the constraints? (min/max lengths, required fields, formats) |
-| **Permissions** | Who can do what? (owner only, any authenticated user, admin, workspace role, which API-key scope) |
+| **Permissions** | Who can do what? (owner only, any authenticated user, admin, workspace role, which `resource:action` scope) |
 | **Platforms** | Web only, mobile only, or both? (default: both) |
 | **Error handling** | What happens when things go wrong? (not found, unauthorized, invalid, conflict) |
 | **Edge cases** | Empty states, pagination, concurrent access? |
@@ -80,14 +80,14 @@ Create a spec document with this structure:
 - **Behavior:** Returns features ordered by createdAt desc, paginated
 
 ### `feature.create` — POST /api/features
-- **Credential:** `SessionOrKey("write")`
+- **Credential:** `RequireScope("features:write")`
 - **Payload:** `{ title: string, description?: string }`
 - **Success:** `Feature` (201)
 - **Validation:** title required, min 1, max 256 (domain `Schema`)
 - **Side effects:** PostHog event `feature_created`
 
 ### `feature.remove` — DELETE /api/features/:id
-- **Credential:** `SessionOrKey("delete")`; owner or admin
+- **Credential:** `RequireScope("features:delete")`; owner or admin
 - **Params:** `{ id: FeatureId }`
 - **Errors:** `NotFound`, `Forbidden`
 - **Behavior:** Soft delete (set status to 'archived') or hard delete?
@@ -142,7 +142,7 @@ I need a few more details before I can build this:
 4. Should this support pagination? What's the expected volume?
 
 **Permissions:**
-5. Can any authenticated user [action], or only the owner? Which API-key scope?
+5. Can any authenticated user [action], or only the owner? Which `resource:action` scope?
 6. Should admins be able to [action] on behalf of users?
 
 **Platforms:**

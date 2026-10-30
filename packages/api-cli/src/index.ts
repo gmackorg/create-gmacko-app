@@ -15,7 +15,7 @@ Usage:
   gmacko-ops get_workspace_context
   gmacko-ops get_billing_overview
   gmacko-ops list_api_keys
-  gmacko-ops create_api_key --name <name> [--permissions read,write] [--expiresInDays 30]
+  gmacko-ops create_api_key --name <name> [--permissions profile:read,posts:write] [--expiresInDays 30]
   gmacko-ops revoke_api_key --id <api-key-id>
   gmacko-ops list_posts
   gmacko-ops get_post --id <post-id>

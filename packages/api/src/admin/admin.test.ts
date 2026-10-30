@@ -201,7 +201,7 @@ describe("admin bootstrap (ported)", () => {
     await resetBootstrap();
     const seeded = await setSettings({ announcementMessage: "welcome" });
     const person = await api.createUser();
-    const adminKey = await api.createApiKey(person, ["admin"]);
+    const adminKey = await api.createApiKey(person, ["platform:admin"]);
     const byKey = await api.fetch("/api/bootstrap/complete", {
       method: "POST",
       headers: {
@@ -466,12 +466,12 @@ describe("admin launch controls (ported)", () => {
       { cookie: person.cookie },
     );
     expect(bySession).toMatchObject({ _tag: "Forbidden", reason: "role" });
-    const adminKey = await api.createApiKey(person, ["admin"]);
+    const adminKey = await api.createApiKey(person, ["platform:admin"]);
     const byKey = await api.failure((client) => client.admin.stats(), {
       bearer: adminKey.key,
     });
     expect(byKey).toMatchObject({ _tag: "Forbidden", reason: "role" });
-    const readKey = await api.createApiKey(await asAdmin(), ["read"]);
+    const readKey = await api.createApiKey(await asAdmin(), ["profile:read"]);
     const byScope = await api.failure((client) => client.admin.stats(), {
       bearer: readKey.key,
     });

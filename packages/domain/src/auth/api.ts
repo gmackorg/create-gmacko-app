@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 
-import { SessionOrKey } from "../security";
+import { RequireScope } from "../security";
 import { SessionState } from "./models";
 
 /**
@@ -18,6 +18,6 @@ export class AuthApi extends HttpApiGroup.make("auth")
   .add(
     HttpApiEndpoint.get("secret", "/secret", {
       success: Schema.String,
-    }).middleware(SessionOrKey("read")),
+    }).middleware(RequireScope("profile:read")),
   )
   .prefix("/auth") {}

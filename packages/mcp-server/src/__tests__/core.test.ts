@@ -1,9 +1,10 @@
 /**
  * The MCP executor over operator-core, against the in-process `TestApi`
- * with an admin-scoped key: the key gate, the tool list the server
+ * with an every-scope key: the key gate, the tool list the server
  * advertises, and one protected call end to end.
  */
 import { makeTestApi, type TestApi } from "@gmacko/api/testing";
+import { ALL_SCOPES } from "@gmacko/domain";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createOperatorExecutor } from "../core";
@@ -13,7 +14,7 @@ let adminKey: string;
 beforeAll(async () => {
   api = makeTestApi();
   const admin = await api.createUser({ role: "admin" });
-  adminKey = (await api.createApiKey(admin, ["admin"])).key;
+  adminKey = (await api.createApiKey(admin, ALL_SCOPES)).key;
 });
 afterAll(() => api.dispose());
 
@@ -60,14 +61,17 @@ describe("mcp operator executor", () => {
 
   it("reports a wrong-scope key as the contract's Forbidden", async () => {
     const admin = await api.createUser({ role: "admin" });
-    const readKey = (await api.createApiKey(admin, ["read"])).key;
+    const readKey = (await api.createApiKey(admin, ["api_keys:read"])).key;
     const executor = createOperatorExecutor({
       apiKey: readKey,
       baseUrl: api.baseUrl,
       transport: (request) => api.handler(request),
     });
     await expect(
-      executor.callTool("create_api_key", { name: "x", permissions: "read" }),
+      executor.callTool("create_api_key", {
+        name: "x",
+        permissions: "profile:read",
+      }),
     ).rejects.toThrow("Forbidden (scope)");
   });
 });

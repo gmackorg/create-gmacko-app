@@ -7,7 +7,7 @@ app's HTTP API through `@gmacko/api-client` with a bearer key. The MCP server
 ```bash
 pnpm api:ops -- --help
 GMACKO_API_KEY=gmk_... pnpm api:ops -- get_workspace_context
-GMACKO_API_KEY=gmk_... pnpm api:ops -- create_api_key --name ci --permissions read,write --expiresInDays 30
+GMACKO_API_KEY=gmk_... pnpm api:ops -- create_api_key --name ci --permissions profile:read,posts:write --expiresInDays 30
 ```
 
 ## Environment
@@ -18,14 +18,19 @@ GMACKO_API_KEY=gmk_... pnpm api:ops -- create_api_key --name ci --permissions re
 
 ## Key scopes
 
-| Scope    | Tools                                                                          |
-| -------- | ------------------------------------------------------------------------------ |
-| `read`   | `get_workspace_context`, `get_billing_overview`, `list_api_keys`, `get_preferences` |
-| `write`  | `create_post`, `update_preferences`                                            |
-| `delete` | `delete_post`                                                                  |
-| `admin`  | `create_api_key`, `revoke_api_key`                                             |
+| Scope               | Tools                                |
+| ------------------- | ------------------------------------ |
+| `workspace:read`    | `get_workspace_context`              |
+| `billing:read`      | `get_billing_overview`               |
+| `api_keys:read`     | `list_api_keys`                      |
+| `api_keys:manage`   | `create_api_key`, `revoke_api_key`   |
+| `posts:write`       | `create_post`                        |
+| `posts:delete`      | `delete_post`                        |
+| `preferences:read`  | `get_preferences`                    |
+| `preferences:write` | `update_preferences`                 |
 
-Creating and revoking keys needs a key holding the `admin` scope (a session
+Each tool's description names its scope too. The full catalog is in
+`docs/API_AUTH.md`. Creating and revoking keys needs `api_keys:manage` (a session
 in the web app always may). Deleting the account is session-only and has no
 tool.
 

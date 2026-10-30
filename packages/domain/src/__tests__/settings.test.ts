@@ -101,20 +101,25 @@ describe("payloads", () => {
 
   it("CreateApiKey needs a name, at least one scope and a positive integer expiry", () => {
     expect(
-      () => new CreateApiKey({ name: "", permissions: ["read"] }),
+      () => new CreateApiKey({ name: "", permissions: ["profile:read"] }),
     ).toThrow();
     // SAFETY: deliberately out of contract. `CreateApiKey.permissions` is
-    // `Schema.NonEmptyArray(ApiKeyScope)`, whose type is `[ApiKeyScope,
-    // ...ApiKeyScope[]]`; the empty array inhabits no such tuple, which is
-    // exactly the emptiness this line asserts the constructor rejects.
+    // `Schema.NonEmptyArray(Scope)`, whose type is `[Scope, ...Scope[]]`;
+    // the empty array inhabits no such tuple, which is exactly the emptiness
+    // this line asserts the constructor rejects.
     expect(
       () => new CreateApiKey({ name: "ci", permissions: [] as never }),
+    ).toThrow();
+    // SAFETY: deliberately out of contract, as above. A pre-catalog
+    // permission is not a `Scope`; new keys must name catalog scopes.
+    expect(
+      () => new CreateApiKey({ name: "ci", permissions: ["read"] as never }),
     ).toThrow();
     expect(
       () =>
         new CreateApiKey({
           name: "ci",
-          permissions: ["read"],
+          permissions: ["profile:read"],
           expiresInDays: 0,
         }),
     ).toThrow();
@@ -122,16 +127,20 @@ describe("payloads", () => {
       () =>
         new CreateApiKey({
           name: "ci",
-          permissions: ["read"],
+          permissions: ["profile:read"],
           expiresInDays: 1.5,
         }),
     ).toThrow();
     expect(
-      () => new CreateApiKey({ name: "x".repeat(101), permissions: ["read"] }),
+      () =>
+        new CreateApiKey({
+          name: "x".repeat(101),
+          permissions: ["profile:read"],
+        }),
     ).toThrow();
     const key = new CreateApiKey({
       name: "ci",
-      permissions: ["read", "write"],
+      permissions: ["profile:read", "posts:write"],
     });
     expect(key.expiresInDays).toBeUndefined();
     expect(CreateApiKeyForm["~standard"].vendor).toBe("effect");
@@ -187,7 +196,7 @@ describe("row models round-trip through JSON", () => {
         id: ApiKeyId.make("k1"),
         name: "ci",
         keyPrefix: "gmk_abcdefgh",
-        permissions: ["read", "write"],
+        permissions: ["profile:read", "posts:write"],
         lastUsedAt: null,
         expiresAt: t1,
         createdAt: t0,
@@ -200,7 +209,7 @@ describe("row models round-trip through JSON", () => {
         id: ApiKeyId.make("k1"),
         name: "ci",
         keyPrefix: "gmk_abcdefgh",
-        permissions: ["admin"],
+        permissions: ["api_keys:manage"],
         expiresAt: null,
         key: "gmk_abcdefghijklmnop",
       }),
@@ -479,7 +488,7 @@ describe("SettingsApi", () => {
         id: "workspaceContext",
         method: "GET",
         path: "/workspace",
-        credential: "SessionOrKey(read)",
+        credential: "RequireScope(workspace:read)",
         roles: [],
         success: 200,
         errors: credentialErrors,
@@ -488,7 +497,7 @@ describe("SettingsApi", () => {
         id: "platformPrimitives",
         method: "GET",
         path: "/platform-primitives",
-        credential: "SessionOrKey(read)",
+        credential: "RequireScope(workspace:read)",
         roles: [],
         success: 200,
         errors: credentialErrors,
@@ -497,7 +506,7 @@ describe("SettingsApi", () => {
         id: "billingOverview",
         method: "GET",
         path: "/billing",
-        credential: "SessionOrKey(read)",
+        credential: "RequireScope(billing:read)",
         roles: [],
         success: 200,
         errors: credentialErrors,
@@ -506,7 +515,7 @@ describe("SettingsApi", () => {
         id: "listInvites",
         method: "GET",
         path: "/workspace/invites",
-        credential: "SessionOrKey(read)",
+        credential: "RequireScope(workspace:read)",
         roles: ["WorkspaceRole(admin)"],
         success: 200,
         errors: credentialErrors,
@@ -515,7 +524,7 @@ describe("SettingsApi", () => {
         id: "createInvite",
         method: "POST",
         path: "/workspace/invites",
-        credential: "SessionOrKey(write)",
+        credential: "RequireScope(workspace:invite)",
         roles: ["WorkspaceRole(admin)"],
         success: 201,
         errors: [...credentialErrors, "409 Conflict"],
@@ -524,7 +533,7 @@ describe("SettingsApi", () => {
         id: "acceptInvite",
         method: "POST",
         path: "/workspace/invites/:inviteId/accept",
-        credential: "SessionOrKey(write)",
+        credential: "RequireScope(workspace:join)",
         roles: [],
         success: 200,
         errors: [...credentialErrors, "404 NotFound", "409 Conflict"],
@@ -533,7 +542,7 @@ describe("SettingsApi", () => {
         id: "getPreferences",
         method: "GET",
         path: "/preferences",
-        credential: "SessionOrKey(read)",
+        credential: "RequireScope(preferences:read)",
         roles: [],
         success: 200,
         errors: credentialErrors,
@@ -542,7 +551,7 @@ describe("SettingsApi", () => {
         id: "updatePreferences",
         method: "PATCH",
         path: "/preferences",
-        credential: "SessionOrKey(write)",
+        credential: "RequireScope(preferences:write)",
         roles: [],
         success: 200,
         errors: credentialErrors,
@@ -551,7 +560,7 @@ describe("SettingsApi", () => {
         id: "listApiKeys",
         method: "GET",
         path: "/api-keys",
-        credential: "SessionOrKey(read)",
+        credential: "RequireScope(api_keys:read)",
         roles: [],
         success: 200,
         errors: credentialErrors,
@@ -560,7 +569,7 @@ describe("SettingsApi", () => {
         id: "createApiKey",
         method: "POST",
         path: "/api-keys",
-        credential: "SessionOrKey(admin)",
+        credential: "RequireScope(api_keys:manage)",
         roles: [],
         success: 201,
         errors: [...credentialErrors, "429 RateLimited"],
@@ -569,7 +578,7 @@ describe("SettingsApi", () => {
         id: "revokeApiKey",
         method: "DELETE",
         path: "/api-keys/:id",
-        credential: "SessionOrKey(admin)",
+        credential: "RequireScope(api_keys:manage)",
         roles: [],
         success: 204,
         errors: [...credentialErrors, "404 NotFound", "429 RateLimited"],

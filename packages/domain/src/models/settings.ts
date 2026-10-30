@@ -1,7 +1,8 @@
 import { Schema } from "effect";
 import { Model } from "effect/schema";
 
-import { ApiKeyScope, WorkspaceMemberRole } from "../roles";
+import { WorkspaceMemberRole } from "../roles";
+import { Scope } from "../scopes";
 import { Theme, WaitlistSource, WaitlistStatus } from "./enums";
 import {
   ApiKeyId,
@@ -45,7 +46,7 @@ export class ApiKeyModel extends Model.Class<ApiKeyModel>("ApiKeyModel")({
   keyHash: Model.Sensitive(Schema.String),
   /** First 12 characters of the key, for recognising it in a list. */
   keyPrefix: Schema.String,
-  permissions: Schema.Array(ApiKeyScope),
+  permissions: Schema.Array(Scope),
   lastUsedAt: Schema.NullOr(Schema.Date),
   expiresAt: Schema.NullOr(Schema.Date),
   createdAt: Model.GeneratedByApp(Schema.Date),

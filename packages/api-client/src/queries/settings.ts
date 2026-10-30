@@ -103,7 +103,7 @@ export const settingsMutations = (api: ApiClient) => ({
         ),
       meta: invalidates("settings.updatePreferences"),
     }),
-  /** Needs the `admin` scope on a key (any session works); the response carries the plaintext key once. */
+  /** Needs `api_keys:manage` on a key (any session works); the response carries the plaintext key once. */
   createApiKey: () =>
     mutationOptions({
       mutationKey: [...queryKeys.settings.all, "createApiKey"],

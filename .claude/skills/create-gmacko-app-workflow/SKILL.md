@@ -50,7 +50,7 @@ The main rule is to map work to the correct layer first, then operate within tha
 `pnpm check:standards` runs in CI and `pnpm check:fast`; `AGENTS.md` lists every rule.
 
 - Data reads and writes go through the contract client; `createServerFn` only sets cookies or redirects and lives in `apps/web/src/server/actions.ts`.
-- Every non-public endpoint declares exactly one credential (`Session` or `SessionOrKey(scope)`), after any role check.
+- Every non-public endpoint declares exactly one credential (`Session` or `RequireScope(scope)`), after any role check.
 - No `db.transaction` / `withTransaction`: use `Database.batch` or a guarded `updateWhere`.
 - No `process.env` in anything that ships in the Worker bundle; `AppConfig` is the only reader of bindings, and only `runtime.ts` imports `cloudflare:workers`.
 - Never create `apps/web/.dev.vars`; D1 migrations are expand/contract only.

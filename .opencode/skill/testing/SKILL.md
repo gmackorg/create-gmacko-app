@@ -162,7 +162,7 @@ const clearPosts = () =>
 ```typescript
 // packages/api/src/posts/posts.test.ts
 describe("posts", () => {
-  it("create returns the created row with 201 and needs the write scope", async () => {
+  it("create returns the created row with 201 and needs the features:write scope", async () => {
     const created = await api.call(
       (client) => client.posts.create({ payload: new CreatePost({ title: "Hello", content: "World" }) }),
       { cookie: author.cookie },
@@ -318,7 +318,7 @@ describe("CreatePost", () => {
 
 // API tests: describe the behavior per endpoint
 describe("posts", () => {
-  it("create returns the created row with 201 and needs the write scope", ...);
+  it("create returns the created row with 201 and needs the features:write scope", ...);
   it("remove is 404 for an unknown id", ...);
 });
 

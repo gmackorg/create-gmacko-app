@@ -96,7 +96,7 @@ Build the API first. The `HttpApi` contract in `packages/domain` is the single s
 // packages/domain/src/your-feature/api.ts
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
-import { SessionOrKey } from "../security";
+import { RequireScope } from "../security";
 import { CreateYourFeature, YourFeature } from "./models";
 
 export class YourFeatureApi extends HttpApiGroup.make("yourFeature")
@@ -105,7 +105,7 @@ export class YourFeatureApi extends HttpApiGroup.make("yourFeature")
     HttpApiEndpoint.post("create", "/", {
       payload: CreateYourFeature,
       success: YourFeature.pipe(HttpApiSchema.status(201)),
-    }).middleware(SessionOrKey("write")),
+    }).middleware(RequireScope("features:write")),
   )
   .prefix("/your-features") {}
 ```

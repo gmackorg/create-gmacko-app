@@ -88,7 +88,7 @@ export const CreateFeatureForm = Schema.toStandardSchemaV1(CreateFeature);
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
 import { NotFound } from "../errors";
-import { SessionOrKey } from "../security";
+import { RequireScope } from "../security";
 import { CreateFeature, Feature, FeatureId } from "./models";
 
 export class FeatureApi extends HttpApiGroup.make("feature")
@@ -104,18 +104,18 @@ export class FeatureApi extends HttpApiGroup.make("feature")
     HttpApiEndpoint.post("create", "/", {
       payload: CreateFeature,
       success: Feature.pipe(HttpApiSchema.status(201)),
-    }).middleware(SessionOrKey("write")),
+    }).middleware(RequireScope("features:write")),
   )
   .add(
     HttpApiEndpoint.delete("remove", "/:id", {
       params: { id: FeatureId },
       error: NotFound,
-    }).middleware(SessionOrKey("delete")),
+    }).middleware(RequireScope("features:delete")),
   )
   .prefix("/features") {}
 ```
 
-Add the group to `AppApi` in `packages/domain/src/api.ts`. Rules of thumb: reads take `SessionOrKey("read")`, mutations `SessionOrKey("write")`, deletes `SessionOrKey("delete")`, admin endpoints `SessionOrKey("admin")` plus `AdminOnly` (declare the credential last so it runs outermost). Public endpoints declare nothing.
+Add the group to `AppApi` in `packages/domain/src/api.ts`. Each bearer endpoint takes one `resource:action` scope: add `features:write` / `features:delete` to the catalog in `packages/domain/src/scopes.ts` (with a description and whether OAuth clients may be granted it; `scopes.test.ts` fails on an unused or undeclared scope). Admin endpoints take `RequireScope("platform:admin")` plus `AdminOnly` (declare the credential last so it runs outermost). Public endpoints declare nothing.
 
 ## Step 2: Service and Handlers (API First)
 

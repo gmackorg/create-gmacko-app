@@ -281,7 +281,7 @@ function checkServerFnForData() {
 // ── Rule: endpoint-declares-credential ───────────────────────────────────────
 // Every endpoint of the contract (`packages/domain/src/**/api.ts`) names the
 // credential it accepts: nothing (public), `Session`, or one
-// `SessionOrKey(scope)` (plan principle 07; docs/API_AUTH.md). Two security
+// `RequireScope(scope)` (plan principle 07; docs/API_AUTH.md). Two security
 // middlewares on one endpoint would run both schemes and the second one
 // last; a role check (`AdminOnly`, `WorkspaceRole(min)`) without a credential
 // has no `CurrentUser` to read; and the credential must be declared after the
@@ -295,7 +295,7 @@ function checkServerFnForData() {
 const ENDPOINT_START =
   /\bHttpApiEndpoint\.(get|post|put|patch|del|delete|head|options)\s*\(/;
 const MIDDLEWARE_CALL = /\.middleware\(\s*([A-Za-z_$][\w$]*)/g;
-const SECURITY_MIDDLEWARE = new Set(["Session", "SessionOrKey"]);
+const SECURITY_MIDDLEWARE = new Set(["Session", "RequireScope"]);
 const ROLE_MIDDLEWARE = new Set(["AdminOnly", "WorkspaceRole"]);
 function checkEndpointCredentials() {
   const contractFiles = codeFiles.filter((f) => {
@@ -334,7 +334,7 @@ function checkEndpointCredentials() {
           f,
           line,
           `Endpoint \`${id}\` declares ${security.length} security middlewares (${security.map((m) => m.name).join(", ")}).`,
-          "Name exactly one credential: `Session` (cookie only) or `SessionOrKey(scope)` (cookie or a key holding the scope).",
+          "Name exactly one credential: `Session` (cookie only) or `RequireScope(scope)` (cookie, or a bearer credential holding the scope).",
         );
       } else if (roles.length > 0 && security.length === 0) {
         add(
@@ -342,7 +342,7 @@ function checkEndpointCredentials() {
           f,
           line,
           `Endpoint \`${id}\` has a role check (${roles.map((m) => m.name).join(", ")}) but no credential.`,
-          "A role middleware reads the `CurrentUser` a credential provides; add `.middleware(SessionOrKey(scope))` (or `Session`) after the role check.",
+          "A role middleware reads the `CurrentUser` a credential provides; add `.middleware(RequireScope(scope))` (or `Session`) after the role check.",
         );
       } else if (roles.length > 0 && last?.kind !== "security") {
         add(
@@ -350,7 +350,7 @@ function checkEndpointCredentials() {
           f,
           line,
           `Endpoint \`${id}\` declares its credential before a role check.`,
-          'Declare the credential last so it runs outermost: `.middleware(AdminOnly).middleware(SessionOrKey("admin"))` (docs/API_AUTH.md, rule 6).',
+          'Declare the credential last so it runs outermost: `.middleware(AdminOnly).middleware(RequireScope("platform:admin"))` (docs/API_AUTH.md, rule 6).',
         );
       }
     });

@@ -1,17 +1,20 @@
 /**
  * The operator tools against the in-process `TestApi`, as the CLI and the
- * MCP server drive them: a bearer key (admin-scoped for key management), the
+ * MCP server drive them: a bearer key (every scope for key management), the
  * tool list with input schemas derived from the contract, CLI-style string
  * arguments coerced through those schemas, and the contract's typed errors
  * surfacing as messages.
  */
 import { makeTestApi, type TestApi, type TestUser } from "@gmacko/api/testing";
+import { ALL_SCOPES, AppApi } from "@gmacko/domain";
+import { inspectApi } from "@gmacko/domain/inspect";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   createOperatorClient,
   executeOperatorTool,
   listOperatorTools,
+  operatorToolScope,
 } from "../index";
 
 let api: TestApi;
@@ -21,8 +24,8 @@ let readKey: string;
 beforeAll(async () => {
   api = makeTestApi();
   admin = await api.createUser({ role: "admin" });
-  adminKey = (await api.createApiKey(admin, ["admin"])).key;
-  readKey = (await api.createApiKey(admin, ["read"])).key;
+  adminKey = (await api.createApiKey(admin, ALL_SCOPES)).key;
+  readKey = (await api.createApiKey(admin, ["api_keys:read"])).key;
 });
 afterAll(() => api.dispose());
 
@@ -54,6 +57,48 @@ describe("listOperatorTools", () => {
     expect(listOperatorTools().map((tool) => tool.name)).toEqual(TOOL_NAMES);
   });
 
+  it("filters by scope: public tools always, the rest only with their scope", () => {
+    expect(
+      listOperatorTools({ scopes: ["posts:write"] }).map((tool) => tool.name),
+    ).toEqual(["auth_help", "list_posts", "get_post", "create_post"]);
+    expect(listOperatorTools({ scopes: ALL_SCOPES })).toHaveLength(
+      TOOL_NAMES.length,
+    );
+  });
+
+  it("names the scope of the endpoint each tool calls, in its description too", () => {
+    const scopes = new Map(
+      inspectApi(AppApi).map((row) => [`${row.group}.${row.id}`, row.scope]),
+    );
+    const endpointOf = {
+      auth_help: null,
+      get_workspace_context: "settings.workspaceContext",
+      get_billing_overview: "settings.billingOverview",
+      list_api_keys: "settings.listApiKeys",
+      create_api_key: "settings.createApiKey",
+      revoke_api_key: "settings.revokeApiKey",
+      list_posts: "posts.list",
+      get_post: "posts.byId",
+      create_post: "posts.create",
+      delete_post: "posts.remove",
+      get_preferences: "settings.getPreferences",
+      update_preferences: "settings.updatePreferences",
+    } satisfies Record<string, string | null>;
+    const endpoints: ReadonlyMap<string, string | null> = new Map(
+      Object.entries(endpointOf),
+    );
+    for (const tool of listOperatorTools()) {
+      const endpoint = endpoints.get(tool.name);
+      expect(endpoint, tool.name).not.toBeUndefined();
+      const scope = endpoint === null ? null : scopes.get(endpoint ?? "");
+      expect(operatorToolScope(tool.name), tool.name).toBe(scope);
+      expect(tool.description).toContain(
+        scope === null ? "(public)" : `(scope: ${scope})`,
+      );
+    }
+    expect(operatorToolScope("nope")).toBeUndefined();
+  });
+
   it("derives input schemas from the contract's payload schemas", () => {
     const tools = new Map(listOperatorTools().map((tool) => [tool.name, tool]));
     const createKey = tools.get("create_api_key")?.inputSchema;
@@ -63,7 +108,7 @@ describe("listOperatorTools", () => {
       name: { type: "string", minLength: 1, maxLength: 100 },
       permissions: {
         type: "array",
-        items: { type: "string", enum: ["read", "write", "delete", "admin"] },
+        items: { type: "string", enum: [...ALL_SCOPES] },
       },
       expiresInDays: { type: "integer" },
     });
@@ -96,7 +141,7 @@ describe("listOperatorTools", () => {
 });
 
 describe("executeOperatorTool", () => {
-  it("answers auth_help without a request and names the admin scope keys need", async () => {
+  it("answers auth_help without a request and names the scope key management needs", async () => {
     const offline = createOperatorClient({
       baseUrl: api.baseUrl,
       transport: () => {
@@ -105,7 +150,7 @@ describe("executeOperatorTool", () => {
     });
     const help = await executeOperatorTool(offline, "auth_help");
     expect(help).toContain("GMACKO_API_KEY");
-    expect(help).toContain("admin");
+    expect(help).toContain("api_keys:manage");
     expect(help).toContain("HTTP API");
   });
 
@@ -131,7 +176,7 @@ describe("executeOperatorTool", () => {
     await expect(
       executeOperatorTool(client(readKey), "create_api_key", {
         name: "nope",
-        permissions: "read",
+        permissions: "profile:read",
       }),
     ).rejects.toThrow("Forbidden (scope)");
   });
@@ -142,7 +187,7 @@ describe("executeOperatorTool", () => {
       "create_api_key",
       {
         name: "Automation",
-        permissions: "read, write",
+        permissions: "profile:read, posts:write",
         expiresInDays: "30",
       },
     );
@@ -153,7 +198,7 @@ describe("executeOperatorTool", () => {
       expiresAt: string | null;
     } = JSON.parse(created);
     expect(parsed.key).toMatch(/^gmk_/);
-    expect(parsed.permissions).toEqual(["read", "write"]);
+    expect(parsed.permissions).toEqual(["profile:read", "posts:write"]);
     expect(parsed.expiresAt).toEqual(expect.any(String));
 
     await expect(

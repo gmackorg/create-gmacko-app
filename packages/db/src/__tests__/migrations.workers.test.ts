@@ -170,4 +170,75 @@ describe("migrations on D1 (vitest-pool-workers)", () => {
     expect(await countWhere("session", userId)).toBe(0);
     expect(await countWhere("account", userId)).toBe(0);
   });
+
+  it("api_key_scopes expands legacy permissions to catalog scopes, keeps catalog scopes, drops the rest", async () => {
+    const migration = env.TEST_MIGRATIONS.find(
+      (m) => m.name === "20261030061137_api_key_scopes.sql",
+    );
+    if (migration === undefined) throw new Error("api_key_scopes is missing");
+    const { userId } = await seedUserWithSession("keys");
+    const stored = {
+      read: ["read"],
+      write: ["write"],
+      delete: ["delete"],
+      admin: ["admin"],
+      readWrite: ["read", "write"],
+      current: ["posts:write", "profile:read"],
+      junk: ["bogus"],
+    } satisfies Record<string, ReadonlyArray<string>>;
+    await env.DB.batch(
+      Object.entries(stored).map(([id, permissions]) =>
+        env.DB.prepare(
+          "INSERT INTO `api_keys` (`id`, `user_id`, `name`, `key_hash`, `key_prefix`, `permissions`, `created_at`) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        ).bind(
+          id,
+          userId,
+          id,
+          `hash-${id}`,
+          "gmk_test",
+          JSON.stringify(permissions),
+          now(),
+        ),
+      ),
+    );
+    const apply = () =>
+      env.DB.batch(migration.queries.map((query) => env.DB.prepare(query)));
+    const read = async () =>
+      Object.fromEntries(
+        (
+          await env.DB.prepare(
+            "SELECT `id`, `permissions` FROM `api_keys` WHERE `user_id` = ?",
+          )
+            .bind(userId)
+            .all<{ id: string; permissions: string }>()
+        ).results.map((row) => [row.id, JSON.parse(row.permissions)]),
+      );
+
+    await apply();
+    const reads = [
+      "workspace:read",
+      "billing:read",
+      "preferences:read",
+      "profile:read",
+      "api_keys:read",
+    ];
+    const writes = [
+      "posts:write",
+      "workspace:invite",
+      "workspace:join",
+      "preferences:write",
+    ];
+    const after = await read();
+    expect(new Set(after.read)).toEqual(new Set(reads));
+    expect(new Set(after.write)).toEqual(new Set(writes));
+    expect(after.delete).toEqual(["posts:delete"]);
+    expect(after.admin).toHaveLength(12);
+    expect(new Set(after.readWrite)).toEqual(new Set([...reads, ...writes]));
+    expect(after.current).toEqual(["posts:write", "profile:read"]);
+    expect(after.junk).toEqual([]);
+
+    // Running it again changes nothing.
+    await apply();
+    expect(await read()).toEqual(after);
+  });
 });

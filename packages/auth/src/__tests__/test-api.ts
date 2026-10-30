@@ -8,8 +8,8 @@ import type { Database } from "@gmacko/db";
 import {
   AdminOnly,
   CurrentUser,
+  RequireScope,
   Session,
-  SessionOrKey,
   WorkspaceRole,
 } from "@gmacko/domain";
 import { Effect, FileSystem, Layer, Path, Schema } from "effect";
@@ -43,37 +43,37 @@ export class TestApi extends HttpApi.make("test").add(
     )
     .add(
       HttpApiEndpoint.get("read", "/read", { success: Who }).middleware(
-        SessionOrKey("read"),
+        RequireScope("profile:read"),
       ),
     )
     .add(
       HttpApiEndpoint.post("write", "/write", { success: Who }).middleware(
-        SessionOrKey("write"),
+        RequireScope("posts:write"),
       ),
     )
     .add(
       HttpApiEndpoint.get("admin", "/admin", { success: Who })
         .middleware(AdminOnly)
-        .middleware(SessionOrKey("admin")),
+        .middleware(RequireScope("platform:admin")),
     )
     .add(
       HttpApiEndpoint.get("workspace", "/workspace", { success: Who })
         .middleware(WorkspaceRole("member"))
-        .middleware(SessionOrKey("read")),
+        .middleware(RequireScope("workspace:read")),
     )
     .add(
       HttpApiEndpoint.get("workspaceAdmin", "/workspace-admin", {
         success: Who,
       })
         .middleware(WorkspaceRole("admin"))
-        .middleware(SessionOrKey("read")),
+        .middleware(RequireScope("workspace:read")),
     )
     .add(
       HttpApiEndpoint.get("workspaceOwner", "/workspace-owner", {
         success: Who,
       })
         .middleware(WorkspaceRole("owner"))
-        .middleware(SessionOrKey("read")),
+        .middleware(RequireScope("workspace:read")),
     ),
 ) {}
 

@@ -8,17 +8,17 @@ import { Context, Predicate, type Schema } from "effect";
 import { HttpApi, type HttpApiGroup, HttpApiMiddleware } from "effect/http-api";
 
 import { type RateLimitScope, RateLimitScopeAnnotation } from "./middleware";
-import { ApiKeyScope } from "./roles";
+import { isScope, type Scope } from "./scopes";
 
 export interface EndpointInfo {
   readonly group: string;
   readonly id: string;
   readonly method: string;
   readonly path: string;
-  /** `public`, `Session`, or `SessionOrKey(<scope>)`. */
+  /** `public`, `Session`, or `RequireScope(<scope>)`. */
   readonly credential: string;
-  /** The API-key scope a key needs, or `null` when keys are not accepted. */
-  readonly scope: ApiKeyScope | null;
+  /** The scope a bearer credential needs, or `null` when bearers are not accepted. */
+  readonly scope: Scope | null;
   /** Role middlewares layered on the credential (`AdminOnly`, `WorkspaceRole(admin)`). */
   readonly roles: ReadonlyArray<string>;
   /** Keys of the security middlewares (the ones with a scheme). */
@@ -45,17 +45,12 @@ export interface EndpointInfo {
 }
 
 const SESSION_KEY = "@gmacko/domain/Session";
-const SESSION_OR_KEY_PREFIX = "@gmacko/domain/SessionOrKey/";
+const REQUIRE_SCOPE_PREFIX = "@gmacko/domain/RequireScope/";
 const ADMIN_ONLY_KEY = "@gmacko/domain/AdminOnly";
 const WORKSPACE_ROLE_PREFIX = "@gmacko/domain/WorkspaceRole/";
 
 /** The credential columns of an `EndpointInfo`, which is where these land. */
 type EndpointCredential = Pick<EndpointInfo, "credential" | "scope">;
-
-/** The scope suffix of a `SessionOrKey` middleware key, when it names one. */
-const apiKeyScopes: ReadonlyArray<string> = ApiKeyScope.literals;
-const isApiKeyScope = (value: string): value is ApiKeyScope =>
-  apiKeyScopes.includes(value);
 
 const describeCredential = (
   securityKeys: ReadonlyArray<string>,
@@ -63,10 +58,10 @@ const describeCredential = (
   if (securityKeys.length === 0) return { credential: "public", scope: null };
   const [key] = securityKeys;
   if (key === SESSION_KEY) return { credential: "Session", scope: null };
-  if (key?.startsWith(SESSION_OR_KEY_PREFIX)) {
-    const scope = key.slice(SESSION_OR_KEY_PREFIX.length);
-    if (isApiKeyScope(scope)) {
-      return { credential: `SessionOrKey(${scope})`, scope };
+  if (key?.startsWith(REQUIRE_SCOPE_PREFIX)) {
+    const scope = key.slice(REQUIRE_SCOPE_PREFIX.length);
+    if (isScope(scope)) {
+      return { credential: `RequireScope(${scope})`, scope };
     }
   }
   return { credential: securityKeys.join(" + "), scope: null };

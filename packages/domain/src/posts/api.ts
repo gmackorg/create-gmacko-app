@@ -2,7 +2,7 @@ import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 
 import { NotFound } from "../errors";
-import { SessionOrKey } from "../security";
+import { RequireScope } from "../security";
 import { CreatePost, Post, PostId } from "./models";
 
 /** Posts have no owner column; any credential with the scope may write or delete. */
@@ -23,12 +23,12 @@ export class PostsApi extends HttpApiGroup.make("posts")
     HttpApiEndpoint.post("create", "/", {
       payload: CreatePost,
       success: Post.pipe(HttpApiSchema.status(201)),
-    }).middleware(SessionOrKey("write")),
+    }).middleware(RequireScope("posts:write")),
   )
   .add(
     HttpApiEndpoint.delete("remove", "/:id", {
       params: { id: PostId },
       error: NotFound,
-    }).middleware(SessionOrKey("delete")),
+    }).middleware(RequireScope("posts:delete")),
   )
   .prefix("/posts") {}

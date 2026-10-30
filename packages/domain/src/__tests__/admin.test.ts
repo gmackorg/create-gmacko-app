@@ -199,7 +199,7 @@ describe("AdminApi", () => {
     /** Every `/admin/*` endpoint also counts against the operator-api rate limit. */
     const adminErrors = [...credentialErrors, "429 RateLimited"];
     const admin = {
-      credential: "SessionOrKey(admin)",
+      credential: "RequireScope(platform:admin)",
       roles: ["AdminOnly"],
     };
     expect(routeTable(inspectGroup(AdminApi))).toEqual([

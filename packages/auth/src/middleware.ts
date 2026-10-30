@@ -9,7 +9,7 @@
  *    the decoded credential and looks at the raw request.
  * 2. Bearer beats cookie: any `Authorization` header (not only
  *    `Bearer gmk_…`) makes the request a bearer request, so a bad key can
- *    never fall through to a valid cookie. In `SessionOrKey` the `session`
+ *    never fall through to a valid cookie. In `RequireScope` the `session`
  *    scheme exists so OpenAPI shows the cookie and always refuses; the
  *    `apiKey` scheme, tried last, is the single path for both credentials
  *    (bearer present ⇒ key path, otherwise cookie path). One path means one
@@ -33,12 +33,12 @@
 import { Database, type DatabaseError } from "@gmacko/db";
 import {
   AdminOnly,
-  type ApiKeyScope,
   CurrentUser,
   type CurrentUserShape,
   Forbidden,
+  RequireScope,
+  type Scope,
   Session,
-  SessionOrKey,
   Unauthorized,
   type WorkspaceMemberRole,
   WorkspaceRole,
@@ -224,11 +224,11 @@ const cookiePath = (
     );
   });
 
-/** `gmk_` bearer → `CurrentUser(credential: "key")` when the key holds `scope` or `admin`. */
+/** `gmk_` bearer → `CurrentUser(credential: "key")` when the key holds `scope`. */
 const keyPath = (
   deps: Deps,
   keys: ApiKeysShape,
-  scope: ApiKeyScope,
+  scope: Scope,
   wrapped: Wrapped,
   request: Request,
   bearer: string,
@@ -239,10 +239,7 @@ const keyPath = (
   Effect.gen(function* () {
     const context = yield* deps.forRequest(request);
     const key = yield* keys.authenticate(bearer).pipe(orDie("api key lookup"));
-    if (
-      !key.permissions.includes(scope) &&
-      !key.permissions.includes("admin")
-    ) {
+    if (!key.permissions.includes(scope)) {
       return yield* new Forbidden({ reason: "scope" });
     }
     return yield* provide(wrapped, toCurrentUser(key.user, "key"), context);
@@ -273,14 +270,16 @@ export const SessionLive: Layer.Layer<
   ),
 );
 
-/** The service shape shared by the four `SessionOrKey(scope)` tags. */
+/** The service shape shared by every `RequireScope(scope)` tag. */
 type ShapeOf<K> = K extends Context.Key<unknown, infer S> ? S : never;
-type SessionOrKeyShape = ShapeOf<ReturnType<typeof SessionOrKey<"read">>>;
+type RequireScopeShape = ShapeOf<
+  ReturnType<typeof RequireScope<"profile:read">>
+>;
 type WorkspaceRoleShape = ShapeOf<ReturnType<typeof WorkspaceRole<"owner">>>;
 
-const sessionOrKeyLive = <Self>(
-  tag: Context.Service<Self, SessionOrKeyShape>,
-  scope: ApiKeyScope,
+const requireScopeLive = <Self>(
+  tag: Context.Service<Self, RequireScopeShape>,
+  scope: Scope,
 ): Layer.Layer<Self, never, Auth | Database | AuthSecurityConfig | ApiKeys> =>
   Layer.effect(tag)(
     Effect.gen(function* () {
@@ -306,17 +305,58 @@ const sessionOrKeyLive = <Self>(
   );
 
 /** Built once per scope, like the tags themselves (see security.ts). */
-const sessionOrKeyLayers = {
-  read: sessionOrKeyLive(SessionOrKey("read"), "read"),
-  write: sessionOrKeyLive(SessionOrKey("write"), "write"),
-  delete: sessionOrKeyLive(SessionOrKey("delete"), "delete"),
-  admin: sessionOrKeyLive(SessionOrKey("admin"), "admin"),
+const requireScopeLayers = {
+  "posts:write": requireScopeLive(RequireScope("posts:write"), "posts:write"),
+  "posts:delete": requireScopeLive(
+    RequireScope("posts:delete"),
+    "posts:delete",
+  ),
+  "workspace:read": requireScopeLive(
+    RequireScope("workspace:read"),
+    "workspace:read",
+  ),
+  "workspace:invite": requireScopeLive(
+    RequireScope("workspace:invite"),
+    "workspace:invite",
+  ),
+  "workspace:join": requireScopeLive(
+    RequireScope("workspace:join"),
+    "workspace:join",
+  ),
+  "billing:read": requireScopeLive(
+    RequireScope("billing:read"),
+    "billing:read",
+  ),
+  "preferences:read": requireScopeLive(
+    RequireScope("preferences:read"),
+    "preferences:read",
+  ),
+  "preferences:write": requireScopeLive(
+    RequireScope("preferences:write"),
+    "preferences:write",
+  ),
+  "profile:read": requireScopeLive(
+    RequireScope("profile:read"),
+    "profile:read",
+  ),
+  "api_keys:read": requireScopeLive(
+    RequireScope("api_keys:read"),
+    "api_keys:read",
+  ),
+  "api_keys:manage": requireScopeLive(
+    RequireScope("api_keys:manage"),
+    "api_keys:manage",
+  ),
+  "platform:admin": requireScopeLive(
+    RequireScope("platform:admin"),
+    "platform:admin",
+  ),
 } as const;
 
-/** The live layer for `SessionOrKey(scope)`. */
-export const SessionOrKeyLive = <S extends ApiKeyScope>(
+/** The live layer for `RequireScope(scope)`. */
+export const RequireScopeLive = <S extends Scope>(
   scope: S,
-): (typeof sessionOrKeyLayers)[S] => sessionOrKeyLayers[scope];
+): (typeof requireScopeLayers)[S] => requireScopeLayers[scope];
 
 // ---------------------------------------------------------------------------
 // Role middlewares
@@ -425,10 +465,7 @@ export const WorkspaceRoleLive = <R extends WorkspaceMemberRole>(
  */
 export const SecurityLive = Layer.mergeAll(
   SessionLive,
-  SessionOrKeyLive("read"),
-  SessionOrKeyLive("write"),
-  SessionOrKeyLive("delete"),
-  SessionOrKeyLive("admin"),
+  ...Object.values(requireScopeLayers),
   AdminOnlyLive,
   WorkspaceRoleLive("owner"),
   WorkspaceRoleLive("admin"),

@@ -29,7 +29,7 @@ export type UpdateUserRoleInput = ConstructorParameters<
   typeof UpdateUserRole
 >[0];
 
-/** Every `/admin/*` query needs a platform admin (session, or a key with the `admin` scope). */
+/** Every `/admin/*` query needs a platform admin (session, or a key with the `platform:admin` scope). */
 export const adminQueries = (api: ApiClient) => ({
   launchControls: () =>
     queryOptions({

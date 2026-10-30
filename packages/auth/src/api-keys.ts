@@ -17,8 +17,9 @@ import {
   ApiKey,
   ApiKeyCreated,
   type ApiKeyId,
-  ApiKeyScope,
   NotFound,
+  type Scope,
+  toScopes,
   Unauthorized,
   type User,
 } from "@gmacko/domain";
@@ -43,12 +44,12 @@ export interface GeneratedKey {
 export interface AuthenticatedKey {
   readonly keyId: ApiKeyId;
   readonly user: User;
-  readonly permissions: ReadonlyArray<ApiKeyScope>;
+  readonly permissions: ReadonlyArray<Scope>;
 }
 
 export interface CreateApiKeyInput {
   readonly name: string;
-  readonly permissions: ReadonlyArray<ApiKeyScope>;
+  readonly permissions: ReadonlyArray<Scope>;
   readonly expiresAt?: Date | undefined;
 }
 
@@ -105,14 +106,6 @@ export const generateKey: Effect.Effect<GeneratedKey> = Effect.gen(
     return { secret, prefix: secret.slice(0, PREFIX_LENGTH), hash };
   },
 );
-
-/** The stored `permissions` JSON is untyped `string[]`; keep only real scopes. */
-const toScopes = (
-  permissions: ReadonlyArray<string>,
-): ReadonlyArray<ApiKeyScope> =>
-  permissions.filter((value): value is ApiKeyScope =>
-    ApiKeyScope.literals.some((literal) => literal === value),
-  );
 
 export class ApiKeys extends Context.Service<ApiKeys, ApiKeysShape>()(
   "@gmacko/auth/ApiKeys",

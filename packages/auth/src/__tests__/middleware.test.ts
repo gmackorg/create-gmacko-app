@@ -11,6 +11,7 @@ import {
   workspaceMembership,
 } from "@gmacko/db/schema";
 import { layerTest } from "@gmacko/db/testing";
+import { ALL_SCOPES, type Scope } from "@gmacko/domain";
 import { eq } from "drizzle-orm";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -77,7 +78,7 @@ describe("security middlewares", () => {
 
   const mintKey = (
     email: string,
-    permissions: ReadonlyArray<"read" | "write" | "delete" | "admin">,
+    permissions: ReadonlyArray<Scope>,
     expiresAt?: Date,
   ) =>
     run(
@@ -136,7 +137,7 @@ describe("security middlewares", () => {
   });
 
   describe("cookie session", () => {
-    it("provides CurrentUser with credential 'session' on Session and SessionOrKey endpoints", async () => {
+    it("provides CurrentUser with credential 'session' on Session and RequireScope endpoints", async () => {
       for (const path of ["/me", "/read"] as const) {
         const response = await call("GET", path, { cookie: signedIn.cookie });
         expect(response.status, path).toBe(200);
@@ -238,8 +239,8 @@ describe("security middlewares", () => {
   });
 
   describe("API keys", () => {
-    it("200 with a read key on a SessionOrKey(read) endpoint, credential 'key'", async () => {
-      const key = await mintKey(signedIn.email, ["read"]);
+    it("200 with a profile:read key on a RequireScope(profile:read) endpoint, credential 'key'", async () => {
+      const key = await mintKey(signedIn.email, ["profile:read"]);
       const response = await call("GET", "/read", {
         authorization: `Bearer ${key.key}`,
       });
@@ -251,7 +252,7 @@ describe("security middlewares", () => {
     });
 
     it("403 Forbidden(scope) with a read key on a write endpoint (regression: previously allowed)", async () => {
-      const key = await mintKey(signedIn.email, ["read"]);
+      const key = await mintKey(signedIn.email, ["profile:read"]);
       const response = await call("POST", "/write", {
         authorization: `Bearer ${key.key}`,
       });
@@ -262,14 +263,14 @@ describe("security middlewares", () => {
       });
     });
 
-    it("200 with a write key on a write endpoint, and with an admin key anywhere", async () => {
-      const write = await mintKey(signedIn.email, ["write"]);
+    it("200 with a write key on a write endpoint, and with an every-scope key anywhere", async () => {
+      const write = await mintKey(signedIn.email, ["posts:write"]);
       const written = await call("POST", "/write", {
         authorization: `Bearer ${write.key}`,
       });
       expect(written.status).toBe(200);
 
-      const admin = await mintKey(signedIn.email, ["admin"]);
+      const admin = await mintKey(signedIn.email, ALL_SCOPES);
       for (const [method, path] of [
         ["GET", "/read"],
         ["POST", "/write"],
@@ -281,8 +282,25 @@ describe("security middlewares", () => {
       }
     });
 
+    it("403 Forbidden(scope): a scope implies no other, not even platform:admin", async () => {
+      const admin = await mintKey(signedIn.email, ["platform:admin"]);
+      for (const [method, path] of [
+        ["GET", "/read"],
+        ["POST", "/write"],
+      ] as const) {
+        const response = await call(method, path, {
+          authorization: `Bearer ${admin.key}`,
+        });
+        expect(response.status, `${method} ${path}`).toBe(403);
+        expect(await jsonOf(response)).toEqual({
+          _tag: "Forbidden",
+          reason: "scope",
+        });
+      }
+    });
+
     it("keys never need an Origin: a POST with a key and a foreign Origin passes", async () => {
-      const write = await mintKey(signedIn.email, ["write"]);
+      const write = await mintKey(signedIn.email, ["posts:write"]);
       const response = await call("POST", "/write", {
         authorization: `Bearer ${write.key}`,
         origin: foreignOrigin,
@@ -290,8 +308,8 @@ describe("security middlewares", () => {
       expect(response.status).toBe(200);
     });
 
-    it("403 Forbidden(scope) for any bearer on a Session-only endpoint, even a valid admin key", async () => {
-      const admin = await mintKey(signedIn.email, ["admin"]);
+    it("403 Forbidden(scope) for any bearer on a Session-only endpoint, even a valid every-scope key", async () => {
+      const admin = await mintKey(signedIn.email, ALL_SCOPES);
       for (const bearer of [admin.key, "gmk_garbage", "not-a-gmk-token"]) {
         const response = await call("GET", "/me", {
           authorization: `Bearer ${bearer}`,
@@ -308,10 +326,10 @@ describe("security middlewares", () => {
     it("401 for an expired or revoked key, with no fall-through to a valid cookie in the same request", async () => {
       const expired = await mintKey(
         signedIn.email,
-        ["admin"],
+        ALL_SCOPES,
         new Date(Date.now() - 60_000),
       );
-      const revoked = await mintKey(signedIn.email, ["admin"]);
+      const revoked = await mintKey(signedIn.email, ALL_SCOPES);
       await run(
         Effect.gen(function* () {
           const api = yield* ApiKeys;
@@ -336,16 +354,16 @@ describe("security middlewares", () => {
     });
 
     it("touches lastUsedAt only when the key authenticated", async () => {
-      const live = await mintKey(signedIn.email, ["read"]);
+      const live = await mintKey(signedIn.email, ["profile:read"]);
       const expired = await mintKey(
         signedIn.email,
-        ["read"],
+        ["profile:read"],
         new Date(Date.now() - 60_000),
       );
       await call("GET", "/read", { authorization: `Bearer ${live.key}` });
       await call("GET", "/read", { authorization: `Bearer ${expired.key}` });
       // A valid key lacking the scope still authenticated: it was used.
-      const scoped = await mintKey(signedIn.email, ["read"]);
+      const scoped = await mintKey(signedIn.email, ["profile:read"]);
       await call("POST", "/write", { authorization: `Bearer ${scoped.key}` });
 
       const rows = await run(
@@ -377,7 +395,7 @@ describe("security middlewares", () => {
         reason: "role",
       });
 
-      const admin = await mintKey(signedIn.email, ["admin"]);
+      const admin = await mintKey(signedIn.email, ALL_SCOPES);
       const byKey = await call("GET", "/admin", {
         authorization: `Bearer ${admin.key}`,
       });

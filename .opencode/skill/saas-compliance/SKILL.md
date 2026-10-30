@@ -19,7 +19,7 @@ SOC2 compliance is organized around five trust service criteria. This skill maps
 ✓ Better Auth with session management           → packages/auth/
 ✓ Role-based access control (user, admin)        → packages/db/src/auth-schema.ts (`role`), packages/domain/src/roles.ts
 ✓ Workspace roles (owner > admin > member)       → `WorkspaceRole(min)` middleware
-✓ API key authentication with scopes             → packages/auth/src/api-keys.ts, `SessionOrKey(scope)`
+✓ API key authentication with scopes             → packages/auth/src/api-keys.ts, `RequireScope(scope)`
 ✓ Session expiration and rotation                → Better Auth config (packages/auth/src/index.ts)
 ✓ CSRF protection                                → Origin / Sec-Fetch-Site check on non-GET cookie requests
 ✓ Magic link sign-in                             → Better Auth magicLink plugin
@@ -30,8 +30,8 @@ SOC2 compliance is organized around five trust service criteria. This skill maps
 
 **Checklist for every new feature:**
 
-- [ ] Every endpoint declares exactly one credential: public, `Session`, or `SessionOrKey(scope)` (`endpoint-declares-credential`)
-- [ ] Mutations take `SessionOrKey("write")`, deletes `SessionOrKey("delete")`, admin operations `SessionOrKey("admin")` + `AdminOnly`
+- [ ] Every endpoint declares exactly one credential: public, `Session`, or `RequireScope(scope)` (`endpoint-declares-credential`)
+- [ ] Each bearer endpoint takes one catalog scope (`packages/domain/src/scopes.ts`, `resource:action`); admin operations take `RequireScope("platform:admin")` + `AdminOnly`; key management and other key-only scopes stay out of OAuth
 - [ ] Sensitive operations (delete account, complete bootstrap) accept `Session` only; a leaked key must never reach them
 - [ ] Role checks read D1, never the cookie cache (the middleware does this)
 - [ ] Input is validated by the domain `Schema` before any handler runs

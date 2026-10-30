@@ -135,7 +135,7 @@ Rules that follow:
 4. HttpApi middleware chain, outermost first: `EndpointBoundary` (one span,
    `x-request-id`/`x-trace-id`, 500 for anything unhandled) → `RateLimit` (429
    with `Retry-After`) → role check (`AdminOnly`, `WorkspaceRole(min)`) →
-   credential (`Session` or `SessionOrKey(scope)`, providing `CurrentUser`).
+   credential (`Session` or `RequireScope(scope)`, providing `CurrentUser`).
 5. Handler → service → `Database` (D1) → typed success or declared error,
    encoded from the contract's `Schema`.
 6. Telemetry flush handed to `waitUntil` through `Background`; the response
@@ -177,7 +177,7 @@ Rules that follow:
 - Declared per endpoint in the contract; `docs/API_AUTH.md` is the generated matrix
 - `AdminOnly` requires `user.role === "admin"`, read fresh from D1
 - `WorkspaceRole(min)` requires at least `min` in the caller's workspace
-- A key's `admin` scope does not grant the platform admin role
+- The `platform:admin` scope does not grant the platform admin role
 
 ## Environment Strategy
 
