@@ -7,6 +7,7 @@
  * suite exercises the real functions instead of a stand-in for them.
  */
 import { AppApi, type RateLimitScope } from "@gmacko/domain";
+import { Option, Schema } from "effect";
 
 /** One contract endpoint that lives under better-auth's prefix. */
 export interface ContractAuthRoute {
@@ -85,6 +86,46 @@ export const authRateLimitScope = (
     return "signup";
   }
   return "auth";
+};
+
+/** The OAuth provider's endpoints an MCP client calls server to server. */
+const OAUTH_CLIENT_PATHS: ReadonlySet<string> = new Set([
+  "/api/auth/oauth2/token",
+  "/api/auth/oauth2/revoke",
+  "/api/auth/oauth2/introspect",
+]);
+
+const decodeClientId = Schema.decodeUnknownOption(
+  Schema.Struct({ client_id: Schema.NonEmptyString }),
+);
+
+/**
+ * The rate-limit key for an OAuth client's server-to-server call, or
+ * `undefined` to use the default (credential, then cookie, then address).
+ * These calls carry neither a bearer nor a cookie, and a hosted MCP client
+ * makes them for all of its users from a few addresses, so an address key
+ * would put every user in one bucket. The key is the `client_id` from the
+ * form body *and* the address: each registered client gets its own count,
+ * and nobody can spend a client's allowance from somewhere else.
+ */
+export const oauthClientRateKey = async (
+  request: Request,
+): Promise<string | undefined> => {
+  const { pathname } = new URL(request.url);
+  if (request.method.toUpperCase() !== "POST") return undefined;
+  if (!OAUTH_CLIENT_PATHS.has(pathname.replace(/\/+$/, ""))) return undefined;
+  const form = await request
+    .clone()
+    .formData()
+    .then((data) => Object.fromEntries(data.entries()))
+    .catch(() => null);
+  const clientId = decodeClientId(form);
+  if (Option.isNone(clientId)) return undefined;
+  const address =
+    request.headers.get("cf-connecting-ip") ??
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    "unknown";
+  return `oauth-client:${clientId.value.client_id}:ip:${address}`;
 };
 
 /** The two halves of `/api/auth/*`, plus the gate in front of better-auth's half. */

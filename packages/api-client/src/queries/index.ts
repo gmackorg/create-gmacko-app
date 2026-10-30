@@ -19,6 +19,7 @@ import { adminMutations, adminQueries } from "./admin";
 import { authMutations, authQueries } from "./auth";
 import { healthMutations, healthQueries } from "./health";
 import { applyInvalidation } from "./invalidation";
+import { oauthMutations, oauthQueries } from "./oauth";
 import { postsMutations, postsQueries } from "./posts";
 import { settingsMutations, settingsQueries } from "./settings";
 
@@ -60,6 +61,7 @@ export const makeQueries = (api: ApiClient) => ({
   posts: postsQueries(api),
   settings: settingsQueries(api),
   admin: adminQueries(api),
+  oauth: oauthQueries(api),
   health: healthQueries(api),
 });
 export type Queries = ReturnType<typeof makeQueries>;
@@ -70,6 +72,7 @@ export const makeMutations = (api: ApiClient) => ({
   posts: postsMutations(api),
   settings: settingsMutations(api),
   admin: adminMutations(api),
+  oauth: oauthMutations(api),
   health: healthMutations(api),
 });
 export type Mutations = ReturnType<typeof makeMutations>;

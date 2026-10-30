@@ -423,13 +423,20 @@ export const clientKeyOfRequest = (request: Request): Effect.Effect<string> =>
     return `anon:${crypto.randomUUID()}`;
   });
 
-/** Counts one call against `scope` for a plain fetch `Request`. */
+/**
+ * Counts one call against `scope` for a plain fetch `Request`, keyed by
+ * `client` when the route knows a better key than `clientKeyOfRequest`'s
+ * (the OAuth token endpoint keys by OAuth client; see apps/web auth-dispatch).
+ */
 export const consumeForRequest = (
   scope: RateLimitScope,
   request: Request,
+  client?: string | undefined,
 ): Effect.Effect<void, RateLimited, RateLimiter> =>
-  Effect.flatMap(clientKeyOfRequest(request), (client) =>
-    Effect.flatMap(RateLimiter, (limiter) => limiter.consume(scope, client)),
+  Effect.flatMap(
+    client === undefined ? clientKeyOfRequest(request) : Effect.succeed(client),
+    (key) =>
+      Effect.flatMap(RateLimiter, (limiter) => limiter.consume(scope, key)),
   );
 
 /**

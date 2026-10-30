@@ -14,6 +14,7 @@ const settings = [...root, "settings"] as const;
 const admin = [...root, "admin"] as const;
 const adminUsers = [...admin, "users"] as const;
 const health = [...root, "health"] as const;
+const oauth = [...root, "oauth"] as const;
 
 export type ListUsersInput = Partial<ListUsersQuery>;
 
@@ -64,6 +65,10 @@ export const queryKeys = {
     listUsers: (query?: ListUsersInput) =>
       [...adminUsers, "list", listUsersQuery(query)] as const,
     getUser: (userId: string) => [...adminUsers, "byId", userId] as const,
+  },
+  oauth: {
+    all: oauth,
+    workspaces: () => [...oauth, "workspaces"] as const,
   },
   health: {
     all: health,

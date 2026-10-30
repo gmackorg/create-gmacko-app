@@ -13,6 +13,7 @@ import {
   isContractAuthRequest,
   makeAuthDispatch,
   matchesPathTemplate,
+  oauthClientRateKey,
 } from "~/server/auth-dispatch";
 
 const ORIGIN = "http://localhost";
@@ -203,5 +204,58 @@ describe("/api/auth/$ dispatch", () => {
     );
     expect(await response.text()).toBe("auth");
     expect(seen).toEqual(["POST"]);
+  });
+});
+
+describe("oauthClientRateKey", () => {
+  const form = (
+    path: string,
+    body: Record<string, string>,
+    ip = "203.0.113.7",
+  ) =>
+    new Request(`https://app.example${path}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "cf-connecting-ip": ip,
+      },
+      body: new URLSearchParams(body),
+    });
+
+  it("keys the token, revoke and introspect endpoints by client and address", async () => {
+    for (const path of [
+      "/api/auth/oauth2/token",
+      "/api/auth/oauth2/revoke",
+      "/api/auth/oauth2/introspect",
+    ]) {
+      expect(
+        await oauthClientRateKey(form(path, { client_id: "c1" })),
+        path,
+      ).toBe("oauth-client:c1:ip:203.0.113.7");
+    }
+  });
+
+  it("leaves the body readable for better-auth", async () => {
+    const request = form("/api/auth/oauth2/token", { client_id: "c1" });
+    await oauthClientRateKey(request);
+    expect(await request.text()).toBe("client_id=c1");
+  });
+
+  it("falls back to the default key elsewhere or without a client_id", async () => {
+    expect(
+      await oauthClientRateKey(
+        form("/api/auth/oauth2/register", { client_id: "c1" }),
+      ),
+    ).toBeUndefined();
+    expect(
+      await oauthClientRateKey(
+        form("/api/auth/oauth2/token", { grant_type: "x" }),
+      ),
+    ).toBeUndefined();
+    expect(
+      await oauthClientRateKey(
+        new Request("https://app.example/api/auth/oauth2/token"),
+      ),
+    ).toBeUndefined();
   });
 });

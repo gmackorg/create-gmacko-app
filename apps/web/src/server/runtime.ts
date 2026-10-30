@@ -20,6 +20,7 @@ import {
   rateLimitsFor,
   WebhookEvents,
 } from "@gmacko/api";
+import { authorizationServerMetadata } from "@gmacko/auth/oauth-provider";
 import { RequestContext } from "@gmacko/auth/request-context";
 import { Auth } from "@gmacko/auth/service";
 import { Database } from "@gmacko/db";
@@ -29,6 +30,7 @@ import { Context, Effect, Layer, ManagedRuntime } from "effect";
 
 import { env as clientEnv } from "~/env";
 import { AuthLive } from "./auth";
+import { oauthClientRateKey } from "./auth-dispatch";
 import { fromBindings, webFromBindings } from "./config";
 import { createStorageHandlers } from "./storage";
 import type { StripeWebhookLedger } from "./stripe-webhook";
@@ -184,18 +186,29 @@ export const authHandler: (request: Request) => Promise<Response> = flushed(
     runtime.runPromise(Effect.flatMap(Auth, (auth) => auth.handler(request))),
 );
 
+/** `/.well-known/oauth-authorization-server[/api/auth]`: the OAuth provider's metadata. */
+export const authServerMetadataHandler: (
+  request: Request,
+) => Promise<Response> = flushed((request: Request) =>
+  runtime.runPromise(
+    Effect.flatMap(Auth, (auth) =>
+      Effect.promise(() => authorizationServerMetadata(auth.instance)(request)),
+    ),
+  ),
+);
+
 /**
  * The rate-limit gate for better-auth's own routes, which are not HttpApi
  * endpoints and so never reach the contract's `RateLimit` middleware
  * (`routes/api/auth.$.ts` decides which scope a request counts against).
  * Answers the 429 to send, or `null` to let the request through.
  */
-export const guardAuthRequest = (
+export const guardAuthRequest = async (
   scope: RateLimitScope,
   request: Request,
 ): Promise<Response | null> =>
   runtime.runPromise(
-    consumeForRequest(scope, request).pipe(
+    consumeForRequest(scope, request, await oauthClientRateKey(request)).pipe(
       Effect.as<Response | null>(null),
       Effect.catchTag("RateLimited", (refused) =>
         Effect.succeed(rateLimitedResponse(refused)),

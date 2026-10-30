@@ -9,6 +9,7 @@ export * from "./auth";
 export * from "./errors";
 export * from "./health";
 export * from "./middleware";
+export * from "./oauth";
 export * from "./posts";
 export * from "./primitives";
 export * from "./roles";

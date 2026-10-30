@@ -8,6 +8,7 @@
     "./client": "./src/client.ts",
     "./api-keys": "./src/api-keys.ts",
     "./middleware": "./src/middleware.ts",
+    "./oauth-provider": "./src/oauth-provider.ts",
     "./request-context": "./src/request-context.ts",
     "./security-config": "./src/security-config.ts",
     "./testing": "./src/testing.ts"
@@ -24,6 +25,7 @@
   },
   "dependencies": {
     "@better-auth/expo": "catalog:",
+    "@better-auth/oauth-provider": "catalog:",
     "@gmacko/db": "workspace:*",
     "@gmacko/domain": "workspace:*",
     "better-auth": "catalog:",

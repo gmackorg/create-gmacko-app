@@ -15,7 +15,14 @@ export const API_AUTH_PATH = fileURLToPath(
   new URL("../../../docs/API_AUTH.md", import.meta.url),
 );
 
-const GROUP_ORDER = ["health", "auth", "posts", "settings", "admin"] as const;
+const GROUP_ORDER = [
+  "health",
+  "auth",
+  "posts",
+  "settings",
+  "admin",
+  "oauth",
+] as const;
 
 /**
  * The same order, widened by annotation rather than asserted at each use:

@@ -11,6 +11,7 @@
     "./posts": "./src/posts/index.ts",
     "./settings": "./src/settings/index.ts",
     "./admin": "./src/admin/index.ts",
+    "./oauth": "./src/oauth/index.ts",
     "./health": "./src/health/index.ts",
     "./models": "./src/models/index.ts",
     "./inspect": "./src/inspect.ts",

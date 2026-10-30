@@ -17,6 +17,8 @@ import { magicLink } from "better-auth/plugins/magic-link";
 import { oAuthProxy } from "better-auth/plugins/oauth-proxy";
 import { Schema } from "effect";
 
+import { oauthProviderPlugin } from "./oauth-provider";
+
 export function isPlatformAdminRole(
   role: UserRole | null | undefined,
 ): role is "admin" {
@@ -302,6 +304,9 @@ export function makeAuth(options: AuthOptions, db: PlainDatabase) {
       // redeems the device code) and user-code entry (the phone starts a
       // flow, the user approves it at /device).
       devicePairing,
+      // OAuth 2.1 authorization server for the remote MCP endpoint
+      // (oauth-provider.ts): DCR, PKCE, workspace-pinned opaque tokens.
+      oauthProviderPlugin({ baseUrl: options.baseUrl, db }),
       // SAFETY: `AuthPluginLike` names the whole of what better-auth requires
       // of a plugin object at this position (`id`, optional `version`); the
       // structural mismatch `BetterAuthPlugin` reports is nominal only —

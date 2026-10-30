@@ -119,12 +119,21 @@ describe.each(Object.entries(pairs))("%s", (_name, { table, model }) => {
 
 it("covers every table in the schema that a row model mirrors", () => {
   const modelled = Object.keys(pairs).sort();
-  // better-auth's four tables (`device_code` is its device-authorization
-  // plugin's), plus `rate_limit_window` and `stripe_webhook_event`, which are
+  // better-auth's tables (`device_code` is its device-authorization plugin's,
+  // `oauth_*` its OAuth provider's), plus `rate_limit_window`,
+  // `stripe_webhook_event` and `oauth_workspace_selection`, which are
   // infrastructure rather than contract (see schema.ts).
   const exempt = [
     "account",
     "device_code",
+    "oauth_access_token",
+    "oauth_client",
+    "oauth_client_assertion",
+    "oauth_client_resource",
+    "oauth_consent",
+    "oauth_refresh_token",
+    "oauth_resource",
+    "oauth_workspace_selection",
     "rate_limit_window",
     "session",
     "stripe_webhook_event",

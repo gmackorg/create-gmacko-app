@@ -25,9 +25,11 @@ type Provider = "github" | "google" | "apple";
 function SocialSignInButton({
   provider,
   label,
+  callbackURL,
 }: {
   provider: Provider;
   label: string;
+  callbackURL: string;
 }) {
   const navigate = useNavigate();
   const { data: launch } = useSuspenseQuery(queries.settings.launchState());
@@ -52,7 +54,7 @@ function SocialSignInButton({
         try {
           const res = await authClient.signIn.social({
             provider,
-            callbackURL: "/",
+            callbackURL,
           });
           if (res.error || !res.data?.url) {
             toast.error(res.error?.message ?? "Could not start sign-in");
@@ -69,7 +71,7 @@ function SocialSignInButton({
   );
 }
 
-function MagicLinkForm() {
+function MagicLinkForm({ callbackURL }: { callbackURL: string }) {
   const [sent, setSent] = useState(false);
   const { data: launch } = useSuspenseQuery(queries.settings.launchState());
   const form = useForm({
@@ -78,7 +80,7 @@ function MagicLinkForm() {
     onSubmit: async ({ value }) => {
       const res = await authClient.signIn.magicLink({
         email: value.email.trim(),
-        callbackURL: "/",
+        callbackURL,
       });
       if (res.error) {
         toast.error(res.error.message ?? "Could not send the magic link");
@@ -176,15 +178,36 @@ export function SignOutButton() {
   );
 }
 
-export function AuthShowcase() {
+/**
+ * Sign-in when anonymous, the signed-in user's card otherwise. `callbackURL`
+ * is where every sign-in method lands afterwards (same-origin path); the
+ * OAuth sign-in page passes its own URL so the authorization resumes.
+ */
+export function AuthShowcase({
+  callbackURL = "/",
+}: {
+  callbackURL?: string;
+} = {}) {
   const session = useSession();
 
   if (!session.user) {
     return (
       <div className="flex w-full max-w-sm flex-col items-center gap-4">
-        <SocialSignInButton provider="github" label="Sign in with GitHub" />
-        <SocialSignInButton provider="google" label="Sign in with Google" />
-        <SocialSignInButton provider="apple" label="Sign in with Apple" />
+        <SocialSignInButton
+          provider="github"
+          label="Sign in with GitHub"
+          callbackURL={callbackURL}
+        />
+        <SocialSignInButton
+          provider="google"
+          label="Sign in with Google"
+          callbackURL={callbackURL}
+        />
+        <SocialSignInButton
+          provider="apple"
+          label="Sign in with Apple"
+          callbackURL={callbackURL}
+        />
 
         <div className="flex w-full items-center gap-3 py-2">
           <div className="bg-border h-px flex-1" />
@@ -192,7 +215,7 @@ export function AuthShowcase() {
           <div className="bg-border h-px flex-1" />
         </div>
 
-        <MagicLinkForm />
+        <MagicLinkForm callbackURL={callbackURL} />
       </div>
     );
   }

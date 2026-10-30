@@ -62,9 +62,7 @@ export function ScopePicker(props: {
                 name={`${name}-${option.value}`}
                 checked={props.value.includes(option.value)}
                 disabled={props.disabled}
-                onChange={(event) =>
-                  toggle(option.value, event.target.checked)
-                }
+                onChange={(event) => toggle(option.value, event.target.checked)}
                 className="mt-0.5 h-4 w-4 rounded border-gray-300"
               />
               <span>

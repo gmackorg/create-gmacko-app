@@ -93,10 +93,15 @@ const toBase64Url = (bytes: Uint8Array): string =>
     .replace(/=+$/, "");
 
 /** Same bytes, same encoding as `createHash("sha256").update(key).digest("hex")`. */
+export const sha256Hex = async (secret: string): Promise<string> =>
+  toHex(
+    new Uint8Array(
+      await crypto.subtle.digest("SHA-256", encoder.encode(secret)),
+    ),
+  );
+
 export const hashSecret = (secret: string): Effect.Effect<string> =>
-  Effect.promise(() =>
-    crypto.subtle.digest("SHA-256", encoder.encode(secret)),
-  ).pipe(Effect.map((digest) => toHex(new Uint8Array(digest))));
+  Effect.promise(() => sha256Hex(secret));
 
 export const generateKey: Effect.Effect<GeneratedKey> = Effect.gen(
   function* () {

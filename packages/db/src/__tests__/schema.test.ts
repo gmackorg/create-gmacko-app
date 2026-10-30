@@ -13,6 +13,14 @@ const expectedTables = [
   "billing_plan",
   "billing_plan_limit",
   "device_code",
+  "oauth_access_token",
+  "oauth_client",
+  "oauth_client_assertion",
+  "oauth_client_resource",
+  "oauth_consent",
+  "oauth_refresh_token",
+  "oauth_resource",
+  "oauth_workspace_selection",
   "post",
   "rate_limit_window",
   "session",
@@ -36,7 +44,7 @@ describe("migrations", () => {
   });
   afterAll(() => runtime.dispose());
 
-  it("creates exactly the 20 expected tables", async () => {
+  it("creates exactly the 28 expected tables", async () => {
     const names = await runtime.runPromise(
       Effect.gen(function* () {
         const { sql } = yield* Database;
@@ -49,7 +57,7 @@ describe("migrations", () => {
         return rows.map((row) => row.name);
       }),
     );
-    expect(names).toHaveLength(20);
+    expect(names).toHaveLength(28);
     expect(names).toEqual([...expectedTables].sort());
   });
 

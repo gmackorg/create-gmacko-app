@@ -6,7 +6,7 @@
 Every endpoint of `AppApi` (`packages/domain/src/api.ts`) names the credential it accepts. This table is
 read back out of the contract with `HttpApi.reflect`, so it is the contract, not a description of it.
 
-35 endpoints (health 4, auth 2, posts 4, settings 14, admin 11); 10 public.
+37 endpoints (health 4, auth 2, posts 4, settings 14, admin 11, oauth 2); 10 public.
 
 ## Credentials
 
@@ -94,6 +94,8 @@ cookie), else the client address.
 | admin | `listUsers` | GET | `/api/admin/users` | `RequireScope(platform:admin)` | platform:admin | `AdminOnly` | operator-api | 200 | 401 `Unauthorized`, 403 `Forbidden`, 429 `RateLimited`, 500 `InternalError` |
 | admin | `updateUserRole` | PATCH | `/api/admin/users/:userId/role` | `RequireScope(platform:admin)` | platform:admin | `AdminOnly` | operator-api | 200 | 401 `Unauthorized`, 403 `Forbidden`, 404 `NotFound`, 409 `Conflict`, 429 `RateLimited`, 500 `InternalError` |
 | admin | `getUser` | GET | `/api/admin/users/:userId` | `RequireScope(platform:admin)` | platform:admin | `AdminOnly` | operator-api | 200 | 401 `Unauthorized`, 403 `Forbidden`, 404 `NotFound`, 429 `RateLimited`, 500 `InternalError` |
+| oauth | `workspaces` | GET | `/api/oauth/workspaces` | `Session` | — | — | — | 200 | 401 `Unauthorized`, 403 `Forbidden`, 500 `InternalError` |
+| oauth | `selectWorkspace` | PUT | `/api/oauth/workspace` | `Session` | — | — | — | 200 | 401 `Unauthorized`, 403 `Forbidden`, 404 `NotFound`, 500 `InternalError` |
 
 ## Implementation rules (Phase 3)
 

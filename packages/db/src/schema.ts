@@ -6,7 +6,7 @@ import {
   unique,
 } from "drizzle-orm/sqlite-core";
 
-import { user } from "./auth-schema";
+import { session, user } from "./auth-schema";
 import { bool, id, json, timestampMs, timestamps } from "./columns";
 
 export const workspaceRoleEnum = ["owner", "admin", "member"] as const;
@@ -97,6 +97,29 @@ export const workspaceMembership = sqliteTable(
       table.userId,
     ),
   ],
+);
+
+/**
+ * The workspace a browser session picked on `/oauth/workspace` while
+ * authorizing an OAuth client (one row per session, replaced by the next
+ * pick). `@gmacko/auth`'s OAuth provider reads it fresh from D1 — never from
+ * the session cookie cache — to pin the consent, and so every token minted
+ * from it, to that workspace; membership is re-checked on every read.
+ */
+export const oauthWorkspaceSelection = sqliteTable(
+  "oauth_workspace_selection",
+  {
+    sessionId: text("session_id")
+      .primaryKey()
+      .references(() => session.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    ...timestamps(),
+  },
 );
 
 export const workspaceInviteAllowlist = sqliteTable(

@@ -5,6 +5,7 @@ import { AdminApi } from "./admin/api";
 import { AuthApi } from "./auth/api";
 import { HealthApi } from "./health/api";
 import { EndpointBoundary } from "./middleware";
+import { OAuthApi } from "./oauth/api";
 import { PostsApi } from "./posts/api";
 import { SettingsApi } from "./settings/api";
 
@@ -24,6 +25,7 @@ export class AppApi extends HttpApi.make("gmacko")
   .add(PostsApi)
   .add(SettingsApi)
   .add(AdminApi)
+  .add(OAuthApi)
   .prefix("/api")
   .middleware(EndpointBoundary)
   .add(HealthApi)

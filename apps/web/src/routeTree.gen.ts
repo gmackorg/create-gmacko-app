@@ -21,9 +21,14 @@ import { Route as PrivacyRouteImport } from "./routes/privacy";
 import { Route as SettingsRouteImport } from "./routes/settings";
 import { Route as TermsRouteImport } from "./routes/terms";
 import { Route as DotwellKnownForgeHealthRouteImport } from "./routes/[.]well-known.forge-health";
+import { Route as DotwellKnownOauthAuthorizationServerRouteImport } from "./routes/[.]well-known.oauth-authorization-server";
 import { Route as AdminIndexRouteImport } from "./routes/admin.index";
 import { Route as AdminUsersRouteImport } from "./routes/admin.users";
 import { Route as ApiSplatRouteImport } from "./routes/api.$";
+import { Route as OauthConsentRouteImport } from "./routes/oauth.consent";
+import { Route as OauthSignInRouteImport } from "./routes/oauth.sign-in";
+import { Route as OauthWorkspaceRouteImport } from "./routes/oauth.workspace";
+import { Route as DotwellKnownOauthAuthorizationServerSplatRouteImport } from "./routes/[.]well-known.oauth-authorization-server.$";
 import { Route as ApiAuthSplatRouteImport } from "./routes/api/auth.$";
 import { Route as ApiStorageSplatRouteImport } from "./routes/api.storage.$";
 import { Route as ApiWebhooksStripeRouteImport } from "./routes/api.webhooks.stripe";
@@ -88,6 +93,12 @@ const DotwellKnownForgeHealthRoute = DotwellKnownForgeHealthRouteImport.update({
   path: "/.well-known/forge-health",
   getParentRoute: () => rootRouteImport,
 } as any);
+const DotwellKnownOauthAuthorizationServerRoute =
+  DotwellKnownOauthAuthorizationServerRouteImport.update({
+    id: "/.well-known/oauth-authorization-server",
+    path: "/.well-known/oauth-authorization-server",
+    getParentRoute: () => rootRouteImport,
+  } as any);
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: "/",
   path: "/",
@@ -103,6 +114,27 @@ const ApiSplatRoute = ApiSplatRouteImport.update({
   path: "/api/$",
   getParentRoute: () => rootRouteImport,
 } as any);
+const OauthConsentRoute = OauthConsentRouteImport.update({
+  id: "/oauth/consent",
+  path: "/oauth/consent",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const OauthSignInRoute = OauthSignInRouteImport.update({
+  id: "/oauth/sign-in",
+  path: "/oauth/sign-in",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const OauthWorkspaceRoute = OauthWorkspaceRouteImport.update({
+  id: "/oauth/workspace",
+  path: "/oauth/workspace",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const DotwellKnownOauthAuthorizationServerSplatRoute =
+  DotwellKnownOauthAuthorizationServerSplatRouteImport.update({
+    id: "/$",
+    path: "/$",
+    getParentRoute: () => DotwellKnownOauthAuthorizationServerRoute,
+  } as any);
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: "/api/auth/$",
   path: "/api/auth/$",
@@ -132,9 +164,14 @@ export interface FileRoutesByFullPath {
   "/settings": typeof SettingsRoute;
   "/terms": typeof TermsRoute;
   "/.well-known/forge-health": typeof DotwellKnownForgeHealthRoute;
+  "/.well-known/oauth-authorization-server": typeof DotwellKnownOauthAuthorizationServerRouteWithChildren;
   "/admin/users": typeof AdminUsersRoute;
   "/api/$": typeof ApiSplatRoute;
+  "/oauth/consent": typeof OauthConsentRoute;
+  "/oauth/sign-in": typeof OauthSignInRoute;
+  "/oauth/workspace": typeof OauthWorkspaceRoute;
   "/admin/": typeof AdminIndexRoute;
+  "/.well-known/oauth-authorization-server/$": typeof DotwellKnownOauthAuthorizationServerSplatRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
   "/api/storage/$": typeof ApiStorageSplatRoute;
   "/api/webhooks/stripe": typeof ApiWebhooksStripeRoute;
@@ -151,9 +188,14 @@ export interface FileRoutesByTo {
   "/settings": typeof SettingsRoute;
   "/terms": typeof TermsRoute;
   "/.well-known/forge-health": typeof DotwellKnownForgeHealthRoute;
+  "/.well-known/oauth-authorization-server": typeof DotwellKnownOauthAuthorizationServerRouteWithChildren;
   "/admin/users": typeof AdminUsersRoute;
   "/api/$": typeof ApiSplatRoute;
+  "/oauth/consent": typeof OauthConsentRoute;
+  "/oauth/sign-in": typeof OauthSignInRoute;
+  "/oauth/workspace": typeof OauthWorkspaceRoute;
   "/admin": typeof AdminIndexRoute;
+  "/.well-known/oauth-authorization-server/$": typeof DotwellKnownOauthAuthorizationServerSplatRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
   "/api/storage/$": typeof ApiStorageSplatRoute;
   "/api/webhooks/stripe": typeof ApiWebhooksStripeRoute;
@@ -172,9 +214,14 @@ export interface FileRoutesById {
   "/settings": typeof SettingsRoute;
   "/terms": typeof TermsRoute;
   "/.well-known/forge-health": typeof DotwellKnownForgeHealthRoute;
+  "/.well-known/oauth-authorization-server": typeof DotwellKnownOauthAuthorizationServerRouteWithChildren;
   "/admin/users": typeof AdminUsersRoute;
   "/api/$": typeof ApiSplatRoute;
+  "/oauth/consent": typeof OauthConsentRoute;
+  "/oauth/sign-in": typeof OauthSignInRoute;
+  "/oauth/workspace": typeof OauthWorkspaceRoute;
   "/admin/": typeof AdminIndexRoute;
+  "/.well-known/oauth-authorization-server/$": typeof DotwellKnownOauthAuthorizationServerSplatRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
   "/api/storage/$": typeof ApiStorageSplatRoute;
   "/api/webhooks/stripe": typeof ApiWebhooksStripeRoute;
@@ -194,9 +241,14 @@ export interface FileRouteTypes {
     | "/settings"
     | "/terms"
     | "/.well-known/forge-health"
+    | "/.well-known/oauth-authorization-server"
     | "/admin/users"
     | "/api/$"
+    | "/oauth/consent"
+    | "/oauth/sign-in"
+    | "/oauth/workspace"
     | "/admin/"
+    | "/.well-known/oauth-authorization-server/$"
     | "/api/auth/$"
     | "/api/storage/$"
     | "/api/webhooks/stripe";
@@ -213,9 +265,14 @@ export interface FileRouteTypes {
     | "/settings"
     | "/terms"
     | "/.well-known/forge-health"
+    | "/.well-known/oauth-authorization-server"
     | "/admin/users"
     | "/api/$"
+    | "/oauth/consent"
+    | "/oauth/sign-in"
+    | "/oauth/workspace"
     | "/admin"
+    | "/.well-known/oauth-authorization-server/$"
     | "/api/auth/$"
     | "/api/storage/$"
     | "/api/webhooks/stripe";
@@ -233,9 +290,14 @@ export interface FileRouteTypes {
     | "/settings"
     | "/terms"
     | "/.well-known/forge-health"
+    | "/.well-known/oauth-authorization-server"
     | "/admin/users"
     | "/api/$"
+    | "/oauth/consent"
+    | "/oauth/sign-in"
+    | "/oauth/workspace"
     | "/admin/"
+    | "/.well-known/oauth-authorization-server/$"
     | "/api/auth/$"
     | "/api/storage/$"
     | "/api/webhooks/stripe";
@@ -254,7 +316,11 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute;
   TermsRoute: typeof TermsRoute;
   DotwellKnownForgeHealthRoute: typeof DotwellKnownForgeHealthRoute;
+  DotwellKnownOauthAuthorizationServerRoute: typeof DotwellKnownOauthAuthorizationServerRouteWithChildren;
   ApiSplatRoute: typeof ApiSplatRoute;
+  OauthConsentRoute: typeof OauthConsentRoute;
+  OauthSignInRoute: typeof OauthSignInRoute;
+  OauthWorkspaceRoute: typeof OauthWorkspaceRoute;
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute;
   ApiStorageSplatRoute: typeof ApiStorageSplatRoute;
   ApiWebhooksStripeRoute: typeof ApiWebhooksStripeRoute;
@@ -346,6 +412,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof DotwellKnownForgeHealthRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/.well-known/oauth-authorization-server": {
+      id: "/.well-known/oauth-authorization-server";
+      path: "/.well-known/oauth-authorization-server";
+      fullPath: "/.well-known/oauth-authorization-server";
+      preLoaderRoute: typeof DotwellKnownOauthAuthorizationServerRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/admin/": {
       id: "/admin/";
       path: "/";
@@ -366,6 +439,34 @@ declare module "@tanstack/react-router" {
       fullPath: "/api/$";
       preLoaderRoute: typeof ApiSplatRouteImport;
       parentRoute: typeof rootRouteImport;
+    };
+    "/oauth/consent": {
+      id: "/oauth/consent";
+      path: "/oauth/consent";
+      fullPath: "/oauth/consent";
+      preLoaderRoute: typeof OauthConsentRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/oauth/sign-in": {
+      id: "/oauth/sign-in";
+      path: "/oauth/sign-in";
+      fullPath: "/oauth/sign-in";
+      preLoaderRoute: typeof OauthSignInRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/oauth/workspace": {
+      id: "/oauth/workspace";
+      path: "/oauth/workspace";
+      fullPath: "/oauth/workspace";
+      preLoaderRoute: typeof OauthWorkspaceRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/.well-known/oauth-authorization-server/$": {
+      id: "/.well-known/oauth-authorization-server/$";
+      path: "/$";
+      fullPath: "/.well-known/oauth-authorization-server/$";
+      preLoaderRoute: typeof DotwellKnownOauthAuthorizationServerSplatRouteImport;
+      parentRoute: typeof DotwellKnownOauthAuthorizationServerRoute;
     };
     "/api/auth/$": {
       id: "/api/auth/$";
@@ -403,6 +504,21 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren);
 
+interface DotwellKnownOauthAuthorizationServerRouteChildren {
+  DotwellKnownOauthAuthorizationServerSplatRoute: typeof DotwellKnownOauthAuthorizationServerSplatRoute;
+}
+
+const DotwellKnownOauthAuthorizationServerRouteChildren: DotwellKnownOauthAuthorizationServerRouteChildren =
+  {
+    DotwellKnownOauthAuthorizationServerSplatRoute:
+      DotwellKnownOauthAuthorizationServerSplatRoute,
+  };
+
+const DotwellKnownOauthAuthorizationServerRouteWithChildren =
+  DotwellKnownOauthAuthorizationServerRoute._addFileChildren(
+    DotwellKnownOauthAuthorizationServerRouteChildren,
+  );
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
@@ -416,7 +532,12 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   TermsRoute: TermsRoute,
   DotwellKnownForgeHealthRoute: DotwellKnownForgeHealthRoute,
+  DotwellKnownOauthAuthorizationServerRoute:
+    DotwellKnownOauthAuthorizationServerRouteWithChildren,
   ApiSplatRoute: ApiSplatRoute,
+  OauthConsentRoute: OauthConsentRoute,
+  OauthSignInRoute: OauthSignInRoute,
+  OauthWorkspaceRoute: OauthWorkspaceRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiStorageSplatRoute: ApiStorageSplatRoute,
   ApiWebhooksStripeRoute: ApiWebhooksStripeRoute,

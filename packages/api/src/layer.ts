@@ -20,6 +20,7 @@ import type { Background } from "./background";
 import { EndpointBoundaryLive } from "./boundary";
 import { AppConfig } from "./config";
 import { HealthHandlers } from "./health/handlers";
+import { OAuthHandlers } from "./oauth/handlers";
 import { PostsHandlers } from "./posts/handlers";
 import { RateLimiter, RateLimitLive } from "./rate-limit";
 import { SettingsHandlers } from "./settings/handlers";
@@ -52,6 +53,7 @@ const Handlers = Layer.mergeAll(
   PostsHandlers,
   SettingsHandlers,
   AdminHandlers,
+  OAuthHandlers,
 );
 
 /** The services the app provides; everything else is built here. */
