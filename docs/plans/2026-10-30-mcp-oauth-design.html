@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CREA-6 · OAuth for the remote MCP server</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; color: var(--foreground, #202124); font: 14px/1.5 var(--font-sans, system-ui, sans-serif); }
+  main { width: 100%; min-width: 0; }
+  h1 { font-size: 1.2rem; margin: 0 0 .25rem; }
+  h2 { font-size: 1rem; margin: 1.6rem 0 .5rem; }
+  h3 { font-size: .9rem; margin: 0 0 .25rem; }
+  p { max-width: 75ch; margin: .5rem 0; }
+  a { color: var(--accent-surface-foreground, #2458ac); }
+  .meta, .muted { color: var(--muted-foreground, #606773); }
+  code, pre { font-family: var(--font-mono, Menlo, Consolas, monospace); font-size: .85em; background: var(--code-background, #f1f3f5); color: var(--code-foreground, #202124); border-radius: 4px; padding: 0 .25em; }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  th, td { text-align: left; vertical-align: top; padding: .45rem .5rem; border-bottom: 1px solid var(--border, #d8dce2); }
+  th { font-weight: 600; color: var(--muted-foreground, #606773); }
+  .badge, .chip { display: inline-block; border-radius: 999px; padding: .1rem .5rem; font-size: .72rem; font-weight: 600; white-space: nowrap; }
+  .badge { background: var(--accent-surface, #eaf0ff); color: var(--accent-surface-foreground, #2458ac); }
+  .chip.done { background: color-mix(in srgb, var(--success, #1e8e3e) 18%, transparent); color: var(--success, #1e8e3e); }
+  .chip.active { background: var(--accent-surface, #eaf0ff); color: var(--accent-surface-foreground, #2458ac); }
+  .chip.todo { background: var(--muted, #f1f3f5); color: var(--muted-foreground, #606773); }
+  .chip.risk { background: var(--warning-surface, #fff4d6); color: var(--warning-foreground, #7a5200); }
+  .chip.key { background: var(--destructive-surface, #fde7e7); color: var(--destructive, #b3261e); }
+  .callout { border-left: 3px solid var(--accent, #2458ac); background: var(--accent-surface, #eaf0ff); color: var(--accent-surface-foreground, #1a2b4d); border-radius: 0 var(--radius, .625rem) var(--radius, .625rem) 0; padding: .65rem .85rem; margin: .75rem 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: .75rem; }
+  .card { border: 1px solid var(--border, #d8dce2); border-radius: var(--radius, .625rem); background: var(--card, #f7f8fa); color: var(--card-foreground, #202124); padding: .75rem; }
+  .card.accent { border-color: var(--accent, #2458ac); box-shadow: 0 0 0 1px var(--accent, #2458ac); }
+  .card ul { margin: .4rem 0 0; padding-left: 1.1rem; }
+  .card p { margin: .25rem 0; font-size: .85rem; }
+  .scope-list { list-style: none; margin: 0; padding: 0; }
+  .scope-list li { padding: .15rem 0; }
+  .goals { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: .75rem; }
+  .goals ul { list-style: none; padding: 0; margin: .3rem 0 0; }
+  .goals li { padding: .2rem 0 .2rem 1.4rem; position: relative; }
+  .goals .yes li::before { content: "✓"; position: absolute; left: 0; color: var(--success, #1e8e3e); font-weight: 700; }
+  .goals .no li::before { content: "✕"; position: absolute; left: 0; color: var(--muted-foreground, #606773); font-weight: 700; }
+
+  /* Connect-flow stepper: numbered steps joined by a drawn connector */
+  .flow { list-style: none; margin: .5rem 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: .6rem; counter-reset: step; }
+  .flow li { counter-increment: step; position: relative; border: 1px solid var(--border, #d8dce2); border-radius: var(--radius, .625rem); background: var(--card, #f7f8fa); padding: .6rem .65rem .6rem 2.3rem; font-size: .82rem; }
+  .flow li::before { content: counter(step); position: absolute; left: .6rem; top: .6rem; width: 1.3rem; height: 1.3rem; border-radius: 50%; display: grid; place-items: center; font-size: .72rem; font-weight: 700; background: var(--accent, #2458ac); color: var(--accent-foreground, #fff); }
+  .flow li strong { display: block; font-size: .85rem; }
+  .flow li.hl { border-color: var(--accent, #2458ac); }
+
+  /* Request pipeline: an animated arrow path through the per-request checks */
+  .pipe { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; margin: .5rem 0; font-size: .8rem; }
+  .pipe .node { border: 1px solid var(--border, #d8dce2); background: var(--card, #f7f8fa); border-radius: 6px; padding: .3rem .55rem; }
+  .pipe .node.fail { border-style: dashed; color: var(--destructive, #b3261e); }
+  .pipe .arrow { color: var(--muted-foreground, #606773); }
+
+  .timeline { list-style: none; margin: 0; padding: 0; position: relative; }
+  .timeline::before { content: ""; position: absolute; left: 7px; top: 6px; bottom: 6px; width: 2px; background: var(--border, #d8dce2); }
+  .timeline li { position: relative; padding: 0 0 1rem 1.75rem; }
+  .timeline li::before { content: ""; position: absolute; left: 0; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--background, #fff); border: 2px solid var(--border, #d8dce2); }
+  .timeline li.active::before { background: var(--accent, #2458ac); border-color: var(--accent, #2458ac); }
+  .timeline .head { display: flex; gap: .5rem; align-items: baseline; flex-wrap: wrap; }
+  .progress { display: flex; gap: 3px; height: 8px; margin: .5rem 0 1rem; }
+  .progress span { flex: 1; border-radius: 3px; background: var(--muted, #e6e8eb); transform-origin: left; }
+  .progress span.active { background: var(--accent, #2458ac); }
+
+  /* Risk grid: likelihood (rows) × impact (cols) */
+  .risk-grid { display: grid; grid-template-columns: 5.5rem repeat(3, minmax(0, 1fr)); gap: 3px; font-size: .75rem; margin: .5rem 0; }
+  .risk-grid .lbl { color: var(--muted-foreground, #606773); display: flex; align-items: center; justify-content: center; text-align: center; padding: .25rem; }
+  .risk-grid .cell { min-height: 3rem; border-radius: 4px; padding: .3rem; background: var(--muted, #f1f3f5); display: flex; flex-wrap: wrap; gap: .25rem; align-content: flex-start; }
+  .risk-grid .chip { white-space: normal; }
+  .risk-grid .cell.hot { background: color-mix(in srgb, var(--warning, #c58a00) 22%, transparent); }
+  .risk-grid .cell.warm { background: color-mix(in srgb, var(--warning, #c58a00) 11%, transparent); }
+
+  details { border: 1px solid var(--border, #d8dce2); border-radius: var(--radius, .625rem); background: var(--card, #f7f8fa); padding: .6rem .75rem; margin: .6rem 0; }
+  summary { cursor: pointer; font-weight: 600; }
+  :focus-visible { outline: 2px solid var(--ring, #2458ac); outline-offset: 3px; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal { animation: rise .45s cubic-bezier(.2,.7,.3,1) both; animation-delay: calc(var(--i, 0) * 60ms); }
+    .flow li { animation: rise .4s ease-out both; animation-delay: calc(250ms + var(--i, 0) * 80ms); }
+    .pipe > * { animation: fade .35s ease-out both; animation-delay: calc(400ms + var(--i, 0) * 70ms); }
+    .progress span { animation: grow .5s ease-out both; animation-delay: calc(300ms + var(--i, 0) * 60ms); }
+    .timeline li.active::before { animation: pulse 1.8s ease-in-out infinite; }
+    @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+    @keyframes fade { from { opacity: 0; } }
+    @keyframes grow { from { transform: scaleX(0); } }
+    @keyframes pulse { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent, #2458ac) 25%, transparent); } }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1 class="reveal">OAuth for the remote MCP server <span class="badge">Approved design · spike done</span></h1>
+  <p class="meta reveal" style="--i:1">2026-10-30 · create-gmacko-app @ <code>crea-6-mcp-oauth</code> · <a href="https://tasks.gmac.io/gmacko/issue/CREA-6">CREA-6</a></p>
+
+  <div class="callout reveal" style="--i:2"><strong>Decision:</strong> Serve a Streamable HTTP <code>/mcp</code> endpoint from the Worker, protected by better-auth's OAuth 2.1 provider. On a consent page the user pins the grant to <strong>one workspace</strong> and picks <strong>resource:action scopes</strong>. That scope vocabulary replaces read/write/delete/admin for API keys too, so each credential type is checked against the same catalog.</div>
+
+  <h2 class="reveal" style="--i:3">Decisions taken</h2>
+  <div class="grid">
+    <section class="card reveal" style="--i:4"><h3>Host</h3><p>Remote <code>/mcp</code> in <code>apps/web</code>. The stdio <code>gmacko-mcp</code> server and its API-key auth stay unchanged for local use and CI.</p></section>
+    <section class="card reveal" style="--i:5"><h3>Workspace</h3><p>One workspace per grant. It replaces <code>resolveWorkspace</code> for that token. If the membership is lost, the token gets a 401.</p></section>
+    <section class="card reveal" style="--i:6"><h3>Scopes</h3><p>A new <code>resource:action</code> catalog, unified: API keys migrate to it.</p></section>
+    <section class="card reveal" style="--i:7"><h3>Auth server</h3><p><code>@better-auth/oauth-provider</code> 1.7.14 (better-auth bumped from 1.7.2): DCR, PKCE, and RFC 8707 resources, with <strong>opaque</strong> tokens in D1 next to sessions.</p></section>
+  </div>
+
+  <h2 class="reveal" style="--i:8">Goals and non-goals</h2>
+  <div class="goals reveal" style="--i:9">
+    <div class="card yes"><h3>In scope</h3><ul>
+      <li>MCP-spec discovery: protected-resource and AS metadata, 401 with <code>WWW-Authenticate</code></li>
+      <li>Consent page with a workspace picker and grouped scopes</li>
+      <li>One scope catalog for sessions, keys, and OAuth tokens</li>
+      <li><code>tools/list</code> filtered by the granted scopes</li>
+      <li>"Connected apps" in Settings: list and revoke</li>
+      <li>Template scaffolding emits all of it</li>
+    </ul></div>
+    <div class="card no"><h3>Out of scope</h3><ul>
+      <li>Multiple workspaces per grant</li>
+      <li>Changing scopes without re-consent</li>
+      <li><code>admin</code> or <code>api_keys:manage</code> over OAuth</li>
+      <li>Verified-publisher client allowlists</li>
+      <li>OAuth for the stdio server</li>
+    </ul></div>
+  </div>
+
+  <h2 class="reveal" style="--i:10">Architecture</h2>
+  <p class="reveal" style="--i:11">Every authenticated request resolves to a <strong>principal</strong>: user, workspace, and scopes. The three credential types differ only in where those values come from.</p>
+  <div class="table-scroll reveal" style="--i:12"><table>
+    <thead><tr><th>Credential</th><th>Scopes</th><th>Workspace</th></tr></thead>
+    <tbody>
+      <tr><td>Cookie session</td><td>All</td><td><code>resolveWorkspace</code> (unchanged)</td></tr>
+      <tr><td><code>gmk_</code> API key</td><td>Stored on the key (migrated)</td><td><code>resolveWorkspace</code>: keys stay user-level</td></tr>
+      <tr><td>OAuth access token <span class="chip active">new</span></td><td>Granted at consent</td><td>The consent's <code>referenceId</code>, stored on the token row; membership re-checked per request</td></tr>
+    </tbody>
+  </table></div>
+  <div class="grid" style="margin-top:.75rem">
+    <section class="card reveal" style="--i:13"><h3>packages/domain</h3><p><code>scopes.ts</code> catalog with a <code>grantable</code> flag; <code>RequireScope(scope)</code> replaces <code>SessionOrKey(level)</code>.</p></section>
+    <section class="card reveal" style="--i:14"><h3>packages/auth</h3><p><code>oauthProvider({ postLogin, consentPage, resources, disableJwtPlugin: true })</code>. The bearer scheme verifies <code>gmk_</code> keys and OAuth tokens, and <code>RequestContext.workspace</code> honours the pin.</p></section>
+    <section class="card reveal" style="--i:15"><h3>apps/web</h3><p><code>/oauth/workspace</code> (post-login picker) and <code>/oauth/consent</code> routes, <code>/.well-known/*</code>, and <code>/mcp</code>, which reuses <code>@gmacko/operator-core</code> through its in-process <code>transport</code> with the bearer forwarded.</p></section>
+    <section class="card reveal" style="--i:16"><h3>packages/db</h3><p>The plugin's tables (client, resource, consent, access/refresh token), a nullable <code>session.oauth_workspace_id</code>, and an <code>api_keys.permissions</code> data migration. No custom grant table.</p></section>
+  </div>
+
+  <h2 class="reveal" style="--i:17">Connect flow</h2>
+  <ol class="flow" aria-label="MCP client connect flow">
+    <li style="--i:0"><strong>Discover</strong><code>POST /mcp</code> returns 401 with <code>resource_metadata</code></li>
+    <li style="--i:1"><strong>Register</strong>The client self-registers (DCR)</li>
+    <li style="--i:2"><strong>Authorize</strong>PKCE and <code>resource=…/mcp</code>; sign in if needed</li>
+    <li class="hl" style="--i:3"><strong>Workspace</strong>The <code>postLogin</code> page stores the pick on the session, then <code>/oauth2/continue</code></li>
+    <li class="hl" style="--i:4"><strong>Consent</strong>Pick scopes (subset allowed); <code>consentReferenceId</code> returns the workspace; DCR clients are marked "unverified"</li>
+    <li style="--i:5"><strong>Token</strong>Code exchanged; audience bound to <code>/mcp</code></li>
+  </ol>
+  <p class="muted reveal" style="--i:18">A user with no workspace sees "you need a workspace" and cannot approve. Deny returns <code>access_denied</code>.</p>
+
+  <h3 class="reveal" style="--i:19">Per request on /mcp</h3>
+  <div class="pipe" aria-label="Request pipeline: verify token, check audience, load scopes and pinned workspace, check membership, list or call tools, API middleware rechecks scope">
+    <span class="node" style="--i:0">Verify token</span><span class="arrow" style="--i:1">→</span>
+    <span class="node" style="--i:2">Audience = /mcp</span><span class="arrow" style="--i:3">→</span>
+    <span class="node" style="--i:4">Scopes + pinned workspace</span><span class="arrow" style="--i:5">→</span>
+    <span class="node" style="--i:6">Membership still exists?</span><span class="arrow" style="--i:7">→</span>
+    <span class="node" style="--i:8">tools/list (filtered) · tools/call</span><span class="arrow" style="--i:9">→</span>
+    <span class="node" style="--i:10">API middleware re-checks scope</span>
+  </div>
+  <div class="table-scroll reveal" style="--i:20"><table>
+    <thead><tr><th>Condition</th><th>Response</th></tr></thead>
+    <tbody>
+      <tr><td>Token expired or revoked, wrong audience, membership gone, or workspace deleted</td><td>HTTP 401 <code>invalid_token</code> → the client re-authorizes</td></tr>
+      <tr><td>Tool call missing a scope</td><td>MCP <code>isError</code> result naming the scope needed</td></tr>
+      <tr><td>Too many calls</td><td>Existing <code>RateLimit</code>, keyed per grant</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2 class="reveal" style="--i:21">Scope catalog</h2>
+  <p class="reveal" style="--i:22">A scope narrows what a credential may do; it never grants a role. <code>listInvites</code> and <code>createInvite</code> also keep <code>WorkspaceRole("admin")</code>. Consent pre-ticks the <code>:read</code> scopes, and write/delete scopes are opt-in.</p>
+  <div class="table-scroll reveal" style="--i:23"><table>
+    <thead><tr><th>Scope</th><th>Endpoints</th><th>Today</th><th>Grantable</th></tr></thead>
+    <tbody>
+      <tr><td><code>posts:write</code></td><td>posts.create</td><td>write</td><td>OAuth + key</td></tr>
+      <tr><td><code>posts:delete</code></td><td>posts.remove</td><td>delete</td><td>OAuth + key</td></tr>
+      <tr><td><code>workspace:read</code></td><td>workspaceContext, platformPrimitives, listInvites</td><td>read</td><td>OAuth + key</td></tr>
+      <tr><td><code>workspace:invite</code></td><td>createInvite</td><td>write</td><td>OAuth + key</td></tr>
+      <tr><td><code>billing:read</code></td><td>billingOverview</td><td>read</td><td>OAuth + key</td></tr>
+      <tr><td><code>preferences:read</code> / <code>:write</code></td><td>get/updatePreferences</td><td>read / write</td><td>OAuth + key</td></tr>
+      <tr><td><code>profile:read</code></td><td>auth.secret</td><td>read</td><td>OAuth + key</td></tr>
+      <tr><td><code>api_keys:read</code></td><td>listApiKeys</td><td>read</td><td>OAuth + key</td></tr>
+      <tr><td><code>api_keys:manage</code></td><td>createApiKey, revokeApiKey</td><td>admin</td><td><span class="chip key">key only</span></td></tr>
+      <tr><td><code>admin</code></td><td>9 admin endpoints (plus <code>AdminOnly</code>)</td><td>admin</td><td><span class="chip key">key only</span></td></tr>
+    </tbody>
+  </table></div>
+  <p class="muted">posts.list and byId stay public. The settings POST at <code>settings/api.ts:89</code> gets mapped in phase 1.</p>
+  <details><summary>Legacy key migration (cumulative, same effective access)</summary>
+    <ul class="scope-list">
+      <li><code>read</code> → every <code>:read</code> scope</li>
+      <li><code>write</code> → <code>posts:write</code>, <code>preferences:write</code>, <code>workspace:invite</code></li>
+      <li><code>delete</code> → <code>posts:delete</code></li>
+      <li><code>admin</code> → <code>api_keys:manage</code>, <code>admin</code></li>
+      <li>Unknown values are dropped and logged</li>
+    </ul>
+  </details>
+
+  <h2 class="reveal" style="--i:24">Phases (stacked PRs)</h2>
+  <div class="progress" role="img" aria-label="Phase 1 of 4 is next; none done">
+    <span class="active" style="--i:0"></span><span style="--i:1"></span><span style="--i:2"></span><span style="--i:3"></span>
+  </div>
+  <ol class="timeline">
+    <li class="active reveal" style="--i:25"><div class="head"><h3>Phase 1 — Scope catalog and key migration</h3><span class="chip active">Next</span></div>
+      <p class="muted">No new surface; effective access is preserved. Starts with the better-auth spike.</p>
+      <details><summary>Tasks</summary><div class="table-scroll"><table>
+        <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Spike: OAuth provider capabilities, plus the better-auth 1.7.14 bump and the <code>account.issuer</code> drop it needs</td><td><code>pnpm-workspace.yaml</code>, <code>packages/db</code></td><td>Source review of 1.7.14; auth/db/api/web typecheck and tests, <code>check:fast</code></td><td><span class="chip done">Done</span></td></tr>
+          <tr><td>Scope catalog with a <code>grantable</code> flag</td><td><code>packages/domain/src/scopes.ts</code></td><td>Catalog invariant tests</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td><code>RequireScope</code> replaces <code>SessionOrKey</code></td><td><code>packages/domain/src/security.ts</code>, <code>*/api.ts</code>, <code>packages/auth/src/middleware.ts</code></td><td>"Every endpoint declares one scope or is public/session" test; regenerate <code>api-auth-matrix</code></td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Key permission data migration</td><td><code>packages/db/drizzle</code></td><td><code>migrations.workers.test.ts</code> expansion cases</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Scope picker for key creation and <code>create_api_key</code></td><td>apps/web settings, <code>packages/operator-core</code></td><td>Component test and operator-core test</td><td><span class="chip todo">Todo</span></td></tr>
+        </tbody>
+      </table></div></details></li>
+    <li class="reveal" style="--i:26"><div class="head"><h3>Phase 2 — Authorization server and consent</h3><span class="chip todo">Todo</span></div>
+      <details><summary>Tasks</summary><div class="table-scroll"><table>
+        <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>OAuth provider plugin (opaque tokens, unauthenticated DCR, <code>/mcp</code> resource whose <code>allowedScopes</code> are the OAuth-grantable scopes) and its tables</td><td><code>packages/auth/src/index.ts</code>, <code>packages/db/src/auth-schema.ts</code></td><td>Workers test: register → authorize → token; a key-only scope fails with <code>invalid_scope</code></td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>AS and protected-resource metadata</td><td><code>apps/web/src/server</code></td><td>Metadata shape test</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td><code>/oauth/workspace</code> picker (stores <code>session.oauth_workspace_id</code> after a membership check) and <code>/oauth/consent</code> scope picker</td><td><code>apps/web/src/routes</code>, <code>packages/ui</code></td><td>Storybook stories, picker states, no-workspace case, deny, a forged non-member workspace refused</td><td><span class="chip todo">Todo</span></td></tr>
+        </tbody>
+      </table></div></details></li>
+    <li class="reveal" style="--i:27"><div class="head"><h3>Phase 3 — /mcp and middleware</h3><span class="chip todo">Todo</span></div>
+      <details><summary>Tasks</summary><div class="table-scroll"><table>
+        <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Bearer scheme accepts OAuth tokens; workspace pin and membership check</td><td><code>packages/auth/src/middleware.ts</code>, <code>request-context.ts</code></td><td>Principal × scope × membership table test</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Streamable HTTP <code>/mcp</code> over operator-core's in-process transport</td><td><code>apps/web/src/server</code>, <code>packages/operator-core</code></td><td>401 header, filtered <code>tools/list</code>, <code>isError</code> on a missing scope, PKCE/audience failures</td><td><span class="chip todo">Todo</span></td></tr>
+        </tbody>
+      </table></div></details></li>
+    <li class="reveal" style="--i:28"><div class="head"><h3>Phase 4 — Connected apps, docs, scaffolding</h3><span class="chip todo">Todo</span></div>
+      <details><summary>Tasks</summary><div class="table-scroll"><table>
+        <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Connected apps list and revoke</td><td>apps/web settings, <code>packages/domain/src/settings</code></td><td>Revoke makes the token fail with 401</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Docs</td><td><code>docs/API_AUTH.md</code>, <code>README.md</code>, <code>AGENTS.md</code></td><td>Review</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Scaffolding plus E2E smoke</td><td><code>packages/create-gmacko-app</code></td><td>MCP Inspector against <code>https://gmacko.localhost/mcp</code> under <code>pnpm dev</code></td><td><span class="chip todo">Todo</span></td></tr>
+        </tbody>
+      </table></div></details></li>
+  </ol>
+
+  <h2 class="reveal" style="--i:29">Risks</h2>
+  <div class="risk-grid reveal" style="--i:30" role="table" aria-label="Risks by likelihood and impact">
+    <div class="lbl"></div><div class="lbl">Low impact</div><div class="lbl">Medium impact</div><div class="lbl">High impact</div>
+    <div class="lbl">Likely</div><div class="cell warm"></div><div class="cell hot"></div><div class="cell hot"></div>
+    <div class="lbl">Possible</div><div class="cell"></div><div class="cell warm"><span class="chip risk">R3 MCP SDK on workerd</span></div><div class="cell hot"><span class="chip risk">R2 key migration</span></div>
+    <div class="lbl">Unlikely</div><div class="cell"><span class="chip risk">R5 concurrent flows</span></div><div class="cell"><span class="chip risk">R4 DCR abuse</span></div><div class="cell warm"></div>
+  </div>
+  <details><summary>Mitigations</summary>
+    <p><strong>R1, gaps in the plugin API: resolved.</strong> 1.7.14 covers all three requirements: <code>consentPage</code> with a scope subset at <code>/oauth2/consent</code>; <code>resources</code> with per-resource <code>allowedScopes</code> and <code>invalid_target</code> enforcement; and <code>postLogin.consentReferenceId</code>, documented for "selection of an organization or team". This was confirmed by reading the source, not run end to end; phase 2's workers test is the runtime proof.</p>
+    <p><strong>R5, two simultaneous authorize flows in one browser session share <code>session.oauth_workspace_id</code>.</strong> The later pick wins. The consent page names the workspace being granted, and the plugin's <code>shouldRedirect</code> re-validates membership on continuation.</p>
+    <p><strong>R2, the key migration widens or narrows access.</strong> The expansion is cumulative and table-tested, and the old column value is logged before rewriting.</p>
+    <p><strong>R3, the MCP SDK's Streamable HTTP transport assumes Node.</strong> Use its Web-standard transport or a thin fetch adapter, and test under workerd.</p>
+    <p><strong>R4, anyone can register clients through DCR.</strong> Consent marks DCR clients as unverified and shows the redirect host. Registration goes through <code>RateLimit</code>, and admin scopes are never grantable.</p>
+  </details>
+
+  <h2>Verification</h2>
+  <p>Acceptance criteria are on <a href="https://tasks.gmac.io/gmacko/issue/CREA-6">CREA-6</a>. Each PR must pass <code>pnpm check:fast</code>, <code>check:standards</code>, and the workers tests. The final one adds an MCP Inspector run through DCR, sign-in, consent, and token against local dev.</p>
+
+  <h2>Open questions</h2>
+  <p>None blocking. The spike replaced the custom <code>oauth_grant_workspace</code> table with the plugin's <code>referenceId</code>, and chose opaque tokens (no JWKS keys to manage, immediate revocation) because <code>/mcp</code> verifies in the same Worker as the authorization server.</p>
+</main>
+</body>
+</html>
