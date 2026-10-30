@@ -49,6 +49,7 @@ export const NotFoundResource = Schema.Literals([
   "waitlistEntry",
   "apiKey",
   "workspace",
+  "oauthConnection",
 ]);
 export type NotFoundResource = typeof NotFoundResource.Type;
 

@@ -12,6 +12,12 @@ export const oauthQueries = (api: ApiClient) => ({
       queryKey: queryKeys.oauth.workspaces(),
       queryFn: () => api.run((c) => c.oauth.workspaces()),
     }),
+  /** "Connected apps" in Settings: the user's OAuth grants. Session only. */
+  listConnections: () =>
+    queryOptions({
+      queryKey: queryKeys.oauth.listConnections(),
+      queryFn: () => api.run((c) => c.oauth.listConnections()),
+    }),
 });
 
 export const oauthMutations = (api: ApiClient) => ({
@@ -27,5 +33,12 @@ export const oauthMutations = (api: ApiClient) => ({
           }),
         ),
       meta: invalidates("oauth.selectWorkspace"),
+    }),
+  revokeConnection: () =>
+    mutationOptions({
+      mutationKey: [...queryKeys.oauth.all, "revokeConnection"],
+      mutationFn: (id: string) =>
+        api.run((c) => c.oauth.revokeConnection({ params: { id } })),
+      meta: invalidates("oauth.revokeConnection"),
     }),
 });

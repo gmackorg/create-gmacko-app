@@ -6,7 +6,7 @@
 Every endpoint of `AppApi` (`packages/domain/src/api.ts`) names the credential it accepts. This table is
 read back out of the contract with `HttpApi.reflect`, so it is the contract, not a description of it.
 
-37 endpoints (health 4, auth 2, posts 4, settings 14, admin 11, oauth 2); 10 public.
+39 endpoints (health 4, auth 2, posts 4, settings 14, admin 11, oauth 4); 10 public.
 
 ## Credentials
 
@@ -14,7 +14,7 @@ read back out of the contract with `HttpApi.reflect`, so it is the contract, not
 | --- | --- | --- |
 | public | anything, including no credential | — |
 | `Session` | the better-auth session cookie (`better-auth.session_token`, `__Secure-` prefixed over https); on non-GET requests only when `Origin` is on the allowlist or the request carries `Sec-Fetch-Site: same-origin` (browsers omit `Origin` on same-origin non-CORS requests) | 401 `Unauthorized` (no or invalid session), 403 `Forbidden(origin)`, 403 `Forbidden(scope)` for any `Authorization` header |
-| `RequireScope(scope)` | the session cookie as above (same `Origin` / `Sec-Fetch-Site` rule on non-GET; a session holds every scope), **or** `Authorization: Bearer gmk_…` whose permissions include `scope` | 401 `Unauthorized` (invalid, expired or revoked key, or any non-`Bearer gmk_` `Authorization` header: no fall-through to the cookie), 403 `Forbidden(scope)` (the bearer lacks the scope), 403 `Forbidden(origin)` |
+| `RequireScope(scope)` | the session cookie as above (same `Origin` / `Sec-Fetch-Site` rule on non-GET; a session holds every scope), **or** `Authorization: Bearer gmk_…` whose permissions include `scope`, **or** (only on requests the `/mcp` endpoint dispatches) `Authorization: Bearer gmo_…`, an OAuth access token granted `scope` | 401 `Unauthorized` (invalid, expired or revoked key, or any non-`Bearer gmk_` `Authorization` header: no fall-through to the cookie), 403 `Forbidden(scope)` (the bearer lacks the scope), 403 `Forbidden(origin)` |
 
 Role middlewares run inside the credential middleware and read the `CurrentUser` it provided:
 
@@ -96,6 +96,8 @@ cookie), else the client address.
 | admin | `getUser` | GET | `/api/admin/users/:userId` | `RequireScope(platform:admin)` | platform:admin | `AdminOnly` | operator-api | 200 | 401 `Unauthorized`, 403 `Forbidden`, 404 `NotFound`, 429 `RateLimited`, 500 `InternalError` |
 | oauth | `workspaces` | GET | `/api/oauth/workspaces` | `Session` | — | — | — | 200 | 401 `Unauthorized`, 403 `Forbidden`, 500 `InternalError` |
 | oauth | `selectWorkspace` | PUT | `/api/oauth/workspace` | `Session` | — | — | — | 200 | 401 `Unauthorized`, 403 `Forbidden`, 404 `NotFound`, 500 `InternalError` |
+| oauth | `listConnections` | GET | `/api/oauth/connections` | `Session` | — | — | — | 200 | 401 `Unauthorized`, 403 `Forbidden`, 500 `InternalError` |
+| oauth | `revokeConnection` | DELETE | `/api/oauth/connections/:id` | `Session` | — | — | — | 204 | 401 `Unauthorized`, 403 `Forbidden`, 404 `NotFound`, 500 `InternalError` |
 
 ## Implementation rules (Phase 3)
 
@@ -129,6 +131,13 @@ Effect 4's `HttpApiBuilder` (verified on rc.112, unchanged on 4.0.3) runs securi
    insertion order, so the last one declared runs outermost. `.middleware(AdminOnly).middleware(RequireScope("platform:admin"))`
    is the only order in which the role check sees the `CurrentUser` the credential provided; the
    api.test.ts contract test asserts `securityIsOutermost` for every non-public endpoint.
+7. **OAuth access tokens are an MCP credential, not an API credential.** A `gmo_` bearer is verified by
+   `OAuthTokens` (`packages/auth/src/oauth-tokens.ts`) and accepted only when the request carries
+   `OAuthResource` in the handler's per-request context, which only the `/mcp` endpoint sets when it
+   dispatches a tool call; called directly, the API answers 401. The token must be for that resource,
+   unexpired and unrevoked, its client enabled, its approving session unexpired, and its user still a
+   member of the workspace the grant is pinned to. That workspace replaces the default one for the
+   request (`RequestContext.workspace`), so `WorkspaceRole` and the handlers see the pinned workspace.
 
 ## Decisions
 

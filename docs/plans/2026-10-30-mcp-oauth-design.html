@@ -62,6 +62,8 @@
   .progress { display: flex; gap: 3px; height: 8px; margin: .5rem 0 1rem; }
   .progress span { flex: 1; border-radius: 3px; background: var(--muted, #e6e8eb); transform-origin: left; }
   .progress span.active { background: var(--accent, #2458ac); }
+  .progress span.done { background: var(--success, #1e8e3e); }
+  .timeline li.done::before { background: var(--success, #1e8e3e); border-color: var(--success, #1e8e3e); }
 
   /* Risk grid: likelihood (rows) × impact (cols) */
   .risk-grid { display: grid; grid-template-columns: 5.5rem repeat(3, minmax(0, 1fr)); gap: 3px; font-size: .75rem; margin: .5rem 0; }
@@ -90,7 +92,7 @@
 </head>
 <body>
 <main>
-  <h1 class="reveal">OAuth for the remote MCP server <span class="badge">Approved design · spike done</span></h1>
+  <h1 class="reveal">OAuth for the remote MCP server <span class="badge">Implemented · in review</span></h1>
   <p class="meta reveal" style="--i:1">2026-10-30 · create-gmacko-app @ <code>crea-6-mcp-oauth</code> · <a href="https://tasks.gmac.io/gmacko/issue/CREA-6">CREA-6</a></p>
 
   <div class="callout reveal" style="--i:2"><strong>Decision:</strong> Serve a Streamable HTTP <code>/mcp</code> endpoint from the Worker, protected by better-auth's OAuth 2.1 provider. On a consent page the user pins the grant to <strong>one workspace</strong> and picks <strong>resource:action scopes</strong>. That scope vocabulary replaces read/write/delete/admin for API keys too, so each credential type is checked against the same catalog.</div>
@@ -197,46 +199,46 @@
   </details>
 
   <h2 class="reveal" style="--i:24">Phases (stacked PRs)</h2>
-  <div class="progress" role="img" aria-label="Phase 1 of 4 is next; none done">
-    <span class="active" style="--i:0"></span><span style="--i:1"></span><span style="--i:2"></span><span style="--i:3"></span>
+  <div class="progress" role="img" aria-label="All 4 phases done">
+    <span class="done" style="--i:0"></span><span class="done" style="--i:1"></span><span class="done" style="--i:2"></span><span class="done" style="--i:3"></span>
   </div>
   <ol class="timeline">
-    <li class="active reveal" style="--i:25"><div class="head"><h3>Phase 1 — Scope catalog and key migration</h3><span class="chip active">Next</span></div>
+    <li class="done reveal" style="--i:25"><div class="head"><h3>Phase 1 — Scope catalog and key migration</h3><span class="chip done">Done</span></div>
       <p class="muted">No new surface; effective access is preserved. Starts with the better-auth spike.</p>
       <details><summary>Tasks</summary><div class="table-scroll"><table>
         <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
         <tbody>
           <tr><td>Spike: OAuth provider capabilities, plus the better-auth 1.7.14 bump and the <code>account.issuer</code> drop it needs</td><td><code>pnpm-workspace.yaml</code>, <code>packages/db</code></td><td>Source review of 1.7.14; auth/db/api/web typecheck and tests, <code>check:fast</code></td><td><span class="chip done">Done</span></td></tr>
-          <tr><td>Scope catalog with a <code>grantable</code> flag</td><td><code>packages/domain/src/scopes.ts</code></td><td>Catalog invariant tests</td><td><span class="chip todo">Todo</span></td></tr>
-          <tr><td><code>RequireScope</code> replaces <code>SessionOrKey</code></td><td><code>packages/domain/src/security.ts</code>, <code>*/api.ts</code>, <code>packages/auth/src/middleware.ts</code></td><td>"Every endpoint declares one scope or is public/session" test; regenerate <code>api-auth-matrix</code></td><td><span class="chip todo">Todo</span></td></tr>
-          <tr><td>Key permission data migration</td><td><code>packages/db/drizzle</code></td><td><code>migrations.workers.test.ts</code> expansion cases</td><td><span class="chip todo">Todo</span></td></tr>
-          <tr><td>Scope picker for key creation and <code>create_api_key</code></td><td>apps/web settings, <code>packages/operator-core</code></td><td>Component test and operator-core test</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Scope catalog with a <code>grantable</code> flag</td><td><code>packages/domain/src/scopes.ts</code></td><td>Catalog invariant tests</td><td><span class="chip done">Done</span></td></tr>
+          <tr><td><code>RequireScope</code> replaces <code>SessionOrKey</code></td><td><code>packages/domain/src/security.ts</code>, <code>*/api.ts</code>, <code>packages/auth/src/middleware.ts</code></td><td>"Every endpoint declares one scope or is public/session" test; regenerate <code>api-auth-matrix</code></td><td><span class="chip done">Done</span></td></tr>
+          <tr><td>Key permission data migration</td><td><code>packages/db/drizzle</code></td><td><code>migrations.workers.test.ts</code> expansion cases</td><td><span class="chip done">Done</span></td></tr>
+          <tr><td>Scope picker for key creation and <code>create_api_key</code></td><td>apps/web settings, <code>packages/operator-core</code></td><td>Component test and operator-core test</td><td><span class="chip done">Done</span></td></tr>
         </tbody>
       </table></div></details></li>
-    <li class="reveal" style="--i:26"><div class="head"><h3>Phase 2 — Authorization server and consent</h3><span class="chip todo">Todo</span></div>
+    <li class="done reveal" style="--i:26"><div class="head"><h3>Phase 2 — Authorization server and consent</h3><span class="chip done">Done</span></div>
       <details><summary>Tasks</summary><div class="table-scroll"><table>
         <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
         <tbody>
-          <tr><td>OAuth provider plugin (opaque tokens, unauthenticated DCR, <code>/mcp</code> resource whose <code>allowedScopes</code> are the OAuth-grantable scopes) and its tables</td><td><code>packages/auth/src/index.ts</code>, <code>packages/db/src/auth-schema.ts</code></td><td>Workers test: register → authorize → token; a key-only scope fails with <code>invalid_scope</code></td><td><span class="chip todo">Todo</span></td></tr>
-          <tr><td>AS and protected-resource metadata</td><td><code>apps/web/src/server</code></td><td>Metadata shape test</td><td><span class="chip todo">Todo</span></td></tr>
-          <tr><td><code>/oauth/workspace</code> picker (stores <code>session.oauth_workspace_id</code> after a membership check) and <code>/oauth/consent</code> scope picker</td><td><code>apps/web/src/routes</code>, <code>packages/ui</code></td><td>Storybook stories, picker states, no-workspace case, deny, a forged non-member workspace refused</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>OAuth provider plugin (opaque tokens, unauthenticated DCR, <code>/mcp</code> resource whose <code>allowedScopes</code> are the OAuth-grantable scopes) and its tables</td><td><code>packages/auth/src/index.ts</code>, <code>packages/db/src/auth-schema.ts</code></td><td>Workers test: register → authorize → token; a key-only scope fails with <code>invalid_scope</code></td><td><span class="chip done">Done</span></td></tr>
+          <tr><td>AS and protected-resource metadata</td><td><code>apps/web/src/server</code></td><td>Metadata shape test</td><td><span class="chip done">Done</span></td></tr>
+          <tr><td><code>/oauth/workspace</code> picker (stores <code>session.oauth_workspace_id</code> after a membership check) and <code>/oauth/consent</code> scope picker</td><td><code>apps/web/src/routes</code>, <code>packages/ui</code></td><td>Storybook stories, picker states, no-workspace case, deny, a forged non-member workspace refused</td><td><span class="chip done">Done</span></td></tr>
         </tbody>
       </table></div></details></li>
-    <li class="reveal" style="--i:27"><div class="head"><h3>Phase 3 — /mcp and middleware</h3><span class="chip todo">Todo</span></div>
+    <li class="done reveal" style="--i:27"><div class="head"><h3>Phase 3 — /mcp and middleware</h3><span class="chip done">Done</span></div>
       <details><summary>Tasks</summary><div class="table-scroll"><table>
         <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
         <tbody>
-          <tr><td>Bearer scheme accepts OAuth tokens; workspace pin and membership check</td><td><code>packages/auth/src/middleware.ts</code>, <code>request-context.ts</code></td><td>Principal × scope × membership table test</td><td><span class="chip todo">Todo</span></td></tr>
-          <tr><td>Streamable HTTP <code>/mcp</code> over operator-core's in-process transport</td><td><code>apps/web/src/server</code>, <code>packages/operator-core</code></td><td>401 header, filtered <code>tools/list</code>, <code>isError</code> on a missing scope, PKCE/audience failures</td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Bearer scheme accepts OAuth tokens; workspace pin and membership check</td><td><code>packages/auth/src/middleware.ts</code>, <code>request-context.ts</code></td><td>Principal × scope × membership table test</td><td><span class="chip done">Done</span></td></tr>
+          <tr><td>Streamable HTTP <code>/mcp</code> over operator-core's in-process transport</td><td><code>apps/web/src/server</code>, <code>packages/operator-core</code></td><td>401 header, filtered <code>tools/list</code>, <code>isError</code> on a missing scope, PKCE/audience failures</td><td><span class="chip done">Done</span></td></tr>
         </tbody>
       </table></div></details></li>
-    <li class="reveal" style="--i:28"><div class="head"><h3>Phase 4 — Connected apps, docs, scaffolding</h3><span class="chip todo">Todo</span></div>
+    <li class="done reveal" style="--i:28"><div class="head"><h3>Phase 4 — Connected apps, docs, scaffolding</h3><span class="chip done">Done</span></div>
       <details><summary>Tasks</summary><div class="table-scroll"><table>
         <thead><tr><th>Task</th><th>Files</th><th>Verification</th><th>Status</th></tr></thead>
         <tbody>
-          <tr><td>Connected apps list and revoke</td><td>apps/web settings, <code>packages/domain/src/settings</code></td><td>Revoke makes the token fail with 401</td><td><span class="chip todo">Todo</span></td></tr>
-          <tr><td>Docs</td><td><code>docs/API_AUTH.md</code>, <code>README.md</code>, <code>AGENTS.md</code></td><td>Review</td><td><span class="chip todo">Todo</span></td></tr>
-          <tr><td>Scaffolding plus E2E smoke</td><td><code>packages/create-gmacko-app</code></td><td>MCP Inspector against <code>https://gmacko.localhost/mcp</code> under <code>pnpm dev</code></td><td><span class="chip todo">Todo</span></td></tr>
+          <tr><td>Connected apps list and revoke</td><td>apps/web settings, <code>packages/domain/src/settings</code></td><td>Revoke makes the token fail with 401</td><td><span class="chip done">Done</span></td></tr>
+          <tr><td>Docs</td><td><code>docs/API_AUTH.md</code>, <code>README.md</code>, <code>AGENTS.md</code></td><td>Review</td><td><span class="chip done">Done</span></td></tr>
+          <tr><td>Scaffolding plus E2E smoke</td><td><code>packages/create-gmacko-app</code></td><td>MCP Inspector against <code>https://gmacko.localhost/mcp</code> under <code>pnpm dev</code></td><td><span class="chip done">Done</span></td></tr>
         </tbody>
       </table></div></details></li>
   </ol>
@@ -256,11 +258,27 @@
     <p><strong>R4, anyone can register clients through DCR.</strong> Consent marks DCR clients as unverified and shows the redirect host. Registration goes through <code>RateLimit</code>, and admin scopes are never grantable.</p>
   </details>
 
+
+  <h2>As built: changes from the design</h2>
+  <div class="table-scroll"><table>
+    <thead><tr><th>Design said</th><th>Built</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Workspace pick on a <code>session</code> column</td><td><code>oauth_workspace_selection</code> table keyed by session</td><td>better-auth serves sessions from a 5-minute cookie cache, so a column could be read stale. The table is read fresh, and better-auth's own tables stay as its CLI generates them.</td></tr>
+      <tr><td>Legacy <code>admin</code> key → <code>api_keys:manage</code> + <code>admin</code></td><td><code>admin</code> → every scope; platform admin is <code>platform:admin</code></td><td><code>admin</code> implied every permission before, so anything less would narrow existing keys. The rename keeps every scope in <code>resource:action</code> form.</td></tr>
+      <tr><td>One unmapped settings POST</td><td><code>acceptInvite</code> → <code>workspace:join</code>, key-only</td><td>A token pinned to one workspace should not join others.</td></tr>
+      <tr><td>Plugin JSON columns as generated (<code>mode: "json"</code>)</td><td>Plain <code>text</code></td><td>The drizzle adapter already serialises them, so json mode double-encoded them (found by the flow test). The DDL is unchanged.</td></tr>
+      <tr><td>Audience bound to <code>/mcp</code></td><td>Also: <code>gmo_</code> tokens are refused on the REST API unless <code>/mcp</code> dispatched the request</td><td>Enforced through the handler's per-request context, which a caller cannot set.</td></tr>
+      <tr><td>Rate limit per principal</td><td>Token, revoke and introspect keyed by OAuth client + IP</td><td>Hosted MCP clients call from a few shared IPs for all their users.</td></tr>
+      <tr><td>DCR as designed</td><td><code>application_type</code> inferred; registered clients linked to <code>/mcp</code></td><td>Without these, Claude Code and Cursor loopback redirects were rejected, and every authorize failed with <code>invalid_target</code>.</td></tr>
+      <tr><td>Scaffolder unchanged</td><td><code>operator-core</code> kept whenever the web app is</td><td><code>/mcp</code> serves its tools. <code>--operator-lane</code> now covers only the CLI and the stdio server.</td></tr>
+    </tbody>
+  </table></div>
+
   <h2>Verification</h2>
   <p>Acceptance criteria are on <a href="https://tasks.gmac.io/gmacko/issue/CREA-6">CREA-6</a>. Each PR must pass <code>pnpm check:fast</code>, <code>check:standards</code>, and the workers tests. The final one adds an MCP Inspector run through DCR, sign-in, consent, and token against local dev.</p>
 
   <h2>Open questions</h2>
-  <p>None blocking. The spike replaced the custom <code>oauth_grant_workspace</code> table with the plugin's <code>referenceId</code>, and chose opaque tokens (no JWKS keys to manage, immediate revocation) because <code>/mcp</code> verifies in the same Worker as the authorization server.</p>
+  <p>None blocking. Follow-ups worth their own issue: CORS for browser-only MCP clients, and a higher registration limit if one hosted client registers for many users.</p>
 </main>
 </body>
 </html>

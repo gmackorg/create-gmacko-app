@@ -1224,7 +1224,12 @@ function pruneOptionalLanes(targetDir: string, options: CliOptions): void {
   }
 
   if (!options.operatorLane) {
-    fs.removeSync(path.join(targetDir, "packages/operator-core"));
+    // `packages/operator-core` is the tool set the web app's remote `/mcp`
+    // endpoint serves, so it stays whenever apps/web does; the lane itself
+    // is the CLI and the stdio MCP server.
+    if (!options.platforms.web) {
+      fs.removeSync(path.join(targetDir, "packages/operator-core"));
+    }
     fs.removeSync(path.join(targetDir, "packages/api-cli"));
     fs.removeSync(path.join(targetDir, "packages/mcp-server"));
     // The template root carries the lane's scripts; without the packages

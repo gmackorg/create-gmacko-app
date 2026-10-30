@@ -133,10 +133,14 @@ describe("create-gmacko-app scaffold", () => {
       for (const file of EXPECTED_FILES.core) {
         expect(fileExists(result.appPath, file)).toBe(true);
       }
-      // The operator lane is opt-in: no packages and no root scripts for it.
+      // The operator lane is opt-in: no CLI, no stdio MCP server and no root
+      // scripts for it. operator-core stays: the web app's /mcp serves it.
       expect(
         fileExists(result.appPath, "packages/operator-core/package.json"),
-      ).toBe(false);
+      ).toBe(true);
+      expect(
+        fileExists(result.appPath, "apps/web/src/server/mcp.ts"),
+      ).toBe(true);
       expect(fileExists(result.appPath, "packages/api-cli/package.json")).toBe(
         false,
       );

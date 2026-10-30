@@ -69,6 +69,7 @@ export const queryKeys = {
   oauth: {
     all: oauth,
     workspaces: () => [...oauth, "workspaces"] as const,
+    listConnections: () => [...oauth, "listConnections"] as const,
   },
   health: {
     all: health,

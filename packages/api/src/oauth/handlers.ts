@@ -3,6 +3,7 @@ import { Effect, Layer } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 
 import { requestContext, withUser } from "../boundary";
+import { OAuthConnections } from "./connections";
 import { OAuthWorkspaces } from "./service";
 
 /**
@@ -22,8 +23,10 @@ const sessionId = Effect.flatMap(
 );
 
 export const OAuthHandlers = HttpApiBuilder.group(AppApi, "oauth", (handlers) =>
-  Effect.map(OAuthWorkspaces, (workspaces) =>
-    handlers
+  Effect.gen(function* () {
+    const workspaces = yield* OAuthWorkspaces;
+    const connections = yield* OAuthConnections;
+    return handlers
       .handle("workspaces", () =>
         withUser((user) =>
           Effect.flatMap(sessionId, (id) => workspaces.choice(user.id, id)),
@@ -35,6 +38,14 @@ export const OAuthHandlers = HttpApiBuilder.group(AppApi, "oauth", (handlers) =>
             workspaces.select(user.id, id, payload.workspaceId),
           ),
         ),
-      ),
-  ),
-).pipe(Layer.provide(OAuthWorkspaces.layer));
+      )
+      .handle("listConnections", () =>
+        withUser((user) => connections.list(user.id)),
+      )
+      .handle("revokeConnection", ({ params }) =>
+        withUser((user) => connections.revoke(user.id, params.id)),
+      );
+  }),
+).pipe(
+  Layer.provide(Layer.mergeAll(OAuthWorkspaces.layer, OAuthConnections.layer)),
+);

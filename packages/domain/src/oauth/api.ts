@@ -1,8 +1,13 @@
+import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 
 import { NotFound } from "../errors";
 import { Session } from "../security";
-import { OAuthWorkspaceChoice, SelectOAuthWorkspace } from "./models";
+import {
+  OAuthConnection,
+  OAuthWorkspaceChoice,
+  SelectOAuthWorkspace,
+} from "./models";
 
 /**
  * The browser half of authorizing an OAuth client (the remote MCP
@@ -14,6 +19,10 @@ import { OAuthWorkspaceChoice, SelectOAuthWorkspace } from "./models";
  * pinned to (`oauth_workspace_selection`, keyed by the session); a workspace
  * the caller is not a member of is `NotFound`, so the endpoint never
  * confirms that someone else's workspace exists.
+ *
+ * `listConnections` / `revokeConnection` back "Connected apps" in Settings:
+ * revoking deletes the consent and revokes every access and refresh token
+ * issued under it, so the app has to be connected (and consented) again.
  */
 export class OAuthApi extends HttpApiGroup.make("oauth")
   .add(
@@ -25,6 +34,17 @@ export class OAuthApi extends HttpApiGroup.make("oauth")
     HttpApiEndpoint.put("selectWorkspace", "/workspace", {
       payload: SelectOAuthWorkspace,
       success: OAuthWorkspaceChoice,
+      error: NotFound,
+    }).middleware(Session),
+  )
+  .add(
+    HttpApiEndpoint.get("listConnections", "/connections", {
+      success: Schema.Array(OAuthConnection),
+    }).middleware(Session),
+  )
+  .add(
+    HttpApiEndpoint.delete("revokeConnection", "/connections/:id", {
+      params: { id: Schema.String },
       error: NotFound,
     }).middleware(Session),
   )

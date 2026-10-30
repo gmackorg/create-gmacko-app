@@ -29,7 +29,7 @@ const PUBLIC = [
 ];
 
 describe("AppApi", () => {
-  it("declares 37 endpoints: auth 2, posts 4, settings 14, admin 11, oauth 2, health 4", () => {
+  it("declares 39 endpoints: auth 2, posts 4, settings 14, admin 11, oauth 4, health 4", () => {
     const byGroup: Record<string, number> = {};
     for (const row of rows) byGroup[row.group] = (byGroup[row.group] ?? 0) + 1;
     expect(byGroup).toEqual({
@@ -37,10 +37,10 @@ describe("AppApi", () => {
       posts: 4,
       settings: 14,
       admin: 11,
-      oauth: 2,
+      oauth: 4,
       health: 4,
     });
-    expect(rows).toHaveLength(37);
+    expect(rows).toHaveLength(39);
   });
 
   it("prefixes everything with /api except the ForgeGraph probe", () => {

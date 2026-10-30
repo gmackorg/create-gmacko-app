@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { RouterLink } from "~/components/router-link";
 import { ApiKeysSection } from "~/components/settings/api-keys";
 import { BillingSections } from "~/components/settings/billing";
+import { ConnectedAppsSection } from "~/components/settings/connected-apps";
 import { DeleteAccountSection } from "~/components/settings/delete-account";
 import { PairDeviceSection } from "~/components/settings/pair-device";
 import { PreferencesSection } from "~/components/settings/preferences";
@@ -30,6 +31,7 @@ export const Route = createFileRoute("/settings")({
     await Promise.all([
       queryClient.prefetchQuery(queries.settings.getPreferences()),
       queryClient.prefetchQuery(queries.settings.listApiKeys()),
+      queryClient.prefetchQuery(queries.oauth.listConnections()),
       queryClient.prefetchQuery(queries.settings.billingOverview()),
       workspace.canManageWorkspace && workspace.workspace
         ? queryClient.prefetchQuery(queries.settings.listInvites())
@@ -79,6 +81,9 @@ function SettingsPage() {
         <PairDeviceSection />
         <Suspense fallback={<SettingsSkeleton title="API Keys" />}>
           <ApiKeysSection />
+        </Suspense>
+        <Suspense fallback={<SettingsSkeleton title="Connected apps" />}>
+          <ConnectedAppsSection />
         </Suspense>
         <Suspense fallback={<SettingsSkeleton title="Workspace" />}>
           <WorkspaceSection />

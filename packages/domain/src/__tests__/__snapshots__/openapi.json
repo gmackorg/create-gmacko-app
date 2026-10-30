@@ -2192,6 +2192,133 @@
         }
       }
     },
+    "/api/oauth/connections": {
+      "get": {
+        "tags": [
+          "oauth"
+        ],
+        "operationId": "oauth.listConnections",
+        "parameters": [],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OAuthConnectionEncoded"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/oauth/connections/{id}": {
+      "delete": {
+        "tags": [
+          "oauth"
+        ],
+        "operationId": "oauth.revokeConnection",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "<No Content>"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health/live": {
       "get": {
         "tags": [
@@ -2758,7 +2885,8 @@
               "invite",
               "waitlistEntry",
               "apiKey",
-              "workspace"
+              "workspace",
+              "oauthConnection"
             ]
           },
           "id": {
@@ -2769,6 +2897,85 @@
           "_tag",
           "resource",
           "id"
+        ],
+        "additionalProperties": false
+      },
+      "OAuthConnectionEncoded": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "clientId": {
+            "type": "string"
+          },
+          "clientName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OAuthConnectionWorkspaceEncoded"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "posts:write",
+                "posts:delete",
+                "workspace:read",
+                "workspace:invite",
+                "workspace:join",
+                "billing:read",
+                "preferences:read",
+                "preferences:write",
+                "profile:read",
+                "api_keys:read",
+                "api_keys:manage",
+                "platform:admin"
+              ]
+            }
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "clientId",
+          "clientName",
+          "workspace",
+          "scopes",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "OAuthConnectionWorkspaceEncoded": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
         ],
         "additionalProperties": false
       },

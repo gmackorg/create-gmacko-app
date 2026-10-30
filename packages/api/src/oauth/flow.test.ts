@@ -12,6 +12,7 @@ import {
   mcpResource,
   OAUTH_ACCESS_TOKEN_PREFIX,
 } from "@gmacko/auth/oauth-provider";
+import { OAuthTokens } from "@gmacko/auth/oauth-tokens";
 import { Auth } from "@gmacko/auth/service";
 import { Database } from "@gmacko/db";
 import { oauthAccessToken } from "@gmacko/db/schema";
@@ -106,6 +107,74 @@ const authorize = async (
         resource: mcpResource(api.baseUrl),
       })}`,
       { headers: { cookie: person.cookie } },
+    ),
+  );
+
+/** The whole flow, answering the access token: pick `workspaceId`, consent to `scope`. */
+const connect = async (
+  person: TestUser,
+  workspaceId: string,
+  scope: string,
+): Promise<string> => {
+  const clientId = await register();
+  const { verifier, challenge } = await pkce();
+  const toPicker = await authorize(person, clientId, challenge, scope);
+  await api.call(
+    (c) =>
+      c.oauth.selectWorkspace({
+        payload: new SelectOAuthWorkspace({
+          workspaceId: WorkspaceId.make(workspaceId),
+        }),
+      }),
+    { cookie: person.cookie },
+  );
+  const toConsent = await redirectOf(
+    await authFetch("/api/auth/oauth2/continue", {
+      method: "POST",
+      headers: browser(person),
+      body: JSON.stringify({
+        postLogin: true,
+        oauth_query: toPicker.search.slice(1),
+      }),
+    }),
+  );
+  const toClient = await redirectOf(
+    await authFetch("/api/auth/oauth2/consent", {
+      method: "POST",
+      headers: browser(person),
+      body: JSON.stringify({
+        accept: true,
+        scope,
+        oauth_query: toConsent.search.slice(1),
+      }),
+    }),
+  );
+  const tokens: { access_token: string } = await (
+    await authFetch("/api/auth/oauth2/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code: toClient.searchParams.get("code") ?? "",
+        redirect_uri: REDIRECT_URI,
+        client_id: clientId,
+        code_verifier: verifier,
+        resource: mcpResource(api.baseUrl),
+      }),
+    })
+  ).json();
+  return tokens.access_token;
+};
+
+/** Whether `bearer` still authenticates for `/mcp`. */
+const authenticates = (bearer: string) =>
+  api.run(
+    Effect.flatMap(OAuthTokens, (tokens) =>
+      tokens.authenticate(bearer, mcpResource(api.baseUrl)),
+    ).pipe(
+      Effect.provide(OAuthTokens.layer),
+      Effect.as(true),
+      Effect.catchTag("Unauthorized", () => Effect.succeed(false)),
     ),
   );
 
@@ -251,5 +320,51 @@ describe("OAuth authorization-code flow for /mcp", () => {
     const { challenge } = await pkce();
     const next = await authorize(person, clientId, challenge, "profile:read");
     expect(next.pathname).toBe("/oauth/workspace");
+  });
+});
+
+describe("Connected apps (oauth.listConnections / oauth.revokeConnection)", () => {
+  it("lists the connection and revoking it ends its tokens", async () => {
+    const person = await api.createUser();
+    const picked = await api.createWorkspace({ owner: person, name: "Picked" });
+    const token = await connect(
+      person,
+      picked.id,
+      "profile:read offline_access",
+    );
+    expect(await authenticates(token)).toBe(true);
+
+    const [connection, ...rest] = await api.call(
+      (c) => c.oauth.listConnections(),
+      { cookie: person.cookie },
+    );
+    expect(rest).toEqual([]);
+    expect(connection).toMatchObject({
+      clientName: "Test MCP client",
+      workspace: { id: picked.id, name: "Picked" },
+      scopes: ["profile:read"],
+    });
+    if (connection === undefined) throw new Error("no connection");
+
+    // Someone else cannot revoke it, nor learn that it exists.
+    const stranger = await api.createUser();
+    const refused = await api.failure(
+      (c) => c.oauth.revokeConnection({ params: { id: connection.id } }),
+      { cookie: stranger.cookie },
+    );
+    expect(refused).toMatchObject({
+      _tag: "NotFound",
+      resource: "oauthConnection",
+    });
+    expect(await authenticates(token)).toBe(true);
+
+    await api.call(
+      (c) => c.oauth.revokeConnection({ params: { id: connection.id } }),
+      { cookie: person.cookie },
+    );
+    expect(await authenticates(token)).toBe(false);
+    await expect(
+      api.call((c) => c.oauth.listConnections(), { cookie: person.cookie }),
+    ).resolves.toEqual([]);
   });
 });

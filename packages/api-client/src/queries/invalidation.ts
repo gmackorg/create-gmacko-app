@@ -44,6 +44,7 @@ export const invalidation = {
   "settings.revokeApiKey": [k.settings.listApiKeys()],
   "settings.deleteAccount": [CLEAR_ALL],
   "oauth.selectWorkspace": [k.oauth.workspaces()],
+  "oauth.revokeConnection": [k.oauth.listConnections()],
   "admin.updateLaunchControls": [
     k.settings.launchState(),
     k.admin.launchControls(),

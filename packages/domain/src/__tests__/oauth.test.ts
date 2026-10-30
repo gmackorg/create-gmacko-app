@@ -58,6 +58,24 @@ describe("OAuthApi", () => {
         success: 200,
         errors: ["401 Unauthorized", "403 Forbidden", "404 NotFound"],
       },
+      {
+        id: "listConnections",
+        method: "GET",
+        path: "/oauth/connections",
+        credential: "Session",
+        roles: [],
+        success: 200,
+        errors: ["401 Unauthorized", "403 Forbidden"],
+      },
+      {
+        id: "revokeConnection",
+        method: "DELETE",
+        path: "/oauth/connections/:id",
+        credential: "Session",
+        roles: [],
+        success: 204,
+        errors: ["401 Unauthorized", "403 Forbidden", "404 NotFound"],
+      },
     ]);
     expect(
       new SelectOAuthWorkspace({ workspaceId: WorkspaceId.make("w1") })

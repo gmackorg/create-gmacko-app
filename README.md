@@ -69,7 +69,7 @@ packages
   ├─ auth          better-auth (magic link, GitHub/Google/Apple, Expo plugin, scoped API keys)
   ├─ config        Integration flags (single source of truth)
   ├─ ui            UI components (shadcn) and Storybook
-  ├─ operator-core Shared operator logic over @gmacko/api-client (operator lane)
+  ├─ operator-core Operator tools over @gmacko/api-client (served by /mcp; CLI + stdio MCP in the operator lane)
   ├─ api-cli       Operator CLI (operator lane)
   ├─ mcp-server    Operator MCP server (operator lane)
   ├─ logging       Effect logger over JSON console output
@@ -182,6 +182,8 @@ If you enable the optional SaaS bootstrap pack during scaffolding, the next Clau
 2. `/autoplan` if your user-level gstack install provides it
 3. `/design-consultation`
 4. the local follow-up skills documented in `docs/ai/BOOTSTRAP_PLAYBOOK.md`
+
+The web app serves a remote MCP endpoint at `/mcp`, protected by its own OAuth 2.1 provider. MCP clients connect with sign-in, a workspace pick and per-scope consent; see [`docs/MCP.md`](./docs/MCP.md).
 
 If you enable the optional operator lane (`--operator-lane`), generated repos also expose:
 

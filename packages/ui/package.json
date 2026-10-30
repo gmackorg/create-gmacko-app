@@ -8,6 +8,7 @@
     "./api-key-row": "./src/api-key-row.tsx",
     "./api-key-secret": "./src/api-key-secret.tsx",
     "./button": "./src/button.tsx",
+    "./connected-app-row": "./src/connected-app-row.tsx",
     "./dropdown-menu": "./src/dropdown-menu.tsx",
     "./field": "./src/field.tsx",
     "./input": "./src/input.tsx",
