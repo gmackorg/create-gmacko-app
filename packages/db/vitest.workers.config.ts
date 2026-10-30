@@ -39,6 +39,10 @@ export default defineConfig(async () => {
     ],
     test: {
       include: ["src/**/*.workers.test.ts"],
+      // The seed and migration cases apply SQL files to a Miniflare D1. They
+      // finish in well under a second on an idle machine but take ~19s on a
+      // CI runner shared with the Playwright jobs, past vitest's 5s default.
+      testTimeout: 60_000,
       // Migration setup crosses workerd RPC and shares CI with the remote rehearsal.
       hookTimeout: 30_000,
     },
